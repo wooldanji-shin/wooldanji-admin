@@ -1,5 +1,59 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 100;
+  src: url("/assets/Pretendard-Thin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 200;
+  src: url("/assets/Pretendard-ExtraLight.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 300;
+  src: url("/assets/Pretendard-Light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 400;
+  src: url("/assets/Pretendard-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 500;
+  src: url("/assets/Pretendard-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 600;
+  src: url("/assets/Pretendard-SemiBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 700;
+  src: url("/assets/Pretendard-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 800;
+  src: url("/assets/Pretendard-ExtraBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 900;
+  src: url("/assets/Pretendard-Black.woff2") format("woff2");
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -8,8 +62,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Pretendard";
+  --font-mono: "Pretendard";
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +76,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Pretendard", sans-serif;
 }
