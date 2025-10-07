@@ -1,16 +1,19 @@
 'use client';
 
-import { getStoredUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 
 export function AdminHeader({ title }: { title: string }) {
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
-    const user = getStoredUser();
-    if (user) {
-      setUserName(user.name);
+    async function loadUser() {
+      const user = await getCurrentUser();
+      if (user) {
+        setUserName(user.name);
+      }
     }
+    loadUser();
   }, []);
 
   return (

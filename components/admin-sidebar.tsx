@@ -6,15 +6,16 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Users,
-  HardDrive,
   LogOut,
   Settings,
   ChevronDown,
   Bell,
   Shield,
   Palette,
+  Building2,
+  UserCog,
 } from 'lucide-react';
-import { clearStoredUser } from '@/lib/auth';
+import { logout } from '@/lib/auth';
 import { useState } from 'react';
 
 const navigation = [
@@ -24,14 +25,19 @@ const navigation = [
     icon: LayoutDashboard,
   },
   {
+    name: '아파트 관리',
+    href: '/admin/apartments',
+    icon: Building2,
+  },
+  {
     name: '회원관리',
     href: '/admin/users',
     icon: Users,
   },
   {
-    name: '기기등록',
-    href: '/admin/devices',
-    icon: HardDrive,
+    name: '관리자 관리',
+    href: '/admin/managers',
+    icon: UserCog,
   },
 ];
 
@@ -62,9 +68,10 @@ export function AdminSidebar() {
   const router = useRouter();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const handleLogout = () => {
-    clearStoredUser();
+  const handleLogout = async () => {
+    await logout();
     router.push('/login');
+    router.refresh();
   };
 
   return (
@@ -72,7 +79,7 @@ export function AdminSidebar() {
       {/* Logo/Header */}
       <div className='flex h-16 items-center border-b border-sidebar-border px-6'>
         <h1 className='text-xl font-bold text-sidebar-foreground'>
-          Admin System
+          Wooldanji
         </h1>
       </div>
 

@@ -13,6 +13,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" async />
+      </head>
       <body className="antialiased">
         {children}
       </body>

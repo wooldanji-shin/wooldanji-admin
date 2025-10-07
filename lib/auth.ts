@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/client';
 
 export interface User {
   id: string;
@@ -5,48 +6,43 @@ export interface User {
   name: string;
 }
 
-// Simple in-memory auth for demo (replace with real auth later)
-const DEMO_USER = {
-  email: 'admin@example.com',
-  password: 'admin123',
-  id: '1',
-  name: '관리자',
-};
-
 export async function login(
   email: string,
   password: string
 ): Promise<User | null> {
-  // Simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  const supabase = createClient();
 
-  if (email === DEMO_USER.email && password === DEMO_USER.password) {
-    return {
-      id: DEMO_USER.id,
-      email: DEMO_USER.email,
-      name: DEMO_USER.name,
-    };
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return null;
   }
 
-  return null;
+  return {
+    id: data.user.id,
+    email: data.user.email || '',
+    name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || '관리자',
+  };
 }
 
 export async function logout(): Promise<void> {
-  // Simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  const supabase = createClient();
+  await supabase.auth.signOut();
 }
 
-export function getStoredUser(): User | null {
-  if (typeof window === 'undefined') return null;
+export async function getCurrentUser(): Promise<User | null> {
+  const supabase = createClient();
 
-  const stored = localStorage.getItem('admin_user');
-  return stored ? JSON.parse(stored) : null;
-}
+  const { data: { user } } = await supabase.auth.getUser();
 
-export function storeUser(user: User): void {
-  localStorage.setItem('admin_user', JSON.stringify(user));
-}
+  if (!user) return null;
 
-export function clearStoredUser(): void {
-  localStorage.removeItem('admin_user');
+  return {
+    id: user.id,
+    email: user.email || '',
+    name: user.user_metadata?.name || user.email?.split('@')[0] || '관리자',
+  };
 }

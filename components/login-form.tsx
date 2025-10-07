@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { login, storeUser } from '@/lib/auth';
+import { login } from '@/lib/auth';
 import { Lock, Mail } from 'lucide-react';
 
 export function LoginForm() {
@@ -33,8 +33,8 @@ export function LoginForm() {
       const user = await login(email, password);
 
       if (user) {
-        storeUser(user);
         router.push('/admin/dashboard');
+        router.refresh();
       } else {
         setError('이메일 또는 비밀번호가 올바르지 않습니다.');
       }
@@ -116,9 +116,6 @@ export function LoginForm() {
             {loading ? '로그인 중...' : '로그인'}
           </Button>
 
-          <div className='text-xs text-muted-foreground text-center mt-4'>
-            데모: admin@example.com / admin123
-          </div>
         </form>
       </CardContent>
     </Card>
