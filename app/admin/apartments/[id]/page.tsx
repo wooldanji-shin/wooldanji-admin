@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -104,11 +104,12 @@ const PLACE_OPTIONS = [
 ];
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function ApartmentDetailPage({ params }: PageProps) {
   const router = useRouter();
+  const { id } = use(params);
   const [apartment, setApartment] = useState<Apartment | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -126,14 +127,14 @@ export default function ApartmentDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     fetchApartmentDetail();
-  }, [params.id]);
+  }, [id]);
 
   const fetchApartmentDetail = async () => {
     try {
       // TODO: Supabase 연동
       // 임시 데이터
       setApartment({
-        id: params.id,
+        id,
         name: '동부아파트',
         address: '관악구 신원로 26',
         detailAddress: '101동 옆',

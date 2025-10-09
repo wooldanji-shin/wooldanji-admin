@@ -197,11 +197,12 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
         .single();
 
       if (apartmentError) throw apartmentError;
+      if (!apartmentData) throw new Error('Apartment not found');
 
       const formattedApartment: ApartmentDetails = {
         id: apartmentData.id,
         name: apartmentData.name,
-        buildings: (apartmentData.apartment_buildings || []).map((b: any) => ({
+        buildings: ((apartmentData as any).apartment_buildings || []).map((b: any) => ({
           id: b.id,
           buildingNumber: b.buildingNumber,
           lines: (b.apartment_lines || []).map((l: any) => ({

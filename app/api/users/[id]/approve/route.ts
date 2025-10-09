@@ -3,9 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
@@ -47,7 +48,7 @@ export async function PUT(
     const { data, error } = await supabase
       .from('user')
       .update({ approvalStatus: status })
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 
@@ -64,7 +65,7 @@ export async function PUT(
       const { data: existingRole } = await supabase
         .from('user_roles')
         .select('id')
-        .eq('userId', params.id)
+        .eq('userId', id)
         .eq('role', 'APP_USER')
         .single();
 
@@ -72,7 +73,7 @@ export async function PUT(
         await supabase
           .from('user_roles')
           .insert({
-            userId: params.id,
+            userId: id,
             role: 'APP_USER'
           });
       }
