@@ -103,7 +103,11 @@ const PLACE_OPTIONS = [
   '후문',
 ];
 
-export default function ApartmentDetailPage({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: { id: string };
+}
+
+export default function ApartmentDetailPage({ params }: PageProps) {
   const router = useRouter();
   const [apartment, setApartment] = useState<Apartment | null>(null);
   const [loading, setLoading] = useState(true);
