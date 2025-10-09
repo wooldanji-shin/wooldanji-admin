@@ -106,7 +106,7 @@ interface ApartmentDetails {
 
 interface AdminScope {
   id: string;
-  scope_level: 'APARTMENT' | 'BUILDING' | 'LINE';
+  scopeLevel: 'APARTMENT' | 'BUILDING' | 'LINE';
   apartmentId: string | null;
   buildingId: string | null;
   lineId: string | null;
@@ -246,7 +246,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
         .from('admin_scopes')
         .select(`
           id,
-          scope_level,
+          scopeLevel,
           apartmentId,
           buildingId,
           lineId,
@@ -460,21 +460,21 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
   // 아파트 전체 관리자 가져오기
   const getApartmentAdmins = () => {
     return adminScopes.filter(scope =>
-      scope.scope_level === 'APARTMENT' && scope.apartmentId === apartmentId
+      scope.scopeLevel === 'APARTMENT' && scope.apartmentId === apartmentId
     );
   };
 
   // 특정 동의 관리자 가져오기
   const getBuildingAdmins = (buildingId: string) => {
     return adminScopes.filter(scope =>
-      scope.scope_level === 'BUILDING' && scope.buildingId === buildingId
+      scope.scopeLevel === 'BUILDING' && scope.buildingId === buildingId
     );
   };
 
   // 특정 라인의 관리자 가져오기
   const getLineAdmins = (lineId: string) => {
     return adminScopes.filter(scope =>
-      scope.scope_level === 'LINE' && scope.lineId === lineId
+      scope.scopeLevel === 'LINE' && scope.lineId === lineId
     );
   };
 

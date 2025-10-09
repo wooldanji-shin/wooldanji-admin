@@ -71,12 +71,12 @@
 | apartmentId | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE** (NULL 가능) |
 | buildingId  | uuid        | **FK** → `apartment_buildings.id` **ON DELETE CASCADE** (NULL 가능) |
 | lineId      | uuid        | **FK** → `apartment_lines.id` **ON DELETE CASCADE** (NULL 가능) |
-| scope_level | text        | `APARTMENT` \| `BUILDING` \| `LINE` *(필요 시 `REGION`/`LINE_PLACE` 등 확장)* |
+| scopeLevel | text        | `APARTMENT` \| `BUILDING` \| `LINE` *(필요 시 `REGION`/`LINE_PLACE` 등 확장)* |
 
 > **제약조건**:
-> - `CHECK (scope_level IN ('APARTMENT', 'BUILDING', 'LINE'))`
-> - `CHECK` (scope_level에 따라 필수 FK NOT NULL)
-> - `UNIQUE (userId, scope_level, apartmentId, buildingId, lineId)`
+> - `CHECK (scopeLevel IN ('APARTMENT', 'BUILDING', 'LINE'))`
+> - `CHECK` (scopeLevel에 따라 필수 FK NOT NULL)
+> - `UNIQUE (userId, scopeLevel, apartmentId, buildingId, lineId)`
 > - **ON DELETE CASCADE**: 사용자나 관리 대상(아파트/동/라인) 삭제 시 관리 권한도 함께 삭제
 
 ---

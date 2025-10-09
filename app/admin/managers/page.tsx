@@ -69,7 +69,7 @@ interface Manager {
 
 interface AdminScope {
   id: string;
-  scope_level: 'APARTMENT' | 'BUILDING' | 'LINE';
+  scopeLevel: 'APARTMENT' | 'BUILDING' | 'LINE';
   apartmentId: string | null;
   buildingId: string | null;
   lineId: string | null;
@@ -131,7 +131,7 @@ export default function ManagersPage() {
           user_roles!inner(role),
           admin_scopes(
             id,
-            scope_level,
+            scopeLevel,
             apartmentId,
             buildingId,
             lineId,
@@ -242,7 +242,7 @@ export default function ManagersPage() {
     // 기존 권한 정보 로드
     if (manager.admin_scopes && manager.admin_scopes.length > 0) {
       const scope = manager.admin_scopes[0];
-      setScopeLevel(scope.scope_level);
+      setScopeLevel(scope.scopeLevel);
       if (scope.apartmentId) setSelectedApartment(scope.apartmentId);
       if (scope.buildingId) setSelectedBuilding(scope.buildingId);
       if (scope.lineId) setSelectedLine(scope.lineId);
@@ -269,7 +269,7 @@ export default function ManagersPage() {
       // 새 권한 추가
       const scopeData: any = {
         userId: selectedManager.id,
-        scope_level: scopeLevel,
+        scopeLevel: scopeLevel,
         apartmentId: selectedApartment || null,
         buildingId: null,
         lineId: null,
@@ -332,21 +332,21 @@ export default function ManagersPage() {
     const building = scope.apartment_buildings;
     const line = scope.apartment_lines;
 
-    if (scope.scope_level === 'APARTMENT' && apartment) {
+    if (scope.scopeLevel === 'APARTMENT' && apartment) {
       return (
         <div className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm">{apartment.name} 전체</span>
         </div>
       );
-    } else if (scope.scope_level === 'BUILDING' && apartment && building) {
+    } else if (scope.scopeLevel === 'BUILDING' && apartment && building) {
       return (
         <div className="flex items-center gap-2">
           <Home className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm">{apartment.name} {building.buildingNumber}동</span>
         </div>
       );
-    } else if (scope.scope_level === 'LINE' && apartment && building && line) {
+    } else if (scope.scopeLevel === 'LINE' && apartment && building && line) {
       return (
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-muted-foreground" />
