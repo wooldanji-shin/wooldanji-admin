@@ -142,33 +142,60 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   };
 
   const handleAddLine = async (buildingId: string) => {
-    const lineNumber = newLines[buildingId];
-    if (!lineNumber || !lineNumber.trim()) return;
+    const lineInput = newLines[buildingId];
+    if (!lineInput || !lineInput.trim()) return;
 
-    const lineNum = parseInt(lineNumber);
-    if (isNaN(lineNum)) {
-      alert('올바른 라인 번호를 입력하세요.');
+    // 쉼표로 구분된 라인 번호들을 파싱
+    const lineNumbers = lineInput
+      .split(',')
+      .map(l => l.trim())
+      .filter(l => l)
+      .map(l => parseInt(l))
+      .filter(l => !isNaN(l));
+
+    if (lineNumbers.length === 0) {
+      alert('올바른 라인 번호를 입력하세요. (예: 1,2,3,4,5)');
+      return;
+    }
+
+    // 현재 동의 기존 라인 번호들
+    const building = buildings.find(b => b.id === buildingId);
+    if (!building) return;
+
+    const existingLineNumbers = building.lines.map(l => l.line);
+
+    // 중복 체크
+    const duplicates = lineNumbers.filter(num => existingLineNumbers.includes(num));
+    if (duplicates.length > 0) {
+      alert(`${duplicates.join(', ')}라인은 이미 존재합니다.`);
       return;
     }
 
     try {
-      const { data: newLine, error: lineError } = await supabase
+      // 여러 라인을 한번에 추가
+      const linesToInsert = lineNumbers.map(num => ({
+        buildingId,
+        line: num,
+      }));
+
+      const { data: insertedLines, error: lineError } = await supabase
         .from('apartment_lines')
-        .insert({
-          buildingId,
-          line: lineNum,
-        })
-        .select()
-        .single();
+        .insert(linesToInsert)
+        .select();
 
       if (lineError) throw lineError;
 
       // 로컬 상태 업데이트
+      const addedLines = (insertedLines as any[]).map(l => ({
+        id: l.id,
+        line: l.line,
+      }));
+
       setBuildings(buildings.map(b =>
         b.id === buildingId
           ? {
               ...b,
-              lines: [...b.lines, { id: (newLine as any).id, line: lineNum }].sort((a, b) => a.line - b.line),
+              lines: [...b.lines, ...addedLines].sort((a, b) => a.line - b.line),
             }
           : b
       ));
@@ -208,6 +235,36 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     } catch (err) {
       console.error('Failed to delete line:', err);
       setError('라인 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleAddBuilding = async () => {
+    try {
+      const { data: newBuilding, error: buildingError } = await supabase
+        .from('apartment_buildings')
+        .insert({
+          apartmentId: resolvedParams.id,
+          buildingNumber: 0,
+          householdsCount: 0,
+        })
+        .select()
+        .single();
+
+      if (buildingError) throw buildingError;
+
+      // 로컬 상태 업데이트
+      setBuildings([
+        ...buildings,
+        {
+          id: (newBuilding as any).id,
+          buildingNumber: 0,
+          householdsCount: 0,
+          lines: [],
+        },
+      ]);
+    } catch (err) {
+      console.error('Failed to add building:', err);
+      alert('동 추가에 실패했습니다.');
     }
   };
 
@@ -338,95 +395,111 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
       </Card>
 
       {/* Buildings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <Building2 className="inline-block mr-2 h-5 w-5" />
-            동 및 라인 관리
-          </CardTitle>
-          <CardDescription>각 동의 정보와 라인을 관리합니다</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {buildings.map((building) => (
-              <Card key={building.id}>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>동 번호</Label>
-                        <Input
-                          type="number"
-                          value={building.buildingNumber === 0 ? '' : building.buildingNumber}
-                          onChange={(e) =>
-                            updateBuildingNumber(building.id, parseInt(e.target.value) || 0)
-                          }
-                          placeholder="동 번호 입력"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>세대수</Label>
-                        <Input
-                          type="number"
-                          value={building.householdsCount === 0 ? '' : building.householdsCount}
-                          onChange={(e) =>
-                            updateHouseholdsCount(building.id, parseInt(e.target.value) || 0)
-                          }
-                          placeholder="세대수 입력"
-                        />
-                      </div>
-                    </div>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <Building2 className="inline-block mr-2 h-5 w-5" />
+              동 및 라인 관리
+            </CardTitle>
+            <CardDescription>각 동의 정보와 라인을 관리합니다</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {buildings.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    등록된 동이 없습니다. '동 추가하기' 버튼을 클릭하여 동을 추가해주세요.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                buildings.map((building) => (
+                  <Card key={building.id}>
+                    <CardContent className="pt-6">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>동 번호</Label>
+                            <Input
+                              type="number"
+                              value={building.buildingNumber === 0 ? '' : building.buildingNumber}
+                              onChange={(e) =>
+                                updateBuildingNumber(building.id, parseInt(e.target.value) || 0)
+                              }
+                              placeholder="동 번호 입력"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>세대수</Label>
+                            <Input
+                              type="number"
+                              value={building.householdsCount === 0 ? '' : building.householdsCount}
+                              onChange={(e) =>
+                                updateHouseholdsCount(building.id, parseInt(e.target.value) || 0)
+                              }
+                              placeholder="세대수 입력"
+                            />
+                          </div>
+                        </div>
 
-                    <div className="space-y-2">
-                      <Label>라인 목록</Label>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {building.lines.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">등록된 라인이 없습니다</p>
-                        ) : (
-                          building.lines.map((line) => (
-                            <Badge key={line.id} variant="secondary" className="flex items-center gap-2">
-                              {line.line}라인
-                              <button
-                                onClick={() => handleDeleteLineClick(building.id, line.id, line.line)}
-                                className="ml-1 hover:text-destructive"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))
-                        )}
+                        <div className="space-y-2">
+                          <Label>라인 목록</Label>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {building.lines.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">등록된 라인이 없습니다</p>
+                            ) : (
+                              building.lines.map((line) => (
+                                <Badge key={line.id} variant="secondary" className="flex items-center gap-2">
+                                  {line.line}라인
+                                  <button
+                                    onClick={() => handleDeleteLineClick(building.id, line.id, line.line)}
+                                    className="ml-1 hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="라인 번호 (예: 1,2,3,4,5)"
+                              value={newLines[building.id] || ''}
+                              onChange={(e) => {
+                                // 숫자와 쉼표만 허용
+                                const value = e.target.value.replace(/[^0-9,]/g, '');
+                                setNewLines({ ...newLines, [building.id]: value });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleAddLine(building.id);
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAddLine(building.id)}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              라인 추가
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          placeholder="라인 번호 (예: 12)"
-                          value={newLines[building.id] || ''}
-                          onChange={(e) =>
-                            setNewLines({ ...newLines, [building.id]: e.target.value })
-                          }
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              handleAddLine(building.id);
-                            }
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddLine(building.id)}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          라인 추가
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Button onClick={handleAddBuilding} className="w-full" variant="outline" size="lg">
+          <Plus className="h-4 w-4 mr-2" />
+          동 추가하기
+        </Button>
+      </div>
 
       {/* Delete Line Confirmation Dialog */}
       <Dialog open={deleteLineDialog} onOpenChange={setDeleteLineDialog}>

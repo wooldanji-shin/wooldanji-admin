@@ -17,7 +17,7 @@ interface Building {
   id: string;
   number: string;
   householdsCount: number;
-  lines: string; // 쉼표로 구분된 라인 번호 (예: "12,34,56")
+  lines: string; // 쉼표로 구분된 라인 번호 (예: "1,2,3,4,5")
 }
 
 export default function NewApartmentPage() {
@@ -220,27 +220,19 @@ export default function NewApartmentPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>
-                    <Building2 className="inline-block mr-2 h-5 w-5" />
-                    동/라인 정보
-                  </CardTitle>
-                  <CardDescription>
-                    아파트의 동 정보와 각 동의 라인을 설정해주세요
-                  </CardDescription>
-                </div>
-                <Button onClick={addBuilding}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  동 추가
-                </Button>
-              </div>
+              <CardTitle>
+                <Building2 className="inline-block mr-2 h-5 w-5" />
+                동/라인 정보
+              </CardTitle>
+              <CardDescription>
+                아파트의 동 정보와 각 동의 라인을 설정해주세요
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {buildings.length === 0 ? (
                 <Alert>
                   <AlertDescription>
-                    아직 등록된 동이 없습니다. '동 추가' 버튼을 클릭하여 동을 추가해주세요.
+                    아직 등록된 동이 없습니다. '동 추가하기' 버튼을 클릭하여 동을 추가해주세요.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -282,7 +274,7 @@ export default function NewApartmentPage() {
                         <div className="space-y-2">
                           <Label>라인 번호 * (쉼표로 구분)</Label>
                           <Input
-                            placeholder="예: 12,34,56"
+                            placeholder="예: 1,2,3,4,5"
                             value={building.lines}
                             onChange={(e) => {
                               // 숫자와 쉼표만 허용
@@ -291,7 +283,7 @@ export default function NewApartmentPage() {
                             }}
                           />
                           <p className="text-xs text-muted-foreground">
-                            라인 번호를 쉼표로 구분하여 입력하세요 (예: 12,34,56,78,90)
+                            라인 번호를 쉼표로 구분하여 입력하세요 (예: 1,2,3,4,5,6)
                           </p>
                         </div>
                       </CardContent>
@@ -301,6 +293,11 @@ export default function NewApartmentPage() {
               )}
             </CardContent>
           </Card>
+
+          <Button onClick={addBuilding} className="w-full" variant="outline" size="lg">
+            <Plus className="h-4 w-4 mr-2" />
+            동 추가하기
+          </Button>
 
           <div className="flex justify-between">
             <Button
