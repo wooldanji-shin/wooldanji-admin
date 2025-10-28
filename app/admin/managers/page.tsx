@@ -53,6 +53,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { formatLineRange } from '@/lib/utils/line';
 
 interface Manager {
   id: string;
@@ -75,7 +76,7 @@ interface AdminScope {
   lineId: string | null;
   apartments?: { id: string; name: string; address: string };
   apartment_buildings?: { id: string; buildingNumber: number };
-  apartment_lines?: { id: string; line: number };
+  apartment_lines?: { id: string; line: number[] };
 }
 
 interface Apartment {
@@ -92,7 +93,7 @@ interface Building {
 
 interface Line {
   id: string;
-  line: number;
+  line: number[];
   buildingId: string;
 }
 
@@ -192,8 +193,7 @@ export default function ManagersPage() {
     const { data } = await supabase
       .from('apartment_lines')
       .select('*')
-      .eq('buildingId', buildingId)
-      .order('line');
+      .eq('buildingId', buildingId);
     setLines(data || []);
   };
 
@@ -350,7 +350,7 @@ export default function ManagersPage() {
       return (
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">{apartment.name} {building.buildingNumber}동 {line.line}라인</span>
+          <span className="text-sm">{apartment.name} {building.buildingNumber}동 {formatLineRange(line.line)}라인</span>
         </div>
       );
     }
@@ -368,7 +368,7 @@ export default function ManagersPage() {
     }
   };
 
-  const getRegisterMethodBadge = (method: string | null) => {
+  const getRegisterMethodBadge = (method: string | null | undefined) => {
     switch (method?.toLowerCase()) {
       case 'google':
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Google</Badge>;
@@ -676,7 +676,7 @@ export default function ManagersPage() {
                   <SelectContent>
                     {lines.map((line) => (
                       <SelectItem key={line.id} value={line.id}>
-                        {line.line}라인
+                        {formatLineRange(line.line)}라인
                       </SelectItem>
                     ))}
                   </SelectContent>

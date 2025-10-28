@@ -14,7 +14,6 @@ import {
   Download,
   Upload,
   Smartphone,
-  TabletSmartphone,
   UserCog,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,6 +60,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
+import { formatLineRange } from '@/lib/utils/line';
 
 type Device = Database['public']['Tables']['devices']['Row'] & {
   apartment_line_places?: {
@@ -68,7 +68,7 @@ type Device = Database['public']['Tables']['devices']['Row'] & {
     placeName: string;
     apartment_lines?: {
       id: string;
-      line: number;
+      line: number[];
       apartment_buildings?: {
         id: string;
         buildingNumber: number;
@@ -83,7 +83,6 @@ interface DeviceFormData {
   linePlaceId: string;
   placeName: string;
   macAddress: string;
-  iosMacAddress: string;
   devicePassword: string;
 }
 
@@ -95,7 +94,7 @@ interface ApartmentDetails {
     buildingNumber: number;
     lines?: Array<{
       id: string;
-      line: number;
+      line: number[];
       places?: Array<{
         id: string;
         placeName: string;
@@ -279,29 +278,29 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
     const building = device.apartment_line_places?.apartment_lines?.apartment_buildings?.buildingNumber;
     const line = device.apartment_line_places?.apartment_lines?.line;
     const place = device.apartment_line_places?.placeName;
+    const lineRange = line ? formatLineRange(line) : '';
 
     return (
       device.macAddress.toLowerCase().includes(searchLower) ||
-      device.iosMacAddress?.toLowerCase().includes(searchLower) ||
       place?.toLowerCase().includes(searchLower) ||
       building?.toString().includes(searchTerm) ||
-      line?.toString().includes(searchTerm)
+      lineRange.includes(searchTerm)
     );
   });
 
   const groupedDevices = filteredDevices.reduce((acc, device) => {
     const building = device.apartment_line_places?.apartment_lines?.apartment_buildings?.buildingNumber || 0;
-    const line = device.apartment_line_places?.apartment_lines?.line || 0;
+    const lineId = device.apartment_line_places?.apartment_lines?.id || '';
 
     if (!acc[building]) {
       acc[building] = {};
     }
-    if (!acc[building][line]) {
-      acc[building][line] = [];
+    if (!acc[building][lineId]) {
+      acc[building][lineId] = [];
     }
-    acc[building][line].push(device);
+    acc[building][lineId].push(device);
     return acc;
-  }, {} as Record<number, Record<number, Device[]>>);
+  }, {} as Record<number, Record<string, Device[]>>);
 
   const handleAddDevice = () => {
     setEditingDevice(null);
@@ -311,7 +310,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       linePlaceId: '',
       placeName: '',
       macAddress: '',
-      iosMacAddress: '',
       devicePassword: '',
     });
     setDeviceDialog(true);
@@ -329,7 +327,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       linePlaceId: device.linePlaceId,
       placeName: device.apartment_line_places?.placeName || '',
       macAddress: device.macAddress,
-      iosMacAddress: device.iosMacAddress || '',
       devicePassword: device.devicePassword,
     });
     setDeviceDialog(true);
@@ -367,7 +364,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
           .update({
             linePlaceId,
             macAddress: deviceForm.macAddress,
-            iosMacAddress: deviceForm.iosMacAddress || null,
             devicePassword: deviceForm.devicePassword,
           })
           .eq('id', editingDevice.id);
@@ -380,7 +376,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
           .insert({
             linePlaceId,
             macAddress: deviceForm.macAddress,
-            iosMacAddress: deviceForm.iosMacAddress || null,
             devicePassword: deviceForm.devicePassword,
           });
 
@@ -430,16 +425,20 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
 
   const handleExportCSV = () => {
     const csv = [
-      ['동', '라인', '장소', 'Android MAC', 'iOS MAC', '비밀번호', '등록일'],
-      ...filteredDevices.map(device => [
-        device.apartment_line_places?.apartment_lines?.apartment_buildings?.buildingNumber || '',
-        device.apartment_line_places?.apartment_lines?.line || '',
-        device.apartment_line_places?.placeName || '',
-        device.macAddress,
-        device.iosMacAddress || '',
-        device.devicePassword,
-        new Date(device.createdAt).toLocaleDateString('ko-KR'),
-      ])
+      ['동', '라인', '장소', 'MAC Address', '비밀번호', '등록일'],
+      ...filteredDevices.map(device => {
+        const line = device.apartment_line_places?.apartment_lines?.line;
+        const lineRange = line ? formatLineRange(line) : '';
+
+        return [
+          device.apartment_line_places?.apartment_lines?.apartment_buildings?.buildingNumber || '',
+          lineRange,
+          device.apartment_line_places?.placeName || '',
+          device.macAddress,
+          device.devicePassword,
+          new Date(device.createdAt).toLocaleDateString('ko-KR'),
+        ];
+      })
     ].map(row => row.join(',')).join('\n');
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -621,8 +620,9 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
                         <div className="border-t px-4 pb-4">
                           {building.lines && building.lines.length > 0 ? (
                             building.lines.map((line: any) => {
-                              const lineDevices = buildingDevices[line.line] || [];
+                              const lineDevices = buildingDevices[line.id] || [];
                               const lineKey = `${building.id}-${line.id}`;
+                              const lineRange = formatLineRange(line.line);
 
                               return (
                                 <div key={lineKey} className="mt-4">
@@ -636,7 +636,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
                                       ) : (
                                         <ChevronRight className="h-4 w-4" />
                                       )}
-                                      <span className="font-medium">{line.line}라인</span>
+                                      <span className="font-medium">{lineRange}라인</span>
                                       {lineDevices.length === 0 ? (
                                         <Badge variant="secondary" className="text-xs text-muted-foreground">
                                           등록된 기기 없음
@@ -680,14 +680,8 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
                                         <div className="text-sm text-muted-foreground space-y-1">
                                           <div className="flex items-center gap-2">
                                             <Smartphone className="h-3 w-3" />
-                                            <span>Android: {device.macAddress}</span>
+                                            <span>MAC: {device.macAddress}</span>
                                           </div>
-                                          {device.iosMacAddress && (
-                                            <div className="flex items-center gap-2">
-                                              <TabletSmartphone className="h-3 w-3" />
-                                              <span>iOS: {device.iosMacAddress}</span>
-                                            </div>
-                                          )}
                                           <p>Password: {device.devicePassword}</p>
                                         </div>
                                       </div>
@@ -738,8 +732,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
                   <TableHead>동</TableHead>
                   <TableHead>라인</TableHead>
                   <TableHead>설치 장소</TableHead>
-                  <TableHead>Android MAC</TableHead>
-                  <TableHead>iOS MAC</TableHead>
+                  <TableHead>MAC Address</TableHead>
                   <TableHead>비밀번호</TableHead>
                   <TableHead>등록일</TableHead>
                   <TableHead className="text-right">관리</TableHead>
@@ -748,27 +741,29 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
               <TableBody>
                 {filteredDevices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       {searchTerm ? '검색 결과가 없습니다' : '등록된 기기가 없습니다'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredDevices.map((device) => (
-                    <TableRow key={device.id}>
-                      <TableCell>
-                        {device.apartment_line_places?.apartment_lines?.apartment_buildings?.buildingNumber}동
-                      </TableCell>
-                      <TableCell>
-                        {device.apartment_line_places?.apartment_lines?.line}라인
-                      </TableCell>
+                  filteredDevices.map((device) => {
+                    const line = device.apartment_line_places?.apartment_lines?.line;
+                    const lineRange = line ? formatLineRange(line) : '';
+                    const building = device.apartment_line_places?.apartment_lines?.apartment_buildings?.buildingNumber;
+
+                    return (
+                      <TableRow key={device.id}>
+                        <TableCell>
+                          {building}동
+                        </TableCell>
+                        <TableCell>
+                          {lineRange}라인
+                        </TableCell>
                       <TableCell>
                         {device.apartment_line_places?.placeName}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {device.macAddress}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {device.iosMacAddress || '-'}
                       </TableCell>
                       <TableCell>{device.devicePassword}</TableCell>
                       <TableCell>
@@ -797,7 +792,8 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -860,11 +856,14 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
                     <SelectValue placeholder="라인을 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>
-                    {getSelectedBuilding()?.lines?.map((line) => (
-                      <SelectItem key={line.id} value={line.id}>
-                        {line.line}라인
-                      </SelectItem>
-                    ))}
+                    {getSelectedBuilding()?.lines?.map((line) => {
+                      const lineRange = formatLineRange(line.line);
+                      return (
+                        <SelectItem key={line.id} value={line.id}>
+                          {lineRange}라인
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -898,26 +897,14 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
             </div>
 
             <div className="space-y-2">
-              <Label>Android MAC Address</Label>
+              <Label>MAC Address</Label>
               <Input
                 placeholder="예: AA:BB:CC:DD:EE:FF"
                 value={deviceForm.macAddress}
                 onChange={(e) => setDeviceForm({ ...deviceForm, macAddress: e.target.value.toUpperCase() })}
               />
               <p className="text-xs text-muted-foreground">
-                Android 기기의 MAC 주소를 입력하세요
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>iOS MAC Address (선택)</Label>
-              <Input
-                placeholder="예: AA:BB:CC:DD:EE:FF"
-                value={deviceForm.iosMacAddress}
-                onChange={(e) => setDeviceForm({ ...deviceForm, iosMacAddress: e.target.value.toUpperCase() })}
-              />
-              <p className="text-xs text-muted-foreground">
-                iOS 기기의 MAC 주소를 입력하세요 (선택사항)
+                기기의 MAC 주소를 입력하세요
               </p>
             </div>
 

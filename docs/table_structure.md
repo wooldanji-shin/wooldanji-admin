@@ -15,7 +15,6 @@
 | name              | text        |       |
 | address           | text        |       |
 | detailAddress     | text        |       |
-| hasAccessControl  | bool        |       |
 | premium           | bool        |       |
 | birthDay          | text        | (날짜 타입으로 변경 고려) |
 | premiumExpiryDate | timestamptz |       |
@@ -24,23 +23,26 @@
 | recommendCode     | text        |       |
 | openDoorCount     | int4        |       |
 | rssLevel          | int4        |       |
-| approvalStatus    | text        |       |
+| approvalStatus    | text        | `pending` \| `approve` \| `inactive` |
 | registerMethod    | text        |       |
 | registrationType  | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원 |
 | apartmentId       | uuid        | **FK** → `apartments.id` **ON DELETE SET NULL** (APARTMENT 타입인 경우 필수, GENERAL인 경우 NULL) |
 | buildingNumber    | int4        | 동 번호 (예: 101, 102) |
-| unit              | int4        | 호수 (예: 1023, 1034) - 끝 한자리로 라인 매칭 |
+| unit              | int4        | 호수 (예: 1023, 1034) - `unit % 100`으로 라인 매칭 |
 | termsAgreed       | bool        |       |
 | privacyAgreed     | bool        |       |
 | marketingAgreed   | bool        |       |
 | phoneNumber       | text        |       |
+| lastAccessedAt    | timestamptz | 마지막 출입 시간 (문 열림 성공 시 업데이트) |
 
-> **호수-라인 매칭 규칙**: `unit % 10`으로 끝 한자리 추출
-> - 끝자리 1 또는 2 → 12라인 (예: 1001, 1002, 1011, 1012, 1021, 1022)
-> - 끝자리 3 또는 4 → 34라인 (예: 1003, 1004, 1013, 1014, 1023, 1024)
-> - 끝자리 5 또는 6 → 56라인 (예: 1005, 1006, 1015, 1016, 1025, 1026)
-> - 끝자리 7 또는 8 → 78라인 (예: 1007, 1008, 1017, 1018, 1027, 1028)
-> - 끝자리 9 또는 0 → 90라인 (예: 1009, 1010, 1019, 1020, 1029, 1030)
+> **호수-라인 매칭 규칙**: `unit % 100`으로 간단하게 매칭
+> - **매칭 공식**: `unit % 100`의 값이 라인 배열에 포함되어 있는지 확인
+> - **예시**:
+>   - **1004호** → `1004 % 100 = 4` → `[1,2,3,4]` 배열에 4가 있으면 매칭 ✅
+>   - **1044호** → `1044 % 100 = 44` → `[44]` 배열에 44가 있으면 매칭 ✅
+>   - **1003호** → `1003 % 100 = 3` → `[1,2,3,4]` 배열에 3이 있으면 매칭 ✅
+>   - **1099호** → `1099 % 100 = 99` → 어떤 라인 배열에도 99가 없으면 회원가입 불가 ❌
+> - **관리자**: 1~99까지 라인을 배열로 자유롭게 등록 가능
 >
 > **제약조건**:
 > - `CHECK (registrationType IN ('GENERAL', 'APARTMENT'))`
@@ -111,11 +113,19 @@
 |-----------|-------------|-------|
 | id        | uuid        | **PK** |
 | createdAt | timestamptz |       |
-| line      | int4        | 예: 12, 34, 56, 78, 90 |
+| line      | int4[]      | **라인 번호 배열** - 예: `[1,2,3,4]` (1~4라인), `[1,2,...,20]` (1~20라인) |
 | buildingId| uuid        | **FK** → `apartment_buildings.id` **ON DELETE CASCADE** |
 
+> **라인 배열 설명**:
+> - 하나의 장치가 여러 라인을 담당할 수 있도록 **배열**로 저장
+> - 예시:
+>   - `[1,2,3,4]`: 끝자리 1,2,3,4호가 모두 이 라인 사용 (Case-1)
+>   - `[1,2]`, `[3,4]`: 끝자리 1,2호와 3,4호가 각각 다른 라인 사용 (Case-2)
+>   - `[1]`, `[2]`, `[3]`, `[4]`: 각 끝자리마다 독립 라인 (Case-3)
+>   - `[1,2,3,...,40]`: 관리자가 1~40 입력 시
+>
 > **제약조건**:
-> - `UNIQUE (buildingId, line)`
+> - `CHECK (array_length(line, 1) > 0)`: 배열은 비어있으면 안됨
 > - **ON DELETE CASCADE**: 동 삭제 시 해당 라인들도 함께 삭제
 
 ---
@@ -141,12 +151,19 @@
 | id          | uuid        | **PK** |
 | created_at  | timestamptz |       |
 | linePlaceId | uuid        | **FK** → `apartment_line_places.id` **ON DELETE CASCADE** |
-| macAddress  | text        | **UNIQUE** 권장 |
-| devicePassword | text     | **권장:** 해시 저장(`password_hash`) |
+| macAddress  | text        | **BLE 기기 MAC 주소** (예: `74:F0:7D:B2:70:32`) |
+| devicePassword | text     | **권장:** 암호화 저장 (AES 등) |
+| lastOpenedAt | timestamptz | 마지막으로 문이 성공적으로 열린 시간 (고장 감지용) |
+| isWorking   | bool        | 기기 작동 여부 (기본값: true, false = 점검 중) |
 
 > **제약조건**:
 > - `UNIQUE (macAddress)`
 > - **ON DELETE CASCADE**: 장소 삭제 시 해당 기기들도 함께 삭제
+>
+> **기기 상태 관리**:
+> - `isWorking = true`: 정상 작동 (문 열기 가능)
+> - `isWorking = false`: 점검 중 (문 열기 시도 안 함, "기기가 점검중입니다" 표시)
+> - `lastOpenedAt`: 24시간 이상 미사용 시 pg_cron으로 `isWorking = false` 자동 설정 가능 (선택사항)
 
 ---
 
@@ -219,11 +236,14 @@ INSERT INTO user (registrationType, apartmentId, buildingNumber, unit, ...)
 VALUES ('APARTMENT', '아파트UUID', 101, 1023, ...);
 
 -- Step 2: 자동으로 user_line_access 생성
--- 1023호 → unit % 10 = 3 → 끝자리 3이므로 34라인
+-- 1023호 → 1023 % 100 = 23 → 배열에 23이 포함된 라인 찾기
 INSERT INTO user_line_access (userId, lineId, accessType, grantedBy)
 SELECT
   '신규유저UUID',
-  (SELECT id FROM apartment_lines WHERE buildingId = '101동UUID' AND line = 34),
+  (SELECT id FROM apartment_lines
+   WHERE buildingId = '101동UUID'
+     AND (1023 % 100) = ANY(line)  -- 23 = ANY(line)
+   LIMIT 1),
   'OWNER',
   '신규유저UUID';
 ```
@@ -282,14 +302,16 @@ final devices = await supabase
     id,
     macAddress,
     devicePassword,
+    isWorking,
     apartment_line_places!inner(
       lineId,
       placeName
     )
   ''')
-  .eq('apartment_line_places.lineId', access['lineId']);
+  .eq('apartment_line_places.lineId', access['lineId'])
+  .eq('isWorking', true);  // 정상 작동 중인 기기만
 
-// 3. macAddress와 devicePassword로 실제 하드웨어 통신
+// 3. BLE 기기와 통신
 for (final device in devices) {
   await connectToDevice(
     macAddress: device['macAddress'],
@@ -300,4 +322,56 @@ for (final device in devices) {
 
 ---
 
+## 라인 매칭 SQL 함수
 
+### 호수에 맞는 라인 찾기 (단일 방식: unit % 100)
+```sql
+-- 호수에 맞는 라인 ID 찾기 함수
+CREATE OR REPLACE FUNCTION find_line_for_unit(
+  p_building_id uuid,
+  p_unit int
+)
+RETURNS uuid AS $$
+DECLARE
+  v_line_id uuid;
+  v_line_number int := p_unit % 100;
+BEGIN
+  -- unit % 100 값이 배열에 포함된 라인 찾기
+  SELECT id INTO v_line_id
+  FROM apartment_lines
+  WHERE "buildingId" = p_building_id
+    AND v_line_number = ANY(line)
+  LIMIT 1;
+
+  RETURN v_line_id;  -- NULL이면 가입 불가
+END;
+$$ LANGUAGE plpgsql;
+
+-- 사용 예시
+SELECT find_line_for_unit('101동UUID', 1004);  -- 4가 포함된 라인 반환
+SELECT find_line_for_unit('101동UUID', 1044);  -- 44가 포함된 라인 반환
+SELECT find_line_for_unit('101동UUID', 1023);  -- 23이 포함된 라인 반환
+```
+
+---
+
+## 디바이스 비밀번호 암호화
+
+### 암호화 저장 방식 (권장)
+```dart
+// 저장할 때
+final encryptedPassword = encrypt(originalPassword, encryptionKey);
+await supabase.from('devices').update({
+  'devicePassword': encryptedPassword
+});
+
+// 사용할 때
+final encryptedPassword = device.devicePassword;
+final originalPassword = decrypt(encryptedPassword, encryptionKey);
+final passwordBytes = bleService.passwordStringToBytes(originalPassword);
+await bleService.sendOpenCommand(passwordBytes);
+```
+
+- **DB 저장**: 비밀번호를 암호화(AES 등)하여 저장
+- **사용 시**: 복호화하여 원본 비밀번호를 얻어 BLE 기기에 전송
+- **장점**: 양방향 변환 가능, DB 유출 시에도 암호화 키 없이는 복호화 불가

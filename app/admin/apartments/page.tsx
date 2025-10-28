@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
+import { formatLineRange } from '@/lib/utils/line';
 
 interface Apartment {
   id: string;
@@ -32,7 +33,7 @@ interface Apartment {
   buildingCount: number;
   totalUnits: number;
   totalDevices: number;
-  lines: number[];
+  lineRanges: { id: string; line: number[] }[];
   createdAt: string;
   status: 'active' | 'pending' | 'inactive';
 }
@@ -87,11 +88,13 @@ export default function ApartmentsPage() {
         const buildingCount = buildings.length;
         const totalUnits = buildings.reduce((sum: number, b: any) => sum + b.householdsCount, 0);
 
-        // 모든 라인 번호 수집
-        const allLines = new Set<number>();
+        // 모든 라인 범위 수집 (line은 이제 number[] 배열)
+        const lineRanges: { id: string; line: number[] }[] = [];
         buildings.forEach((b: any) => {
           b.apartment_lines?.forEach((l: any) => {
-            allLines.add(l.line);
+            if (l.line && Array.isArray(l.line)) {
+              lineRanges.push({ id: l.id, line: l.line });
+            }
           });
         });
 
@@ -112,7 +115,7 @@ export default function ApartmentsPage() {
           buildingCount,
           totalUnits,
           totalDevices,
-          lines: Array.from(allLines).sort((a, b) => a - b),
+          lineRanges,
           createdAt: new Date(apt.createdAt).toLocaleDateString('ko-KR'),
           status: 'active' as const,
         };
@@ -283,7 +286,7 @@ export default function ApartmentsPage() {
 
                     <p className="text-muted-foreground mb-4">{apartment.address}</p>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                       <div>
                         <p className="text-sm text-muted-foreground">동수</p>
                         <p className="text-lg font-semibold">{apartment.buildingCount}동</p>
@@ -295,16 +298,6 @@ export default function ApartmentsPage() {
                       <div>
                         <p className="text-sm text-muted-foreground">설치 기기</p>
                         <p className="text-lg font-semibold">{apartment.totalDevices}대</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">라인</p>
-                        <div className="flex gap-1 flex-wrap mt-1">
-                          {apartment.lines.map((line) => (
-                            <Badge key={line} variant="secondary" className="text-xs">
-                              {line}라인
-                            </Badge>
-                          ))}
-                        </div>
                       </div>
                     </div>
 

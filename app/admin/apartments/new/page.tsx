@@ -12,12 +12,13 @@ import {
   AlertDescription,
 } from '@/components/ui/alert';
 import { createClient } from '@/lib/supabase/client';
+import { parseMultipleLineRanges } from '@/lib/utils/line';
 
 interface Building {
   id: string;
   number: string;
   householdsCount: number;
-  lines: string; // 쉼표로 구분된 라인 번호 (예: "1,2,3,4,5")
+  lines: string; // 범위 또는 쉼표로 구분된 라인 번호 (예: "1~3, 4, 5~11")
 }
 
 export default function NewApartmentPage() {
@@ -94,12 +95,12 @@ export default function NewApartmentPage() {
         if (!buildingData) throw new Error('Failed to create building');
 
         // 3. apartment_lines 테이블에 라인 정보 추가
-        const lines = building.lines.split(',').map(l => l.trim()).filter(l => l);
-        for (const line of lines) {
+        const lineRanges = parseMultipleLineRanges(building.lines);
+        for (const lineRange of lineRanges) {
           const { error: lineError } = await supabase
             .from('apartment_lines')
             .insert({
-              line: parseInt(line),
+              line: lineRange,
               buildingId: (buildingData as any).id,
             } as any);
 
@@ -272,18 +273,18 @@ export default function NewApartmentPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label>라인 번호 * (쉼표로 구분)</Label>
+                          <Label>라인 번호 *</Label>
                           <Input
-                            placeholder="예: 1,2,3,4,5"
+                            placeholder="예: 1~3, 4, 5~11"
                             value={building.lines}
                             onChange={(e) => {
-                              // 숫자와 쉼표만 허용
-                              const value = e.target.value.replace(/[^0-9,]/g, '');
+                              // 숫자, 쉼표, 물결표, 하이픈, 공백만 허용
+                              const value = e.target.value.replace(/[^0-9,~\-\s]/g, '');
                               updateBuilding(building.id, 'lines', value);
                             }}
                           />
                           <p className="text-xs text-muted-foreground">
-                            라인 번호를 쉼표로 구분하여 입력하세요 (예: 1,2,3,4,5,6)
+                            범위는 물결표(~)로, 여러 개는 쉼표(,)로 구분하세요 (예: 1~3, 4, 5~11)
                           </p>
                         </div>
                       </CardContent>

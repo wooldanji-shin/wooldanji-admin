@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
+import { parseMultipleLineRanges, formatLineRange } from '@/lib/utils/line';
 
 interface Building {
   id: string;
@@ -34,7 +35,7 @@ interface Building {
 
 interface Line {
   id: string;
-  line: number;
+  line: number[];
 }
 
 interface ApartmentDetails {
@@ -73,7 +74,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
 
   // 라인 삭제 다이얼로그
   const [deleteLineDialog, setDeleteLineDialog] = useState(false);
-  const [deletingLine, setDeletingLine] = useState<{ buildingId: string; lineId: string; lineNumber: number } | null>(null);
+  const [deletingLine, setDeletingLine] = useState<{ buildingId: string; lineId: string; lineRange: string } | null>(null);
 
   useEffect(() => {
     fetchApartment();
@@ -145,37 +146,34 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     const lineInput = newLines[buildingId];
     if (!lineInput || !lineInput.trim()) return;
 
-    // 쉼표로 구분된 라인 번호들을 파싱
-    const lineNumbers = lineInput
-      .split(',')
-      .map(l => l.trim())
-      .filter(l => l)
-      .map(l => parseInt(l))
-      .filter(l => !isNaN(l));
+    // 쉼표로 구분된 여러 범위를 파싱 (예: "1~2, 3~7" → [[1,2], [3,4,5,6,7]])
+    const lineRanges = parseMultipleLineRanges(lineInput);
 
-    if (lineNumbers.length === 0) {
-      alert('올바른 라인 번호를 입력하세요. (예: 1,2,3,4,5)');
+    if (lineRanges.length === 0) {
+      alert('올바른 라인 번호를 입력하세요. (예: 1~4 또는 1~2, 3~7)');
       return;
     }
 
-    // 현재 동의 기존 라인 번호들
+    // 현재 동의 기존 라인들과 중복 체크
     const building = buildings.find(b => b.id === buildingId);
     if (!building) return;
 
-    const existingLineNumbers = building.lines.map(l => l.line);
+    // 기존 라인들의 번호들을 모두 flat하게 가져옴
+    const existingLineNumbers = building.lines.flatMap(l => l.line);
 
     // 중복 체크
-    const duplicates = lineNumbers.filter(num => existingLineNumbers.includes(num));
+    const allNewNumbers = lineRanges.flat();
+    const duplicates = allNewNumbers.filter(num => existingLineNumbers.includes(num));
     if (duplicates.length > 0) {
       alert(`${duplicates.join(', ')}라인은 이미 존재합니다.`);
       return;
     }
 
     try {
-      // 여러 라인을 한번에 추가
-      const linesToInsert = lineNumbers.map(num => ({
+      // 각 범위를 별도의 라인 row로 추가
+      const linesToInsert = lineRanges.map(range => ({
         buildingId,
-        line: num,
+        line: range,
       }));
 
       const { data: insertedLines, error: lineError } = await supabase
@@ -186,7 +184,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
       if (lineError) throw lineError;
 
       // 로컬 상태 업데이트
-      const addedLines = (insertedLines as any[]).map(l => ({
+      const addedLines: Line[] = (insertedLines as any[]).map(l => ({
         id: l.id,
         line: l.line,
       }));
@@ -195,7 +193,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
         b.id === buildingId
           ? {
               ...b,
-              lines: [...b.lines, ...addedLines].sort((a, b) => a.line - b.line),
+              lines: [...b.lines, ...addedLines],
             }
           : b
       ));
@@ -207,8 +205,8 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const handleDeleteLineClick = (buildingId: string, lineId: string, lineNumber: number) => {
-    setDeletingLine({ buildingId, lineId, lineNumber });
+  const handleDeleteLineClick = (buildingId: string, lineId: string, lineRange: string) => {
+    setDeletingLine({ buildingId, lineId, lineRange });
     setDeleteLineDialog(true);
   };
 
@@ -448,26 +446,29 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
                             {building.lines.length === 0 ? (
                               <p className="text-sm text-muted-foreground">등록된 라인이 없습니다</p>
                             ) : (
-                              building.lines.map((line) => (
-                                <Badge key={line.id} variant="secondary" className="flex items-center gap-2">
-                                  {line.line}라인
-                                  <button
-                                    onClick={() => handleDeleteLineClick(building.id, line.id, line.line)}
-                                    className="ml-1 hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))
+                              building.lines.map((line) => {
+                                const lineRange = formatLineRange(line.line);
+                                return (
+                                  <Badge key={line.id} variant="secondary" className="flex items-center gap-2">
+                                    {lineRange}라인
+                                    <button
+                                      onClick={() => handleDeleteLineClick(building.id, line.id, lineRange)}
+                                      className="ml-1 hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                );
+                              })
                             )}
                           </div>
                           <div className="flex gap-2">
                             <Input
-                              placeholder="라인 번호 (예: 1,2,3,4,5)"
+                              placeholder="라인 번호 (예: 1~2, 3~7, 8~10)"
                               value={newLines[building.id] || ''}
                               onChange={(e) => {
-                                // 숫자와 쉼표만 허용
-                                const value = e.target.value.replace(/[^0-9,]/g, '');
+                                // 숫자, 쉼표, 물결표, 하이픈, 공백만 허용
+                                const value = e.target.value.replace(/[^0-9,~\-\s]/g, '');
                                 setNewLines({ ...newLines, [building.id]: value });
                               }}
                               onKeyDown={(e) => {
@@ -507,7 +508,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
           <DialogHeader>
             <DialogTitle>라인 삭제</DialogTitle>
             <DialogDescription>
-              정말로 <strong>{deletingLine?.lineNumber}라인</strong>을 삭제하시겠습니까?
+              정말로 <strong>{deletingLine?.lineRange}라인</strong>을 삭제하시겠습니까?
               <br />
               이 작업은 되돌릴 수 없으며, 해당 라인의 모든 데이터(장소, 기기)가 삭제됩니다.
             </DialogDescription>
