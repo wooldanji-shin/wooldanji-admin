@@ -153,7 +153,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
     linePlaceId: '',
     placeName: '',
     macAddress: '',
-    iosMacAddress: '',
     devicePassword: '',
   });
 
@@ -496,22 +495,8 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
             <p className="text-muted-foreground mt-1">
               {apartment?.name || '아파트'}의 모든 기기를 관리합니다
             </p>
-            {getApartmentAdmins().length > 0 && (
-              <div className="flex items-center gap-2 mt-2">
-                <UserCog className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  관리자: {getApartmentAdmins().map(scope =>
-                    `${scope.user?.name}${scope.user?.phoneNumber ? ` ${scope.user.phoneNumber}` : ''}`
-                  ).join(', ')}
-                </span>
-              </div>
-            )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV 내보내기
-            </Button>
             <Button onClick={handleAddDevice}>
               <Plus className="h-4 w-4 mr-2" />
               기기 추가

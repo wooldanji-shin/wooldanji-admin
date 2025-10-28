@@ -10,7 +10,6 @@ import {
   Settings,
   ChevronDown,
   Bell,
-  Shield,
   Palette,
   Building2,
   UserCog,
@@ -42,23 +41,18 @@ const navigation = [
 ];
 
 const settingsMenu = {
-  name: '설정',
+  name: '콘텐츠 관리',
   icon: Settings,
   subItems: [
     {
-      name: '알림 설정',
+      name: '헤더 설정',
+      href: '/admin/settings/header',
+      icon: Palette,
+    },
+    {
+      name: '알림 관리',
       href: '/admin/settings/notifications',
       icon: Bell,
-    },
-    {
-      name: '보안 설정',
-      href: '/admin/settings/security',
-      icon: Shield,
-    },
-    {
-      name: '테마 설정',
-      href: '/admin/settings/theme',
-      icon: Palette,
     },
   ],
 };
