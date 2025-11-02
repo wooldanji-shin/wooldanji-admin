@@ -70,7 +70,7 @@ type Building = {
 
 type Line = {
   id: string;
-  line: number;
+  line: number[];
 };
 
 interface ApartmentDetails {
@@ -198,16 +198,8 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
       }
 
       // 라인 필터링 (호수의 끝자리로)
-      if (selectedLine) {
-        const lineNum = lines.find(l => l.id === selectedLine)?.line;
-        if (lineNum) {
-          // 라인 번호에 따른 호수 끝자리 매칭
-          const unitEndings = getUnitEndingsForLine(lineNum);
-
-          // 클라이언트 사이드에서 필터링하기 위해 먼저 동 필터링까지만 적용
-          // unit 필터링은 데이터 받은 후 처리
-        }
-      }
+      // 클라이언트 사이드에서 필터링하기 위해 먼저 동 필터링까지만 적용
+      // unit 필터링은 데이터 받은 후 처리
 
       // 페이지네이션
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -222,13 +214,12 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
 
       // 라인 필터링 (클라이언트 사이드)
       if (selectedLine) {
-        const lineNum = lines.find(l => l.id === selectedLine)?.line;
-        if (lineNum) {
-          const unitEndings = getUnitEndingsForLine(lineNum);
+        const lineArray = lines.find(l => l.id === selectedLine)?.line;
+        if (lineArray && lineArray.length > 0) {
           filteredData = filteredData.filter((user: any) => {
             if (!user.unit) return false;
-            const lastDigit = user.unit % 10;
-            return unitEndings.includes(lastDigit.toString());
+            const unitMod = user.unit % 100;
+            return lineArray.includes(unitMod);
           });
         }
       }
@@ -289,16 +280,12 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  // 라인 번호에 따른 호수 끝자리 반환
-  const getUnitEndingsForLine = (lineNum: number): string[] => {
-    switch (lineNum) {
-      case 12: return ['1', '2'];
-      case 34: return ['3', '4'];
-      case 56: return ['5', '6'];
-      case 78: return ['7', '8'];
-      case 90: return ['9', '0'];
-      default: return [];
-    }
+  // 라인 배열을 문자열로 변환 (예: [1,2,3,4] -> "1~4")
+  const formatLineDisplay = (lineArray: number[]): string => {
+    if (!lineArray || lineArray.length === 0) return '';
+    const sorted = [...lineArray].sort((a, b) => a - b);
+    if (sorted.length === 1) return `${sorted[0]}`;
+    return `${sorted[0]}~${sorted[sorted.length - 1]}`;
   };
 
   useEffect(() => {
@@ -567,7 +554,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
                     <SelectItem value="all">전체 라인</SelectItem>
                     {lines.map((line) => (
                       <SelectItem key={line.id} value={line.id}>
-                        {line.line}라인
+                        {formatLineDisplay(line.line)}라인
                       </SelectItem>
                     ))}
                   </SelectContent>

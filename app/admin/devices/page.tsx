@@ -85,22 +85,18 @@ export default function DevicesPage() {
 
       <div className='flex-1 p-6 space-y-6'>
         {/* Search and Actions */}
-        <Card className='bg-card border-border'>
-          <CardContent className='pt-6'>
-            <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between'>
-              <div className='relative flex-1 max-w-md w-full'>
-                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                <Input
-                  placeholder='주소, 아파트명, 동으로 검색...'
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className='pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground'
-                />
-              </div>
-              <AddDeviceDialog />
-            </div>
-          </CardContent>
-        </Card>
+        <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6'>
+          <div className='relative flex-1 w-full'>
+            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+            <Input
+              placeholder='주소, 아파트명, 동으로 검색...'
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className='pl-10'
+            />
+          </div>
+          <AddDeviceDialog />
+        </div>
 
         {/* Devices Table */}
         <Card className='bg-card border-border'>

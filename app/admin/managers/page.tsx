@@ -394,27 +394,23 @@ export default function ManagersPage() {
 
       <div className='flex-1 p-6 space-y-6 overflow-auto'>
         {/* Search */}
-        <Card className='bg-card border-border'>
-          <CardContent className='pt-6'>
-            <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between'>
-              <div className='relative flex-1 max-w-md w-full'>
-                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                <Input
-                  placeholder='이름, 이메일, 전화번호로 검색...'
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className='pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground'
-                />
-              </div>
-              <div className='flex items-center gap-2'>
-                <Shield className='h-4 w-4 text-muted-foreground' />
-                <span className='text-sm text-muted-foreground'>
-                  전체 {filteredManagers.length}명
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6'>
+          <div className='relative flex-1 w-full'>
+            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+            <Input
+              placeholder='이름, 이메일, 전화번호로 검색...'
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className='pl-10'
+            />
+          </div>
+          <div className='flex items-center gap-2 whitespace-nowrap'>
+            <Shield className='h-4 w-4 text-muted-foreground' />
+            <span className='text-sm text-muted-foreground'>
+              전체 {filteredManagers.length}명
+            </span>
+          </div>
+        </div>
 
         {error && (
           <Alert variant="destructive">

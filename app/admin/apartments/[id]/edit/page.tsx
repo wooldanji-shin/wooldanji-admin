@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Save, Building2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,11 +31,13 @@ interface Building {
   buildingNumber: number;
   householdsCount: number;
   lines: Line[];
+  isNew?: boolean; // 새로 추가된 동인지 표시
 }
 
 interface Line {
   id: string;
   line: number[];
+  isNew?: boolean; // 새로 추가된 라인인지 표시
 }
 
 interface ApartmentDetails {
@@ -54,11 +56,14 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   // 편집할 데이터
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [deletedBuildingIds, setDeletedBuildingIds] = useState<string[]>([]);
+  const [deletedLineIds, setDeletedLineIds] = useState<string[]>([]);
 
   // 새로운 라인 추가 상태
   const [newLines, setNewLines] = useState<Record<string, string>>({});
@@ -68,13 +73,34 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     new (window as any).daum.Postcode({
       oncomplete: function(data: any) {
         setAddress(data.roadAddress || data.jibunAddress);
+        setHasChanges(true);
       }
     }).open();
   };
 
+  // 변경사항 있을 때 페이지 나가기 경고
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges]);
+
   // 라인 삭제 다이얼로그
   const [deleteLineDialog, setDeleteLineDialog] = useState(false);
   const [deletingLine, setDeletingLine] = useState<{ buildingId: string; lineId: string; lineRange: string } | null>(null);
+
+  // 동 삭제 다이얼로그
+  const [deleteBuildingDialog, setDeleteBuildingDialog] = useState(false);
+  const [deletingBuilding, setDeletingBuilding] = useState<{ id: string; buildingNumber: number; linesCount: number } | null>(null);
+
+  // 뒤로가기 확인 다이얼로그
+  const [backConfirmDialog, setBackConfirmDialog] = useState(false);
 
   useEffect(() => {
     fetchApartment();
@@ -134,15 +160,17 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     setBuildings(buildings.map(b =>
       b.id === buildingId ? { ...b, buildingNumber: newNumber } : b
     ));
+    setHasChanges(true);
   };
 
   const updateHouseholdsCount = (buildingId: string, newCount: number) => {
     setBuildings(buildings.map(b =>
       b.id === buildingId ? { ...b, householdsCount: newCount } : b
     ));
+    setHasChanges(true);
   };
 
-  const handleAddLine = async (buildingId: string) => {
+  const handleAddLine = (buildingId: string) => {
     const lineInput = newLines[buildingId];
     if (!lineInput || !lineInput.trim()) return;
 
@@ -150,7 +178,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     const lineRanges = parseMultipleLineRanges(lineInput);
 
     if (lineRanges.length === 0) {
-      alert('올바른 라인 번호를 입력하세요. (예: 1~4 또는 1~2, 3~7)');
+      setError('올바른 라인 번호를 입력하세요. (예: 1~4 또는 1~2, 3~7)');
       return;
     }
 
@@ -165,44 +193,29 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     const allNewNumbers = lineRanges.flat();
     const duplicates = allNewNumbers.filter(num => existingLineNumbers.includes(num));
     if (duplicates.length > 0) {
-      alert(`${duplicates.join(', ')}라인은 이미 존재합니다.`);
+      setError(`${duplicates.join(', ')}라인은 이미 존재합니다.`);
       return;
     }
 
-    try {
-      // 각 범위를 별도의 라인 row로 추가
-      const linesToInsert = lineRanges.map(range => ({
-        buildingId,
-        line: range,
-      }));
+    // 로컬 상태에만 추가 (임시 ID 생성)
+    const addedLines: Line[] = lineRanges.map(range => ({
+      id: `temp-${Date.now()}-${Math.random()}`,
+      line: range,
+      isNew: true,
+    }));
 
-      const { data: insertedLines, error: lineError } = await supabase
-        .from('apartment_lines')
-        .insert(linesToInsert)
-        .select();
+    setBuildings(buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            lines: [...b.lines, ...addedLines],
+          }
+        : b
+    ));
 
-      if (lineError) throw lineError;
-
-      // 로컬 상태 업데이트
-      const addedLines: Line[] = (insertedLines as any[]).map(l => ({
-        id: l.id,
-        line: l.line,
-      }));
-
-      setBuildings(buildings.map(b =>
-        b.id === buildingId
-          ? {
-              ...b,
-              lines: [...b.lines, ...addedLines],
-            }
-          : b
-      ));
-
-      setNewLines({ ...newLines, [buildingId]: '' });
-    } catch (err) {
-      console.error('Failed to add line:', err);
-      alert('라인 추가에 실패했습니다.');
-    }
+    setNewLines({ ...newLines, [buildingId]: '' });
+    setHasChanges(true);
+    setError(null);
   };
 
   const handleDeleteLineClick = (buildingId: string, lineId: string, lineRange: string) => {
@@ -210,63 +223,108 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     setDeleteLineDialog(true);
   };
 
-  const handleDeleteLineConfirm = async () => {
+  const handleDeleteLineConfirm = () => {
     if (!deletingLine) return;
 
-    try {
-      const { error: deleteError } = await supabase
-        .from('apartment_lines')
-        .delete()
-        .eq('id', deletingLine.lineId);
+    const line = buildings
+      .find(b => b.id === deletingLine.buildingId)
+      ?.lines.find(l => l.id === deletingLine.lineId);
 
-      if (deleteError) throw deleteError;
-
-      // 로컬 상태 업데이트
-      setBuildings(buildings.map(b =>
-        b.id === deletingLine.buildingId
-          ? { ...b, lines: b.lines.filter(l => l.id !== deletingLine.lineId) }
-          : b
-      ));
-
-      setDeleteLineDialog(false);
-      setDeletingLine(null);
-    } catch (err) {
-      console.error('Failed to delete line:', err);
-      setError('라인 삭제에 실패했습니다.');
+    // 기존 라인이면 삭제 목록에 추가
+    if (line && !line.isNew) {
+      setDeletedLineIds([...deletedLineIds, deletingLine.lineId]);
     }
+
+    // 로컬 상태에서 제거
+    setBuildings(buildings.map(b =>
+      b.id === deletingLine.buildingId
+        ? { ...b, lines: b.lines.filter(l => l.id !== deletingLine.lineId) }
+        : b
+    ));
+
+    setDeleteLineDialog(false);
+    setDeletingLine(null);
+    setHasChanges(true);
   };
 
-  const handleAddBuilding = async () => {
-    try {
-      const { data: newBuilding, error: buildingError } = await supabase
-        .from('apartment_buildings')
-        .insert({
-          apartmentId: resolvedParams.id,
-          buildingNumber: 0,
-          householdsCount: 0,
-        })
-        .select()
-        .single();
+  const handleAddBuilding = () => {
+    // 로컬 상태에만 추가 (임시 ID 생성)
+    const newBuilding: Building = {
+      id: `temp-${Date.now()}-${Math.random()}`,
+      buildingNumber: 0,
+      householdsCount: 0,
+      lines: [],
+      isNew: true,
+    };
 
-      if (buildingError) throw buildingError;
+    setBuildings([...buildings, newBuilding]);
+    setHasChanges(true);
+  };
 
-      // 로컬 상태 업데이트
-      setBuildings([
-        ...buildings,
-        {
-          id: (newBuilding as any).id,
-          buildingNumber: 0,
-          householdsCount: 0,
-          lines: [],
-        },
-      ]);
-    } catch (err) {
-      console.error('Failed to add building:', err);
-      alert('동 추가에 실패했습니다.');
+  const handleDeleteBuilding = (buildingId: string) => {
+    const building = buildings.find(b => b.id === buildingId);
+    if (!building) return;
+
+    setDeletingBuilding({
+      id: buildingId,
+      buildingNumber: building.buildingNumber,
+      linesCount: building.lines.length,
+    });
+    setDeleteBuildingDialog(true);
+  };
+
+  const confirmDeleteBuilding = () => {
+    if (!deletingBuilding) return;
+
+    const building = buildings.find(b => b.id === deletingBuilding.id);
+    if (!building) return;
+
+    // 해당 동의 라인도 삭제 목록에 추가
+    building.lines.forEach(line => {
+      if (!line.isNew) {
+        setDeletedLineIds(prev => [...prev, line.id]);
+      }
+    });
+
+    // 기존 동이면 삭제 목록에 추가
+    if (!building.isNew) {
+      setDeletedBuildingIds([...deletedBuildingIds, deletingBuilding.id]);
     }
+
+    // 로컬 상태에서 제거
+    setBuildings(buildings.filter(b => b.id !== deletingBuilding.id));
+    setHasChanges(true);
+    setDeleteBuildingDialog(false);
+    setDeletingBuilding(null);
   };
 
   const handleSave = async () => {
+    // 폼 검증
+    if (!name.trim()) {
+      setError('아파트명을 입력해주세요.');
+      return;
+    }
+
+    if (!address.trim()) {
+      setError('주소를 입력해주세요.');
+      return;
+    }
+
+    // 동 번호 검증
+    const buildingNumbers = buildings.map(b => b.buildingNumber);
+    const invalidBuildings = buildings.filter(b => b.buildingNumber === 0);
+    if (invalidBuildings.length > 0) {
+      setError('모든 동의 번호를 1 이상으로 입력해주세요.');
+      return;
+    }
+
+    // 동 번호 중복 검증
+    const duplicates = buildingNumbers.filter((num, index) => buildingNumbers.indexOf(num) !== index);
+    if (duplicates.length > 0) {
+      setError(`동 번호가 중복되었습니다: ${duplicates.join(', ')}동`);
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -282,19 +340,86 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
 
       if (apartmentError) throw apartmentError;
 
-      // 2. 각 동의 정보 업데이트
-      for (const building of buildings) {
-        const { error: buildingError } = await supabase
-          .from('apartment_buildings')
-          .update({
-            buildingNumber: building.buildingNumber,
-            householdsCount: building.householdsCount,
-          })
-          .eq('id', building.id);
+      // 2. 삭제된 라인 삭제
+      if (deletedLineIds.length > 0) {
+        const { error: deleteLineError } = await supabase
+          .from('apartment_lines')
+          .delete()
+          .in('id', deletedLineIds);
 
-        if (buildingError) throw buildingError;
+        if (deleteLineError) throw deleteLineError;
       }
 
+      // 3. 삭제된 동 삭제
+      if (deletedBuildingIds.length > 0) {
+        const { error: deleteBuildingError } = await supabase
+          .from('apartment_buildings')
+          .delete()
+          .in('id', deletedBuildingIds);
+
+        if (deleteBuildingError) throw deleteBuildingError;
+      }
+
+      // 4. 기존 동 업데이트 & 새 동 추가
+      for (const building of buildings) {
+        if (building.isNew) {
+          // 새 동 추가
+          const { data: newBuilding, error: insertError } = await supabase
+            .from('apartment_buildings')
+            .insert({
+              apartmentId: resolvedParams.id,
+              buildingNumber: building.buildingNumber,
+              householdsCount: building.householdsCount,
+            })
+            .select()
+            .single();
+
+          if (insertError) throw insertError;
+
+          // 새 동의 라인 추가
+          const newLines = building.lines.filter(l => l.isNew);
+          if (newLines.length > 0) {
+            const linesToInsert = newLines.map(line => ({
+              buildingId: (newBuilding as any).id,
+              line: line.line,
+            }));
+
+            const { error: lineInsertError } = await supabase
+              .from('apartment_lines')
+              .insert(linesToInsert);
+
+            if (lineInsertError) throw lineInsertError;
+          }
+        } else {
+          // 기존 동 업데이트
+          const { error: updateError } = await supabase
+            .from('apartment_buildings')
+            .update({
+              buildingNumber: building.buildingNumber,
+              householdsCount: building.householdsCount,
+            })
+            .eq('id', building.id);
+
+          if (updateError) throw updateError;
+
+          // 기존 동의 새 라인 추가
+          const newLines = building.lines.filter(l => l.isNew);
+          if (newLines.length > 0) {
+            const linesToInsert = newLines.map(line => ({
+              buildingId: building.id,
+              line: line.line,
+            }));
+
+            const { error: lineInsertError } = await supabase
+              .from('apartment_lines')
+              .insert(linesToInsert);
+
+            if (lineInsertError) throw lineInsertError;
+          }
+        }
+      }
+
+      setHasChanges(false);
       router.push('/admin/apartments');
     } catch (err) {
       console.error('Failed to save apartment:', err);
@@ -328,13 +453,19 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
+    <div className="p-8 pb-24">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 -mt-8 pt-8 mb-8 border-b">
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push('/admin/apartments')}
+          onClick={() => {
+            if (hasChanges) {
+              setBackConfirmDialog(true);
+            } else {
+              router.push('/admin/apartments');
+            }
+          }}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -342,13 +473,19 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
         </Button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">아파트 설정</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">아파트 설정</h1>
+              {hasChanges && (
+                <Badge variant="outline" className="text-orange-600 border-orange-600">
+                  저장 안됨
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
-              아파트 정보를 수정합니다
+              아파트 정보와 구조를 관리합니다
             </p>
           </div>
-          <Button onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSave} disabled={saving || !hasChanges} size="lg">
             {saving ? '저장 중...' : '저장'}
           </Button>
         </div>
@@ -372,7 +509,10 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
             <Label>아파트명</Label>
             <Input
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setHasChanges(true);
+              }}
               placeholder="아파트명"
             />
           </div>
@@ -412,9 +552,30 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
                 </Alert>
               ) : (
                 buildings.map((building) => (
-                  <Card key={building.id}>
+                  <Card key={building.id} className={building.isNew ? 'border-blue-200' : ''}>
                     <CardContent className="pt-6">
                       <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {building.isNew && (
+                              <Badge variant="outline" className="text-blue-600 border-blue-600">
+                                신규
+                              </Badge>
+                            )}
+                            <span className="text-sm text-muted-foreground">
+                              {building.buildingNumber}동 {building.lines.length > 0 && `· ${building.lines.length}개 라인`}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteBuilding(building.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            동 삭제
+                          </Button>
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label>동 번호</Label>
@@ -449,8 +610,13 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
                               building.lines.map((line) => {
                                 const lineRange = formatLineRange(line.line);
                                 return (
-                                  <Badge key={line.id} variant="secondary" className="flex items-center gap-2">
+                                  <Badge
+                                    key={line.id}
+                                    variant={line.isNew ? "outline" : "secondary"}
+                                    className={`flex items-center gap-2 ${line.isNew ? 'border-blue-600 text-blue-600' : ''}`}
+                                  >
                                     {lineRange}라인
+                                    {line.isNew && <span className="text-xs">(신규)</span>}
                                     <button
                                       onClick={() => handleDeleteLineClick(building.id, line.id, lineRange)}
                                       className="ml-1 hover:text-destructive"
@@ -502,6 +668,21 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
         </Button>
       </div>
 
+      {/* Sticky Bottom Save Button */}
+      {hasChanges && (
+        <div className="fixed bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t p-4">
+          <div className="container max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <span className="text-muted-foreground">저장하지 않은 변경사항이 있습니다</span>
+            </div>
+            <Button onClick={handleSave} disabled={saving} size="lg">
+              {saving ? '저장 중...' : '저장'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Delete Line Confirmation Dialog */}
       <Dialog open={deleteLineDialog} onOpenChange={setDeleteLineDialog}>
         <DialogContent>
@@ -519,6 +700,61 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
             </Button>
             <Button variant="destructive" onClick={handleDeleteLineConfirm}>
               삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Building Confirmation Dialog */}
+      <Dialog open={deleteBuildingDialog} onOpenChange={setDeleteBuildingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>동 삭제</DialogTitle>
+            <DialogDescription>
+              정말로 <strong>{deletingBuilding?.buildingNumber}동</strong>을 삭제하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          {deletingBuilding && deletingBuilding.linesCount > 0 && (
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-sm text-destructive">
+                이 동에는 <strong>{deletingBuilding.linesCount}개의 라인</strong>이 있습니다.
+                <br />
+                동을 삭제하면 모든 라인과 해당 라인의 데이터(장소, 기기)도 함께 삭제됩니다.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setDeleteBuildingDialog(false);
+              setDeletingBuilding(null);
+            }}>
+              취소
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteBuilding}>
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Back Confirmation Dialog */}
+      <Dialog open={backConfirmDialog} onOpenChange={setBackConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>저장하지 않은 변경사항</DialogTitle>
+            <DialogDescription>
+              저장하지 않은 변경사항이 있습니다. 정말 나가시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBackConfirmDialog(false)}>
+              취소
+            </Button>
+            <Button variant="destructive" onClick={() => {
+              setBackConfirmDialog(false);
+              router.push('/admin/apartments');
+            }}>
+              나가기
             </Button>
           </DialogFooter>
         </DialogContent>

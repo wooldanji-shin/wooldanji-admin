@@ -23,8 +23,8 @@
 | recommendCode     | text        |                                                                                                   |
 | openDoorCount     | int4        |                                                                                                   |
 | rssLevel          | int4        |                                                                                                   |
-| approvalStatus    | text        | `pending` \| `approve` \| `inactive`                                                              |
-| registerMethod    | text        |                                                                                                   |
+| approvalStatus    | text        | `pending` \| `approve` \|`inactive`                                                               |
+| registerMethods   | text[]      |                                                                                                   |
 | registrationType  | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원                                            |
 | apartmentId       | uuid        | **FK** → `apartments.id` **ON DELETE SET NULL** (APARTMENT 타입인 경우 필수, GENERAL인 경우 NULL) |
 | buildingNumber    | int4        | 동 번호 (예: 101, 102)                                                                            |
@@ -441,8 +441,8 @@ await bleService.sendOpenCommand(passwordBytes);
 | ---------- | ----------- | ---------------------------------------- |
 | id         | uuid        | **PK**                                   |
 | createdAt  | timestamptz | DEFAULT now()                            |
-| title      | text        | 알림 제목 (NULL 가능)                               |
-| content    | text        | 알림 내용                     |
+| title      | text        | 알림 제목 (NULL 가능)                    |
+| content    | text        | 알림 내용                                |
 | imageUrl   | text        | 이미지 URL (Supabase Storage, NULL 가능) |
 | linkUrl    | text        | 클릭 시 이동할 URL (NULL 가능)           |
 | orderIndex | int4        | 표시 순서 (작을수록 상단)                |

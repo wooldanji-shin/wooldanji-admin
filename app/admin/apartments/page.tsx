@@ -1,7 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, Building2, Home, Cpu, Settings, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Trash2,
+  Building2,
+  Home,
+  Cpu,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,8 +37,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
-import { formatLineRange } from '@/lib/utils/line';
 
 interface Apartment {
   id: string;
@@ -38,6 +58,9 @@ interface Apartment {
   status: 'active' | 'pending' | 'inactive';
 }
 
+type SortField = 'name' | 'buildingCount' | 'totalUnits' | 'totalDevices' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
 export default function ApartmentsPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -47,7 +70,9 @@ export default function ApartmentsPage() {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingApartment, setDeletingApartment] = useState<Apartment | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 5;
+  const [sortField, setSortField] = useState<SortField>('createdAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const ITEMS_PER_PAGE = 15;
 
   useEffect(() => {
     fetchApartments();
@@ -129,11 +154,47 @@ export default function ApartmentsPage() {
     }
   };
 
-  const filteredApartments = apartments.filter(
-    (apt) =>
-      apt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      apt.address.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 정렬 핸들러
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  // 정렬 아이콘 렌더링
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
+  // 필터링 및 정렬
+  const filteredApartments = apartments
+    .filter(
+      (apt) =>
+        apt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        apt.address.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
+
+      // 날짜 정렬을 위해 변환
+      if (sortField === 'createdAt') {
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
 
   // 페이지네이션 계산
   const totalPages = Math.ceil(filteredApartments.length / ITEMS_PER_PAGE);
@@ -187,166 +248,175 @@ export default function ApartmentsPage() {
         </Button>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">전체 아파트</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{apartments.length}</div>
-            <p className="text-xs text-muted-foreground">
-              등록된 아파트 수
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">전체 동수</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {apartments.reduce((acc, apt) => acc + apt.buildingCount, 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              총 건물 동수
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">전체 세대수</CardTitle>
-            <Home className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {apartments.reduce((acc, apt) => acc + apt.totalUnits, 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              총 세대 수
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">전체 기기</CardTitle>
-            <Cpu className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {apartments.reduce((acc, apt) => acc + apt.totalDevices, 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              설치된 기기 수
-            </p>
-          </CardContent>
-        </Card>
+      {/* Search */}
+      <div className="relative mb-8">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="아파트명 또는 주소로 검색..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
-      {/* Search */}
-      <Card className="mb-8">
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="아파트명 또는 주소로 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+      {/* Apartments Table */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead
+                    className="text-muted-foreground cursor-pointer hover:text-foreground"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center">
+                      아파트명
+                      {getSortIcon('name')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-muted-foreground">주소</TableHead>
+                  <TableHead
+                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
+                    onClick={() => handleSort('buildingCount')}
+                  >
+                    <div className="flex items-center justify-center">
+                      동수
+                      {getSortIcon('buildingCount')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
+                    onClick={() => handleSort('totalUnits')}
+                  >
+                    <div className="flex items-center justify-center">
+                      세대수
+                      {getSortIcon('totalUnits')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
+                    onClick={() => handleSort('totalDevices')}
+                  >
+                    <div className="flex items-center justify-center">
+                      기기수
+                      {getSortIcon('totalDevices')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center justify-center">
+                      등록일
+                      {getSortIcon('createdAt')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-right">관리</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
+                        데이터를 불러오는 중...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredApartments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                      {searchTerm ? '검색 결과가 없습니다.' : '등록된 아파트가 없습니다.'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedApartments.map((apartment) => (
+                    <TableRow
+                      key={apartment.id}
+                      className="border-border hover:bg-secondary/50 cursor-pointer"
+                      onClick={() => router.push(`/admin/apartments/${apartment.id}/view`)}
+                    >
+                      <TableCell className="font-medium">
+                        {apartment.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-xs truncate">
+                        {apartment.address}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary" className="font-normal">
+                          {apartment.buildingCount}동
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-normal">
+                          {apartment.totalUnits}세대
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-normal">
+                          {apartment.totalDevices}대
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center text-sm text-muted-foreground">
+                        {apartment.createdAt}
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/admin/apartments/${apartment.id}/view`)}
+                          >
+                            <Users className="h-4 w-4 mr-1" />
+                            회원
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/admin/apartments/${apartment.id}/devices`)}
+                          >
+                            <Cpu className="h-4 w-4 mr-1" />
+                            장치
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/admin/apartments/${apartment.id}/edit`)}
+                              >
+                                <Building2 className="h-4 w-4 mr-2" />
+                                아파트 설정
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(apartment)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                삭제
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
-
-      {/* Apartments List */}
-      <div className="space-y-4">
-        {loading ? (
-          <Card>
-            <CardContent className="text-center py-8">
-              데이터를 불러오는 중...
-            </CardContent>
-          </Card>
-        ) : filteredApartments.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-8">
-              등록된 아파트가 없습니다.
-            </CardContent>
-          </Card>
-        ) : (
-          paginatedApartments.map((apartment) => (
-            <Card key={apartment.id} className="overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-xl font-semibold">{apartment.name}</h3>
-                    </div>
-
-                    <p className="text-muted-foreground mb-4">{apartment.address}</p>
-
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">동수</p>
-                        <p className="text-lg font-semibold">{apartment.buildingCount}동</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">세대수</p>
-                        <p className="text-lg font-semibold">{apartment.totalUnits}세대</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">설치 기기</p>
-                        <p className="text-lg font-semibold">{apartment.totalDevices}대</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>등록일: {apartment.createdAt}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/admin/apartments/${apartment.id}/view`)}
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      회원보기
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/admin/apartments/${apartment.id}/devices`)}
-                    >
-                      <Cpu className="h-4 w-4 mr-2" />
-                      기기관리
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/admin/apartments/${apartment.id}/edit`)}
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      설정
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteClick(apartment)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      삭제
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
 
       {/* Pagination */}
       {!loading && filteredApartments.length > 0 && totalPages > 1 && (
