@@ -60,26 +60,6 @@ export async function PUT(
       );
     }
 
-    // 승인시에만 APP_USER 역할 부여 (이미 없는 경우)
-    if (status === 'approve') {
-      const { data: existingRole } = await supabase
-        .from('user_roles')
-        .select('id')
-        .eq('userId', id)
-        .eq('role', 'APP_USER')
-        .single();
-
-      if (!existingRole) {
-        await supabase
-          .from('user_roles')
-          .insert({
-            userId: id,
-            role: 'APP_USER'
-          });
-      }
-    }
-    // pending으로 변경시에는 역할 유지 (삭제하지 않음)
-
     return NextResponse.json({
       success: true,
       data
