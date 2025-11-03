@@ -33,8 +33,25 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, AlertCircle, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { UserFullDetails } from '@/lib/supabase/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const ITEMS_PER_PAGE = 10;
+
+type Apartment = {
+  id: string;
+  name: string;
+};
+
+type Building = {
+  id: string;
+  buildingNumber: number;
+};
 
 export default function UsersPage() {
   const router = useRouter();
@@ -51,14 +68,63 @@ export default function UsersPage() {
   const debounceTimer = useRef<NodeJS.Timeout>(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserFullDetails | null>(null);
+  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
 
   const searchQuery = searchParams.get('search') || '';
   const currentPage = parseInt(searchParams.get('page') || '1');
+  const selectedApartment = searchParams.get('apartment') || '';
+  const selectedBuilding = searchParams.get('building') || '';
 
   // 초기 로드시 URL의 검색어를 input에 설정
   useEffect(() => {
     setSearchInput(searchQuery);
   }, []);
+
+  // 아파트 목록 로드
+  const fetchApartments = useCallback(async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('apartments')
+        .select('id, name')
+        .order('name');
+
+      if (fetchError) throw fetchError;
+      setApartments(data || []);
+    } catch (err) {
+      console.error('Failed to fetch apartments:', err);
+    }
+  }, [supabase]);
+
+  // 선택된 아파트의 동 목록 로드
+  const fetchBuildings = useCallback(async () => {
+    if (!selectedApartment) {
+      setBuildings([]);
+      return;
+    }
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('apartment_buildings')
+        .select('id, buildingNumber')
+        .eq('apartmentId', selectedApartment)
+        .order('buildingNumber');
+
+      if (fetchError) throw fetchError;
+      setBuildings(data || []);
+    } catch (err) {
+      console.error('Failed to fetch buildings:', err);
+      setBuildings([]);
+    }
+  }, [selectedApartment, supabase]);
+
+  useEffect(() => {
+    fetchApartments();
+  }, [fetchApartments]);
+
+  useEffect(() => {
+    fetchBuildings();
+  }, [fetchBuildings]);
 
   const fetchUsers = useCallback(async () => {
     // 초기 로딩이 아닌 경우 로딩 표시 안 함 (검색이나 페이지네이션)
@@ -81,6 +147,19 @@ export default function UsersPage() {
         query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phoneNumber.ilike.%${searchQuery}%`);
       }
 
+      // 아파트 필터링
+      if (selectedApartment) {
+        query = query.eq('apartmentId', selectedApartment);
+      }
+
+      // 동 필터링
+      if (selectedBuilding) {
+        const buildingNum = buildings.find(b => b.id === selectedBuilding)?.buildingNumber;
+        if (buildingNum) {
+          query = query.eq('buildingNumber', buildingNum);
+        }
+      }
+
       // 페이지네이션
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -100,7 +179,7 @@ export default function UsersPage() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [searchQuery, currentPage, supabase, initialLoading]);
+  }, [searchQuery, currentPage, selectedApartment, selectedBuilding, buildings, supabase, initialLoading]);
 
   useEffect(() => {
     fetchUsers();
@@ -147,6 +226,16 @@ export default function UsersPage() {
 
   const handlePageChange = (newPage: number) => {
     updateSearchParams({ page: newPage.toString() });
+  };
+
+  const handleApartmentChange = (value: string) => {
+    const apartmentValue = value === 'all' ? '' : value;
+    updateSearchParams({ apartment: apartmentValue, building: '', page: '1' });
+  };
+
+  const handleBuildingChange = (value: string) => {
+    const buildingValue = value === 'all' ? '' : value;
+    updateSearchParams({ building: buildingValue, page: '1' });
   };
 
   const handleApprovalStatusChange = async (userId: string, status: 'approve' | 'pending') => {
@@ -253,9 +342,9 @@ export default function UsersPage() {
       <AdminHeader title='회원관리' />
 
       <div className='flex-1 p-6 space-y-6 overflow-auto'>
-        {/* Search and Stats */}
-        <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6'>
-          <div className='relative flex-1 w-full'>
+        {/* Search and Filters */}
+        <div className='flex flex-col lg:flex-row gap-4 items-start lg:items-center mb-6'>
+          <div className='relative w-full lg:w-[300px]'>
             <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
             <Input
               placeholder='이름, 이메일, 전화번호로 검색...'
@@ -264,7 +353,40 @@ export default function UsersPage() {
               className='pl-10'
             />
           </div>
-          <div className='text-sm text-muted-foreground whitespace-nowrap'>
+
+          <Select value={selectedApartment || 'all'} onValueChange={handleApartmentChange}>
+            <SelectTrigger className='w-full lg:w-[200px]'>
+              <SelectValue placeholder='아파트 선택' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>전체 아파트</SelectItem>
+              {apartments.map((apartment) => (
+                <SelectItem key={apartment.id} value={apartment.id}>
+                  {apartment.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedBuilding || 'all'}
+            onValueChange={handleBuildingChange}
+            disabled={!selectedApartment || selectedApartment === 'all'}
+          >
+            <SelectTrigger className='w-full lg:w-[150px]'>
+              <SelectValue placeholder='동 선택' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>전체 동</SelectItem>
+              {buildings.map((building) => (
+                <SelectItem key={building.id} value={building.id}>
+                  {building.buildingNumber}동
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className='text-sm text-muted-foreground whitespace-nowrap lg:ml-auto'>
             전체 {totalCount}명
           </div>
         </div>

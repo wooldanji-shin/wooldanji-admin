@@ -23,7 +23,7 @@ import Image from 'next/image';
 interface Notification {
   id: string;
   title: string | null;
-  content: string;
+  content: string | null;
   imageUrl: string | null;
   linkUrl: string | null;
   createdAt: string;
@@ -206,12 +206,6 @@ export default function NotificationSettingsPage() {
       setError(null);
       setSuccess(false);
 
-      // Validate content
-      if (!content.trim()) {
-        setError('알림 내용을 입력해주세요.');
-        return;
-      }
-
       let finalImageUrl = existingImageUrl;
 
       // Handle image changes
@@ -248,7 +242,7 @@ export default function NotificationSettingsPage() {
         .from('home_notifications')
         .insert({
           title: title.trim() || null,
-          content: content.trim(),
+          content: content.trim() || null,
           imageUrl: finalImageUrl,
           linkUrl: linkUrl.trim() || null,
           orderIndex: 0,
@@ -498,7 +492,7 @@ export default function NotificationSettingsPage() {
               {/* Content */}
               <div className='space-y-2'>
                 <Label htmlFor='content' className='text-sm font-medium'>
-                  내용 <span className='text-destructive'>*</span>
+                  내용 <span className='text-muted-foreground'>(선택사항)</span>
                 </Label>
                 <Textarea
                   id='content'
@@ -556,7 +550,7 @@ export default function NotificationSettingsPage() {
                 </Button>
                 <Button
                   onClick={handleSave}
-                  disabled={saving || !content.trim()}
+                  disabled={saving}
                 >
                   {saving ? (
                     <>
