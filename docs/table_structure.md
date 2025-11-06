@@ -23,8 +23,8 @@
 | recommendCode     | text        |                                                                                                   |
 | openDoorCount     | int4        |                                                                                                   |
 | rssLevel          | int4        |                                                                                                   |
-| approvalStatus    | text        | `pending` \| `approve` \|`inactive`                                                               |
-| registerMethods   | text[]      |                                                                                                   |
+| approvalStatus    | text        | `pending` \| `approve` \| `inactive`                                                              |
+| registerMethod    | text        |                                                                                                   |
 | registrationType  | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원                                            |
 | apartmentId       | uuid        | **FK** → `apartments.id` **ON DELETE SET NULL** (APARTMENT 타입인 경우 필수, GENERAL인 경우 NULL) |
 | buildingNumber    | int4        | 동 번호 (예: 101, 102)                                                                            |
@@ -441,8 +441,8 @@ await bleService.sendOpenCommand(passwordBytes);
 | ---------- | ----------- | ---------------------------------------- |
 | id         | uuid        | **PK**                                   |
 | createdAt  | timestamptz | DEFAULT now()                            |
-| title      | text        | 알림 제목 (NULL 가능)                    |
-| content    | text        | 알림 내용                                |
+| title      | text        | 알림 제목 (NULL 가능)                               |
+| content    | text        | 알림 내용                     |
 | imageUrl   | text        | 이미지 URL (Supabase Storage, NULL 가능) |
 | linkUrl    | text        | 클릭 시 이동할 URL (NULL 가능)           |
 | orderIndex | int4        | 표시 순서 (작을수록 상단)                |
@@ -577,6 +577,62 @@ home_categories.id
 user.regionSido, regionSigungu, regionDong
   → (지역 필터링) → home_category_items 조회
 ```
+
+---
+
+## ✓ 추가: 다이얼로그 메시지 관리 테이블
+
+### Table: `dialog_messages`
+
+| Column      | Type        | Notes                                                  |
+| ----------- | ----------- | ------------------------------------------------------ |
+| id          | uuid        | **PK**                                                 |
+| messageKey  | text        | **UNIQUE** - 메시지 식별자 (예: `door_opened_success`) |
+| title       | text        | 다이얼로그 제목                                        |
+| content     | text        | 다이얼로그 내용 (NULL 가능)                            |
+| description | text        | 사용 시점 설명 (NULL 가능) - 관리자용 메모             |
+| createdAt   | timestamptz | DEFAULT now()                                          |
+
+
+> **설명**:
+>
+> - 앱 전역에서 사용되는 다이얼로그 메시지를 동적으로 관리
+> - 관리자가 메시지를 수정하면 모든 사용자에게 즉시 반영
+> - 하드코딩된 문구를 DB로 이관하여 유연한 운영 가능
+>
+> **사용 예시**:
+>
+> ```sql
+> -- 초기 데이터
+> INSERT INTO dialog_messages (messageKey, title, content, description) VALUES
+>   ('door_opened_success', '문이 열렸습니다!', '''울단지''가 무료로 제공해\n드리는 서비스 입니다.\n편히 사용하세요', '문이 성공적으로 열렸을 때 표시'),
+>   ('door_open_failed', '문열기 실패', '다시 시도해주세요', '문열기 시도가 실패했을 때 표시'),
+>   ('bluetooth_required', '블루투스 권한 필요', '설정에서 블루투스 권한을 허용해주세요', '블루투스 권한이 없을 때 표시');
+> ```
+>
+> **Flutter 사용 예시**:
+>
+> ```dart
+> // 메시지 조회
+> final message = await supabase
+>   .from('dialog_messages')
+>   .select()
+>   .eq('messageKey', 'door_opened_success')
+>   .single();
+>
+> // 다이얼로그 표시
+> CustomDialog.show(
+>   context: context,
+>   title: message['title'],
+>   content: message['content'],
+> );
+> ```
+>
+> **제약조건**:
+>
+> - `UNIQUE (messageKey)`: 메시지 키는 중복 불가
+
+---
 
 ## bukcet 폴더구조
 

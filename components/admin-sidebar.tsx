@@ -13,6 +13,7 @@ import {
   Palette,
   Building2,
   UserCog,
+  MessageSquare,
 } from 'lucide-react';
 import { logout } from '@/lib/auth';
 import { useState } from 'react';
@@ -53,6 +54,11 @@ const settingsMenu = {
       name: '알림 관리',
       href: '/admin/settings/notifications',
       icon: Bell,
+    },
+    {
+      name: '다이얼로그 설정',
+      href: '/admin/settings/dialog-messages',
+      icon: MessageSquare,
     },
   ],
 };
