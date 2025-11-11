@@ -23,9 +23,9 @@
 | recommendCode     | text        |                                                                                                   |
 | openDoorCount     | int4        |                                                                                                   |
 | rssLevel          | int4        |                                                                                                   |
-| approvalStatus    | text        | `pending` \| `approve` \| `inactive`                                                              |
-| registerMethod    | text        |                                                                                                   |
-| registrationType  | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원                                            |
+| approvalStatus              | text        | `pending` \| `approve` \| `inactive`                                                              |
+| registerMethods             | text[]      | 가입 방법 배열 (예: `['google', 'kakao']`)                                                        |
+| registrationType            | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원                                            |
 | apartmentId       | uuid        | **FK** → `apartments.id` **ON DELETE SET NULL** (APARTMENT 타입인 경우 필수, GENERAL인 경우 NULL) |
 | buildingNumber    | int4        | 동 번호 (예: 101, 102)                                                                            |
 | unit              | int4        | 호수 (예: 1023, 1034) - `unit % 100`으로 라인 매칭                                                |
@@ -34,9 +34,12 @@
 | marketingAgreed   | bool        |                                                                                                   |
 | phoneNumber       | text        |                                                                                                   |
 | lastAccessedAt    | timestamptz | 마지막 출입 시간 (문 열림 성공 시 업데이트)                                                       |
-| regionSido        | text        | ✓ 추가: 시/도 (예: 서울, 경기) - 다음 주소 검색 API 결과 저장                                     |
-| regionSigungu     | text        | ✓ 추가: 시/군/구 (예: 관악구, 수원시) - 다음 주소 검색 API 결과 저장                              |
-| regionDong        | text        | ✓ 추가: 읍/면/동 (예: 신림동, 봉천동) - 다음 주소 검색 API 결과 저장                              |
+| regionSido                  | text        | ✓ 추가: 시/도 (예: 서울, 경기) - 다음 주소 검색 API 결과 저장                                     |
+| regionSigungu               | text        | ✓ 추가: 시/군/구 (예: 관악구, 수원시) - 다음 주소 검색 API 결과 저장                              |
+| regionDong                  | text        | ✓ 추가: 읍/면/동 (예: 신림동, 봉천동) - 다음 주소 검색 API 결과 저장                              |
+| overlayPermissionGranted    | bool        | 오버레이 권한 허용 여부 (기본값: false)                                                           |
+| platform                    | text        | 플랫폼 정보 (예: 'android', 'ios')                                                                |
+| fcmToken                    | text[]      | FCM 토큰 배열 - 사용자가 여러 기기에서 로그인 시 모든 기기의 토큰 저장                            |
 
 > **✓ 추가: 지역 정보 저장**:
 >
@@ -67,7 +70,7 @@
 | --------- | ----------- | ------------------------------------------------------------- |
 | id        | uuid        | **PK**                                                        |
 | userId    | uuid        | **FK** → `user.id` **ON DELETE CASCADE**                      |
-| role      | text        | 예: `APP_USER` / `APT_ADMIN` / `REGION_ADMIN` / `SUPER_ADMIN` |
+| role      | text        | 예: `APP_USER` / `APT_ADMIN` / `MANAGER` / `SUPER_ADMIN` |
 | createdAt | timestamptz |                                                               |
 
 > **제약조건**:
@@ -415,7 +418,7 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ---
 
-## ✓ 추가: 홈 화면 콘텐츠 관리 테이블
+## ✓ 홈 화면 콘텐츠 관리
 
 ### Table: `home_headers`
 
@@ -424,14 +427,12 @@ await bleService.sendOpenCommand(passwordBytes);
 | id         | uuid        | **PK**                                                           |
 | createdAt  | timestamptz | DEFAULT now()                                                    |
 | headerText | text        | 홈 화면 상단 헤더 텍스트 (예: "주민이 추천하는 믿을 수 있는 곳") |
-| orderIndex | int4        | 표시 순서 (작을수록 상단)                                        |
-| isActive   | bool        | DEFAULT true - 활성화 여부                                       |
 
 > **설명**:
 >
 > - 홈 화면 상단에 표시되는 동적 헤더 텍스트 관리
 > - 관리자가 텍스트를 변경하면 모든 사용자에게 즉시 반영
-> - `orderIndex`로 여러 헤더의 표시 순서 제어
+> - `isActive` 필드 제거됨 - 단일 레코드로 관리
 
 ---
 
@@ -453,130 +454,381 @@ await bleService.sendOpenCommand(passwordBytes);
 > - 지역 필터링 없음 (아파트 공지, 앱 업데이트 안내 등)
 > - 이미지 중심 콘텐츠 (제목/내용은 선택사항)
 
+
 ---
 
-### Table: `home_categories`
+## ✓ 광고 시스템 테이블
 
-| Column       | Type        | Notes                                      |
-| ------------ | ----------- | ------------------------------------------ |
-| id           | uuid        | **PK**                                     |
-| createdAt    | timestamptz | DEFAULT now()                              |
-| categoryName | text        | 카테고리 이름 (예: "집", "차", "반려동물") |
-| iconUrl      | text        | 카테고리 아이콘 이미지 URL (NULL 가능)     |
-| orderIndex   | int4        | 표시 순서 (작을수록 좌측/상단)             |
-| isActive     | bool        | DEFAULT true - 활성화 여부                 |
+### Table: `advertisers` (광고 업체 정보)
+
+| Column                | Type        | Notes                                           |
+| --------------------- | ----------- | ----------------------------------------------- |
+| id                    | uuid        | **PK**                                          |
+| createdAt             | timestamptz | DEFAULT now()                                   |
+| businessName          | text        | 상호명                                          |
+| businessType          | text        | 업종                                            |
+| representativeName    | text        | 대표자명                                        |
+| email                 | text        | 이메일                                          |
+| phoneNumber           | text        | 휴대전화번호                                    |
+| landlineNumber        | text        | 유선전화번호 (NULL 가능)                        |
+| businessRegistration  | text        | 사업자등록증 이미지 URL                         |
+| address               | text        | 업체 주소 (실제 위치)                           |
+| representativeImage   | text        | 대표 이미지 URL (NULL 가능)                     |
+| logo                  | text        | 로고 이미지 URL (NULL 가능)                     |
+| description           | text        | 소개내용 (광고용) (NULL 가능)                   |
+| website               | text        | 웹사이트 링크 (NULL 가능)                       |
+| contractStartDate     | timestamptz | 계약 시작일                                     |
+| contractEndDate       | timestamptz | 계약 종료일                                     |
+| contractDocument      | text        | 계약서 이미지 URL (NULL 가능)                   |
+| contractMemo          | text        | 계약 관련 메모 (NULL 가능)                      |
+| createdBy             | uuid        | **FK** → `user.id` - 등록한 매니저              |
+| isActive              | bool        | DEFAULT true - 활성화 여부                      |
 
 > **설명**:
 >
-> - 홈 화면 카테고리 정의 (집, 차, 반려동물 등)
-> - 관리자가 새로운 카테고리 추가/수정/삭제 가능
-> - 각 카테고리는 여러 `home_category_items`를 가짐
+> - 광고주/업체의 기본 정보 관리
+> - 매니저가 영업 후 등록
+> - 하나의 업체가 여러 광고 등록 가능 (하지만 현재는 1:1 관계로 운영)
+>
+> **제약조건**:
+>
+> - `createdBy` **FK** → `user.id` **ON DELETE SET NULL**
 
 ---
 
-### Table: `home_category_items`
+### Table: `ad_categories` (광고 카테고리)
 
-| Column        | Type        | Notes                                               |
-| ------------- | ----------- | --------------------------------------------------- |
-| id            | uuid        | **PK**                                              |
-| createdAt     | timestamptz | DEFAULT now()                                       |
-| categoryId    | uuid        | **FK** → `home_categories.id` **ON DELETE CASCADE** |
-| title         | text        | 아이템 제목 (NULL 가능)                             |
-| content       | text        | 아이템 내용 (NULL 가능)                             |
-| imageUrl      | text        | **이미지 URL** (Supabase Storage) - 주요 콘텐츠     |
-| linkUrl       | text        | 클릭 시 이동할 URL (NULL 가능)                      |
-| regionSido    | text        | **지역 필터: 시/도** (NULL = 전국)                  |
-| regionSigungu | text        | **지역 필터: 시/군/구** (NULL = 상위 지역 전체)     |
-| regionDong    | text        | **지역 필터: 읍/면/동** (NULL = 상위 지역 전체)     |
-| orderIndex    | int4        | 카테고리 내 표시 순서 (작을수록 좌측/상단)          |
-| isActive      | bool        | DEFAULT true - 활성화 여부                          |
-| startDate     | timestamptz | 게시 시작 일시 (NULL = 즉시)                        |
-| endDate       | timestamptz | 게시 종료 일시 (NULL = 무제한)                      |
+| Column             | Type        | Notes                                   |
+| ------------------ | ----------- | --------------------------------------- |
+| id                 | uuid        | **PK**                                  |
+| createdAt          | timestamptz | DEFAULT now()                           |
+| categoryName       | text        | 카테고리 이름 (예: 필라테스, 영어학원) |
+| iconUrl            | text        | 카테고리 아이콘 URL (NULL 가능)         |
+| orderIndex         | int4        | 표시 순서 (작을수록 상단)               |
+| weekdayEnabled     | bool        | 평일 노출 여부 (DEFAULT true)           |
+| weekdayStartTime   | time        | 평일 시작 시간 (NULL = 제한 없음)       |
+| weekdayEndTime     | time        | 평일 종료 시간 (NULL = 제한 없음)       |
+| weekendEnabled     | bool        | 주말 노출 여부 (DEFAULT true)           |
+| weekendStartTime   | time        | 주말 시작 시간 (NULL = 제한 없음)       |
+| weekendEndTime     | time        | 주말 종료 시간 (NULL = 제한 없음)       |
+| isActive           | bool        | DEFAULT true - 활성화 여부              |
 
-> **✓ 추가: 지역별 광고 관리**:
+> **설명**:
 >
-> - **이미지 중심 콘텐츠** - 주로 광고 배너/카드 이미지
-> - **지역 필터링**:
->   - `regionSido`, `regionSigungu`, `regionDong` 모두 NULL → **전국 공통** 콘텐츠
->   - `regionSido`만 설정 → 해당 시/도 전체 (예: "서울" → 서울 전체)
->   - `regionSido` + `regionSigungu` 설정 → 해당 시/군/구 (예: "서울" + "관악구" → 관악구 전체)
->   - 모두 설정 → 특정 읍/면/동만 (예: "서울" + "관악구" + "신림동" → 신림동만)
+> - 광고 카테고리별 노출 시간 제어
+> - 평일/주말 각각 다른 시간 설정 가능
+> - 카테고리 전체가 시간대별로 노출/숨김
 >
-> **사용 예시**:
+> **시간 제어 예시**:
 >
 > ```sql
-> -- 관리자가 "집" 카테고리에 신림동 전용 광고 4개 추가
-> INSERT INTO home_category_items (categoryId, imageUrl, regionSido, regionSigungu, regionDong, ...)
-> VALUES
->   ('집-category-id', 'ad1.jpg', '서울', '관악구', '신림동', ...),
->   ('집-category-id', 'ad2.jpg', '서울', '관악구', '신림동', ...),
->   ('집-category-id', 'ad3.jpg', '서울', '관악구', '신림동', ...),
->   ('집-category-id', 'ad4.jpg', '서울', '관악구', '신림동', ...);
+> -- 평일 9시~18시, 주말 10시~17시 노출
+> INSERT INTO ad_categories (
+>   categoryName,
+>   weekdayEnabled, weekdayStartTime, weekdayEndTime,
+>   weekendEnabled, weekendStartTime, weekendEndTime
+> ) VALUES (
+>   '필라테스',
+>   true, '09:00', '18:00',
+>   true, '10:00', '17:00'
+> );
 >
-> -- 결과: 신림동 거주 사용자만 이 4개 광고 표시
+> -- 평일만 노출, 주말 숨김
+> INSERT INTO ad_categories (
+>   categoryName,
+>   weekdayEnabled, weekdayStartTime, weekdayEndTime,
+>   weekendEnabled
+> ) VALUES (
+>   '학원',
+>   true, '09:00', '18:00',
+>   false
+> );
+> ```
+
+---
+
+### Table: `advertisements` (광고)
+
+| Column        | Type        | Notes                                                         |
+| ------------- | ----------- | ------------------------------------------------------------- |
+| id            | uuid        | **PK**                                                        |
+| createdAt     | timestamptz | DEFAULT now()                                                 |
+| advertiserId  | uuid        | **FK** → `advertisers.id` **ON DELETE CASCADE**               |
+| categoryId    | uuid        | **FK** → `ad_categories.id` **ON DELETE SET NULL**            |
+| adType        | text        | `NEIGHBORHOOD` \| `REGION` - 동네 광고 or 지역 광고           |
+| title         | text        | 광고 제목                                                     |
+| imageUrl      | text        | 광고 이미지 URL                                               |
+| linkUrl       | text        | 클릭 시 이동할 URL (NULL 가능)                                |
+| startDate     | timestamptz | 광고 게시 시작일                                              |
+| endDate       | timestamptz | 광고 게시 종료일                                              |
+| orderIndex    | int4        | 표시 순서 (작을수록 상단) - DEFAULT 0                         |
+| createdBy     | uuid        | **FK** → `user.id` - 등록한 매니저                            |
+| isActive      | bool        | DEFAULT false - 활성화 여부 (수동 활성화 필요)                |
+
+> **설명**:
+>
+> - 광고주가 원하는 홍보 범위에 따라 타입 결정
+> - **동네 광고**: 특정 아파트만 타겟팅 (`advertisement_apartments`로 연결)
+> - **지역 광고**: 여러 지역 타겟팅 (`advertisement_regions`로 연결)
+>
+> **광고 상태 관리**:
+>
+> - **4가지 상태**: pending (대기중), scheduled (예정), active (진행중), ended (종료됨)
+> - `isActive = false`: **대기중** - 관리자가 수동으로 활성화 필요
+> - `isActive = true` + `NOW() < startDate`: **예정** - 시작일 전
+> - `isActive = true` + `NOW() BETWEEN startDate AND endDate`: **진행중** - 노출 중
+> - `isActive = false` (자동 비활성화) OR 광고주 비활성화: **종료됨**
+>
+> **자동 비활성화** (pg_cron):
+>
+> - 매일 오전 1시에 실행
+> - `endDate < NOW()` → `isActive = false` 자동 설정
+> - 광고주 `isActive = false` OR `contractEndDate < NOW()` → 해당 광고들 `isActive = false`
+>
+> **광고 타입별 로직**:
+>
+> ```sql
+> -- 동네 광고: A, B 아파트만
+> INSERT INTO advertisements (
+>   advertiserId, categoryId, adType, title, imageUrl, createdBy
+> ) VALUES (
+>   'advertiser-id', 'category-id', 'NEIGHBORHOOD',
+>   '필라테스 신규 회원 모집', 'image.jpg', 'manager-id'
+> );
+>
+> -- advertisement_apartments에 아파트 연결
+> INSERT INTO advertisement_apartments (advertisementId, apartmentId) VALUES
+>   ('ad-id', 'A-apt-id'),
+>   ('ad-id', 'B-apt-id');
+>
+> -- 지역 광고: 서울 관악구 + 동작구 (여러 지역)
+> INSERT INTO advertisements (
+>   advertiserId, categoryId, adType, title, imageUrl, createdBy
+> ) VALUES (
+>   'advertiser-id', 'category-id', 'REGION',
+>   '영어학원 여름특강', 'image.jpg', 'manager-id'
+> );
+>
+> -- advertisement_regions에 지역 연결 (여러 지역 가능)
+> INSERT INTO advertisement_regions (advertisementId, regionSido, regionSigungu) VALUES
+>   ('ad-id', '서울', '관악구'),
+>   ('ad-id', '서울', '동작구');
+>
+> -- 레거시 방식 (단일 지역만 가능, 권장하지 않음)
+> INSERT INTO advertisements (
+>   advertiserId, categoryId, adType,
+>   regionSido, regionSigungu,
+>   title, imageUrl, createdBy
+> ) VALUES (
+>   'advertiser-id', 'category-id', 'REGION',
+>   '서울', '관악구',
+>   '영어학원 여름특강', 'image.jpg', 'manager-id'
+> );
 > ```
 >
 > **제약조건**:
 >
-> - `CHECK` (지역 필터 논리 일관성): `regionSigungu`가 있으면 `regionSido` 필수, `regionDong`이 있으면 `regionSigungu` 필수
-> - **ON DELETE CASCADE**: 카테고리 삭제 시 해당 아이템도 함께 삭제
+> - `CHECK (adType IN ('NEIGHBORHOOD', 'REGION'))`
+> - `CHECK` (adType = 'REGION'일 때 regionSido 필수)
+> - **ON DELETE CASCADE**: 업체 삭제 시 광고도 삭제
+> - **ON DELETE SET NULL**: 카테고리 삭제 시 광고는 유지하되 카테고리만 NULL
 
 ---
 
-## ✓ 추가: 홈 콘텐츠 조회 로직
+### Table: `advertisement_apartments` (광고-아파트 연결)
 
-### 지역 필터링 쿼리 예시
+| Column          | Type        | Notes                                            |
+| --------------- | ----------- | ------------------------------------------------ |
+| id              | uuid        | **PK**                                           |
+| advertisementId | uuid        | **FK** → `advertisements.id` **ON DELETE CASCADE** |
+| apartmentId     | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE**     |
+| createdAt       | timestamptz | DEFAULT now()                                    |
 
-```dart
-// 사용자의 지역 정보로 카테고리 아이템 조회
-final user = await supabase.auth.getUser();
-final userProfile = await supabase
-  .from('user')
-  .select('regionSido, regionSigungu, regionDong')
-  .eq('id', user.id)
-  .single();
+> **설명**:
+>
+> - 동네 광고(`adType = 'NEIGHBORHOOD'`)와 아파트를 연결
+> - 다대다 관계: 하나의 광고가 여러 아파트에 노출 가능
+>
+> **제약조건**:
+>
+> - `UNIQUE (advertisementId, apartmentId)`: 중복 방지
+> - **ON DELETE CASCADE**: 광고 삭제 시 연결도 삭제, 아파트 삭제 시 연결도 삭제
 
-// 해당 카테고리의 아이템 조회 (지역 필터 적용)
-final items = await supabase
-  .from('home_category_items')
-  .select('*')
-  .eq('categoryId', categoryId)
-  .eq('isActive', true)
-  .or('startDate.is.null,startDate.lte.${DateTime.now().toIso8601String()}')
-  .or('endDate.is.null,endDate.gte.${DateTime.now().toIso8601String()}')
-  .or([
-    'regionSido.is.null',  // 전국 공통
-    'and(regionSido.eq.${userProfile['regionSido']},regionSigungu.is.null)',  // 시/도 매칭
-    'and(regionSido.eq.${userProfile['regionSido']},regionSigungu.eq.${userProfile['regionSigungu']},regionDong.is.null)',  // 시/군/구 매칭
-    'and(regionSido.eq.${userProfile['regionSido']},regionSigungu.eq.${userProfile['regionSigungu']},regionDong.eq.${userProfile['regionDong']})',  // 완전 매칭
-  ].join(','))
-  .order('orderIndex');
+---
+
+### Table: `advertisement_regions` (광고-지역 연결)
+
+| Column          | Type        | Notes                                              |
+| --------------- | ----------- | -------------------------------------------------- |
+| id              | uuid        | **PK**                                             |
+| advertisementId | uuid        | **FK** → `advertisements.id` **ON DELETE CASCADE** |
+| regionSido      | text        | 시/도 (예: 서울, 경기) - 필수                      |
+| regionSigungu   | text        | 시/군/구 (예: 관악구, 수원시) (NULL 가능)          |
+| regionDong      | text        | 읍/면/동 (예: 신림동, 봉천동) (NULL 가능)          |
+| createdAt       | timestamptz | DEFAULT now()                                      |
+
+> **설명**:
+>
+> - 지역 광고(`adType = 'REGION'`)와 지역을 연결
+> - 다대다 관계: 하나의 광고가 여러 지역에 노출 가능
+> - 시/도는 필수, 시/군/구와 동은 선택적으로 좁은 범위 지정 가능
+>
+> **제약조건**:
+>
+> - `UNIQUE (advertisementId, regionSido, regionSigungu, regionDong)`: 중복 방지
+> - **ON DELETE CASCADE**: 광고 삭제 시 연결도 삭제
+>
+> **사용 예시**:
+>
+> ```sql
+> -- 서울 전체에 광고 노출
+> INSERT INTO advertisement_regions (advertisementId, regionSido) VALUES
+>   ('ad-id', '서울');
+>
+> -- 서울 관악구와 동작구에 광고 노출
+> INSERT INTO advertisement_regions (advertisementId, regionSido, regionSigungu) VALUES
+>   ('ad-id', '서울', '관악구'),
+>   ('ad-id', '서울', '동작구');
+>
+> -- 서울 관악구 신림동에만 광고 노출
+> INSERT INTO advertisement_regions (advertisementId, regionSido, regionSigungu, regionDong) VALUES
+>   ('ad-id', '서울', '관악구', '신림동');
+> ```
+
+---
+
+### Table: `manager_profiles` (매니저 추가 정보)
+
+| Column               | Type        | Notes                                       |
+| -------------------- | ----------- | ------------------------------------------- |
+| id                   | uuid        | **PK**                                      |
+| userId               | uuid        | **FK** → `user.id` **ON DELETE CASCADE**    |
+| businessRegistration | text        | 사업자등록증 URL (선택)                     |
+| address              | text        | 주소 (NULL 가능)                            |
+| memo                 | text        | 메모 (NULL 가능)                            |
+| createdAt            | timestamptz | DEFAULT now()                               |
+
+> **설명**:
+>
+> - 매니저의 추가 정보 저장
+> - `user` 테이블과 1:1 관계
+>
+> **제약조건**:
+>
+> - `UNIQUE (userId)`: 한 유저당 하나의 프로필
+> - **ON DELETE CASCADE**: 유저 삭제 시 프로필도 삭제
+
+---
+
+### Table: `manager_apartments` (매니저-아파트 연결)
+
+| Column      | Type        | Notes                                        |
+| ----------- | ----------- | -------------------------------------------- |
+| id          | uuid        | **PK**                                       |
+| managerId   | uuid        | **FK** → `user.id` **ON DELETE CASCADE**     |
+| apartmentId | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE** |
+| createdAt   | timestamptz | DEFAULT now() - 아파트 등록일                |
+
+> **설명**:
+>
+> - 매니저가 영업해서 등록한 아파트 목록
+> - 매니저는 자기가 등록한 아파트만 관리 가능
+> - 다대다 관계: 한 매니저가 여러 아파트, 한 아파트에 여러 매니저 가능
+>
+> **제약조건**:
+>
+> - `UNIQUE (managerId, apartmentId)`: 중복 방지
+> - **ON DELETE CASCADE**: 매니저 삭제 시 연결 삭제, 아파트 삭제 시 연결 삭제
+
+---
+
+## ✓ 광고 시스템 관계 다이어그램
+
 ```
+user.id (MANAGER role)
+  ├─< manager_profiles.userId (1:1)
+  ├─< manager_apartments.managerId (매니저가 관리하는 아파트)
+  ├─< advertisers.createdBy (매니저가 등록한 업체)
+  └─< advertisements.createdBy (매니저가 등록한 광고)
 
-### 알림 조회 예시
+advertisers.id
+  └─< advertisements.advertiserId (업체의 광고)
 
-```dart
-// 전국 공통 알림 (지역 필터 없음)
-final notifications = await supabase
-  .from('home_notifications')
-  .select('*')
-  .eq('isActive', true)
-  .or('startDate.is.null,startDate.lte.${DateTime.now().toIso8601String()}')
-  .or('endDate.is.null,endDate.gte.${DateTime.now().toIso8601String()}')
-  .order('orderIndex');
+ad_categories.id
+  └─< advertisements.categoryId (카테고리별 광고)
+
+advertisements.id
+  ├─< advertisement_apartments.advertisementId (동네 광고)
+  │    └─> apartments.id (동네 광고가 노출될 아파트)
+  └─< advertisement_regions.advertisementId (지역 광고)
+       └─> 지역 정보 (regionSido, regionSigungu, regionDong)
+
+apartments.id
+  ├─< manager_apartments.apartmentId
+  └─< advertisement_apartments.apartmentId
 ```
 
 ---
 
-## ✓ 추가: 관계 다이어그램 업데이트
+## ✓ 광고 조회 로직 (RLS)
 
-```
-home_categories.id
-  └─< home_category_items.categoryId
+### 매니저: 자기가 등록한 광고만 조회
 
-user.regionSido, regionSigungu, regionDong
-  → (지역 필터링) → home_category_items 조회
+```sql
+-- advertisements 테이블 RLS
+CREATE POLICY "Managers view own ads"
+ON advertisements FOR SELECT
+USING (createdBy = auth.uid());
+
+-- advertisers 테이블 RLS
+CREATE POLICY "Managers view own advertisers"
+ON advertisers FOR SELECT
+USING (createdBy = auth.uid());
 ```
+
+### 일반 사용자: 자기 지역/아파트 광고 조회
+
+```sql
+CREATE POLICY "Users view relevant ads"
+ON advertisements FOR SELECT
+USING (
+  isActive = true
+  AND NOW() BETWEEN startDate AND endDate
+  AND (
+    -- 지역 광고 (advertisement_regions 테이블 사용)
+    (
+      adType = 'REGION' AND EXISTS (
+        SELECT 1 FROM advertisement_regions ar
+        WHERE ar.advertisementId = advertisements.id
+          AND (
+            -- 시/도 매칭
+            ar.regionSido = (SELECT regionSido FROM "user" WHERE id = auth.uid())
+            -- 시/군/구 매칭 (NULL이면 모든 시/군/구 포함)
+            AND (ar.regionSigungu IS NULL OR ar.regionSigungu = (SELECT regionSigungu FROM "user" WHERE id = auth.uid()))
+            -- 동 매칭 (NULL이면 모든 동 포함)
+            AND (ar.regionDong IS NULL OR ar.regionDong = (SELECT regionDong FROM "user" WHERE id = auth.uid()))
+          )
+      )
+    )
+    OR
+    -- 동네 광고
+    (
+      adType = 'NEIGHBORHOOD' AND EXISTS (
+        SELECT 1 FROM advertisement_apartments aa
+        WHERE aa.advertisementId = advertisements.id
+          AND aa.apartmentId = (SELECT apartmentId FROM "user" WHERE id = auth.uid())
+      )
+    )
+  )
+);
+```
+
+> **지역 광고 매칭 로직**:
+>
+> - `regionSido = '서울'`: 서울에 사는 모든 사용자에게 노출
+> - `regionSido = '서울', regionSigungu = '관악구'`: 서울 관악구에 사는 사용자에게만 노출
+> - `regionSido = '서울', regionSigungu = '관악구', regionDong = '신림동'`: 서울 관악구 신림동에 사는 사용자에게만 노출
+> - NULL 값은 "제한 없음"을 의미 (예: regionSigungu가 NULL이면 해당 시/도의 모든 시/군/구 포함)
 
 ---
 
@@ -588,9 +840,9 @@ user.regionSido, regionSigungu, regionDong
 | ----------- | ----------- | ------------------------------------------------------ |
 | id          | uuid        | **PK**                                                 |
 | messageKey  | text        | **UNIQUE** - 메시지 식별자 (예: `door_opened_success`) |
-| title       | text        | 다이얼로그 제목                                        |
+| title       | text        | 다이얼로그 제목 (기본값: '')                           |
 | content     | text        | 다이얼로그 내용 (NULL 가능)                            |
-| description | text        | 사용 시점 설명 (NULL 가능) - 관리자용 메모             |
+| description | text        | 메시지 설명 (NULL 가능)                                |
 | createdAt   | timestamptz | DEFAULT now()                                          |
 
 
@@ -604,10 +856,10 @@ user.regionSido, regionSigungu, regionDong
 >
 > ```sql
 > -- 초기 데이터
-> INSERT INTO dialog_messages (messageKey, title, content, description) VALUES
->   ('door_opened_success', '문이 열렸습니다!', '''울단지''가 무료로 제공해\n드리는 서비스 입니다.\n편히 사용하세요', '문이 성공적으로 열렸을 때 표시'),
->   ('door_open_failed', '문열기 실패', '다시 시도해주세요', '문열기 시도가 실패했을 때 표시'),
->   ('bluetooth_required', '블루투스 권한 필요', '설정에서 블루투스 권한을 허용해주세요', '블루투스 권한이 없을 때 표시');
+> INSERT INTO dialog_messages (messageKey, title, content) VALUES
+>   ('door_opened_success', '문이 열렸습니다!', '''울단지''가 무료로 제공해\n드리는 서비스 입니다.\n편히 사용하세요'),
+>   ('door_open_failed', '문열기 실패', '다시 시도해주세요'),
+>   ('bluetooth_required', '블루투스 권한 필요', '설정에서 블루투스 권한을 허용해주세요');
 > ```
 >
 > **Flutter 사용 예시**:
@@ -634,12 +886,300 @@ user.regionSido, regionSigungu, regionDong
 
 ---
 
-## bukcet 폴더구조
+## ✓ 추가: 전화번호 인증 테이블
 
+### Table: `phone_verifications`
+
+| Column            | Type        | Notes                                       |
+| ----------------- | ----------- | ------------------------------------------- |
+| id                | uuid        | **PK**                                      |
+| phone_number      | text        | 인증할 전화번호                             |
+| verification_code | text        | 인증 코드                                   |
+| created_at        | timestamptz | 생성 시간 (DEFAULT now())                   |
+| expires_at        | timestamptz | 만료 시간 (DEFAULT now() + 3분)             |
+| verified          | boolean     | 인증 완료 여부 (DEFAULT false)              |
+| attempts          | integer     | 인증 시도 횟수 (DEFAULT 0)                  |
+
+> **설명**:
+>
+> - 전화번호 인증 프로세스 관리
+> - 인증 코드는 3분 후 자동 만료
+> - 인증 시도 횟수 추적으로 무차별 대입 공격 방지 가능
+>
+> **사용 예시**:
+>
+> ```dart
+> // 인증 코드 생성 및 저장
+> final code = generateRandomCode(6); // 6자리 랜덤 코드
+> await supabase.from('phone_verifications').insert({
+>   'phone_number': phoneNumber,
+>   'verification_code': code,
+> });
+>
+> // 인증 코드 확인
+> final verification = await supabase
+>   .from('phone_verifications')
+>   .select()
+>   .eq('phone_number', phoneNumber)
+>   .eq('verification_code', inputCode)
+>   .eq('verified', false)
+>   .gt('expires_at', DateTime.now().toIso8601String())
+>   .single();
+>
+> if (verification != null) {
+>   // 인증 성공 - verified를 true로 업데이트
+>   await supabase.from('phone_verifications')
+>     .update({'verified': true})
+>     .eq('id', verification['id']);
+> }
+> ```
+
+---
+
+## ✓ 성능 최적화 인덱스
+
+### 광고 시스템 인덱스
+
+| 인덱스명                                  | 테이블                    | 컬럼                                       | 설명                                 |
+| ----------------------------------------- | ------------------------- | ------------------------------------------ | ------------------------------------ |
+| idx_advertisements_region                 | advertisements            | regionSido, regionSigungu, regionDong      | 지역 광고 필터링 최적화 (레거시)     |
+| idx_advertisements_active_dates_partial   | advertisements            | startDate, endDate (WHERE isActive = true) | 활성 광고 날짜 범위 조회 (Partial)   |
+| idx_advertisements_category_active        | advertisements            | categoryId, isActive                       | 카테고리별 광고 조회                 |
+| idx_advertisements_category_order         | advertisements            | categoryId, orderIndex (WHERE isActive)    | **카테고리별 광고 정렬 (핵심)**      |
+| idx_advertisers_created_by                | advertisers               | createdBy                                  | 매니저별 광고 업체 조회              |
+| idx_advertisers_active                    | advertisers               | isActive (WHERE isActive = true)           | 활성 광고 업체 (Partial)             |
+| idx_ad_apts_ad_id                         | advertisement_apartments  | advertisementId                            | 광고-아파트 연결 조회                |
+| idx_ad_regions_ad_id                      | advertisement_regions     | advertisementId                            | **광고-지역 연결 조회 (핵심)**       |
+| idx_ad_regions_region                     | advertisement_regions     | regionSido, regionSigungu, regionDong      | **지역별 광고 필터링 (핵심)**        |
+| idx_ad_categories_order_active            | ad_categories             | orderIndex, isActive (WHERE isActive)      | 카테고리 정렬 조회 (Partial)         |
+
+### 사용자 관련 인덱스
+
+| 인덱스명                 | 테이블     | 컬럼                                | 설명                                   |
+| ------------------------ | ---------- | ----------------------------------- | -------------------------------------- |
+| idx_user_region          | user       | regionSido, regionSigungu, regionDong | **사용자 지역 기반 광고 필터링 (핵심)** |
+| idx_user_apartment_id    | user       | apartmentId                         | 아파트별 사용자 조회                   |
+| idx_user_phone_number    | user       | phoneNumber                         | 전화번호 중복 체크                     |
+
+### 접근 권한 인덱스 (문 열기)
+
+| 인덱스명                           | 테이블            | 컬럼                             | 설명                                     |
+| ---------------------------------- | ----------------- | -------------------------------- | ---------------------------------------- |
+| idx_user_line_access_user_active   | user_line_access  | userId, isActive (WHERE isActive) | **사용자별 활성 접근 권한 (핵심)**       |
+| idx_user_line_access_line_id       | user_line_access  | lineId                           | 라인별 접근 권한 조회                    |
+| idx_user_roles_user_id             | user_roles        | userId                           | 사용자별 역할 조회                       |
+| idx_user_roles_role                | user_roles        | role                             | 역할별 사용자 조회                       |
+
+### 아파트 구조 인덱스
+
+| 인덱스명                              | 테이블                  | 컬럼         | 설명                 |
+| ------------------------------------- | ----------------------- | ------------ | -------------------- |
+| idx_apartments_name                   | apartments              | name         | 아파트명 검색        |
+| idx_apartment_buildings_apartment_id  | apartment_buildings     | apartmentId  | 아파트별 동 조회     |
+| idx_apartment_buildings_number        | apartment_buildings     | buildingNumber | 동 번호 검색         |
+| idx_apartment_lines_building_id       | apartment_lines         | buildingId   | 동별 라인 조회       |
+| idx_apartment_line_places_line_id     | apartment_line_places   | lineId       | 라인별 장소 조회     |
+
+### 기기 관련 인덱스
+
+| 인덱스명                   | 테이블   | 컬럼                          | 설명                         |
+| -------------------------- | -------- | ----------------------------- | ---------------------------- |
+| idx_devices_line_place_id  | devices  | linePlaceId                   | 장소별 기기 조회             |
+| idx_devices_active         | devices  | isWorking (WHERE isWorking)   | 활성 기기 조회 (Partial)     |
+| idx_devices_mac_address    | devices  | macAddress                    | **BLE MAC 주소 조회 (핵심)** |
+
+### 매니저 관련 인덱스
+
+| 인덱스명                          | 테이블              | 컬럼        | 설명                   |
+| --------------------------------- | ------------------- | ----------- | ---------------------- |
+| idx_manager_profiles_user_id      | manager_profiles    | userId      | 매니저 프로필 조회     |
+| idx_manager_apts_manager_id       | manager_apartments  | managerId   | 매니저별 관리 아파트   |
+| idx_manager_apts_apartment_id     | manager_apartments  | apartmentId | 아파트별 매니저 조회   |
+
+### 관리자 권한 인덱스
+
+| 인덱스명                        | 테이블        | 컬럼        | 설명                 |
+| ------------------------------- | ------------- | ----------- | -------------------- |
+| idx_admin_scopes_user_id        | admin_scopes  | userId      | 사용자별 관리 범위   |
+| idx_admin_scopes_apartment_id   | admin_scopes  | apartmentId | 아파트별 관리자 조회 |
+
+> **인덱스 타입**:
+>
+> - **Composite Index**: 여러 컬럼을 조합한 인덱스 (예: regionSido, regionSigungu, regionDong)
+> - **Partial Index**: WHERE 조건이 있는 인덱스 - 특정 조건의 데이터만 인덱싱하여 크기 최적화
+>
+> **핵심 인덱스**:
+>
+> - `idx_user_region`: 광고 필터링의 핵심 - 사용자 지역 정보로 광고 조회
+> - `idx_user_line_access_user_active`: 문 열기의 핵심 - 사용자 접근 권한 확인
+> - `idx_devices_mac_address`: BLE 연결의 핵심 - MAC 주소로 기기 찾기
+
+---
+
+## Storage Bucket 폴더구조
+
+### 1. **home-content** 버킷 (앱 전역 콘텐츠)
+
+```
 home-content/
-├── notifications/ # 알림 이미지
-├── categories/ # 광고 이미지
-│ ├── home/
-│ ├── car/
-│ └── pet/
-└── icons/ # 카테고리 아이콘 (PNG)
+└── notifications/ # 홈 화면 알림 이미지
+    └── {notification-id}.jpg
+```
+
+> **용도**: 앱 전역에서 사용되는 콘텐츠 (홈 알림, 배너 등)
+
+---
+
+### 2. **advertisements** 버킷 (광고 시스템 전체)
+
+```
+advertisements/
+├── categories/ # 광고 카테고리
+│   └── icons/ # 카테고리 아이콘
+│       └── {category-id}.png
+│
+├── advertisers/ # 광고주 관련 파일
+│   ├── logos/ # 광고주 로고
+│   │   └── {advertiser-id}.png
+│   ├── business-registrations/ # 사업자등록증
+│   │   └── {advertiser-id}.jpg
+│   ├── contracts/ # 계약서
+│   │   └── {advertiser-id}.pdf
+│   └── representative-images/ # 대표 이미지
+│       └── {advertiser-id}.jpg
+│
+└── ads/ # 광고 이미지 (카테고리별 분류)
+    ├── pilates/ # 필라테스 광고
+    │   └── {ad-id}.jpg
+    ├── academy/ # 학원 광고
+    │   └── {ad-id}.jpg
+    └── {category-name}/ # 기타 카테고리
+        └── {ad-id}.jpg
+```
+
+> **용도**: 광고 시스템 관련 모든 파일 (카테고리, 광고주, 광고 이미지)
+
+---
+
+### 3. **managers** 버킷 (매니저 관련)
+
+```
+managers/
+└── business-registrations/ # 매니저 사업자등록증
+    └── {manager-id}.jpg
+```
+
+> **용도**: 매니저 관련 파일 (사업자등록증 등)
+
+---
+
+## 업로드 규칙 요약
+
+| 항목                   | 버킷              | 경로                                              |
+| ---------------------- | ----------------- | ------------------------------------------------- |
+| 홈 알림 이미지         | home-content      | `notifications/{notification-id}.jpg`             |
+| 카테고리 아이콘        | advertisements    | `categories/icons/{category-id}.png`              |
+| 광고주 로고            | advertisements    | `advertisers/logos/{advertiser-id}.png`           |
+| 광고주 사업자등록증    | advertisements    | `advertisers/business-registrations/{advertiser-id}.jpg` |
+| 광고주 계약서          | advertisements    | `advertisers/contracts/{advertiser-id}.pdf`       |
+| 광고주 대표 이미지     | advertisements    | `advertisers/representative-images/{advertiser-id}.jpg` |
+| 광고 이미지            | advertisements    | `ads/{category-name}/{ad-id}.jpg`                 |
+| 매니저 사업자등록증    | managers          | `business-registrations/{manager-id}.jpg`         |
+
+---
+
+## 버킷 권한 설정 (RLS)
+
+### home-content
+- **Public**: 모든 사용자 읽기 가능
+- **Upload**: SUPER_ADMIN만 업로드 가능
+
+### advertisements
+- **Public**: 모든 사용자 읽기 가능
+- **Upload**: SUPER_ADMIN, MANAGER 업로드 가능
+- **Delete**: 본인이 생성한 파일만 삭제 가능
+
+### managers
+- **Public**: 인증된 사용자만 읽기 가능
+- **Upload**: SUPER_ADMIN만 업로드 가능
+- **Delete**: SUPER_ADMIN만 삭제 가능
+
+---
+
+## ✓ pg_cron 자동화 작업
+
+### 1. 광고 자동 비활성화 (매일 오전 1시)
+
+**Job 이름**: `deactivate-expired-ads`
+**실행 주기**: `0 1 * * *` (매일 오전 1시)
+
+**수행 작업**:
+1. 종료일이 지난 광고 비활성화
+2. 광고주 계약이 종료되거나 비활성화된 광고 비활성화
+
+```sql
+-- Job 생성
+SELECT cron.schedule(
+  'deactivate-expired-ads',
+  '0 1 * * *',
+  $$
+    -- 1. endDate가 지난 광고 비활성화
+    UPDATE advertisements
+    SET "isActive" = false
+    WHERE "isActive" = true
+      AND "endDate" < NOW();
+
+    -- 2. 광고주 계약이 종료된 광고 비활성화
+    UPDATE advertisements ad
+    SET "isActive" = false
+    FROM advertisers adv
+    WHERE ad."advertiserId" = adv.id
+      AND ad."isActive" = true
+      AND (adv."isActive" = false OR adv."contractEndDate" < NOW());
+  $$
+);
+```
+
+### 2. APP_USER 30일 미사용 비활성화 (매일 오전 2시)
+
+**Job 이름**: `deactivate-inactive-users`
+**실행 주기**: `0 2 * * *` (매일 오전 2시)
+
+**수행 작업**: 아파트 등록 회원 중 30일 이상 미사용 시 비활성화 (관리자 제외)
+
+### 3. 기기 상태 체크 (매일 오전 3시)
+
+**Job 이름**: `check-device-status`
+**실행 주기**: `0 3 * * *` (매일 오전 3시)
+
+**수행 작업**: 24시간 이상 미사용 기기 점검 상태로 변경
+
+### 4. 자동 승인 (매일 오전 6시)
+
+**Job 이름**: `auto-approve-users`
+**실행 주기**: `0 6 * * *` (매일 오전 6시)
+
+**수행 작업**: 승인 대기 회원 자동 승인 (특정 조건 충족 시)
+
+---
+
+## ✓ Cron Job 관리
+
+### Job 조회
+```sql
+SELECT * FROM cron.job ORDER BY jobid;
+```
+
+### Job 삭제
+```sql
+SELECT cron.unschedule('job-name');
+```
+
+### Job 비활성화/활성화
+```sql
+-- 비활성화
+UPDATE cron.job SET active = false WHERE jobname = 'job-name';
+
+-- 활성화
+UPDATE cron.job SET active = true WHERE jobname = 'job-name';
+```

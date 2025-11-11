@@ -45,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
+import { getUserRoles } from '@/lib/auth';
 
 interface Apartment {
   id: string;
@@ -80,8 +81,11 @@ export default function ApartmentsPage() {
 
   const fetchApartments = async () => {
     try {
-      // 아파트 목록과 관련 정보 조회
-      const { data: apartmentsData, error: apartmentsError } = await supabase
+      // 현재 사용자 역할 확인
+      const roles = await getUserRoles();
+      const isManager = roles.includes('MANAGER');
+
+      let query = supabase
         .from('apartments')
         .select(`
           id,
@@ -104,6 +108,29 @@ export default function ApartmentsPage() {
             )
           )
         `);
+
+      // 매니저인 경우 자신이 관리하는 아파트만 필터링
+      if (isManager) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: managerApartments } = await supabase
+            .from('manager_apartments')
+            .select('apartmentId')
+            .eq('managerId', user.id);
+
+          if (managerApartments && managerApartments.length > 0) {
+            const apartmentIds = managerApartments.map(ma => ma.apartmentId);
+            query = query.in('id', apartmentIds);
+          } else {
+            // 관리하는 아파트가 없으면 빈 결과 반환
+            setApartments([]);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      const { data: apartmentsData, error: apartmentsError } = await query;
 
       if (apartmentsError) throw apartmentsError;
 

@@ -196,6 +196,34 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
     setError(null);
 
     try {
+      // 현재 사용자 확인
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('로그인이 필요합니다.');
+      }
+
+      // 사용자 역할 확인
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('userId', user.id);
+
+      const userRoles = roles?.map(r => r.role) || [];
+      const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+      const isManager = userRoles.includes('MANAGER');
+
+      // 매니저인 경우 관리 권한 확인
+      if (isManager && !isSuperAdmin) {
+        const { data: managerApartments } = await supabase
+          .from('manager_apartments')
+          .select('apartmentId')
+          .eq('managerId', user.id)
+          .eq('apartmentId', apartmentId);
+
+        if (!managerApartments || managerApartments.length === 0) {
+          throw new Error('이 아파트에 대한 접근 권한이 없습니다.');
+        }
+      }
       // 아파트 정보 및 구조 로드
       const { data: apartmentData, error: apartmentError } = await supabase
         .from('apartments')
@@ -237,28 +265,53 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
 
       setApartment(formattedApartment);
 
-      // 기기 목록 로드
-      console.log('📡 기기 목록 로드 시작 - apartmentId:', apartmentId);
-      const { data: devicesData, error: devicesError } = await supabase
-        .from('devices')
-        .select(`
-          *,
-          apartment_line_places (
-            id,
-            placeName,
-            apartment_lines (
+      // 1단계: 해당 아파트의 모든 linePlaceId 수집
+      console.log('📡 아파트의 모든 linePlaceId 수집 시작 - apartmentId:', apartmentId);
+      const linePlaceIds: string[] = [];
+      formattedApartment.buildings?.forEach(building => {
+        building.lines?.forEach(line => {
+          line.places?.forEach(place => {
+            linePlaceIds.push(place.id);
+          });
+        });
+      });
+
+      console.log('📡 수집된 linePlaceIds:', linePlaceIds.length, linePlaceIds);
+
+      // 2단계: linePlaceId로 기기 목록 필터링
+      console.log('📡 기기 목록 로드 시작 - linePlaceIds로 필터링');
+
+      let devicesData;
+      let devicesError;
+
+      if (linePlaceIds.length === 0) {
+        // linePlaceId가 없으면 빈 배열
+        devicesData = [];
+        devicesError = null;
+      } else {
+        const { data, error } = await supabase
+          .from('devices')
+          .select(`
+            *,
+            apartment_line_places (
               id,
-              line,
-              apartment_buildings (
+              placeName,
+              apartment_lines (
                 id,
-                buildingNumber,
-                apartmentId
+                line,
+                apartment_buildings (
+                  id,
+                  buildingNumber
+                )
               )
             )
-          )
-        `)
-        .eq('apartment_line_places.apartment_lines.apartment_buildings.apartmentId', apartmentId)
-        .order('createdAt', { ascending: false });
+          `)
+          .in('linePlaceId', linePlaceIds)
+          .order('createdAt', { ascending: false });
+
+        devicesData = data;
+        devicesError = error;
+      }
 
       console.log('📡 기기 목록 응답:', { count: devicesData?.length, error: devicesError });
 

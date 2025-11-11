@@ -33,6 +33,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, AlertCircle, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { UserFullDetails } from '@/lib/supabase/types';
+import { getUserRoles } from '@/lib/auth';
 import {
   Select,
   SelectContent,
@@ -66,6 +67,22 @@ export default function UsersPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const debounceTimer = useRef<NodeJS.Timeout>(null);
+
+  // ESC 키로 이미지 미리보기 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && imagePreview) {
+        e.preventDefault();
+        e.stopPropagation();
+        setImagePreview(null);
+      }
+    };
+
+    if (imagePreview) {
+      document.addEventListener('keydown', handleEscape, true); // capture phase에서 처리
+      return () => document.removeEventListener('keydown', handleEscape, true);
+    }
+  }, [imagePreview]);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserFullDetails | null>(null);
   const [apartments, setApartments] = useState<Apartment[]>([]);
@@ -84,10 +101,36 @@ export default function UsersPage() {
   // 아파트 목록 로드
   const fetchApartments = useCallback(async () => {
     try {
-      const { data, error: fetchError } = await supabase
+      // 현재 사용자 역할 확인
+      const roles = await getUserRoles();
+      const isManager = roles.includes('MANAGER');
+
+      let query = supabase
         .from('apartments')
         .select('id, name')
         .order('name');
+
+      // 매니저인 경우 자신이 관리하는 아파트만 필터링
+      if (isManager) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: managerApartments } = await supabase
+            .from('manager_apartments')
+            .select('apartmentId')
+            .eq('managerId', user.id);
+
+          if (managerApartments && managerApartments.length > 0) {
+            const apartmentIds = managerApartments.map(ma => ma.apartmentId);
+            query = query.in('id', apartmentIds);
+          } else {
+            // 관리하는 아파트가 없으면 빈 결과
+            setApartments([]);
+            return;
+          }
+        }
+      }
+
+      const { data, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
       setApartments(data || []);
@@ -134,13 +177,40 @@ export default function UsersPage() {
     setError(null);
 
     try {
+      // 현재 사용자 역할 확인
+      const roles = await getUserRoles();
+      const isManager = roles.includes('MANAGER');
+
       let query = supabase
         .from('user')
         .select(`
           *,
-          user_roles(id, role, createdAt),
+          user_roles!inner(id, role, createdAt),
           apartments:apartmentId(id, name, address)
-        `, { count: 'exact' });
+        `, { count: 'exact' })
+        .eq('user_roles.role', 'APP_USER'); // APP_USER만 필터링
+
+      // 매니저인 경우 자신이 관리하는 아파트의 회원만 필터링
+      if (isManager) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: managerApartments } = await supabase
+            .from('manager_apartments')
+            .select('apartmentId')
+            .eq('managerId', user.id);
+
+          if (managerApartments && managerApartments.length > 0) {
+            const apartmentIds = managerApartments.map(ma => ma.apartmentId);
+            query = query.in('apartmentId', apartmentIds);
+          } else {
+            // 관리하는 아파트가 없으면 빈 결과
+            setUsers([]);
+            setTotalCount(0);
+            setLoading(false);
+            return;
+          }
+        }
+      }
 
       // 검색 필터링
       if (searchQuery) {
@@ -627,22 +697,36 @@ export default function UsersPage() {
       {/* Image Preview Modal */}
       {imagePreview && (
         <div
-          className='fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8'
-          onClick={() => setImagePreview(null)}
+          className='fixed inset-0 bg-black/80 flex items-center justify-center p-8'
+          style={{ zIndex: 9999 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setImagePreview(null);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className='relative max-w-4xl max-h-[85vh] flex items-center justify-center'>
+          <div
+            className='relative max-w-4xl max-h-[85vh] flex items-center justify-center'
+            onClick={(e) => e.stopPropagation()}
+          >
             <img
               src={imagePreview}
               alt='인증 사진'
               className='max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl'
+              onClick={(e) => e.stopPropagation()}
             />
             <Button
               variant='secondary'
               size='icon'
               className='absolute top-4 right-4 rounded-full shadow-lg'
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 setImagePreview(null);
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
             >
               <X className='h-5 w-5' />

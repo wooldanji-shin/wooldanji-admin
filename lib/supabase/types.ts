@@ -1,221 +1,309 @@
-// Database 타입 정의
-export interface Database {
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
+  }
   public: {
     Tables: {
       user: {
         Row: {
-          id: string;
-          createdAt: string;
-          email: string;
-          name: string | null;
-          address: string | null;
-          detailAddress: string | null;
-          hasAccessControl: boolean | null;
-          premium: boolean | null;
-          birthDay: string | null;
-          premiumExpiryDate: string | null;
-          confirmImageUrl: string | null;
-          shareUserCount: number | null;
-          recommendCode: string | null;
-          openDoorCount: number | null;
-          rssLevel: number | null;
-          approvalStatus: 'pending' | 'approve' | null;
-          registerMethod: string | null;
-          registrationType: 'GENERAL' | 'APARTMENT' | null;
-          apartmentId: string | null;
-          buildingNumber: number | null;
-          unit: number | null;
-          termsAgreed: boolean | null;
-          privacyAgreed: boolean | null;
-          marketingAgreed: boolean | null;
-          phoneNumber: string | null;
-        };
+          address: string | null
+          apartmentId: string | null
+          approvalStatus: string
+          birthDay: string | null
+          buildingNumber: number | null
+          confirmImageUrl: string | null
+          createdAt: string
+          detailAddress: string | null
+          email: string
+          fcmToken: string[] | null
+          id: string
+          lastAccessedAt: string | null
+          marketingAgreed: boolean
+          name: string
+          openDoorCount: number
+          overlayPermissionGranted: boolean | null
+          phoneNumber: string
+          platform: string | null
+          premium: boolean | null
+          premiumExpiryDate: string | null
+          privacyAgreed: boolean
+          recommendCode: string | null
+          regionDong: string | null
+          regionSido: string | null
+          regionSigungu: string | null
+          registerMethods: string[]
+          registrationType: string
+          rssLevel: number | null
+          shareUserCount: number
+          termsAgreed: boolean
+          unit: number | null
+        }
         Insert: {
-          id: string;
-          createdAt?: string;
-          email: string;
-          name?: string | null;
-          address?: string | null;
-          detailAddress?: string | null;
-          hasAccessControl?: boolean | null;
-          premium?: boolean | null;
-          birthDay?: string | null;
-          premiumExpiryDate?: string | null;
-          confirmImageUrl?: string | null;
-          shareUserCount?: number | null;
-          recommendCode?: string | null;
-          openDoorCount?: number | null;
-          rssLevel?: number | null;
-          approvalStatus?: 'pending' | 'approved' | 'rejected' | null;
-          registerMethod?: string | null;
-          registrationType?: 'GENERAL' | 'APARTMENT' | null;
-          apartmentId?: string | null;
-          buildingNumber?: number | null;
-          unit?: number | null;
-          termsAgreed?: boolean | null;
-          privacyAgreed?: boolean | null;
-          marketingAgreed?: boolean | null;
-          phoneNumber?: string | null;
-        };
+          address?: string | null
+          apartmentId?: string | null
+          approvalStatus: string
+          birthDay?: string | null
+          buildingNumber?: number | null
+          confirmImageUrl?: string | null
+          createdAt?: string
+          detailAddress?: string | null
+          email: string
+          fcmToken?: string[] | null
+          id?: string
+          lastAccessedAt?: string | null
+          marketingAgreed: boolean
+          name: string
+          openDoorCount: number
+          overlayPermissionGranted?: boolean | null
+          phoneNumber: string
+          platform?: string | null
+          premium?: boolean | null
+          premiumExpiryDate?: string | null
+          privacyAgreed: boolean
+          recommendCode?: string | null
+          regionDong?: string | null
+          regionSido?: string | null
+          regionSigungu?: string | null
+          registerMethods?: string[]
+          registrationType: string
+          rssLevel?: number | null
+          shareUserCount: number
+          termsAgreed: boolean
+          unit?: number | null
+        }
         Update: {
-          id?: string;
-          createdAt?: string;
-          email?: string;
-          name?: string | null;
-          address?: string | null;
-          detailAddress?: string | null;
-          hasAccessControl?: boolean | null;
-          premium?: boolean | null;
-          birthDay?: string | null;
-          premiumExpiryDate?: string | null;
-          confirmImageUrl?: string | null;
-          shareUserCount?: number | null;
-          recommendCode?: string | null;
-          openDoorCount?: number | null;
-          rssLevel?: number | null;
-          approvalStatus?: 'pending' | 'approved' | 'rejected' | null;
-          registerMethod?: string | null;
-          registrationType?: 'GENERAL' | 'APARTMENT' | null;
-          apartmentId?: string | null;
-          buildingNumber?: number | null;
-          unit?: number | null;
-          termsAgreed?: boolean | null;
-          privacyAgreed?: boolean | null;
-          marketingAgreed?: boolean | null;
-          phoneNumber?: string | null;
-        };
-      };
+          address?: string | null
+          apartmentId?: string | null
+          approvalStatus?: string
+          birthDay?: string | null
+          buildingNumber?: number | null
+          confirmImageUrl?: string | null
+          createdAt?: string
+          detailAddress?: string | null
+          email?: string
+          fcmToken?: string[] | null
+          id?: string
+          lastAccessedAt?: string | null
+          marketingAgreed?: boolean
+          name?: string
+          openDoorCount?: number
+          overlayPermissionGranted?: boolean | null
+          phoneNumber?: string
+          platform?: string | null
+          premium?: boolean | null
+          premiumExpiryDate?: string | null
+          privacyAgreed?: boolean
+          recommendCode?: string | null
+          regionDong?: string | null
+          regionSido?: string | null
+          regionSigungu?: string | null
+          registerMethods?: string[]
+          registrationType?: string
+          rssLevel?: number | null
+          shareUserCount?: number
+          termsAgreed?: boolean
+          unit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_apartmentId_fkey"
+            columns: ["apartmentId"]
+            isOneToOne: false
+            referencedRelation: "apartments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
-          id: string;
-          userId: string;
-          role: 'APP_USER' | 'APT_ADMIN' | 'REGION_ADMIN' | 'SUPER_ADMIN';
-          createdAt: string;
-        };
+          createdAt: string
+          id: string
+          role: string
+          userId: string | null
+        }
         Insert: {
-          id?: string;
-          userId: string;
-          role: 'APP_USER' | 'APT_ADMIN' | 'REGION_ADMIN' | 'SUPER_ADMIN';
-          createdAt?: string;
-        };
+          createdAt?: string
+          id?: string
+          role: string
+          userId?: string | null
+        }
         Update: {
-          id?: string;
-          userId?: string;
-          role?: 'APP_USER' | 'APT_ADMIN' | 'REGION_ADMIN' | 'SUPER_ADMIN';
-          createdAt?: string;
-        };
-      };
+          createdAt?: string
+          id?: string
+          role?: string
+          userId?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_userId_fkey"
+            columns: ["userId"]
+            isOneToOne: false
+            referencedRelation: "user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apartments: {
         Row: {
-          id: string;
-          name: string;
-          address: string;
-          createdAt: string;
-        };
+          address: string
+          createdAt: string
+          id: string
+          name: string
+        }
         Insert: {
-          id?: string;
-          name: string;
-          address: string;
-          createdAt?: string;
-        };
+          address: string
+          createdAt?: string
+          id?: string
+          name: string
+        }
         Update: {
-          id?: string;
-          name?: string;
-          address?: string;
-          createdAt?: string;
-        };
-      };
+          address?: string
+          createdAt?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       apartment_buildings: {
         Row: {
-          id: string;
-          createdAt: string;
-          buildingNumber: number;
-          apartmentId: string;
-          householdsCount: number;
-        };
+          apartmentId: string
+          buildingNumber: number
+          createdAt: string
+          householdsCount: number | null
+          id: string
+        }
         Insert: {
-          id?: string;
-          createdAt?: string;
-          buildingNumber: number;
-          apartmentId: string;
-          householdsCount: number;
-        };
+          apartmentId: string
+          buildingNumber: number
+          createdAt?: string
+          householdsCount?: number | null
+          id?: string
+        }
         Update: {
-          id?: string;
-          createdAt?: string;
-          buildingNumber?: number;
-          apartmentId?: string;
-          householdsCount?: number;
-        };
-      };
+          apartmentId?: string
+          buildingNumber?: number
+          createdAt?: string
+          householdsCount?: number | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apartment_buildings_apartmentId_fkey"
+            columns: ["apartmentId"]
+            isOneToOne: false
+            referencedRelation: "apartments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apartment_lines: {
         Row: {
-          id: string;
-          createdAt: string;
-          line: number;
-          buildingId: string;
-        };
+          buildingId: string
+          createdAt: string
+          id: string
+          line: number[]
+        }
         Insert: {
-          id?: string;
-          createdAt?: string;
-          line: number;
-          buildingId: string;
-        };
+          buildingId: string
+          createdAt?: string
+          id?: string
+          line: number[]
+        }
         Update: {
-          id?: string;
-          createdAt?: string;
-          line?: number;
-          buildingId?: string;
-        };
-      };
+          buildingId?: string
+          createdAt?: string
+          id?: string
+          line?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apartment_lines_buildingId_fkey"
+            columns: ["buildingId"]
+            isOneToOne: false
+            referencedRelation: "apartment_buildings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apartment_line_places: {
         Row: {
-          id: string;
-          lineId: string;
-          createdAt: string;
-          placeName: string;
-        };
+          createdAt: string
+          id: string
+          lineId: string
+          placeName: string | null
+        }
         Insert: {
-          id?: string;
-          lineId: string;
-          createdAt?: string;
-          placeName: string;
-        };
+          createdAt?: string
+          id?: string
+          lineId: string
+          placeName?: string | null
+        }
         Update: {
-          id?: string;
-          lineId?: string;
-          createdAt?: string;
-          placeName?: string;
-        };
-      };
+          createdAt?: string
+          id?: string
+          lineId?: string
+          placeName?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apartment_line_places_lineId_fkey"
+            columns: ["lineId"]
+            isOneToOne: false
+            referencedRelation: "apartment_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       devices: {
         Row: {
-          id: string;
-          createdAt: string;
-          linePlaceId: string;
-          macAddress: string;
-          iosMacAddress: string | null;
-          devicePassword: string;
-        };
+          createdAt: string
+          devicePassword: string
+          id: string
+          isWorking: boolean
+          lastOpenedAt: string | null
+          linePlaceId: string
+          macAddress: string
+        }
         Insert: {
-          id?: string;
-          createdAt?: string;
-          linePlaceId: string;
-          macAddress: string;
-          iosMacAddress?: string | null;
-          devicePassword: string;
-        };
+          createdAt?: string
+          devicePassword: string
+          id?: string
+          isWorking?: boolean
+          lastOpenedAt?: string | null
+          linePlaceId: string
+          macAddress: string
+        }
         Update: {
-          id?: string;
-          createdAt?: string;
-          linePlaceId?: string;
-          macAddress?: string;
-          iosMacAddress?: string | null;
-          devicePassword?: string;
-        };
-      };
-    };
-  };
+          createdAt?: string
+          devicePassword?: string
+          id?: string
+          isWorking?: boolean
+          lastOpenedAt?: string | null
+          linePlaceId?: string
+          macAddress?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_linePlaceId_fkey"
+            columns: ["linePlaceId"]
+            isOneToOne: false
+            referencedRelation: "apartment_line_places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+  }
 }
 
 // 조인된 데이터 타입

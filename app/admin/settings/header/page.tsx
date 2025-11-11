@@ -30,17 +30,15 @@ export default function HeaderSettingsPage() {
       setLoading(true);
       setError(null);
 
-      // Get the active header (there should only be one)
+      // Get the first header (there should only be one)
       const { data, error: fetchError } = await supabase
         .from('home_headers')
         .select('*')
-        .eq('isActive', true)
         .order('createdAt', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        // PGRST116 is "no rows returned"
+      if (fetchError) {
         throw fetchError;
       }
 
@@ -89,8 +87,6 @@ export default function HeaderSettingsPage() {
           .from('home_headers')
           .insert({
             headerText: headerText.trim(),
-            orderIndex: 0,
-            isActive: true,
           })
           .select()
           .single();

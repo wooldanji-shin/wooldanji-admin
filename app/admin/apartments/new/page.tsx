@@ -66,6 +66,10 @@ export default function NewApartmentPage() {
   const handleSubmit = async () => {
     setLoading(true);
     try {
+      // 현재 로그인한 사용자 정보 가져오기
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       // 1. apartments 테이블에 추가
       const { data: apartment, error: apartmentError } = await supabase
         .from('apartments')
@@ -79,7 +83,17 @@ export default function NewApartmentPage() {
       if (apartmentError) throw apartmentError;
       if (!apartment) throw new Error('Failed to create apartment');
 
-      // 2. apartment_buildings 테이블에 동 정보 추가
+      // 2. manager_apartments 테이블에 매니저-아파트 연결 추가
+      const { error: managerApartmentError } = await supabase
+        .from('manager_apartments')
+        .insert({
+          managerId: user.id,
+          apartmentId: (apartment as any).id,
+        } as any);
+
+      if (managerApartmentError) throw managerApartmentError;
+
+      // 3. apartment_buildings 테이블에 동 정보 추가
       for (const building of buildings) {
         const { data: buildingData, error: buildingError } = await supabase
           .from('apartment_buildings')
@@ -94,7 +108,7 @@ export default function NewApartmentPage() {
         if (buildingError) throw buildingError;
         if (!buildingData) throw new Error('Failed to create building');
 
-        // 3. apartment_lines 테이블에 라인 정보 추가
+        // 4. apartment_lines 테이블에 라인 정보 추가
         const lineRanges = parseMultipleLineRanges(building.lines);
         for (const lineRange of lineRanges) {
           const { error: lineError } = await supabase

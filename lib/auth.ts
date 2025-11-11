@@ -46,3 +46,31 @@ export async function getCurrentUser(): Promise<User | null> {
     name: user.user_metadata?.name || user.email?.split('@')[0] || '관리자',
   };
 }
+
+export async function getUserRoles(): Promise<string[]> {
+  const supabase = createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data: roles } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('userId', user.id);
+
+  return roles?.map(r => r.role) || [];
+}
+
+export async function hasRole(role: string): Promise<boolean> {
+  const roles = await getUserRoles();
+  return roles.includes(role);
+}
+
+export async function isSuperAdmin(): Promise<boolean> {
+  return hasRole('SUPER_ADMIN');
+}
+
+export async function isManager(): Promise<boolean> {
+  return hasRole('MANAGER');
+}
