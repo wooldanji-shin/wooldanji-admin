@@ -15,7 +15,6 @@ import {
   UserCog,
   MessageSquare,
   Megaphone,
-  ShoppingBag,
   LayoutList,
   Briefcase,
 } from 'lucide-react';
@@ -63,14 +62,8 @@ const advertisingItems = [
     roles: ['SUPER_ADMIN'],
   },
   {
-    name: '광고주 관리',
-    href: '/admin/advertising/advertisers',
-    icon: ShoppingBag,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    name: '광고 관리',
-    href: '/admin/advertising/advertisements',
+    name: '광고 등록/수정',
+    href: '/admin/advertising/ads',
     icon: Megaphone,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },

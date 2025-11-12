@@ -363,74 +363,97 @@ export function ImageUpload({
             return (
               <div
                 key={file.url}
-                className='flex items-center gap-4 p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors'
+                className='flex gap-4 p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors'
               >
-                {/* 파일 아이콘 */}
+                {/* 왼쪽: 파일 아이콘/썸네일 */}
                 <div className='flex-shrink-0'>
                   {isPDF(file.fileType) ? (
-                    <div className='w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950 flex items-center justify-center'>
-                      <FileText className='h-5 w-5 text-red-600 dark:text-red-400' />
+                    <div className='w-16 h-16 rounded-lg bg-red-50 dark:bg-red-950 flex items-center justify-center'>
+                      <FileText className='h-6 w-6 text-red-600 dark:text-red-400' />
+                    </div>
+                  ) : isImage(file.fileType) ? (
+                    <div className='w-16 h-16 rounded-lg overflow-hidden bg-muted flex items-center justify-center relative'>
+                      <img
+                        src={cleanUrl}
+                        alt={nameToDisplay}
+                        className='w-full h-full object-cover'
+                        onError={(e) => {
+                          // 이미지 로딩 실패 시 아이콘으로 대체
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const icon = document.createElement('div');
+                            icon.className = 'flex items-center justify-center w-full h-full';
+                            icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                            parent.appendChild(icon);
+                          }
+                        }}
+                      />
                     </div>
                   ) : (
-                    <div className='w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950 flex items-center justify-center'>
-                      <ImageIcon className='h-5 w-5 text-blue-600 dark:text-blue-400' />
+                    <div className='w-16 h-16 rounded-lg bg-muted flex items-center justify-center'>
+                      <ImageIcon className='h-6 w-6 text-muted-foreground' />
                     </div>
                   )}
                 </div>
 
-                {/* 파일 정보 */}
-                <div className='flex-1 min-w-0'>
-                  <p className='text-sm font-medium truncate' title={nameToDisplay}>
-                    {displayName}
-                  </p>
-                  <p className='text-xs text-muted-foreground mt-0.5'>
-                    {new Date(file.uploadedAt).toLocaleString('ko-KR', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </div>
+                {/* 오른쪽: 파일 정보와 액션 버튼 */}
+                <div className='flex-1 min-w-0 flex flex-col justify-between gap-2'>
+                  {/* 상단: 파일 정보 */}
+                  <div>
+                    <p className='text-sm font-medium truncate' title={nameToDisplay}>
+                      {displayName}
+                    </p>
+                    <p className='text-xs text-muted-foreground mt-0.5'>
+                      {new Date(file.uploadedAt).toLocaleString('ko-KR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
 
-                {/* 액션 버튼들 */}
-                <div className='flex items-center gap-1'>
-                  {/* 미리보기/열기 버튼 */}
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => window.open(cleanUrl, '_blank')}
-                    className='h-9'
-                    title={isPDF(file.fileType) ? 'PDF 열기' : '이미지 보기'}
-                  >
-                    {isPDF(file.fileType) ? '열기' : '보기'}
-                  </Button>
+                  {/* 하단: 액션 버튼들 */}
+                  <div className='flex items-center gap-1'>
+                    {/* 미리보기/열기 버튼 */}
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => window.open(cleanUrl, '_blank')}
+                      className='h-8 px-3'
+                      title={isPDF(file.fileType) ? 'PDF 열기' : '이미지 보기'}
+                    >
+                      {isPDF(file.fileType) ? '열기' : '보기'}
+                    </Button>
 
-                  {/* 다운로드 버튼 */}
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => handleDownload(cleanUrl, nameToDisplay)}
-                    className='h-9 w-9 p-0'
-                    title='다운로드'
-                  >
-                    <Download className='h-4 w-4' />
-                  </Button>
+                    {/* 다운로드 버튼 */}
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => handleDownload(cleanUrl, nameToDisplay)}
+                      className='h-8 w-8 p-0'
+                      title='다운로드'
+                    >
+                      <Download className='h-4 w-4' />
+                    </Button>
 
-                  {/* 삭제 버튼 */}
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => handleRemove(file.url)}
-                    className='h-9 w-9 p-0 hover:bg-destructive/10 hover:text-destructive'
-                    title='삭제'
-                  >
-                    <X className='h-4 w-4' />
-                  </Button>
+                    {/* 삭제 버튼 */}
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => handleRemove(file.url)}
+                      className='h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive'
+                      title='삭제'
+                    >
+                      <X className='h-4 w-4' />
+                    </Button>
+                  </div>
                 </div>
               </div>
             );

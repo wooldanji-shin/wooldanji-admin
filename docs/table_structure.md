@@ -466,29 +466,24 @@ await bleService.sendOpenCommand(passwordBytes);
 | id                    | uuid        | **PK**                                          |
 | createdAt             | timestamptz | DEFAULT now()                                   |
 | businessName          | text        | 상호명                                          |
-| businessType          | text        | 업종                                            |
 | representativeName    | text        | 대표자명                                        |
-| email                 | text        | 이메일                                          |
+| email                 | text        | 이메일 (NULL 가능)                              |
 | phoneNumber           | text        | 휴대전화번호                                    |
 | landlineNumber        | text        | 유선전화번호 (NULL 가능)                        |
-| businessRegistration  | text        | 사업자등록증 이미지 URL                         |
-| address               | text        | 업체 주소 (실제 위치)                           |
-| representativeImage   | text        | 대표 이미지 URL (NULL 가능)                     |
+| address               | text        | 영업점 주소 (실제 위치)                         |
+| businessRegistration  | text        | 사업자등록증 이미지 URL (NULL 가능)             |
 | logo                  | text        | 로고 이미지 URL (NULL 가능)                     |
-| description           | text        | 소개내용 (광고용) (NULL 가능)                   |
-| website               | text        | 웹사이트 링크 (NULL 가능)                       |
-| contractStartDate     | timestamptz | 계약 시작일                                     |
-| contractEndDate       | timestamptz | 계약 종료일                                     |
+| representativeImage   | text        | 대표 이미지 URL (NULL 가능)                     |
 | contractDocument      | text        | 계약서 이미지 URL (NULL 가능)                   |
-| contractMemo          | text        | 계약 관련 메모 (NULL 가능)                      |
+| contractMemo          | text        | 계약 메모 (NULL 가능)                           |
 | createdBy             | uuid        | **FK** → `user.id` - 등록한 매니저              |
-| isActive              | bool        | DEFAULT true - 활성화 여부                      |
 
 > **설명**:
 >
-> - 광고주/업체의 기본 정보 관리
+> - 광고주/업체의 **기본 정보 및 계약 정보** 관리
 > - 매니저가 영업 후 등록
-> - 하나의 업체가 여러 광고 등록 가능 (하지만 현재는 1:1 관계로 운영)
+> - 하나의 업체가 여러 광고 등록 가능 (현재는 1:1, 향후 1:N 확장 가능)
+> - 광고별 세부 정보(소개내용, 활성화 여부 등)는 `advertisements` 테이블에서 관리
 >
 > **제약조건**:
 >
@@ -558,10 +553,10 @@ await bleService.sendOpenCommand(passwordBytes);
 | adType        | text        | `NEIGHBORHOOD` \| `REGION` - 동네 광고 or 지역 광고           |
 | title         | text        | 광고 제목                                                     |
 | imageUrl      | text        | 광고 이미지 URL                                               |
+| description   | text        | 소개내용 (광고별 세부 설명) (NULL 가능)                       |
 | linkUrl       | text        | 클릭 시 이동할 URL (NULL 가능)                                |
 | startDate     | timestamptz | 광고 게시 시작일                                              |
 | endDate       | timestamptz | 광고 게시 종료일                                              |
-| orderIndex    | int4        | 표시 순서 (작을수록 상단) - DEFAULT 0                         |
 | createdBy     | uuid        | **FK** → `user.id` - 등록한 매니저                            |
 | isActive      | bool        | DEFAULT false - 활성화 여부 (수동 활성화 필요)                |
 
@@ -570,6 +565,7 @@ await bleService.sendOpenCommand(passwordBytes);
 > - 광고주가 원하는 홍보 범위에 따라 타입 결정
 > - **동네 광고**: 특정 아파트만 타겟팅 (`advertisement_apartments`로 연결)
 > - **지역 광고**: 여러 지역 타겟팅 (`advertisement_regions`로 연결)
+> - 광고별로 다른 소개내용(`description`) 설정 가능
 >
 > **광고 상태 관리**:
 >
@@ -577,60 +573,53 @@ await bleService.sendOpenCommand(passwordBytes);
 > - `isActive = false`: **대기중** - 관리자가 수동으로 활성화 필요
 > - `isActive = true` + `NOW() < startDate`: **예정** - 시작일 전
 > - `isActive = true` + `NOW() BETWEEN startDate AND endDate`: **진행중** - 노출 중
-> - `isActive = false` (자동 비활성화) OR 광고주 비활성화: **종료됨**
+> - `isActive = false` (자동 비활성화): **종료됨**
 >
 > **자동 비활성화** (pg_cron):
 >
 > - 매일 오전 1시에 실행
 > - `endDate < NOW()` → `isActive = false` 자동 설정
-> - 광고주 `isActive = false` OR `contractEndDate < NOW()` → 해당 광고들 `isActive = false`
 >
-> **광고 타입별 로직**:
+> **광고 등록 예시 (1:1 등록)**:
 >
 > ```sql
-> -- 동네 광고: A, B 아파트만
-> INSERT INTO advertisements (
->   advertiserId, categoryId, adType, title, imageUrl, createdBy
+> -- Step 1: 광고주 등록 (기본 정보 + 계약 정보)
+> INSERT INTO advertisers (
+>   businessName, representativeName, email, phoneNumber,
+>   landlineNumber, address, logo, contractDocument, contractMemo, createdBy
 > ) VALUES (
->   'advertiser-id', 'category-id', 'NEIGHBORHOOD',
->   '필라테스 신규 회원 모집', 'image.jpg', 'manager-id'
-> );
+>   '울단지 필라테스', '김대표', 'pilates@example.com', '010-1234-5678',
+>   '02-1234-5678', '서울 관악구 신림동 123', 'logo.png',
+>   'contract.pdf', '1년 계약', 'manager-id'
+> ) RETURNING id; -- advertiser-id 획득
 >
-> -- advertisement_apartments에 아파트 연결
+> -- Step 2: 광고 등록 (광고별 세부 정보)
+> INSERT INTO advertisements (
+>   advertiserId, categoryId, adType, title, imageUrl,
+>   description, linkUrl, startDate, endDate, createdBy
+> ) VALUES (
+>   'advertiser-id', 'pilates-category-id', 'NEIGHBORHOOD',
+>   '필라테스 신규 회원 모집', 'ad-image.jpg',
+>   '관악구 최고의 필라테스 센터! 신규 회원 50% 할인',
+>   'https://pilates.example.com',
+>   '2024-06-01', '2024-06-30', 'manager-id'
+> ) RETURNING id; -- ad-id 획득
+>
+> -- Step 3: 광고 노출 범위 설정
+> -- 동네 광고인 경우: advertisement_apartments에 아파트 연결
 > INSERT INTO advertisement_apartments (advertisementId, apartmentId) VALUES
->   ('ad-id', 'A-apt-id'),
->   ('ad-id', 'B-apt-id');
+>   ('ad-id', 'apt-A-id'),
+>   ('ad-id', 'apt-B-id');
 >
-> -- 지역 광고: 서울 관악구 + 동작구 (여러 지역)
-> INSERT INTO advertisements (
->   advertiserId, categoryId, adType, title, imageUrl, createdBy
-> ) VALUES (
->   'advertiser-id', 'category-id', 'REGION',
->   '영어학원 여름특강', 'image.jpg', 'manager-id'
-> );
->
-> -- advertisement_regions에 지역 연결 (여러 지역 가능)
+> -- 지역 광고인 경우: advertisement_regions에 지역 연결
 > INSERT INTO advertisement_regions (advertisementId, regionSido, regionSigungu) VALUES
->   ('ad-id', '서울', '관악구'),
->   ('ad-id', '서울', '동작구');
->
-> -- 레거시 방식 (단일 지역만 가능, 권장하지 않음)
-> INSERT INTO advertisements (
->   advertiserId, categoryId, adType,
->   regionSido, regionSigungu,
->   title, imageUrl, createdBy
-> ) VALUES (
->   'advertiser-id', 'category-id', 'REGION',
->   '서울', '관악구',
->   '영어학원 여름특강', 'image.jpg', 'manager-id'
-> );
+>   ('ad-id', '서울', '관악구');
 > ```
 >
 > **제약조건**:
 >
 > - `CHECK (adType IN ('NEIGHBORHOOD', 'REGION'))`
-> - `CHECK` (adType = 'REGION'일 때 regionSido 필수)
-> - **ON DELETE CASCADE**: 업체 삭제 시 광고도 삭제
+> - **ON DELETE CASCADE**: 광고주 삭제 시 광고도 삭제
 > - **ON DELETE SET NULL**: 카테고리 삭제 시 광고는 유지하되 카테고리만 NULL
 
 ---
@@ -942,12 +931,13 @@ USING (
 
 | 인덱스명                                  | 테이블                    | 컬럼                                       | 설명                                 |
 | ----------------------------------------- | ------------------------- | ------------------------------------------ | ------------------------------------ |
-| idx_advertisements_region                 | advertisements            | regionSido, regionSigungu, regionDong      | 지역 광고 필터링 최적화 (레거시)     |
-| idx_advertisements_active_dates_partial   | advertisements            | startDate, endDate (WHERE isActive = true) | 활성 광고 날짜 범위 조회 (Partial)   |
-| idx_advertisements_category_active        | advertisements            | categoryId, isActive                       | 카테고리별 광고 조회                 |
-| idx_advertisements_category_order         | advertisements            | categoryId, orderIndex (WHERE isActive)    | **카테고리별 광고 정렬 (핵심)**      |
+| idx_advertisements_active_dates_partial   | advertisements            | startDate, endDate (WHERE isActive = true) | **활성 광고 날짜 범위 조회 (핵심, Partial)** |
+| idx_advertisements_category_active        | advertisements            | categoryId, isActive                       | **카테고리별 광고 조회 (핵심)**      |
+| idx_advertisements_category_id            | advertisements            | categoryId                                 | 카테고리별 광고 조회                 |
+| idx_advertisements_ad_type                | advertisements            | adType                                     | 광고 타입별 조회                     |
+| idx_advertisements_dates                  | advertisements            | startDate, endDate                         | 광고 날짜 범위 조회                  |
+| idx_advertisements_created_by             | advertisements            | createdBy                                  | 매니저별 광고 조회                   |
 | idx_advertisers_created_by                | advertisers               | createdBy                                  | 매니저별 광고 업체 조회              |
-| idx_advertisers_active                    | advertisers               | isActive (WHERE isActive = true)           | 활성 광고 업체 (Partial)             |
 | idx_ad_apts_ad_id                         | advertisement_apartments  | advertisementId                            | 광고-아파트 연결 조회                |
 | idx_ad_regions_ad_id                      | advertisement_regions     | advertisementId                            | **광고-지역 연결 조회 (핵심)**       |
 | idx_ad_regions_region                     | advertisement_regions     | regionSido, regionSigungu, regionDong      | **지역별 광고 필터링 (핵심)**        |
@@ -1011,6 +1001,9 @@ USING (
 > **핵심 인덱스**:
 >
 > - `idx_user_region`: 광고 필터링의 핵심 - 사용자 지역 정보로 광고 조회
+> - `idx_advertisements_active_dates_partial`: 활성 광고 날짜 범위 조회 (Partial Index로 최적화)
+> - `idx_advertisements_category_active`: 카테고리별 활성 광고 조회
+> - `idx_ad_regions_region`: 지역별 광고 필터링 (regionSido, regionSigungu, regionDong)
 > - `idx_user_line_access_user_active`: 문 열기의 핵심 - 사용자 접근 권한 확인
 > - `idx_devices_mac_address`: BLE 연결의 핵심 - MAC 주소로 기기 찾기
 
@@ -1114,8 +1107,7 @@ managers/
 **실행 주기**: `0 1 * * *` (매일 오전 1시)
 
 **수행 작업**:
-1. 종료일이 지난 광고 비활성화
-2. 광고주 계약이 종료되거나 비활성화된 광고 비활성화
+- 종료일이 지난 광고 자동 비활성화
 
 ```sql
 -- Job 생성
@@ -1123,36 +1115,53 @@ SELECT cron.schedule(
   'deactivate-expired-ads',
   '0 1 * * *',
   $$
-    -- 1. endDate가 지난 광고 비활성화
+    -- endDate가 지난 광고 비활성화
     UPDATE advertisements
     SET "isActive" = false
     WHERE "isActive" = true
       AND "endDate" < NOW();
-
-    -- 2. 광고주 계약이 종료된 광고 비활성화
-    UPDATE advertisements ad
-    SET "isActive" = false
-    FROM advertisers adv
-    WHERE ad."advertiserId" = adv.id
-      AND ad."isActive" = true
-      AND (adv."isActive" = false OR adv."contractEndDate" < NOW());
   $$
 );
 ```
 
-### 2. APP_USER 30일 미사용 비활성화 (매일 오전 2시)
+### 2. APP_USER 30일 미사용 비활성화 (매일 오전 1시 10분)
 
 **Job 이름**: `deactivate-inactive-users`
-**실행 주기**: `0 2 * * *` (매일 오전 2시)
+**실행 주기**: `10 1 * * *` (매일 오전 1시 10분)
 
 **수행 작업**: 아파트 등록 회원 중 30일 이상 미사용 시 비활성화 (관리자 제외)
 
-### 3. 기기 상태 체크 (매일 오전 3시)
+### 3. 기기 상태 체크 (매일 오전 12시)
 
 **Job 이름**: `check-device-status`
-**실행 주기**: `0 3 * * *` (매일 오전 3시)
+**실행 주기**: `0 0 * * *` (매일 오전 12시)
 
-**수행 작업**: 24시간 이상 미사용 기기 점검 상태로 변경
+**수행 작업**: 48시간 이상 미사용 기기 점검 상태로 변경
+
+```sql
+-- 함수 정의
+CREATE OR REPLACE FUNCTION check_device_status()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- 48시간 이상 사용되지 않은 기기를 고장으로 표시
+  UPDATE devices
+  SET "isWorking" = false
+  WHERE "lastOpenedAt" < NOW() - INTERVAL '48 hours'
+    AND "isWorking" = true;
+
+  RAISE NOTICE '기기 상태 체크 완료 (48시간 기준)';
+END;
+$$;
+
+-- Job 생성
+SELECT cron.schedule(
+  'check-device-status',
+  '0 0 * * *',
+  $$SELECT check_device_status();$$
+);
+```
 
 ### 4. 자동 승인 (매일 오전 6시)
 
