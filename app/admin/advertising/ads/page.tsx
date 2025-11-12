@@ -82,8 +82,43 @@ import { getCurrentUser, getUserRoles } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/image-upload';
 
+// 전화번호 포맷팅 함수
+const formatPhoneNumber = (value: string): string => {
+  // 숫자만 추출
+  const numbers = value.replace(/[^\d]/g, '');
+
+  // 핸드폰번호 (010-1111-1111)
+  if (numbers.startsWith('010') || numbers.startsWith('011') || numbers.startsWith('016') || numbers.startsWith('017') || numbers.startsWith('018') || numbers.startsWith('019')) {
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+  }
+
+  return numbers;
+};
+
+// 유선전화 포맷팅 함수
+const formatLandlineNumber = (value: string): string => {
+  // 숫자만 추출
+  const numbers = value.replace(/[^\d]/g, '');
+
+  // 서울 (02): 2-3-4 또는 2-4-4
+  if (numbers.startsWith('02')) {
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 5) return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 2)}-${numbers.slice(2, 5)}-${numbers.slice(5)}`;
+    return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6, 10)}`;
+  }
+
+  // 기타 지역번호 (031, 032, etc): 3-3-4 또는 3-4-4
+  if (numbers.length <= 3) return numbers;
+  if (numbers.length <= 6) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+  if (numbers.length <= 10) return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+  return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+};
+
 // 광고 상태 타입
-type AdStatus = 'all' | 'active' | 'pending' | 'scheduled' | 'expired';
+type AdStatus = 'all' | 'active' | 'pending' | 'scheduled' | 'expiring' | 'expired';
 
 interface Advertisement {
   id: string;
@@ -213,6 +248,10 @@ export default function AdsManagementPage() {
   const [apartmentSearchOpen, setApartmentSearchOpen] = useState(false);
   const [apartmentSearch, setApartmentSearch] = useState('');
 
+  // 계약메모 인라인 수정 상태
+  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
+  const [editingMemoValue, setEditingMemoValue] = useState('');
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -225,11 +264,6 @@ export default function AdsManagementPage() {
     };
     initializeData();
   }, []);
-
-  // 필터링
-  useEffect(() => {
-    filterAdvertisements();
-  }, [advertisements, activeTab, searchTerm, filterAdType, filterCategory, filterAdvertiser]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -315,11 +349,17 @@ export default function AdsManagementPage() {
 
     if (now > end) return 'expired';
     if (now < start) return 'scheduled';
+
+    // 만료 30일 전 체크
+    const thirtyDaysBeforeEnd = new Date(end);
+    thirtyDaysBeforeEnd.setDate(thirtyDaysBeforeEnd.getDate() - 30);
+
+    if (now >= thirtyDaysBeforeEnd) return 'expiring';
     return 'active';
   };
 
   // 필터링 로직
-  const filterAdvertisements = () => {
+  const filterAdvertisements = useCallback(() => {
     let filtered = [...advertisements];
 
     // 상태별 필터
@@ -351,6 +391,59 @@ export default function AdsManagementPage() {
     }
 
     setFilteredAds(filtered);
+  }, [advertisements, activeTab, searchTerm, filterAdType, filterCategory, filterAdvertiser]);
+
+  // 필터링 useEffect
+  useEffect(() => {
+    filterAdvertisements();
+  }, [filterAdvertisements]);
+
+  // 전화번호 변경 핸들러 (메모이제이션)
+  const handlePhoneNumberChange = useCallback((value: string) => {
+    const formatted = formatPhoneNumber(value);
+    setAdvertiserFormData(prev => ({ ...prev, phoneNumber: formatted }));
+  }, []);
+
+  const handleLandlineNumberChange = useCallback((value: string) => {
+    const formatted = formatLandlineNumber(value);
+    setAdvertiserFormData(prev => ({ ...prev, landlineNumber: formatted }));
+  }, []);
+
+  // 계약메모 인라인 수정
+  const handleMemoEdit = (advertiserId: string, currentMemo: string | null) => {
+    setEditingMemoId(advertiserId);
+    setEditingMemoValue(currentMemo || '');
+  };
+
+  const handleMemoSave = async (advertiserId: string) => {
+    try {
+      const { error } = await supabase
+        .from('advertisers')
+        .update({ contractMemo: editingMemoValue || null })
+        .eq('id', advertiserId);
+
+      if (error) throw error;
+
+      // 로컬 상태 업데이트
+      setAdvertisements(prev =>
+        prev.map(ad =>
+          ad.advertiserId === advertiserId
+            ? { ...ad, advertisers: { ...ad.advertisers, contractMemo: editingMemoValue || null } }
+            : ad
+        )
+      );
+
+      setEditingMemoId(null);
+      setEditingMemoValue('');
+    } catch (error: any) {
+      console.error('Error updating memo:', error);
+      setError('메모 저장 실패: ' + error.message);
+    }
+  };
+
+  const handleMemoCancel = () => {
+    setEditingMemoId(null);
+    setEditingMemoValue('');
   };
 
   // 광고 등록/수정 다이얼로그 열기
@@ -697,6 +790,11 @@ export default function AdsManagementPage() {
         className: 'bg-blue-500 hover:bg-blue-600',
         icon: Calendar
       },
+      expiring: {
+        label: '만료예정',
+        className: 'bg-orange-500 hover:bg-orange-600',
+        icon: AlertCircle
+      },
       expired: {
         label: '만료',
         className: 'bg-red-500 hover:bg-red-600',
@@ -776,7 +874,7 @@ export default function AdsManagementPage() {
           <Card>
             <CardContent className='pt-6'>
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AdStatus)}>
-                <TabsList className='grid w-full grid-cols-5 h-auto'>
+                <TabsList className='grid w-full grid-cols-6 h-auto'>
                   <TabsTrigger value='all' className='flex flex-col gap-1 py-3'>
                     <Package className='h-4 w-4' />
                     <div className='font-medium'>전체</div>
@@ -796,6 +894,11 @@ export default function AdsManagementPage() {
                     <Calendar className='h-4 w-4' />
                     <div className='font-medium'>예정</div>
                     <div className='text-xs text-muted-foreground'>{getStatusCount('scheduled')}개</div>
+                  </TabsTrigger>
+                  <TabsTrigger value='expiring' className='flex flex-col gap-1 py-3'>
+                    <AlertCircle className='h-4 w-4' />
+                    <div className='font-medium'>만료예정</div>
+                    <div className='text-xs text-muted-foreground'>{getStatusCount('expiring')}개</div>
                   </TabsTrigger>
                   <TabsTrigger value='expired' className='flex flex-col gap-1 py-3'>
                     <XCircle className='h-4 w-4' />
@@ -959,9 +1062,11 @@ export default function AdsManagementPage() {
                         <TableHead className='w-[100px]'>상태</TableHead>
                         <TableHead>광고 제목</TableHead>
                         <TableHead>광고주</TableHead>
+                        <TableHead className='w-[140px]'>연락처</TableHead>
                         <TableHead className='w-[120px]'>카테고리</TableHead>
                         <TableHead className='w-[100px]'>타입</TableHead>
                         <TableHead className='w-[180px]'>게시 기간</TableHead>
+                        <TableHead className='w-[200px]'>계약메모</TableHead>
                         <TableHead className='text-right w-[120px]'>작업</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -969,7 +1074,11 @@ export default function AdsManagementPage() {
                       {filteredAds.map((ad) => (
                         <TableRow key={ad.id} className='hover:bg-muted/50 transition-colors'>
                           <TableCell>
-                            <div className='w-14 h-14 rounded-lg overflow-hidden bg-muted flex items-center justify-center'>
+                            <div
+                              className='w-14 h-14 rounded-lg overflow-hidden bg-muted flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary transition-all'
+                              onClick={() => ad.imageUrl && window.open(ad.imageUrl, '_blank')}
+                              title={ad.imageUrl ? '이미지 크게 보기' : '이미지 없음'}
+                            >
                               {ad.imageUrl ? (
                                 <img
                                   src={ad.imageUrl}
@@ -1024,6 +1133,14 @@ export default function AdsManagementPage() {
                             </Tooltip>
                           </TableCell>
                           <TableCell>
+                            <div className='space-y-1 text-sm'>
+                              <div className='font-medium'>{ad.advertisers?.phoneNumber || '-'}</div>
+                              {ad.advertisers?.landlineNumber && (
+                                <div className='text-xs text-muted-foreground'>{ad.advertisers.landlineNumber}</div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             {ad.ad_categories ? (
                               <Badge variant='outline' className='font-normal'>
                                 <Tag className='mr-1 h-3 w-3' />
@@ -1057,6 +1174,58 @@ export default function AdsManagementPage() {
                                 {new Date(ad.endDate).toLocaleDateString('ko-KR')}
                               </div>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {editingMemoId === ad.advertiserId ? (
+                              <div className='space-y-2'>
+                                <Textarea
+                                  value={editingMemoValue}
+                                  onChange={(e) => setEditingMemoValue(e.target.value)}
+                                  className='min-h-[60px] text-sm'
+                                  placeholder='계약 메모를 입력하세요'
+                                />
+                                <div className='flex gap-1'>
+                                  <Button
+                                    size='sm'
+                                    onClick={() => handleMemoSave(ad.advertiserId)}
+                                    className='h-7 px-2'
+                                  >
+                                    저장
+                                  </Button>
+                                  <Button
+                                    size='sm'
+                                    variant='outline'
+                                    onClick={handleMemoCancel}
+                                    className='h-7 px-2'
+                                  >
+                                    취소
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className='text-sm cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors'
+                                onClick={() => handleMemoEdit(ad.advertiserId, ad.advertisers?.contractMemo)}
+                                title='클릭하여 수정'
+                              >
+                                {ad.advertisers?.contractMemo ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className='max-w-[180px]'>
+                                        {truncateText(ad.advertisers.contractMemo, 50)}
+                                      </div>
+                                    </TooltipTrigger>
+                                    {ad.advertisers.contractMemo.length > 50 && (
+                                      <TooltipContent>
+                                        <p className='max-w-xs whitespace-pre-wrap'>{ad.advertisers.contractMemo}</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                ) : (
+                                  <span className='text-muted-foreground italic'>메모 없음</span>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className='flex justify-end gap-2'>
@@ -1168,9 +1337,7 @@ export default function AdsManagementPage() {
                       <Input
                         id='phoneNumber'
                         value={advertiserFormData.phoneNumber}
-                        onChange={(e) =>
-                          setAdvertiserFormData({ ...advertiserFormData, phoneNumber: e.target.value })
-                        }
+                        onChange={(e) => handlePhoneNumberChange(e.target.value)}
                         placeholder='010-1234-5678'
                       />
                     </div>
@@ -1179,9 +1346,7 @@ export default function AdsManagementPage() {
                       <Input
                         id='landlineNumber'
                         value={advertiserFormData.landlineNumber}
-                        onChange={(e) =>
-                          setAdvertiserFormData({ ...advertiserFormData, landlineNumber: e.target.value })
-                        }
+                        onChange={(e) => handleLandlineNumberChange(e.target.value)}
                         placeholder='02-1234-5678'
                       />
                     </div>
