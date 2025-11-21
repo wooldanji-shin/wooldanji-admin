@@ -11,7 +11,6 @@ import { createClient } from '@/supabase';
 import {
   Loader2,
   Save,
-  AlertCircle,
   Plus,
   Edit2,
   Trash2,
@@ -19,7 +18,7 @@ import {
   Search,
   MessageSquare,
 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 interface DialogMessage {
   id: string;
@@ -48,9 +47,6 @@ export default function DialogMessagesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string>('');
 
   const supabase = createClient();
 
@@ -78,7 +74,6 @@ export default function DialogMessagesPage() {
   const loadMessages = async () => {
     try {
       setLoading(true);
-      setError(null);
 
       const { data, error: fetchError } = await supabase
         .from('dialog_messages')
@@ -91,7 +86,7 @@ export default function DialogMessagesPage() {
       setFilteredMessages(data || []);
     } catch (err) {
       console.error('Error loading messages:', err);
-      setError('메시지를 불러오는 중 오류가 발생했습니다.');
+      toast.error('메시지를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -104,7 +99,6 @@ export default function DialogMessagesPage() {
     setDescription('');
     setEditingMessage(null);
     setMode('list');
-    setError(null);
   };
 
   const handleCreate = () => {
@@ -119,29 +113,26 @@ export default function DialogMessagesPage() {
     setContent(message.content || '');
     setDescription(message.description || '');
     setMode('edit');
-    setError(null);
   };
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      setError(null);
-      setSuccess(false);
 
       // Validation
       if (!messageKey.trim()) {
-        setError('메시지 키를 입력해주세요.');
+        toast.error('메시지 키를 입력해주세요.');
         return;
       }
 
       if (!title.trim()) {
-        setError('제목을 입력해주세요.');
+        toast.error('제목을 입력해주세요.');
         return;
       }
 
       // Validate messageKey format (alphanumeric and underscores only)
       if (!/^[a-z0-9_]+$/.test(messageKey)) {
-        setError('메시지 키는 영문 소문자, 숫자, 언더스코어(_)만 사용 가능합니다.');
+        toast.error('메시지 키는 영문 소문자, 숫자, 언더스코어(_)만 사용 가능합니다.');
         return;
       }
 
@@ -154,7 +145,7 @@ export default function DialogMessagesPage() {
           .single();
 
         if (existing) {
-          setError('이미 존재하는 메시지 키입니다.');
+          toast.error('이미 존재하는 메시지 키입니다.');
           return;
         }
 
@@ -170,7 +161,7 @@ export default function DialogMessagesPage() {
 
         if (insertError) throw insertError;
 
-        setSuccessMessage('메시지가 성공적으로 추가되었습니다.');
+        toast.success('메시지가 성공적으로 추가되었습니다.');
       } else if (mode === 'edit' && editingMessage) {
         // Update existing message
         const { error: updateError } = await supabase
@@ -184,18 +175,15 @@ export default function DialogMessagesPage() {
 
         if (updateError) throw updateError;
 
-        setSuccessMessage('메시지가 성공적으로 수정되었습니다.');
+        toast.success('메시지가 성공적으로 수정되었습니다.');
       }
-
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
 
       // Reload messages and reset form
       await loadMessages();
       resetForm();
     } catch (err) {
       console.error('Error saving message:', err);
-      setError('메시지를 저장하는 중 오류가 발생했습니다.');
+      toast.error('메시지를 저장하는 중 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
@@ -212,7 +200,6 @@ export default function DialogMessagesPage() {
 
     try {
       setDeleting(message.id);
-      setError(null);
 
       const { error: deleteError } = await supabase
         .from('dialog_messages')
@@ -221,15 +208,13 @@ export default function DialogMessagesPage() {
 
       if (deleteError) throw deleteError;
 
-      setSuccessMessage('메시지가 성공적으로 삭제되었습니다.');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      toast.success('메시지가 성공적으로 삭제되었습니다.');
 
       // Reload messages
       await loadMessages();
     } catch (err) {
       console.error('Error deleting message:', err);
-      setError('메시지를 삭제하는 중 오류가 발생했습니다.');
+      toast.error('메시지를 삭제하는 중 오류가 발생했습니다.');
     } finally {
       setDeleting(null);
     }
@@ -252,30 +237,6 @@ export default function DialogMessagesPage() {
 
       <div className='flex-1 p-6 overflow-auto'>
         <div className='max-w-6xl mx-auto space-y-6'>
-          {/* Info Alert */}
-          <Alert className='bg-muted/50 border-muted'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>
-              앱에서 사용되는 다이얼로그 메시지를 관리합니다. 메시지 키는 코드에서 참조되므로 신중하게 설정하세요.
-            </AlertDescription>
-          </Alert>
-
-          {/* Success Message */}
-          {success && (
-            <Alert className='border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100'>
-              <AlertCircle className='h-4 w-4' />
-              <AlertDescription>{successMessage}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Error Message */}
-          {error && mode === 'list' && (
-            <Alert variant='destructive'>
-              <AlertCircle className='h-4 w-4' />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
           {/* List View */}
           {mode === 'list' && (
             <>
@@ -450,14 +411,6 @@ export default function DialogMessagesPage() {
                     줄바꿈이 그대로 반영됩니다.
                   </p>
                 </div>
-
-                {/* Error Message */}
-                {error && (
-                  <Alert variant='destructive'>
-                    <AlertCircle className='h-4 w-4' />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
 
                 {/* Action Buttons */}
                 <div className='flex justify-end gap-3 pt-4'>

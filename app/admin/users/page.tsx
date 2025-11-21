@@ -29,8 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, AlertCircle, Trash2 } from 'lucide-react';
+import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { UserFullDetails } from '@/lib/supabase/types';
 import { getUserRoles } from '@/lib/auth';
@@ -41,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -62,7 +62,6 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserFullDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
@@ -174,7 +173,6 @@ export default function UsersPage() {
     if (initialLoading) {
       setLoading(true);
     }
-    setError(null);
 
     try {
       // 현재 사용자 역할 확인
@@ -244,7 +242,7 @@ export default function UsersPage() {
       setTotalCount(count || 0);
     } catch (err) {
       console.error('Failed to fetch users:', err);
-      setError('회원 목록을 불러오는데 실패했습니다.');
+      toast.error('회원 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
       setInitialLoading(false);
@@ -323,11 +321,12 @@ export default function UsersPage() {
         throw new Error(error.error || 'Failed to update approval status');
       }
 
+      toast.success('승인 상태가 변경되었습니다.');
       // 목록 갱신
       fetchUsers();
     } catch (err) {
       console.error('Failed to update approval status:', err);
-      setError('승인 상태 변경에 실패했습니다.');
+      toast.error('승인 상태 변경에 실패했습니다.');
     }
   };
 
@@ -347,12 +346,13 @@ export default function UsersPage() {
 
       if (error) throw error;
 
+      toast.success('회원이 삭제되었습니다.');
       setDeleteDialog(false);
       setDeletingUser(null);
       fetchUsers();
     } catch (err) {
       console.error('Failed to delete user:', err);
-      setError('회원 삭제에 실패했습니다.');
+      toast.error('회원 삭제에 실패했습니다.');
     }
   };
 
@@ -460,14 +460,6 @@ export default function UsersPage() {
             전체 {totalCount}명
           </div>
         </div>
-
-        {/* Error Alert */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         {/* Users Table */}
         <Card className='bg-card border-border'>

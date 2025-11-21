@@ -7,10 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Alert,
-  AlertDescription,
-} from '@/components/ui/alert';
+import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { parseMultipleLineRanges } from '@/lib/utils/line';
 
@@ -76,6 +73,7 @@ export default function NewApartmentPage() {
         .insert({
           name: apartmentName,
           address: address,
+          createdBy: user.id,
         } as any)
         .select()
         .single();
@@ -122,10 +120,11 @@ export default function NewApartmentPage() {
         }
       }
 
+      toast.success('아파트가 성공적으로 등록되었습니다.');
       router.push('/admin/apartments');
     } catch (error) {
       console.error('Failed to create apartment:', error);
-      alert('아파트 등록 중 오류가 발생했습니다.');
+      toast.error('아파트 등록 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -245,11 +244,9 @@ export default function NewApartmentPage() {
             </CardHeader>
             <CardContent>
               {buildings.length === 0 ? (
-                <Alert>
-                  <AlertDescription>
-                    아직 등록된 동이 없습니다. '동 추가하기' 버튼을 클릭하여 동을 추가해주세요.
-                  </AlertDescription>
-                </Alert>
+                <div className="text-center py-8 text-muted-foreground">
+                  아직 등록된 동이 없습니다. '동 추가하기' 버튼을 클릭하여 동을 추가해주세요.
+                </div>
               ) : (
                 <div className="space-y-4">
                   {buildings.map((building, index) => (

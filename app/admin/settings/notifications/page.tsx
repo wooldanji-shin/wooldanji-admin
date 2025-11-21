@@ -17,8 +17,8 @@ import {
   Image as ImageIcon,
   Trash2,
 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import Image from 'next/image';
+import { toast } from 'sonner';
 
 interface Notification {
   id: string;
@@ -45,9 +45,6 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string>('');
 
   const supabase = createClient();
 
@@ -58,7 +55,6 @@ export default function NotificationSettingsPage() {
   const loadCurrentNotification = async () => {
     try {
       setLoading(true);
-      setError(null);
 
       // Get the most recent notification (there should only be one)
       const { data, error: fetchError } = await supabase
@@ -82,7 +78,7 @@ export default function NotificationSettingsPage() {
       }
     } catch (err) {
       console.error('Error loading notification:', err);
-      setError('알림 정보를 불러오는 중 오류가 발생했습니다.');
+      toast.error('알림 정보를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -117,18 +113,17 @@ export default function NotificationSettingsPage() {
   const handleFile = (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError('이미지 파일만 업로드 가능합니다.');
+      toast.error('이미지 파일만 업로드 가능합니다.');
       return;
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('이미지 크기는 5MB 이하여야 합니다.');
+      toast.error('이미지 크기는 5MB 이하여야 합니다.');
       return;
     }
 
     setImageFile(file);
-    setError(null);
 
     // Create preview
     const reader = new FileReader();
@@ -203,8 +198,6 @@ export default function NotificationSettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      setError(null);
-      setSuccess(false);
 
       let finalImageUrl = existingImageUrl;
 
@@ -258,12 +251,10 @@ export default function NotificationSettingsPage() {
       // Reset form
       setImageFile(null);
 
-      setSuccessMessage('알림이 성공적으로 저장되었습니다.');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      toast.success('알림이 성공적으로 저장되었습니다.');
     } catch (err) {
       console.error('Error saving notification:', err);
-      setError('알림을 저장하는 중 오류가 발생했습니다.');
+      toast.error('알림을 저장하는 중 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
@@ -272,7 +263,7 @@ export default function NotificationSettingsPage() {
   const handleDelete = async () => {
     // Safety check: can't delete if no current notification
     if (!currentNotification) {
-      setError('삭제할 알림이 없습니다.');
+      toast.error('삭제할 알림이 없습니다.');
       return;
     }
 
@@ -282,7 +273,6 @@ export default function NotificationSettingsPage() {
 
     try {
       setDeleting(true);
-      setError(null);
 
       // Delete image from storage if exists
       // deleteImageFromStorage handles null safely
@@ -305,12 +295,10 @@ export default function NotificationSettingsPage() {
       setExistingImageUrl(null);
       setImageFile(null);
 
-      setSuccessMessage('알림이 성공적으로 삭제되었습니다.');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      toast.success('알림이 성공적으로 삭제되었습니다.');
     } catch (err) {
       console.error('Error deleting notification:', err);
-      setError('알림을 삭제하는 중 오류가 발생했습니다.');
+      toast.error('알림을 삭제하는 중 오류가 발생했습니다.');
     } finally {
       setDeleting(false);
     }
@@ -331,7 +319,6 @@ export default function NotificationSettingsPage() {
       setExistingImageUrl(null);
     }
     setImageFile(null);
-    setError(null);
   };
 
   if (loading) {
@@ -520,24 +507,6 @@ export default function NotificationSettingsPage() {
                   알림 클릭 시 이동할 URL을 입력하세요.
                 </p>
               </div>
-
-              {/* Error Message */}
-              {error && (
-                <Alert variant='destructive'>
-                  <AlertCircle className='h-4 w-4' />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {/* Success Message */}
-              {success && (
-                <Alert className='border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100'>
-                  <AlertCircle className='h-4 w-4' />
-                  <AlertDescription>
-                    {successMessage}
-                  </AlertDescription>
-                </Alert>
-              )}
 
               {/* Action Buttons */}
               <div className='flex justify-end gap-3 pt-4'>

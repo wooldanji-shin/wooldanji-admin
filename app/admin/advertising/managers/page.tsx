@@ -30,13 +30,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Search,
   Plus,
   Edit,
   Trash2,
-  AlertCircle,
   Briefcase,
   Building2,
   Eye,
@@ -47,6 +45,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { Textarea } from '@/components/ui/textarea';
 import { ImageUpload } from '@/components/image-upload';
+import { toast } from 'sonner';
 
 interface Manager {
   id: string;
@@ -87,7 +86,6 @@ export default function AdvertisingManagersPage() {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Create dialog
@@ -104,7 +102,6 @@ export default function AdvertisingManagersPage() {
   const [tempManagerId, setTempManagerId] = useState<string>('');
   const [uploadedCreateImage, setUploadedCreateImage] = useState<string>(''); // 업로드된 생성 이미지 추적
   const [showPassword, setShowPassword] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   // Delete dialog
   const [deleteDialog, setDeleteDialog] = useState(false);
@@ -129,7 +126,6 @@ export default function AdvertisingManagersPage() {
   // 매니저 목록 조회
   const fetchManagers = useCallback(async () => {
     setLoading(true);
-    setError(null);
 
     try {
       const { data, error: fetchError } = await supabase
@@ -152,7 +148,7 @@ export default function AdvertisingManagersPage() {
       setManagers(data || []);
     } catch (err) {
       console.error('Failed to fetch managers:', err);
-      setError('매니저 목록을 불러오는데 실패했습니다.');
+      toast.error('매니저 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -192,17 +188,15 @@ export default function AdvertisingManagersPage() {
 
   // 매니저 생성
   const handleCreateManager = async () => {
-    setCreateError(null);
-
     if (!createForm.email || !createForm.password || !createForm.name) {
-      setCreateError('필수 항목을 입력해주세요.');
+      toast.error('필수 항목을 입력해주세요.');
       return;
     }
 
     // 비밀번호 검증: 8글자 이상, 특수문자 1개 이상
     const passwordRegex = /^(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{8,}$/;
     if (!passwordRegex.test(createForm.password)) {
-      setCreateError('비밀번호는 8글자 이상이며 특수문자를 1개 이상 포함해야 합니다.');
+      toast.error('비밀번호는 8글자 이상이며 특수문자를 1개 이상 포함해야 합니다.');
       return;
     }
 
@@ -232,12 +226,12 @@ export default function AdvertisingManagersPage() {
         memo: '',
       });
       setShowPassword(false);
-      setCreateError(null);
       setUploadedCreateImage(''); // Reset tracking on successful save
+      toast.success('매니저가 생성되었습니다.');
       fetchManagers();
     } catch (err: any) {
       console.error('Failed to create manager:', err);
-      setCreateError(err.message || '매니저 생성에 실패했습니다.');
+      toast.error(err.message || '매니저 생성에 실패했습니다.');
     }
   };
 
@@ -258,7 +252,7 @@ export default function AdvertisingManagersPage() {
   // 매니저 수정 저장
   const handleUpdateManager = async () => {
     if (!editForm.name) {
-      setError('이름은 필수 항목입니다.');
+      toast.error('이름은 필수 항목입니다.');
       return;
     }
 
@@ -288,10 +282,11 @@ export default function AdvertisingManagersPage() {
 
       setIsEditDialogOpen(false);
       setUploadedEditImage(''); // Reset tracking on successful save
+      toast.success('매니저 정보가 수정되었습니다.');
       fetchManagers();
     } catch (err: any) {
       console.error('Failed to update manager:', err);
-      setError('매니저 수정에 실패했습니다.');
+      toast.error('매니저 수정에 실패했습니다.');
     }
   };
 
@@ -313,10 +308,11 @@ export default function AdvertisingManagersPage() {
 
       setDeleteDialog(false);
       setDeletingManager(null);
+      toast.success('매니저가 삭제되었습니다.');
       fetchManagers();
     } catch (err) {
       console.error('Failed to delete manager:', err);
-      setError('매니저 삭제에 실패했습니다.');
+      toast.error('매니저 삭제에 실패했습니다.');
     }
   };
 
@@ -351,13 +347,6 @@ export default function AdvertisingManagersPage() {
             매니저 추가
           </Button>
         </div>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         {/* Managers Table */}
         <Card className='bg-card border-border'>
@@ -503,7 +492,6 @@ export default function AdvertisingManagersPage() {
               memo: '',
             });
             setShowPassword(false);
-            setCreateError(null);
             setTempManagerId('');
           }
         }}
@@ -515,13 +503,6 @@ export default function AdvertisingManagersPage() {
               새로운 매니저 계정을 생성합니다.
             </DialogDescription>
           </DialogHeader>
-
-          {createError && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{createError}</AlertDescription>
-            </Alert>
-          )}
 
           <div className='space-y-4 py-4'>
             <div className='space-y-2'>

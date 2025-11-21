@@ -58,8 +58,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 import { formatLineRange } from '@/lib/utils/line';
@@ -141,7 +141,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
   const [adminScopes, setAdminScopes] = useState<AdminScope[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'tree' | 'table'>('tree');
   const [expandedBuildings, setExpandedBuildings] = useState<string[]>([]);
   const [expandedLines, setExpandedLines] = useState<string[]>([]);
@@ -193,7 +192,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
     }
 
     setLoading(true);
-    setError(null);
 
     try {
       // 현재 사용자 확인
@@ -362,7 +360,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       });
     } catch (err) {
       console.error('❌ Failed to fetch data:', err);
-      setError('데이터를 불러오는데 실패했습니다.');
+      toast.error('데이터를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -441,7 +439,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       fetchData();
     } catch (err) {
       console.error('Failed to toggle device status:', err);
-      setError('기기 상태 변경에 실패했습니다.');
+      toast.error('기기 상태 변경에 실패했습니다.');
     }
   };
 
@@ -472,12 +470,9 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
   const handleQuickSave = async (buildingId: string, lineId: string) => {
     try {
       if (!quickAddForm.placeName || !quickAddForm.macAddress) {
-        setError('장소와 MAC 주소를 입력해주세요.');
+        toast.error('장소와 MAC 주소를 입력해주세요.');
         return;
       }
-
-      // 에러 메시지 초기화
-      setError(null);
 
       // Optimistic UI: 임시 ID로 즉시 UI 업데이트
       const tempDeviceId = `temp-${Date.now()}`;
@@ -569,9 +564,9 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       console.log('✅ 임시 ID를 실제 ID로 교체 완료:', { tempDeviceId, realId: newDevice.id });
     } catch (err) {
       console.error('Failed to quick add device:', err);
-      setError('기기 추가에 실패했습니다.');
+      toast.error('기기 추가에 실패했습니다.');
       // 에러 시 optimistic update 롤백 (임시 기기 제거)
-      setDevices(prev => prev.filter(d => d.id !== tempDeviceId));
+      setDevices(prev => prev.filter(d => d.id !== `temp-${Date.now()}`));
     }
   };
 
@@ -604,7 +599,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
 
     try {
       if (!deviceForm.lineId || !deviceForm.placeName) {
-        setError('모든 필수 정보를 입력해주세요.');
+        toast.error('모든 필수 정보를 입력해주세요.');
         return;
       }
 
@@ -663,10 +658,11 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
 
       console.log('✅ 저장 성공! 다이얼로그 닫고 데이터 새로고침...');
       setDeviceDialog(false);
+      toast.success('기기가 저장되었습니다.');
       await fetchData();
     } catch (err) {
       console.error('❌ Failed to save device:', err);
-      setError('기기 저장에 실패했습니다.');
+      toast.error('기기 저장에 실패했습니다.');
     }
   };
 
@@ -707,7 +703,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       console.log('✅ 삭제 성공!');
     } catch (err) {
       console.error('❌ Failed to delete device:', err);
-      setError('기기 삭제에 실패했습니다. 페이지를 새로고침해주세요.');
+      toast.error('기기 삭제에 실패했습니다. 페이지를 새로고침해주세요.');
       // 에러 시 롤백을 위해 데이터 다시 로드
       await fetchData();
     }
@@ -777,7 +773,7 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       console.log('✅ 일괄 삭제 성공!');
     } catch (err) {
       console.error('❌ Failed to bulk delete devices:', err);
-      setError('일괄 삭제에 실패했습니다. 페이지를 새로고침해주세요.');
+      toast.error('일괄 삭제에 실패했습니다. 페이지를 새로고침해주세요.');
       // 에러 시 롤백을 위해 데이터 다시 로드
       await fetchData();
     }
@@ -883,14 +879,6 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
           </div>
         </div>
       </div>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       {/* Bulk Actions */}
       {selectedDevices.size > 0 && (
@@ -1372,14 +1360,14 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
           </DialogHeader>
           <div className="space-y-4 py-4">
             {(!editingDevice && deviceForm.buildingId && deviceForm.lineId) && (
-              <Alert>
-                <AlertDescription className="text-sm">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm">
                   <strong>
                     {apartment?.buildings?.find(b => b.id === deviceForm.buildingId)?.buildingNumber}동 ·
                     {' '}{formatLineRange(getSelectedLine()?.line || [])}라인
                   </strong>에 기기를 추가합니다
-                </AlertDescription>
-              </Alert>
+                </p>
+              </div>
             )}
 
             {!deviceForm.buildingId || !deviceForm.lineId ? (

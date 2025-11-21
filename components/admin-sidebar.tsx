@@ -17,6 +17,7 @@ import {
   Megaphone,
   LayoutList,
   Briefcase,
+  FileText,
 } from 'lucide-react';
 import { logout, getUserRoles } from '@/lib/auth';
 import { useState, useEffect } from 'react';
@@ -56,7 +57,7 @@ const navigationItems = [
 
 const advertisingItems = [
   {
-    name: '광고 카테고리',
+    name: '홈 섹션 관리',
     href: '/admin/advertising/categories',
     icon: LayoutList,
     roles: ['SUPER_ADMIN'],
@@ -85,6 +86,11 @@ const settingsMenu = {
       icon: Bell,
     },
     {
+      name: '공지사항 관리',
+      href: '/admin/settings/announcements',
+      icon: FileText,
+    },
+    {
       name: '다이얼로그 설정',
       href: '/admin/settings/dialog-messages',
       icon: MessageSquare,
@@ -98,7 +104,7 @@ export function AdminSidebar() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdvertisingOpen, setIsAdvertisingOpen] = useState(false);
   const [userRoles, setUserRoles] = useState<string[]>([]);
-
+  
   useEffect(() => {
     const fetchRoles = async () => {
       const roles = await getUserRoles();

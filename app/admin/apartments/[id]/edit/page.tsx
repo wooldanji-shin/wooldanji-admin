@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -55,7 +55,6 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   const [apartment, setApartment] = useState<ApartmentDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
 
   // 편집할 데이터
@@ -150,7 +149,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
       setBuildings(formattedApartment.buildings);
     } catch (err) {
       console.error('Failed to fetch apartment:', err);
-      setError('아파트 정보를 불러오는데 실패했습니다.');
+      toast.error('아파트 정보를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -178,7 +177,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     const lineRanges = parseMultipleLineRanges(lineInput);
 
     if (lineRanges.length === 0) {
-      setError('올바른 라인 번호를 입력하세요. (예: 1~4 또는 1~2, 3~7)');
+      toast.error('올바른 라인 번호를 입력하세요. (예: 1~4 또는 1~2, 3~7)');
       return;
     }
 
@@ -193,7 +192,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     const allNewNumbers = lineRanges.flat();
     const duplicates = allNewNumbers.filter(num => existingLineNumbers.includes(num));
     if (duplicates.length > 0) {
-      setError(`${duplicates.join(', ')}라인은 이미 존재합니다.`);
+      toast.error(`${duplicates.join(', ')}라인은 이미 존재합니다.`);
       return;
     }
 
@@ -215,7 +214,6 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
 
     setNewLines({ ...newLines, [buildingId]: '' });
     setHasChanges(true);
-    setError(null);
   };
 
   const handleDeleteLineClick = (buildingId: string, lineId: string, lineRange: string) => {
@@ -301,12 +299,12 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   const handleSave = async () => {
     // 폼 검증
     if (!name.trim()) {
-      setError('아파트명을 입력해주세요.');
+      toast.error('아파트명을 입력해주세요.');
       return;
     }
 
     if (!address.trim()) {
-      setError('주소를 입력해주세요.');
+      toast.error('주소를 입력해주세요.');
       return;
     }
 
@@ -314,19 +312,18 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
     const buildingNumbers = buildings.map(b => b.buildingNumber);
     const invalidBuildings = buildings.filter(b => b.buildingNumber === 0);
     if (invalidBuildings.length > 0) {
-      setError('모든 동의 번호를 1 이상으로 입력해주세요.');
+      toast.error('모든 동의 번호를 1 이상으로 입력해주세요.');
       return;
     }
 
     // 동 번호 중복 검증
     const duplicates = buildingNumbers.filter((num, index) => buildingNumbers.indexOf(num) !== index);
     if (duplicates.length > 0) {
-      setError(`동 번호가 중복되었습니다: ${duplicates.join(', ')}동`);
+      toast.error(`동 번호가 중복되었습니다: ${duplicates.join(', ')}동`);
       return;
     }
 
     setSaving(true);
-    setError(null);
 
     try {
       // 1. 아파트 기본 정보 업데이트
@@ -420,10 +417,11 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
       }
 
       setHasChanges(false);
+      toast.success('아파트 정보가 저장되었습니다.');
       router.push('/admin/apartments');
     } catch (err) {
       console.error('Failed to save apartment:', err);
-      setError('저장에 실패했습니다.');
+      toast.error('저장에 실패했습니다.');
     } finally {
       setSaving(false);
     }
@@ -491,13 +489,6 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
       {/* Basic Info */}
       <Card className="mb-6">
         <CardHeader>
@@ -545,11 +536,9 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
           <CardContent>
             <div className="space-y-6">
               {buildings.length === 0 ? (
-                <Alert>
-                  <AlertDescription>
-                    등록된 동이 없습니다. '동 추가하기' 버튼을 클릭하여 동을 추가해주세요.
-                  </AlertDescription>
-                </Alert>
+                <p className="text-center text-muted-foreground py-8">
+                  등록된 동이 없습니다. '동 추가하기' 버튼을 클릭하여 동을 추가해주세요.
+                </p>
               ) : (
                 buildings.map((building) => (
                   <Card key={building.id} className={building.isNew ? 'border-blue-200' : ''}>

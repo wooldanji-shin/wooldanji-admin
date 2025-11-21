@@ -50,10 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Alert,
-  AlertDescription,
-} from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 interface Device {
   id: string;
@@ -285,13 +282,7 @@ export default function ApartmentDetailPage({ params }: PageProps) {
   }
 
   if (!apartment) {
-    return (
-      <div className="p-8">
-        <Alert>
-          <AlertDescription>아파트 정보를 찾을 수 없습니다.</AlertDescription>
-        </Alert>
-      </div>
-    );
+    return null;
   }
 
   return (

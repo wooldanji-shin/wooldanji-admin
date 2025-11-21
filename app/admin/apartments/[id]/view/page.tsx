@@ -55,7 +55,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 
@@ -94,7 +94,6 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
   const [lines, setLines] = useState<Line[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
@@ -163,7 +162,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
       }
     } catch (err) {
       console.error('Failed to fetch apartment info:', err);
-      setError('아파트 정보를 불러오는데 실패했습니다.');
+      toast.error('아파트 정보를 불러오는데 실패했습니다.');
     }
   }, [resolvedParams.id, selectedBuilding, supabase]);
 
@@ -172,7 +171,6 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
     if (initialLoading) {
       setLoading(true);
     }
-    setError(null);
 
     try {
       let query = supabase
@@ -235,7 +233,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
       await fetchStats();
     } catch (err) {
       console.error('Failed to fetch users:', err);
-      setError('회원 목록을 불러오는데 실패했습니다.');
+      toast.error('회원 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
       setInitialLoading(false);
@@ -391,7 +389,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
       fetchUsers();
     } catch (err) {
       console.error('Failed to update approval status:', err);
-      setError('승인 상태 변경에 실패했습니다.');
+      toast.error('승인 상태 변경에 실패했습니다.');
     }
   };
 
@@ -413,10 +411,11 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
 
       setDeleteDialog(false);
       setDeletingUser(null);
+      toast.success('회원이 삭제되었습니다.');
       fetchUsers();
     } catch (err) {
       console.error('Failed to delete user:', err);
-      setError('회원 삭제에 실패했습니다.');
+      toast.error('회원 삭제에 실패했습니다.');
     }
   };
 
@@ -505,14 +504,6 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
           </div>
         </CardContent>
       </Card>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       {/* Search and Filters */}
       <Card className="mb-6">

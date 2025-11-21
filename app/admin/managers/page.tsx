@@ -35,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Search,
   MoreVertical,
@@ -46,7 +45,6 @@ import {
   Home,
   Layers,
   Plus,
-  AlertCircle,
   Shield,
   Eye,
   Image as ImageIcon,
@@ -54,6 +52,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatLineRange } from '@/lib/utils/line';
+import { toast } from 'sonner';
 
 interface Manager {
   id: string;
@@ -102,7 +101,6 @@ export default function ManagersPage() {
 
   const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
@@ -122,7 +120,6 @@ export default function ManagersPage() {
   // 관리자 목록 조회
   const fetchManagers = useCallback(async () => {
     setLoading(true);
-    setError(null);
 
     try {
       let query = supabase
@@ -155,7 +152,7 @@ export default function ManagersPage() {
       setManagers(data || []);
     } catch (err) {
       console.error('Failed to fetch managers:', err);
-      setError('관리자 목록을 불러오는데 실패했습니다.');
+      toast.error('관리자 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -227,10 +224,11 @@ export default function ManagersPage() {
 
       if (!response.ok) throw new Error('Failed to update approval status');
 
+      toast.success('승인 상태가 변경되었습니다.');
       fetchManagers();
     } catch (err) {
       console.error('Failed to update approval status:', err);
-      setError('승인 상태 변경에 실패했습니다.');
+      toast.error('승인 상태 변경에 실패했습니다.');
     }
   };
 
@@ -288,11 +286,12 @@ export default function ManagersPage() {
 
       if (error) throw error;
 
+      toast.success('권한이 저장되었습니다.');
       setIsEditModalOpen(false);
       fetchManagers();
     } catch (err) {
       console.error('Failed to save scope:', err);
-      setError('권한 저장에 실패했습니다.');
+      toast.error('권한 저장에 실패했습니다.');
     }
   };
 
@@ -312,12 +311,13 @@ export default function ManagersPage() {
 
       if (error) throw error;
 
+      toast.success('관리자가 삭제되었습니다.');
       setDeleteDialog(false);
       setDeletingManager(null);
       fetchManagers();
     } catch (err) {
       console.error('Failed to delete manager:', err);
-      setError('관리자 삭제에 실패했습니다.');
+      toast.error('관리자 삭제에 실패했습니다.');
     }
   };
 
@@ -411,13 +411,6 @@ export default function ManagersPage() {
             </span>
           </div>
         </div>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         {/* Managers Table */}
         <Card className='bg-card border-border'>

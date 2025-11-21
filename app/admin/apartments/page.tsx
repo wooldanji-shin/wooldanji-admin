@@ -29,6 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +57,8 @@ interface Apartment {
   totalDevices: number;
   lineRanges: { id: string; line: number[] }[];
   createdAt: string;
+  createdBy: string | null;
+  createdByName: string | null;
   status: 'active' | 'pending' | 'inactive';
 }
 
@@ -92,6 +95,10 @@ export default function ApartmentsPage() {
           name,
           address,
           createdAt,
+          createdBy,
+          user:createdBy (
+            name
+          ),
           apartment_buildings (
             id,
             buildingNumber,
@@ -169,6 +176,8 @@ export default function ApartmentsPage() {
           totalDevices,
           lineRanges,
           createdAt: new Date(apt.createdAt).toLocaleDateString('ko-KR'),
+          createdBy: (apt as any).createdBy || null,
+          createdByName: (apt as any).user?.name || null,
           status: 'active' as const,
         };
       }) || [];
@@ -252,9 +261,10 @@ export default function ApartmentsPage() {
       setApartments(apartments.filter(apt => apt.id !== deletingApartment.id));
       setDeleteDialog(false);
       setDeletingApartment(null);
+      toast.success('아파트가 삭제되었습니다.');
     } catch (error) {
       console.error('Failed to delete apartment:', error);
-      alert('아파트 삭제 중 오류가 발생했습니다.');
+      toast.error('아파트 삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -330,6 +340,9 @@ export default function ApartmentsPage() {
                       {getSortIcon('totalDevices')}
                     </div>
                   </TableHead>
+                  <TableHead className="text-muted-foreground text-center">
+                    등록자
+                  </TableHead>
                   <TableHead
                     className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
                     onClick={() => handleSort('createdAt')}
@@ -345,7 +358,7 @@ export default function ApartmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
                         데이터를 불러오는 중...
@@ -354,7 +367,7 @@ export default function ApartmentsPage() {
                   </TableRow>
                 ) : filteredApartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       {searchTerm ? '검색 결과가 없습니다.' : '등록된 아파트가 없습니다.'}
                     </TableCell>
                   </TableRow>
@@ -385,6 +398,15 @@ export default function ApartmentsPage() {
                         <Badge variant="outline" className="font-normal">
                           {apartment.totalDevices}대
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center text-sm">
+                        {apartment.createdByName ? (
+                          <Badge variant="secondary" className="font-normal">
+                            {apartment.createdByName}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">
                         {apartment.createdAt}

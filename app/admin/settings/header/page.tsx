@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
 import { Loader2, Save, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 const MAX_HEADER_LENGTH = 21;
 
@@ -17,8 +17,6 @@ export default function HeaderSettingsPage() {
   const [headerId, setHeaderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -28,7 +26,6 @@ export default function HeaderSettingsPage() {
   const loadHeader = async () => {
     try {
       setLoading(true);
-      setError(null);
 
       // Get the first header (there should only be one)
       const { data, error: fetchError } = await supabase
@@ -48,7 +45,7 @@ export default function HeaderSettingsPage() {
       }
     } catch (err) {
       console.error('Error loading header:', err);
-      setError('헤더 정보를 불러오는 중 오류가 발생했습니다.');
+      toast.error('헤더 정보를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -57,17 +54,15 @@ export default function HeaderSettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      setError(null);
-      setSuccess(false);
 
       // Validate text
       if (!headerText.trim()) {
-        setError('헤더 텍스트를 입력해주세요.');
+        toast.error('헤더 텍스트를 입력해주세요.');
         return;
       }
 
       if (headerText.length > MAX_HEADER_LENGTH) {
-        setError(`헤더는 최대 ${MAX_HEADER_LENGTH}자까지 입력 가능합니다.`);
+        toast.error(`헤더는 최대 ${MAX_HEADER_LENGTH}자까지 입력 가능합니다.`);
         return;
       }
 
@@ -95,11 +90,10 @@ export default function HeaderSettingsPage() {
         if (data) setHeaderId(data.id);
       }
 
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      toast.success('헤더가 성공적으로 저장되었습니다.');
     } catch (err) {
       console.error('Error saving header:', err);
-      setError('헤더를 저장하는 중 오류가 발생했습니다.');
+      toast.error('헤더를 저장하는 중 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
@@ -110,7 +104,6 @@ export default function HeaderSettingsPage() {
     // Only allow up to MAX_HEADER_LENGTH characters
     if (value.length <= MAX_HEADER_LENGTH) {
       setHeaderText(value);
-      setError(null);
     }
   };
 
@@ -174,22 +167,6 @@ export default function HeaderSettingsPage() {
                   스페이스 포함 최대 {MAX_HEADER_LENGTH}자까지 입력 가능합니다.
                 </p>
               </div>
-
-              {/* Error Message */}
-              {error && (
-                <Alert variant='destructive'>
-                  <AlertCircle className='h-4 w-4' />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {/* Success Message */}
-              {success && (
-                <Alert className='border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100'>
-                  <AlertCircle className='h-4 w-4' />
-                  <AlertDescription>헤더가 성공적으로 저장되었습니다.</AlertDescription>
-                </Alert>
-              )}
 
               {/* Action Buttons */}
               <div className='flex justify-end gap-3 pt-4'>

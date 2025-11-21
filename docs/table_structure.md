@@ -103,12 +103,13 @@
 
 ## Table: `apartments`
 
-| Column    | Type        | Notes  |
-| --------- | ----------- | ------ |
-| id        | uuid        | **PK** |
-| name      | text        |        |
-| address   | text        |        |
-| createdAt | timestamptz |        |
+| Column    | Type        | Notes                                           |
+| --------- | ----------- | ----------------------------------------------- |
+| id        | uuid        | **PK**                                          |
+| name      | text        |                                                 |
+| address   | text        |                                                 |
+| createdAt | timestamptz |                                                 |
+| createdBy | uuid        | **FK** → `user.id` **ON DELETE SET NULL** - 아파트를 등록한 매니저 또는 슈퍼 어드민 |
 
 ---
 
@@ -436,14 +437,76 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ---
 
+### Table: `home_sections`
+
+| Column       | Type        | Notes                                                                                           |
+| ------------ | ----------- | ----------------------------------------------------------------------------------------------- |
+| id           | uuid        | **PK**                                                                                          |
+| createdAt    | timestamptz | DEFAULT now()                                                                                   |
+| sectionType  | text        | 섹션 타입: `AD_CATEGORY` \| `NOTIFICATION` \| `ANNOUNCEMENT` \| `EVENT`                         |
+| orderIndex   | int4        | **UNIQUE** - 섹션 표시 순서 (작을수록 상단)                                                    |
+| adCategoryId | uuid        | **FK** → `ad_categories.id` **ON DELETE CASCADE** (NULL 가능, AD_CATEGORY 타입일 때만 필수)    |
+| iconUrl      | text        | **고정 섹션 전용** - 알림/공지사항/이벤트 섹션의 아이콘 URL (NULL 가능)                         |
+| displayName  | text        | **사용하지 않음** - NULL로 유지 (고정 섹션은 기본값 "알림", "공지사항", "이벤트" 사용)          |
+| isActive     | bool        | DEFAULT true - 활성화 여부                                                                      |
+
+> **설명**:
+>
+> - 홈 화면 섹션의 순서와 구성 관리
+> - 광고 카테고리, 알림, 공지사항, 이벤트 섹션을 자유롭게 배치 가능
+> - `orderIndex`로 섹션 순서 제어 (드래그&드롭)
+>
+> **섹션 타입**:
+> - `AD_CATEGORY`: 광고 카테고리 섹션 (adCategoryId 필수, ad_categories.iconUrl 사용)
+> - `NOTIFICATION`: 알림 섹션 (home_notifications 표시, iconUrl 변경 가능)
+> - `ANNOUNCEMENT`: 공지사항 섹션 (announcements 표시, iconUrl 변경 가능)
+> - `EVENT`: 이벤트 섹션 (isEvent = true인 광고 표시, iconUrl 변경 가능)
+>
+> **아이콘 사용 방식**:
+> - **AD_CATEGORY**: `ad_categories.iconUrl` 사용 (home_sections.iconUrl은 NULL)
+> - **고정 섹션** (NOTIFICATION, ANNOUNCEMENT, EVENT): `home_sections.iconUrl` 사용
+> - 저장 경로: `advertisements/sections/icons/{section-id}.png`
+>
+> **제약조건**:
+> - `CHECK (sectionType IN ('AD_CATEGORY', 'NOTIFICATION', 'ANNOUNCEMENT', 'EVENT'))`
+> - `UNIQUE (orderIndex)`: 순서 중복 불가
+> - **데이터 일관성 체크** (`check_section_data_consistency`):
+>   ```sql
+>   CHECK (
+>     -- AD_CATEGORY: adCategoryId 필수, iconUrl/displayName은 NULL
+>     (sectionType = 'AD_CATEGORY'
+>      AND iconUrl IS NULL
+>      AND displayName IS NULL
+>      AND adCategoryId IS NOT NULL)
+>     OR
+>     -- 고정 섹션: adCategoryId는 NULL (iconUrl/displayName은 선택)
+>     (sectionType != 'AD_CATEGORY'
+>      AND adCategoryId IS NULL)
+>   )
+>   ```
+>
+> **사용 예시**:
+> ```sql
+> -- 홈 화면 섹션 순서 설정
+> INSERT INTO home_sections (sectionType, orderIndex, adCategoryId) VALUES
+>   ('AD_CATEGORY', 1, 'pilates-id'),      -- 필라테스 광고
+>   ('NOTIFICATION', 2, null),             -- 알림 섹션
+>   ('AD_CATEGORY', 3, 'academy-id'),      -- 학원 광고
+>   ('ANNOUNCEMENT', 4, null),             -- 공지사항 섹션
+>   ('EVENT', 5, null),                    -- 이벤트 섹션
+>   ('AD_CATEGORY', 6, 'realestate-id');   -- 부동산 광고
+> ```
+
+---
+
 ### Table: `home_notifications`
 
 | Column     | Type        | Notes                                    |
 | ---------- | ----------- | ---------------------------------------- |
 | id         | uuid        | **PK**                                   |
 | createdAt  | timestamptz | DEFAULT now()                            |
-| title      | text        | 알림 제목 (NULL 가능)                               |
-| content    | text        | 알림 내용                     |
+| title      | text        | 알림 제목 (NULL 가능)                    |
+| content    | text        | 알림 내용                                |
 | imageUrl   | text        | 이미지 URL (Supabase Storage, NULL 가능) |
 | linkUrl    | text        | 클릭 시 이동할 URL (NULL 가능)           |
 | orderIndex | int4        | 표시 순서 (작을수록 상단)                |
@@ -453,6 +516,28 @@ await bleService.sendOpenCommand(passwordBytes);
 > - **전국 공통 알림** - 모든 사용자에게 동일하게 표시
 > - 지역 필터링 없음 (아파트 공지, 앱 업데이트 안내 등)
 > - 이미지 중심 콘텐츠 (제목/내용은 선택사항)
+> - **주의**: 기존 시스템이므로 수정 금지
+
+---
+
+### Table: `announcements`
+
+| Column     | Type        | Notes                                    |
+| ---------- | ----------- | ---------------------------------------- |
+| id         | uuid        | **PK**                                   |
+| createdAt  | timestamptz | DEFAULT now()                            |
+| title      | text        | 공지사항 제목 (NULL 가능)                |
+| content    | text        | 공지사항 내용 (NULL 가능)                |
+| imageUrl   | text        | 이미지 URL (Supabase Storage, NULL 가능) |
+| linkUrl    | text        | 클릭 시 이동할 URL (NULL 가능)           |
+| orderIndex | int4        | 표시 순서 (작을수록 상단)                |
+| isActive   | bool        | DEFAULT true - 활성화 여부               |
+
+> **설명**:
+>
+> - 공지사항 관리 (home_notifications와 동일한 구조)
+> - home_sections에서 ANNOUNCEMENT 타입으로 표시
+> - 여러 개 등록 가능하지만 보통 소수만 사용
 
 
 ---
@@ -468,14 +553,15 @@ await bleService.sendOpenCommand(passwordBytes);
 | businessName          | text        | 상호명                                          |
 | representativeName    | text        | 대표자명                                        |
 | email                 | text        | 이메일 (NULL 가능)                              |
-| phoneNumber           | text        | 휴대전화번호                                    |
-| landlineNumber        | text        | 유선전화번호 (NULL 가능)                        |
+| contactPhoneNumber    | text        | 광고주 연락처 (관리용, 비공개)                  |
+| displayPhoneNumber    | text        | 광고 표시용 전화번호 (앱에서 보여질 공개 번호, NULL 가능) |
 | address               | text        | 영업점 주소 (실제 위치)                         |
 | businessRegistration  | text        | 사업자등록증 이미지 URL (NULL 가능)             |
 | logo                  | text        | 로고 이미지 URL (NULL 가능)                     |
 | representativeImage   | text        | 대표 이미지 URL (NULL 가능)                     |
 | contractDocument      | text        | 계약서 이미지 URL (NULL 가능)                   |
 | contractMemo          | text        | 계약 메모 (NULL 가능)                           |
+| searchTags            | text[]      | 검색용 태그 배열 (자동 생성) - 지역, 아파트, 상호명 조합 |
 | createdBy             | uuid        | **FK** → `user.id` - 등록한 매니저              |
 
 > **설명**:
@@ -484,6 +570,42 @@ await bleService.sendOpenCommand(passwordBytes);
 > - 매니저가 영업 후 등록
 > - 하나의 업체가 여러 광고 등록 가능 (현재는 1:1, 향후 1:N 확장 가능)
 > - 광고별 세부 정보(소개내용, 활성화 여부 등)는 `advertisements` 테이블에서 관리
+>
+> **전화번호 필드 설명**:
+>
+> - `contactPhoneNumber` (필수): 광고주 연락처 - 관리자만 볼 수 있는 내부 연락용 번호
+> - `displayPhoneNumber` (선택): 광고 표시용 전화번호 - 앱에서 사용자에게 보여지는 공개 번호
+> - 두 필드 모두 휴대폰(010) 및 유선전화(02, 031 등) 형식 지원
+> - 자동 포맷팅: 입력 시 하이픈(-) 자동 추가 (예: 01012345678 → 010-1234-5678)
+>
+> **검색 태그 (`searchTags`) 자동 생성**:
+>
+> - 광고 등록/수정 시 자동으로 생성되는 검색용 태그 배열
+> - GIN 인덱스로 빠른 배열 검색 지원
+> - **생성 규칙**:
+>   - 기본: 상호명, 상호명(공백제거), 개별 키워드
+>   - **REGION 광고**: `{지역}_{상호명}`, `{지역}_{키워드}` 형식
+>   - **NEIGHBORHOOD 광고**: `{아파트명}_{상호명}`, `{아파트명}_{키워드}`, `{지역}_{상호명}` 형식
+>
+> **검색 예시**:
+> ```
+> 상호명: "울단지 필라테스"
+> REGION 광고: 서울 관악구
+> NEIGHBORHOOD 광고: 동부아파트, 래미안아파트
+>
+> 생성되는 태그:
+> - "울단지 필라테스", "울단지필라테스", "울단지", "필라테스"
+> - "서울_울단지 필라테스", "서울_울단지", "서울_필라테스"
+> - "관악구_울단지 필라테스", "관악구_울단지", "관악구_필라테스"
+> - "동부아파트_울단지 필라테스", "동부아파트_울단지", "동부아파트_필라테스"
+> - "래미안아파트_울단지 필라테스", "래미안아파트_울단지", "래미안아파트_필라테스"
+>
+> 검색 가능:
+> ✓ "서울_필라테스" → 서울 지역 모든 필라테스 검색
+> ✓ "동부아파트_필라테스" → 동부아파트에 광고 등록한 필라테스 검색
+> ✓ "관악구_울단지" → 관악구 울단지 검색
+> ✓ "필라테스" → 모든 필라테스 검색
+> ```
 >
 > **제약조건**:
 >
@@ -499,7 +621,6 @@ await bleService.sendOpenCommand(passwordBytes);
 | createdAt          | timestamptz | DEFAULT now()                           |
 | categoryName       | text        | 카테고리 이름 (예: 필라테스, 영어학원) |
 | iconUrl            | text        | 카테고리 아이콘 URL (NULL 가능)         |
-| orderIndex         | int4        | 표시 순서 (작을수록 상단)               |
 | weekdayEnabled     | bool        | 평일 노출 여부 (DEFAULT true)           |
 | weekdayStartTime   | time        | 평일 시작 시간 (NULL = 제한 없음)       |
 | weekdayEndTime     | time        | 평일 종료 시간 (NULL = 제한 없음)       |
@@ -1031,6 +1152,10 @@ advertisements/
 │   └── icons/ # 카테고리 아이콘
 │       └── {category-id}.png
 │
+├── sections/ # 홈 섹션 (고정 섹션)
+│   └── icons/ # 고정 섹션 아이콘 (알림, 공지사항, 이벤트)
+│       └── {section-id}.png
+│
 ├── advertisers/ # 광고주 관련 파일
 │   ├── logos/ # 광고주 로고
 │   │   └── {advertiser-id}.png
@@ -1050,7 +1175,7 @@ advertisements/
         └── {ad-id}.jpg
 ```
 
-> **용도**: 광고 시스템 관련 모든 파일 (카테고리, 광고주, 광고 이미지)
+> **용도**: 광고 시스템 관련 모든 파일 (카테고리, 광고주, 광고 이미지, 고정 섹션 아이콘)
 
 ---
 
@@ -1072,6 +1197,7 @@ managers/
 | ---------------------- | ----------------- | ------------------------------------------------- |
 | 홈 알림 이미지         | home-content      | `notifications/{notification-id}.jpg`             |
 | 카테고리 아이콘        | advertisements    | `categories/icons/{category-id}.png`              |
+| **고정 섹션 아이콘**   | advertisements    | `sections/icons/{section-id}.png`                 |
 | 광고주 로고            | advertisements    | `advertisers/logos/{advertiser-id}.png`           |
 | 광고주 사업자등록증    | advertisements    | `advertisers/business-registrations/{advertiser-id}.jpg` |
 | 광고주 계약서          | advertisements    | `advertisers/contracts/{advertiser-id}.pdf`       |

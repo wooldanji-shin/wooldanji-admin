@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,14 +32,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Search,
   Plus,
   Edit,
   Trash2,
-  AlertCircle,
   Building,
   Calendar,
   CheckCircle2,
@@ -94,7 +93,6 @@ export default function AdvertisersPage() {
   const [categories, setCategories] = useState<AdCategory[]>([]);
   const [managers, setManagers] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -218,7 +216,6 @@ export default function AdvertisersPage() {
     if (!currentUserId) return;
 
     setLoading(true);
-    setError(null);
 
     try {
       // 현재 사용자 역할 확인
@@ -245,7 +242,7 @@ export default function AdvertisersPage() {
       setAdvertisers(data || []);
     } catch (err) {
       console.error('Failed to fetch advertisers:', err);
-      setError('광고주 목록을 불러오는데 실패했습니다.');
+      toast.error('광고주 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -312,7 +309,7 @@ export default function AdvertisersPage() {
   // 광고주 생성/수정
   const handleSave = async () => {
     if (!form.businessName || !form.businessType || !form.representativeName || !form.email) {
-      setError('필수 항목을 입력해주세요.');
+      toast.error('필수 항목을 입력해주세요.');
       return;
     }
 
@@ -346,6 +343,7 @@ export default function AdvertisersPage() {
           .eq('id', editingAdvertiser.id);
 
         if (updateError) throw updateError;
+        toast.success('광고주가 수정되었습니다.');
       } else {
         // 생성
         const { error: insertError } = await supabase
@@ -353,6 +351,7 @@ export default function AdvertisersPage() {
           .insert(advertiserData);
 
         if (insertError) throw insertError;
+        toast.success('광고주가 생성되었습니다.');
       }
 
       // 저장 성공 시 uploadedImages 초기화 (다이얼로그 닫힐 때 삭제 방지)
@@ -367,7 +366,7 @@ export default function AdvertisersPage() {
       fetchAdvertisers();
     } catch (err: any) {
       console.error('Failed to save advertiser:', err);
-      setError(err.message || '광고주 저장에 실패했습니다.');
+      toast.error(err.message || '광고주 저장에 실패했습니다.');
     }
   };
 
@@ -460,12 +459,13 @@ export default function AdvertisersPage() {
 
       if (deleteError) throw deleteError;
 
+      toast.success('광고주가 삭제되었습니다.');
       setDeleteDialog(false);
       setDeletingAdvertiser(null);
       fetchAdvertisers();
     } catch (err) {
       console.error('Failed to delete advertiser:', err);
-      setError('광고주 삭제에 실패했습니다.');
+      toast.error('광고주 삭제에 실패했습니다.');
     }
   };
 
@@ -727,13 +727,6 @@ export default function AdvertisersPage() {
             광고주 추가
           </Button>
         </div>
-
-        {error && (
-          <Alert variant='destructive'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
         {/* 카테고리 탭 */}
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className='w-full'>
