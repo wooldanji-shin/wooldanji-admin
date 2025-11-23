@@ -1407,7 +1407,7 @@ export default function AdsManagementPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className='space-y-2'>
+                            <div className='space-y-2 flex flex-col'>
                               <StatusBadge ad={ad} />
                               {ad.isEvent && (
                                 <Badge className='bg-purple-500 hover:bg-purple-600 text-white font-medium'>
