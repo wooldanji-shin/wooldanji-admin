@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
-import { Loader2, Save, AlertCircle } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MAX_HEADER_LENGTH = 21;
@@ -124,14 +124,6 @@ export default function HeaderSettingsPage() {
 
       <div className='flex-1 p-6'>
         <div className='max-w-2xl mx-auto space-y-6'>
-          {/* Info Alert */}
-          <Alert className='bg-muted/50 border-muted'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>
-              홈 화면 상단에 표시되는 헤더 텍스트를 설정합니다. 최대 {MAX_HEADER_LENGTH}자까지 입력 가능합니다.
-            </AlertDescription>
-          </Alert>
-
           {/* Header Settings Card */}
           <Card className='bg-card border-border'>
             <CardHeader>

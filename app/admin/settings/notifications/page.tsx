@@ -11,7 +11,6 @@ import { createClient } from '@/supabase';
 import {
   Loader2,
   Save,
-  AlertCircle,
   Upload,
   X,
   Image as ImageIcon,
@@ -338,15 +337,6 @@ export default function NotificationSettingsPage() {
 
       <div className='flex-1 p-6 overflow-auto'>
         <div className='max-w-4xl mx-auto space-y-6'>
-          {/* Info Alert */}
-          <Alert className='bg-muted/50 border-muted'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>
-              홈 화면에 표시되는 알림을 관리합니다. 한 번에 하나의 알림만 표시됩니다.
-              {!currentNotification && ' 현재 등록된 알림이 없습니다.'}
-            </AlertDescription>
-          </Alert>
-
           {/* Current Notification Display */}
           {currentNotification && (
             <Card className='bg-card border-border'>
