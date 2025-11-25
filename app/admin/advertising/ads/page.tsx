@@ -354,6 +354,12 @@ export default function AdsManagementPage() {
     }[],
   });
 
+  // 이미지 업로드용 고유 폴더 ID
+  const [imageUploadFolderId, setImageUploadFolderId] = useState('');
+
+  // 업로드된 이미지 URL 추적 (취소 시 삭제용)
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
+
   // 지역 선택 상태
   const [regionSido, setRegionSido] = useState('');
   const [regionSigungu, setRegionSigungu] = useState('');
@@ -574,10 +580,72 @@ export default function AdsManagementPage() {
     setEditingMemoValue('');
   };
 
+  // UUID 생성 함수
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  // 다이얼로그 닫기 (취소 시 업로드된 이미지 정리)
+  const handleCloseDialog = async () => {
+    // 신규 등록 모드이고, 업로드된 이미지가 있는 경우
+    if (!selectedAd && imageUploadFolderId) {
+      try {
+        // Storage에서 해당 폴더의 모든 파일 삭제
+        const folderPath = `ads/${imageUploadFolderId}`;
+
+        // 알려진 하위 폴더들
+        const subFolders = ['images', 'logos', 'representative-images', 'business-registrations', 'contracts'];
+        const allFilesToDelete: string[] = [];
+
+        // 각 하위 폴더의 파일들 조회
+        for (const subFolder of subFolders) {
+          const { data: files, error: listError } = await supabase.storage
+            .from('advertisements')
+            .list(`${folderPath}/${subFolder}`, {
+              limit: 1000,
+              offset: 0,
+            });
+
+          if (!listError && files && files.length > 0) {
+            files.forEach(file => {
+              allFilesToDelete.push(`${folderPath}/${subFolder}/${file.name}`);
+            });
+          }
+        }
+
+        // 모든 파일 삭제
+        if (allFilesToDelete.length > 0) {
+          const { error: deleteError } = await supabase.storage
+            .from('advertisements')
+            .remove(allFilesToDelete);
+
+          if (deleteError) {
+            console.error('🔴 파일 삭제 실패:', deleteError);
+          } else {
+            console.log('🟢 업로드된 파일 정리 완료:', allFilesToDelete.length, '개');
+          }
+        }
+      } catch (error) {
+        console.error('🔴 파일 정리 중 오류:', error);
+      }
+    }
+
+    // 상태 초기화
+    setIsDialogOpen(false);
+    setUploadedImageUrls([]);
+  };
+
   // 광고 등록/수정 다이얼로그 열기
   const handleOpenDialog = (ad?: Advertisement) => {
     if (ad) {
       setSelectedAd(ad);
+
+      // 수정 모드: 기존 광고 ID를 폴더명으로 사용
+      setImageUploadFolderId(ad.id);
 
       // 광고주 정보 설정
       setAdvertiserFormData({
@@ -613,6 +681,10 @@ export default function AdsManagementPage() {
       });
     } else {
       setSelectedAd(null);
+
+      // 등록 모드: 새로운 UUID 생성
+      setImageUploadFolderId(generateUUID());
+
       setAdvertiserFormData({
         businessName: '',
         representativeName: '',
@@ -793,7 +865,10 @@ export default function AdsManagementPage() {
       }
 
       await fetchData();
+
+      // 저장 성공 시 정리하지 않고 닫기
       setIsDialogOpen(false);
+      setUploadedImageUrls([]);
     } catch (error: any) {
       console.error('Error saving ad:', error);
       toast.error(error.message);
@@ -1669,7 +1744,11 @@ export default function AdsManagementPage() {
         {/* 광고 등록/수정 다이얼로그 */}
         <Dialog
           open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleCloseDialog();
+            }
+          }}
         >
           <DialogContent className='max-h-[90vh] w-[95vw] max-w-6xl sm:max-w-6xl overflow-y-auto'>
             <DialogHeader>
@@ -1812,7 +1891,7 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        folder='advertisers/logos'
+                        storagePath={`ads/${imageUploadFolderId}/logos`}
                       />
                     </div>
                     <div className='space-y-2'>
@@ -1826,7 +1905,7 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        folder='advertisers/representative-images'
+                        storagePath={`ads/${imageUploadFolderId}/representative-images`}
                       />
                     </div>
                   </div>
@@ -1843,7 +1922,7 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        folder='advertisers/business-registrations'
+                        storagePath={`ads/${imageUploadFolderId}/business-registrations`}
                       />
                     </div>
                     <div className='space-y-2'>
@@ -1857,7 +1936,7 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        folder='advertisers/contracts'
+                        storagePath={`ads/${imageUploadFolderId}/contracts`}
                       />
                     </div>
                   </div>
@@ -1967,7 +2046,7 @@ export default function AdsManagementPage() {
                         setAdFormData({ ...adFormData, imageUrl: url })
                       }
                       bucket='advertisements'
-                      folder='ads'
+                      storagePath={`ads/${imageUploadFolderId}/images`}
                     />
                   </div>
 
@@ -2357,7 +2436,7 @@ export default function AdsManagementPage() {
             <DialogFooter className='gap-2'>
               <Button
                 variant='outline'
-                onClick={() => setIsDialogOpen(false)}
+                onClick={handleCloseDialog}
                 disabled={isSaving}
               >
                 취소

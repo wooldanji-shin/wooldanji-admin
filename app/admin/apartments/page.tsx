@@ -55,6 +55,7 @@ interface Apartment {
   buildingCount: number;
   totalUnits: number;
   totalDevices: number;
+  totalOpenDoorCount: number;
   lineRanges: { id: string; line: number[] }[];
   createdAt: string;
   createdBy: string | null;
@@ -116,6 +117,12 @@ export default function ApartmentsPage() {
           )
         `);
 
+      // 아파트별 회원 정보도 가져오기 (openDoorCount 합계 계산용)
+      const { data: allUsers } = await supabase
+        .from('user')
+        .select('apartmentId, openDoorCount')
+        .eq('registrationType', 'APARTMENT');
+
       // 매니저인 경우 자신이 관리하는 아파트만 필터링
       if (isManager) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -167,6 +174,11 @@ export default function ApartmentsPage() {
           });
         });
 
+        // 총 문 열기 횟수 계산
+        const totalOpenDoorCount = (allUsers || [])
+          .filter((u: any) => u.apartmentId === apt.id)
+          .reduce((sum: number, u: any) => sum + (u.openDoorCount || 0), 0);
+
         return {
           id: apt.id,
           name: apt.name,
@@ -174,6 +186,7 @@ export default function ApartmentsPage() {
           buildingCount,
           totalUnits,
           totalDevices,
+          totalOpenDoorCount,
           lineRanges,
           createdAt: new Date(apt.createdAt).toLocaleDateString('ko-KR'),
           createdBy: (apt as any).createdBy || null,
@@ -341,6 +354,9 @@ export default function ApartmentsPage() {
                     </div>
                   </TableHead>
                   <TableHead className="text-muted-foreground text-center">
+                    문 연 횟수
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-center">
                     등록자
                   </TableHead>
                   <TableHead
@@ -358,7 +374,7 @@ export default function ApartmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
                         데이터를 불러오는 중...
@@ -367,7 +383,7 @@ export default function ApartmentsPage() {
                   </TableRow>
                 ) : filteredApartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                       {searchTerm ? '검색 결과가 없습니다.' : '등록된 아파트가 없습니다.'}
                     </TableCell>
                   </TableRow>
@@ -398,6 +414,13 @@ export default function ApartmentsPage() {
                         <Badge variant="outline" className="font-normal">
                           {apartment.totalDevices}대
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground">
+                        {apartment.totalOpenDoorCount > 0 ? (
+                          <span>{apartment.totalOpenDoorCount}회</span>
+                        ) : (
+                          <span>-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center text-sm">
                         {apartment.createdByName ? (

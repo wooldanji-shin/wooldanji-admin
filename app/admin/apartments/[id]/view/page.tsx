@@ -104,6 +104,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
   // 통계
   const [buildingStats, setBuildingStats] = useState<Record<number, number>>({});
   const [unitStats, setUnitStats] = useState<Record<string, number>>({});
+  const [totalOpenDoorCount, setTotalOpenDoorCount] = useState(0);
 
   const searchQuery = searchParams.get('search') || '';
   const currentPage = parseInt(searchParams.get('page') || '1');
@@ -273,6 +274,18 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
         }
       });
       setUnitStats(unitCounts);
+
+      // 총 문 열기 횟수
+      const { data: openDoorData } = await supabase
+        .from('user')
+        .select('openDoorCount')
+        .eq('apartmentId', resolvedParams.id)
+        .eq('registrationType', 'APARTMENT');
+
+      const totalOpenCount = (openDoorData || []).reduce((sum: number, user: any) => {
+        return sum + (user.openDoorCount || 0);
+      }, 0);
+      setTotalOpenDoorCount(totalOpenCount);
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -476,7 +489,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-muted/50 rounded-lg p-3">
               <p className="text-sm text-muted-foreground">총 동수</p>
               <p className="text-2xl font-bold">{apartment.buildings.length}</p>
@@ -500,6 +513,10 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
                   ? Math.max(...Object.values(unitStats))
                   : 0}
               </p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+              <p className="text-sm text-blue-700">총 문 연 횟수</p>
+              <p className="text-2xl font-bold text-blue-700">{totalOpenDoorCount}회</p>
             </div>
           </div>
         </CardContent>
@@ -585,6 +602,9 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
                     승인상태
                   </TableHead>
                   <TableHead className="text-muted-foreground">
+                    문 열기
+                  </TableHead>
+                  <TableHead className="text-muted-foreground">
                     가입일
                   </TableHead>
                   <TableHead className="text-muted-foreground text-right">
@@ -595,13 +615,13 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
               <TableBody>
                 {initialLoading && loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                       로딩 중...
                     </TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                       {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
                     </TableCell>
                   </TableRow>
@@ -653,6 +673,13 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
                       </TableCell>
                       <TableCell>
                         {getApprovalBadge(user.approvalStatus)}
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground">
+                        {user.openDoorCount !== null && user.openDoorCount !== undefined ? (
+                          <span>{user.openDoorCount}회</span>
+                        ) : (
+                          <span>-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {formatDate(user.createdAt)}

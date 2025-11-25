@@ -383,17 +383,111 @@ export default function AnnouncementsPage() {
     }
   };
 
+  // 이미지를 WebP로 변환하는 함수 (크기 제한 + 고품질)
+  const convertToWebP = async (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const img = new window.Image();
+
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+
+          // 최대 크기 제한 (긴 쪽 기준)
+          const MAX_SIZE = 1080; // 모바일에 최적화된 크기
+          let width = img.width;
+          let height = img.height;
+
+          // 비율 유지하면서 크기 조절
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            if (width > height) {
+              height = (height * MAX_SIZE) / width;
+              width = MAX_SIZE;
+            } else {
+              width = (width * MAX_SIZE) / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas context를 가져올 수 없습니다.'));
+            return;
+          }
+
+          // 고품질 렌더링 설정
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('WebP 변환에 실패했습니다.'));
+              }
+            },
+            'image/webp',
+            0.95 // 고품질 유지 (95%)
+          );
+        };
+
+        img.onerror = () => {
+          reject(new Error('이미지를 로드할 수 없습니다.'));
+        };
+
+        img.src = e.target?.result as string;
+      };
+
+      reader.onerror = () => {
+        reject(new Error('파일을 읽을 수 없습니다.'));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  };
+
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
-      const fileExt = file.name.split('.').pop();
+      // 이미지 파일인지 확인 (jpg, jpeg, png는 webp로 변환)
+      const isImageFile = file.type.startsWith('image/');
+      const shouldConvertToWebP = isImageFile &&
+        (file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/jpg');
+
+      let fileToUpload: File | Blob = file;
+      let fileExt = file.name.split('.').pop();
+      let contentType = file.type;
+
+      // WebP로 변환
+      if (shouldConvertToWebP) {
+        console.log('🔄 [공지사항] WebP로 변환 중...', { original: file.name });
+        const webpBlob = await convertToWebP(file);
+        fileToUpload = webpBlob;
+        fileExt = 'webp';
+        contentType = 'image/webp';
+
+        const sizeDiff = ((1 - webpBlob.size / file.size) * 100).toFixed(1);
+        console.log('✅ [공지사항] WebP 변환 완료', {
+          원본크기: `${(file.size / 1024).toFixed(2)}KB`,
+          변환후크기: `${(webpBlob.size / 1024).toFixed(2)}KB`,
+          감소율: `${sizeDiff}%`,
+        });
+      }
+
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `${ANNOUNCEMENTS_FOLDER}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(filePath, file, {
+        .upload(filePath, fileToUpload, {
           cacheControl: '3600',
           upsert: false,
+          contentType: contentType,
         });
 
       if (uploadError) throw uploadError;

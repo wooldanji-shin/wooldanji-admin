@@ -439,16 +439,20 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `home_sections`
 
-| Column       | Type        | Notes                                                                                           |
-| ------------ | ----------- | ----------------------------------------------------------------------------------------------- |
-| id           | uuid        | **PK**                                                                                          |
-| createdAt    | timestamptz | DEFAULT now()                                                                                   |
-| sectionType  | text        | 섹션 타입: `AD_CATEGORY` \| `NOTIFICATION` \| `ANNOUNCEMENT` \| `EVENT`                         |
-| orderIndex   | int4        | **UNIQUE** - 섹션 표시 순서 (작을수록 상단)                                                    |
-| adCategoryId | uuid        | **FK** → `ad_categories.id` **ON DELETE CASCADE** (NULL 가능, AD_CATEGORY 타입일 때만 필수)    |
-| iconUrl      | text        | **고정 섹션 전용** - 알림/공지사항/이벤트 섹션의 아이콘 URL (NULL 가능)                         |
-| displayName  | text        | **사용하지 않음** - NULL로 유지 (고정 섹션은 기본값 "알림", "공지사항", "이벤트" 사용)          |
-| isActive     | bool        | DEFAULT true - 활성화 여부                                                                      |
+| Column               | Type        | Notes                                                                                           |
+| -------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| id                   | uuid        | **PK**                                                                                          |
+| createdAt            | timestamptz | DEFAULT now()                                                                                   |
+| sectionType          | text        | 섹션 타입: `AD_CATEGORY` \| `NOTIFICATION` \| `ANNOUNCEMENT` \| `EVENT`                         |
+| orderIndex           | int4        | **UNIQUE** - 섹션 표시 순서 (작을수록 상단)                                                    |
+| adCategoryId         | uuid        | **FK** → `ad_categories.id` **ON DELETE CASCADE** (NULL 가능, AD_CATEGORY 타입일 때만 필수)    |
+| iconUrl              | text        | **고정 섹션 전용** - 알림/공지사항/이벤트 섹션의 아이콘 URL (NULL 가능)                         |
+| displayName          | text        | 커스텀 표시 이름 (NULL인 경우 기본값 "알림", "공지사항", "이벤트" 사용) (NULL 가능)             |
+| isActive             | bool        | DEFAULT true - 활성화 여부                                                                      |
+| autoSelectStartTime  | time        | 자동 선택 시작 시간 (HH:MM:SS, NULL이면 스케줄 없음)                                           |
+| autoSelectEndTime    | time        | 자동 선택 종료 시간 (HH:MM:SS, NULL이면 스케줄 없음)                                           |
+| autoSelectStartDate  | date        | 자동 선택 시작 날짜 (YYYY-MM-DD, NULL이면 제한 없음)                                           |
+| autoSelectEndDate    | date        | 자동 선택 종료 날짜 (YYYY-MM-DD, NULL이면 제한 없음)                                           |
 
 > **설명**:
 >
@@ -470,20 +474,21 @@ await bleService.sendOpenCommand(passwordBytes);
 > **제약조건**:
 > - `CHECK (sectionType IN ('AD_CATEGORY', 'NOTIFICATION', 'ANNOUNCEMENT', 'EVENT'))`
 > - `UNIQUE (orderIndex)`: 순서 중복 불가
-> - **데이터 일관성 체크** (`check_section_data_consistency`):
->   ```sql
->   CHECK (
->     -- AD_CATEGORY: adCategoryId 필수, iconUrl/displayName은 NULL
->     (sectionType = 'AD_CATEGORY'
->      AND iconUrl IS NULL
->      AND displayName IS NULL
->      AND adCategoryId IS NOT NULL)
->     OR
->     -- 고정 섹션: adCategoryId는 NULL (iconUrl/displayName은 선택)
->     (sectionType != 'AD_CATEGORY'
->      AND adCategoryId IS NULL)
->   )
->   ```
+> - **데이터 일관성 체크**:
+>   - AD_CATEGORY 타입: adCategoryId 필수, iconUrl은 NULL (ad_categories.iconUrl 사용)
+>   - 고정 섹션 (NOTIFICATION, ANNOUNCEMENT, EVENT): adCategoryId는 NULL, iconUrl/displayName은 선택
+> - **자동 선택 스케줄 제약조건**:
+>   - 시작/종료 시간은 쌍으로 존재 (둘 다 NULL이거나 둘 다 NOT NULL)
+>   - 시작/종료 날짜는 쌍으로 존재 (둘 다 NULL이거나 둘 다 NOT NULL)
+>   - 시작 날짜는 종료 날짜보다 이전이거나 같아야 함
+>   - **중요**: 시간대가 겹치는 스케줄이 여러 섹션에 설정되면 안 됨 (앱 레벨에서 검증 필요)
+>
+> **자동 선택 기능**:
+> - 관리자가 특정 시간대/날짜 범위에 특정 섹션을 자동 선택되도록 설정 가능
+> - 앱 진입 시 현재 시간/날짜가 스케줄 범위에 해당하면 해당 섹션 자동 선택
+> - 해당하는 스케줄이 없으면 랜덤으로 섹션 선택
+> - 날짜 범위가 NULL이면 시간대만 체크 (매일 해당 시간에 적용)
+> - 시간대가 NULL이면 스케줄 기능 비활성화 (랜덤 선택)
 >
 > **사용 예시**:
 > ```sql
@@ -527,7 +532,7 @@ await bleService.sendOpenCommand(passwordBytes);
 | id         | uuid        | **PK**                                   |
 | createdAt  | timestamptz | DEFAULT now()                            |
 | title      | text        | 공지사항 제목 (NULL 가능)                |
-| content    | text        | 공지사항 내용 (NULL 가능)                |
+| content    | text        | 공지사항 내용                            |
 | imageUrl   | text        | 이미지 URL (Supabase Storage, NULL 가능) |
 | linkUrl    | text        | 클릭 시 이동할 URL (NULL 가능)           |
 | orderIndex | int4        | 표시 순서 (작을수록 상단)                |
@@ -546,23 +551,23 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `advertisers` (광고 업체 정보)
 
-| Column                | Type        | Notes                                           |
-| --------------------- | ----------- | ----------------------------------------------- |
-| id                    | uuid        | **PK**                                          |
-| createdAt             | timestamptz | DEFAULT now()                                   |
-| businessName          | text        | 상호명                                          |
-| representativeName    | text        | 대표자명                                        |
-| email                 | text        | 이메일 (NULL 가능)                              |
-| contactPhoneNumber    | text        | 광고주 연락처 (관리용, 비공개)                  |
-| displayPhoneNumber    | text        | 광고 표시용 전화번호 (앱에서 보여질 공개 번호, NULL 가능) |
-| address               | text        | 영업점 주소 (실제 위치)                         |
-| businessRegistration  | text        | 사업자등록증 이미지 URL (NULL 가능)             |
-| logo                  | text        | 로고 이미지 URL (NULL 가능)                     |
-| representativeImage   | text        | 대표 이미지 URL (NULL 가능)                     |
-| contractDocument      | text        | 계약서 이미지 URL (NULL 가능)                   |
-| contractMemo          | text        | 계약 메모 (NULL 가능)                           |
-| searchTags            | text[]      | 검색용 태그 배열 (자동 생성) - 지역, 아파트, 상호명 조합 |
-| createdBy             | uuid        | **FK** → `user.id` - 등록한 매니저              |
+| Column                | Type        | Notes                                                   |
+| --------------------- | ----------- | ------------------------------------------------------- |
+| id                    | uuid        | **PK**                                                  |
+| createdAt             | timestamptz | DEFAULT now()                                           |
+| businessName          | text        | 상호명                                                  |
+| representativeName    | text        | 대표자명                                                |
+| email                 | text        | 이메일 (NULL 가능)                                      |
+| contactPhoneNumber    | text        | 광고주 연락처 (관리용, 비공개)                          |
+| displayPhoneNumber    | text        | 광고 표시용 전화번호 (앱에서 보여질 공개 번호) (NULL 가능) |
+| address               | text        | 영업점 주소 (실제 위치)                                 |
+| businessRegistration  | text        | 사업자등록증 이미지 URL (NULL 가능)                     |
+| logo                  | text        | 로고 이미지 URL (NULL 가능)                             |
+| representativeImage   | text        | 대표 이미지 URL (NULL 가능)                             |
+| contractDocument      | text        | 계약서 이미지 URL (NULL 가능)                           |
+| contractMemo          | text        | 계약 메모 (NULL 가능)                                   |
+| searchTags            | text[]      | 검색용 태그 배열 - 지역, 아파트, 상호명 조합 (NULL 가능) |
+| createdBy             | uuid        | **FK** → `user.id` - 등록한 매니저                      |
 
 > **설명**:
 >
@@ -570,42 +575,6 @@ await bleService.sendOpenCommand(passwordBytes);
 > - 매니저가 영업 후 등록
 > - 하나의 업체가 여러 광고 등록 가능 (현재는 1:1, 향후 1:N 확장 가능)
 > - 광고별 세부 정보(소개내용, 활성화 여부 등)는 `advertisements` 테이블에서 관리
->
-> **전화번호 필드 설명**:
->
-> - `contactPhoneNumber` (필수): 광고주 연락처 - 관리자만 볼 수 있는 내부 연락용 번호
-> - `displayPhoneNumber` (선택): 광고 표시용 전화번호 - 앱에서 사용자에게 보여지는 공개 번호
-> - 두 필드 모두 휴대폰(010) 및 유선전화(02, 031 등) 형식 지원
-> - 자동 포맷팅: 입력 시 하이픈(-) 자동 추가 (예: 01012345678 → 010-1234-5678)
->
-> **검색 태그 (`searchTags`) 자동 생성**:
->
-> - 광고 등록/수정 시 자동으로 생성되는 검색용 태그 배열
-> - GIN 인덱스로 빠른 배열 검색 지원
-> - **생성 규칙**:
->   - 기본: 상호명, 상호명(공백제거), 개별 키워드
->   - **REGION 광고**: `{지역}_{상호명}`, `{지역}_{키워드}` 형식
->   - **NEIGHBORHOOD 광고**: `{아파트명}_{상호명}`, `{아파트명}_{키워드}`, `{지역}_{상호명}` 형식
->
-> **검색 예시**:
-> ```
-> 상호명: "울단지 필라테스"
-> REGION 광고: 서울 관악구
-> NEIGHBORHOOD 광고: 동부아파트, 래미안아파트
->
-> 생성되는 태그:
-> - "울단지 필라테스", "울단지필라테스", "울단지", "필라테스"
-> - "서울_울단지 필라테스", "서울_울단지", "서울_필라테스"
-> - "관악구_울단지 필라테스", "관악구_울단지", "관악구_필라테스"
-> - "동부아파트_울단지 필라테스", "동부아파트_울단지", "동부아파트_필라테스"
-> - "래미안아파트_울단지 필라테스", "래미안아파트_울단지", "래미안아파트_필라테스"
->
-> 검색 가능:
-> ✓ "서울_필라테스" → 서울 지역 모든 필라테스 검색
-> ✓ "동부아파트_필라테스" → 동부아파트에 광고 등록한 필라테스 검색
-> ✓ "관악구_울단지" → 관악구 울단지 검색
-> ✓ "필라테스" → 모든 필라테스 검색
-> ```
 >
 > **제약조건**:
 >
@@ -665,21 +634,25 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `advertisements` (광고)
 
-| Column        | Type        | Notes                                                         |
-| ------------- | ----------- | ------------------------------------------------------------- |
-| id            | uuid        | **PK**                                                        |
-| createdAt     | timestamptz | DEFAULT now()                                                 |
-| advertiserId  | uuid        | **FK** → `advertisers.id` **ON DELETE CASCADE**               |
-| categoryId    | uuid        | **FK** → `ad_categories.id` **ON DELETE SET NULL**            |
-| adType        | text        | `NEIGHBORHOOD` \| `REGION` - 동네 광고 or 지역 광고           |
-| title         | text        | 광고 제목                                                     |
-| imageUrl      | text        | 광고 이미지 URL                                               |
-| description   | text        | 소개내용 (광고별 세부 설명) (NULL 가능)                       |
-| linkUrl       | text        | 클릭 시 이동할 URL (NULL 가능)                                |
-| startDate     | timestamptz | 광고 게시 시작일                                              |
-| endDate       | timestamptz | 광고 게시 종료일                                              |
-| createdBy     | uuid        | **FK** → `user.id` - 등록한 매니저                            |
-| isActive      | bool        | DEFAULT false - 활성화 여부 (수동 활성화 필요)                |
+| Column         | Type        | Notes                                                                   |
+| -------------- | ----------- | ----------------------------------------------------------------------- |
+| id             | uuid        | **PK**                                                                  |
+| createdAt      | timestamptz | DEFAULT now()                                                           |
+| advertiserId   | uuid        | **FK** → `advertisers.id` **ON DELETE CASCADE**                         |
+| categoryId     | uuid        | **FK** → `ad_categories.id` **ON DELETE SET NULL**                      |
+| adType         | text        | `NEIGHBORHOOD` \| `REGION` - 동네 광고 or 지역 광고                     |
+| title          | text        | 광고 제목                                                               |
+| imageUrl       | text        | 광고 이미지 URL                                                         |
+| description    | text        | 소개내용 (광고별 세부 설명) (NULL 가능)                                 |
+| linkUrl        | text        | 클릭 시 이동할 URL (NULL 가능)                                          |
+| startDate      | timestamptz | 광고 게시 시작일                                                        |
+| endDate        | timestamptz | 광고 게시 종료일                                                        |
+| createdBy      | uuid        | **FK** → `user.id` - 등록한 매니저                                      |
+| isActive       | bool        | DEFAULT true - 활성화 여부                                              |
+| isEvent        | bool        | DEFAULT false - 이벤트 광고 여부 (true: 이벤트 섹션에 표시)             |
+| eventStartDate | timestamptz | 이벤트 시작일 (이벤트인 경우 필수) (NULL 가능)                          |
+| eventEndDate   | timestamptz | 이벤트 종료일 (이벤트인 경우 필수) (NULL 가능)                          |
+| clickCount     | integer     | DEFAULT 0 - 광고 클릭 횟수 (사용자가 광고를 클릭할 때마다 증가)         |
 
 > **설명**:
 >
@@ -706,8 +679,8 @@ await bleService.sendOpenCommand(passwordBytes);
 > ```sql
 > -- Step 1: 광고주 등록 (기본 정보 + 계약 정보)
 > INSERT INTO advertisers (
->   businessName, representativeName, email, phoneNumber,
->   landlineNumber, address, logo, contractDocument, contractMemo, createdBy
+>   businessName, representativeName, email, contactPhoneNumber,
+>   displayPhoneNumber, address, logo, contractDocument, contractMemo, createdBy
 > ) VALUES (
 >   '울단지 필라테스', '김대표', 'pilates@example.com', '010-1234-5678',
 >   '02-1234-5678', '서울 관악구 신림동 123', 'logo.png',
