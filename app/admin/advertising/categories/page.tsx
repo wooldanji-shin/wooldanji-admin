@@ -481,19 +481,40 @@ export default function AdCategoriesPage() {
     const newIndex = sections.findIndex((s) => s.id === over.id);
     const newSections = arrayMove(sections, oldIndex, newIndex);
 
-    const updatedSections = newSections.map((section, index) => ({
+    // placeholder를 제외한 실제 DB 섹션만 필터링
+    const dbSections = newSections.filter(s => !s.id.includes('placeholder'));
+
+    // DB 섹션의 orderIndex를 연속된 숫자로 재계산
+    const updatedDbSections = dbSections.map((section, index) => ({
       ...section,
       orderIndex: index + 1,
     }));
+
+    // UI에 표시할 전체 섹션 업데이트 (placeholder 포함)
+    const updatedSections = newSections.map((section) => {
+      if (section.id.includes('placeholder')) {
+        return section; // placeholder는 orderIndex 유지
+      }
+      const dbSection = updatedDbSections.find(s => s.id === section.id);
+      return dbSection || section;
+    });
+
     setSections(updatedSections);
 
     try {
-      const updates = updatedSections
-        .filter(s => !s.id.includes('placeholder'))
-        .map(s => supabase.from('home_sections').update({ orderIndex: s.orderIndex }).eq('id', s.id));
-      
-      const results = await Promise.all(updates);
-      results.forEach(res => { if(res.error) throw res.error; });
+      // 1단계: 모든 섹션의 orderIndex를 임시 값(음수)으로 변경하여 중복 방지
+      const tempUpdates = updatedDbSections.map((s, idx) =>
+        supabase.from('home_sections').update({ orderIndex: -(idx + 1) }).eq('id', s.id)
+      );
+      const tempResults = await Promise.all(tempUpdates);
+      tempResults.forEach(res => { if(res.error) throw res.error; });
+
+      // 2단계: 실제 orderIndex 값으로 업데이트
+      const finalUpdates = updatedDbSections.map(s =>
+        supabase.from('home_sections').update({ orderIndex: s.orderIndex }).eq('id', s.id)
+      );
+      const finalResults = await Promise.all(finalUpdates);
+      finalResults.forEach(res => { if(res.error) throw res.error; });
 
     } catch (err) {
       console.error('Failed to update order:', err);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
@@ -82,22 +82,27 @@ import { getCurrentUser, getUserRoles } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/image-upload';
 
-// 날짜를 시작 시간(00:00:00)으로 변환 (로컬 타임존 사용)
+// 날짜를 시작 시간(00:00:00)으로 변환 (UTC 기준)
 const formatDateToStartOfDay = (date: string): string => {
   if (!date) return '';
-  // 로컬 시간으로 Date 객체 생성 (00:00:00)
-  const localDate = new Date(date + 'T00:00:00');
-  // ISO 8601 형식으로 변환 (UTC로 자동 변환됨)
-  return localDate.toISOString();
+  // UTC 기준으로 날짜 생성하여 타임존 문제 방지
+  return `${date}T00:00:00.000Z`;
 };
 
-// 날짜를 종료 시간(23:59:59)으로 변환 (로컬 타임존 사용)
+// 날짜를 종료 시간(23:59:59)으로 변환 (UTC 기준)
 const formatDateToEndOfDay = (date: string): string => {
   if (!date) return '';
-  // 로컬 시간으로 Date 객체 생성 (23:59:59)
-  const localDate = new Date(date + 'T23:59:59');
-  // ISO 8601 형식으로 변환 (UTC로 자동 변환됨)
-  return localDate.toISOString();
+  // UTC 기준으로 날짜 생성하여 타임존 문제 방지
+  return `${date}T23:59:59.999Z`;
+};
+
+// UTC 날짜 문자열을 로컬 날짜 문자열로 변환 (표시용)
+const formatDisplayDate = (dateString: string): string => {
+  if (!dateString) return '';
+  // UTC 날짜를 그대로 파싱 (타임존 변환 없이)
+  const date = dateString.split('T')[0]; // YYYY-MM-DD 추출
+  const [year, month, day] = date.split('-');
+  return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
 };
 
 // 통합 전화번호 포맷팅 함수 (휴대폰 및 유선전화 모두 지원)
@@ -531,6 +536,25 @@ export default function AdsManagementPage() {
   useEffect(() => {
     filterAdvertisements();
   }, [filterAdvertisements]);
+
+  // 카테고리별로 광고 그룹화
+  const groupedAdsByCategory = useMemo(() => {
+    const grouped: Record<string, { categoryName: string; ads: Advertisement[] }> = {};
+
+    filteredAds.forEach(ad => {
+      if (!ad.categoryId || !ad.ad_categories) return; // 카테고리 없는 광고는 제외
+
+      if (!grouped[ad.categoryId]) {
+        grouped[ad.categoryId] = {
+          categoryName: ad.ad_categories.categoryName,
+          ads: []
+        };
+      }
+      grouped[ad.categoryId].ads.push(ad);
+    });
+
+    return grouped;
+  }, [filteredAds]);
 
   // 전화번호 변경 핸들러 (메모이제이션)
   const handleContactPhoneChange = useCallback((value: string) => {
@@ -1400,42 +1424,44 @@ export default function AdsManagementPage() {
             </CardContent>
           </Card>
 
-          {/* 광고 목록 */}
-          <Card>
-            <CardContent className='pt-6'>
-              <div className='mb-4 flex items-center justify-between'>
-                <div className='flex items-center gap-2'>
-                  <div className='text-lg font-semibold'>광고 목록</div>
-                  <Badge
-                    variant='secondary'
-                    className='text-sm'
-                  >
-                    {filteredAds.length}개
-                  </Badge>
-                </div>
-              </div>
-
-              {filteredAds.length === 0 ? (
-                <div className='flex flex-col items-center justify-center py-16 text-center'>
-                  <Package className='h-16 w-16 text-muted-foreground mb-4' />
-                  <h3 className='text-lg font-medium mb-2'>광고가 없습니다</h3>
-                  <p className='text-sm text-muted-foreground mb-6'>
-                    {searchTerm || getActiveFilterCount() > 0
-                      ? '검색 조건에 맞는 광고가 없습니다. 다른 조건으로 시도해보세요.'
-                      : '새로운 광고를 등록하여 시작하세요.'}
-                  </p>
-                  {!searchTerm && getActiveFilterCount() === 0 && (
-                    <Button
-                      onClick={() => handleOpenDialog()}
-                      size='lg'
-                    >
-                      <Plus className='mr-2 h-5 w-5' />첫 광고 등록하기
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className='rounded-lg border overflow-hidden'>
-                  <Table>
+          {/* 광고 목록 - 카테고리별로 분리 */}
+          <div className='space-y-6'>
+            {Object.keys(groupedAdsByCategory).length === 0 ? (
+              <Card>
+                <CardContent className='pt-6'>
+                  <div className='flex flex-col items-center justify-center py-16 text-center'>
+                    <Package className='h-16 w-16 text-muted-foreground mb-4' />
+                    <h3 className='text-lg font-medium mb-2'>광고가 없습니다</h3>
+                    <p className='text-sm text-muted-foreground mb-6'>
+                      {searchTerm || getActiveFilterCount() > 0
+                        ? '검색 조건에 맞는 광고가 없습니다. 다른 조건으로 시도해보세요.'
+                        : '새로운 광고를 등록하여 시작하세요.'}
+                    </p>
+                    {!searchTerm && getActiveFilterCount() === 0 && (
+                      <Button
+                        onClick={() => handleOpenDialog()}
+                        size='lg'
+                      >
+                        <Plus className='mr-2 h-5 w-5' />첫 광고 등록하기
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              Object.entries(groupedAdsByCategory).map(([categoryId, { categoryName, ads }]) => (
+                <Card key={categoryId}>
+                  <CardContent className='pt-6'>
+                    <div className='mb-4 flex items-center justify-between'>
+                      <div className='flex items-center gap-2'>
+                        <div className='text-lg font-semibold'>{categoryName}</div>
+                        <Badge variant='secondary' className='text-sm'>
+                          {ads.length}개
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className='rounded-lg border overflow-hidden'>
+                      <Table>
                     <TableHeader>
                       <TableRow className='bg-muted/50'>
                         <TableHead className='w-[80px]'>이미지</TableHead>
@@ -1454,7 +1480,7 @@ export default function AdsManagementPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAds.map((ad) => (
+                      {ads.map((ad) => (
                         <TableRow
                           key={ad.id}
                           className='hover:bg-muted/50 transition-colors'
@@ -1588,15 +1614,11 @@ export default function AdsManagementPage() {
                               <div className='space-y-1 text-sm'>
                                 <div className='flex items-center gap-1 text-muted-foreground'>
                                   <Calendar className='h-3 w-3' />
-                                  {new Date(ad.startDate).toLocaleDateString(
-                                    'ko-KR'
-                                  )}
+                                  {formatDisplayDate(ad.startDate)}
                                 </div>
                                 <div className='flex items-center gap-1 text-muted-foreground'>
                                   <Calendar className='h-3 w-3' />
-                                  {new Date(ad.endDate).toLocaleDateString(
-                                    'ko-KR'
-                                  )}
+                                  {formatDisplayDate(ad.endDate)}
                                 </div>
                               </div>
                               {ad.isEvent && ad.eventStartDate && ad.eventEndDate && (
@@ -1606,15 +1628,11 @@ export default function AdsManagementPage() {
                                   </div>
                                   <div className='flex items-center gap-1 text-purple-600'>
                                     <Calendar className='h-3 w-3' />
-                                    {new Date(ad.eventStartDate).toLocaleDateString(
-                                      'ko-KR'
-                                    )}
+                                    {formatDisplayDate(ad.eventStartDate)}
                                   </div>
                                   <div className='flex items-center gap-1 text-purple-600'>
                                     <Calendar className='h-3 w-3' />
-                                    {new Date(ad.eventEndDate).toLocaleDateString(
-                                      'ko-KR'
-                                    )}
+                                    {formatDisplayDate(ad.eventEndDate)}
                                   </div>
                                 </div>
                               )}
@@ -1736,9 +1754,11 @@ export default function AdsManagementPage() {
                     </TableBody>
                   </Table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
         </div>
 
         {/* 광고 등록/수정 다이얼로그 */}
