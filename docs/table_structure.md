@@ -562,8 +562,6 @@ await bleService.sendOpenCommand(passwordBytes);
 | displayPhoneNumber    | text        | 광고 표시용 전화번호 (앱에서 보여질 공개 번호) (NULL 가능) |
 | address               | text        | 영업점 주소 (실제 위치)                                 |
 | businessRegistration  | text        | 사업자등록증 이미지 URL (NULL 가능)                     |
-| logo                  | text        | 로고 이미지 URL (NULL 가능)                             |
-| representativeImage   | text        | 대표 이미지 URL (NULL 가능)                             |
 | contractDocument      | text        | 계약서 이미지 URL (NULL 가능)                           |
 | contractMemo          | text        | 계약 메모 (NULL 가능)                                   |
 | searchTags            | text[]      | 검색용 태그 배열 - 지역, 아파트, 상호명 조합 (NULL 가능) |
@@ -652,6 +650,7 @@ await bleService.sendOpenCommand(passwordBytes);
 | isEvent        | bool        | DEFAULT false - 이벤트 광고 여부 (true: 이벤트 섹션에 표시)             |
 | eventStartDate | timestamptz | 이벤트 시작일 (이벤트인 경우 필수) (NULL 가능)                          |
 | eventEndDate   | timestamptz | 이벤트 종료일 (이벤트인 경우 필수) (NULL 가능)                          |
+| eventDescription | text      | 이벤트 전용 소개글 (이벤트인 경우 사용) (NULL 가능)                      |
 | clickCount     | integer     | DEFAULT 0 - 광고 클릭 횟수 (사용자가 광고를 클릭할 때마다 증가)         |
 
 > **설명**:
@@ -680,10 +679,10 @@ await bleService.sendOpenCommand(passwordBytes);
 > -- Step 1: 광고주 등록 (기본 정보 + 계약 정보)
 > INSERT INTO advertisers (
 >   businessName, representativeName, email, contactPhoneNumber,
->   displayPhoneNumber, address, logo, contractDocument, contractMemo, createdBy
+>   displayPhoneNumber, address, contractDocument, contractMemo, createdBy
 > ) VALUES (
 >   '울단지 필라테스', '김대표', 'pilates@example.com', '010-1234-5678',
->   '02-1234-5678', '서울 관악구 신림동 123', 'logo.png',
+>   '02-1234-5678', '서울 관악구 신림동 123',
 >   'contract.pdf', '1년 계약', 'manager-id'
 > ) RETURNING id; -- advertiser-id 획득
 >
@@ -1130,14 +1129,10 @@ advertisements/
 │       └── {section-id}.png
 │
 ├── advertisers/ # 광고주 관련 파일
-│   ├── logos/ # 광고주 로고
-│   │   └── {advertiser-id}.png
 │   ├── business-registrations/ # 사업자등록증
 │   │   └── {advertiser-id}.jpg
-│   ├── contracts/ # 계약서
-│   │   └── {advertiser-id}.pdf
-│   └── representative-images/ # 대표 이미지
-│       └── {advertiser-id}.jpg
+│   └── contracts/ # 계약서
+│       └── {advertiser-id}.pdf
 │
 └── ads/ # 광고 이미지 (카테고리별 분류)
     ├── pilates/ # 필라테스 광고
@@ -1171,10 +1166,8 @@ managers/
 | 홈 알림 이미지         | home-content      | `notifications/{notification-id}.jpg`             |
 | 카테고리 아이콘        | advertisements    | `categories/icons/{category-id}.png`              |
 | **고정 섹션 아이콘**   | advertisements    | `sections/icons/{section-id}.png`                 |
-| 광고주 로고            | advertisements    | `advertisers/logos/{advertiser-id}.png`           |
 | 광고주 사업자등록증    | advertisements    | `advertisers/business-registrations/{advertiser-id}.jpg` |
 | 광고주 계약서          | advertisements    | `advertisers/contracts/{advertiser-id}.pdf`       |
-| 광고주 대표 이미지     | advertisements    | `advertisers/representative-images/{advertiser-id}.jpg` |
 | 광고 이미지            | advertisements    | `ads/{category-name}/{ad-id}.jpg`                 |
 | 매니저 사업자등록증    | managers          | `business-registrations/{manager-id}.jpg`         |
 

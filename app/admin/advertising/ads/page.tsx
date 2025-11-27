@@ -85,15 +85,17 @@ import { ImageUpload } from '@/components/image-upload';
 // 날짜를 시작 시간(00:00:00)으로 변환 (UTC 기준)
 const formatDateToStartOfDay = (date: string): string => {
   if (!date) return '';
-  // UTC 기준으로 날짜 생성하여 타임존 문제 방지
-  return `${date}T00:00:00.000Z`;
+  // 로컬 타임존의 자정(00:00:00)을 UTC로 변환
+  const localDate = new Date(date + 'T00:00:00');
+  return localDate.toISOString();
 };
 
-// 날짜를 종료 시간(23:59:59)으로 변환 (UTC 기준)
+// 날짜를 종료 시간(23:59:59)으로 변환 (로컬 타임존 기준 → UTC)
 const formatDateToEndOfDay = (date: string): string => {
   if (!date) return '';
-  // UTC 기준으로 날짜 생성하여 타임존 문제 방지
-  return `${date}T23:59:59.999Z`;
+  // 로컬 타임존의 23:59:59를 UTC로 변환
+  const localDate = new Date(date + 'T23:59:59.999');
+  return localDate.toISOString();
 };
 
 // UTC 날짜 문자열을 로컬 날짜 문자열로 변환 (표시용)
@@ -248,6 +250,7 @@ interface Advertisement {
   isEvent: boolean;
   eventStartDate: string | null;
   eventEndDate: string | null;
+  eventDescription: string | null;
   clickCount: number;
   createdAt: string;
   advertisers: {
@@ -258,8 +261,6 @@ interface Advertisement {
     contactPhoneNumber: string;
     displayPhoneNumber: string | null;
     address: string;
-    logo: string | null;
-    representativeImage: string | null;
     businessRegistration: string | null;
     contractDocument: string | null;
     contractMemo: string | null;
@@ -330,8 +331,6 @@ export default function AdsManagementPage() {
     contactPhoneNumber: '',
     displayPhoneNumber: '',
     address: '',
-    logo: '',
-    representativeImage: '',
     businessRegistration: '',
     contractDocument: '',
     contractMemo: '',
@@ -351,6 +350,7 @@ export default function AdsManagementPage() {
     isEvent: false,
     eventStartDate: '',
     eventEndDate: '',
+    eventDescription: '',
     selectedApartments: [] as string[],
     selectedRegions: [] as {
       regionSido: string;
@@ -405,8 +405,6 @@ export default function AdsManagementPage() {
             contactPhoneNumber,
             displayPhoneNumber,
             address,
-            logo,
-            representativeImage,
             businessRegistration,
             contractDocument,
             contractMemo,
@@ -622,7 +620,7 @@ export default function AdsManagementPage() {
         const folderPath = `ads/${imageUploadFolderId}`;
 
         // 알려진 하위 폴더들
-        const subFolders = ['images', 'logos', 'representative-images', 'business-registrations', 'contracts'];
+        const subFolders = ['images', 'business-registrations', 'contracts'];
         const allFilesToDelete: string[] = [];
 
         // 각 하위 폴더의 파일들 조회
@@ -679,8 +677,6 @@ export default function AdsManagementPage() {
         contactPhoneNumber: ad.advertisers.contactPhoneNumber,
         displayPhoneNumber: ad.advertisers.displayPhoneNumber || '',
         address: ad.advertisers.address,
-        logo: ad.advertisers.logo || '',
-        representativeImage: ad.advertisers.representativeImage || '',
         businessRegistration: ad.advertisers.businessRegistration || '',
         contractDocument: ad.advertisers.contractDocument || '',
         contractMemo: ad.advertisers.contractMemo || '',
@@ -700,6 +696,7 @@ export default function AdsManagementPage() {
         isEvent: ad.isEvent || false,
         eventStartDate: ad.eventStartDate ? ad.eventStartDate.split('T')[0] : '',
         eventEndDate: ad.eventEndDate ? ad.eventEndDate.split('T')[0] : '',
+        eventDescription: ad.eventDescription || '',
         selectedApartments: ad.advertisement_apartments?.map(aa => aa.apartments.id) || [],
         selectedRegions: ad.advertisement_regions || [],
       });
@@ -716,8 +713,6 @@ export default function AdsManagementPage() {
         contactPhoneNumber: '',
         displayPhoneNumber: '',
         address: '',
-        logo: '',
-        representativeImage: '',
         businessRegistration: '',
         contractDocument: '',
         contractMemo: '',
@@ -735,6 +730,7 @@ export default function AdsManagementPage() {
         isEvent: false,
         eventStartDate: '',
         eventEndDate: '',
+        eventDescription: '',
         selectedApartments: [],
         selectedRegions: [],
       });
@@ -793,8 +789,6 @@ export default function AdsManagementPage() {
             contactPhoneNumber: advertiserFormData.contactPhoneNumber,
             displayPhoneNumber: advertiserFormData.displayPhoneNumber || null,
             address: advertiserFormData.address,
-            logo: advertiserFormData.logo || null,
-            representativeImage: advertiserFormData.representativeImage || null,
             businessRegistration: advertiserFormData.businessRegistration || null,
             contractDocument: advertiserFormData.contractDocument || null,
             contractMemo: advertiserFormData.contractMemo || null,
@@ -819,6 +813,7 @@ export default function AdsManagementPage() {
             isEvent: adFormData.isEvent,
             eventStartDate: adFormData.isEvent ? formatDateToStartOfDay(adFormData.eventStartDate) : null,
             eventEndDate: adFormData.isEvent ? formatDateToEndOfDay(adFormData.eventEndDate) : null,
+            eventDescription: adFormData.isEvent ? (adFormData.eventDescription || null) : null,
           })
           .eq('id', selectedAd.id);
 
@@ -843,8 +838,6 @@ export default function AdsManagementPage() {
             contactPhoneNumber: advertiserFormData.contactPhoneNumber,
             displayPhoneNumber: advertiserFormData.displayPhoneNumber || null,
             address: advertiserFormData.address,
-            logo: advertiserFormData.logo || null,
-            representativeImage: advertiserFormData.representativeImage || null,
             businessRegistration: advertiserFormData.businessRegistration || null,
             contractDocument: advertiserFormData.contractDocument || null,
             contractMemo: advertiserFormData.contractMemo || null,
@@ -872,6 +865,7 @@ export default function AdsManagementPage() {
             isEvent: adFormData.isEvent,
             eventStartDate: adFormData.isEvent ? formatDateToStartOfDay(adFormData.eventStartDate) : null,
             eventEndDate: adFormData.isEvent ? formatDateToEndOfDay(adFormData.eventEndDate) : null,
+            eventDescription: adFormData.isEvent ? (adFormData.eventDescription || null) : null,
             createdBy: currentUser.id,
           })
           .select()
@@ -1466,8 +1460,8 @@ export default function AdsManagementPage() {
                       <TableRow className='bg-muted/50'>
                         <TableHead className='w-[80px]'>이미지</TableHead>
                         <TableHead className='w-[100px]'>상태</TableHead>
-                        <TableHead>광고 제목</TableHead>
-                        <TableHead>광고주</TableHead>
+                        <TableHead className='w-[200px]'>광고 제목</TableHead>
+                        <TableHead className='w-[150px]'>광고주</TableHead>
                         <TableHead className='w-[140px]'>연락처</TableHead>
                         <TableHead className='w-[120px]'>카테고리</TableHead>
                         <TableHead className='w-[100px]'>타입</TableHead>
@@ -1518,18 +1512,16 @@ export default function AdsManagementPage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className='max-w-[200px]'>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className='font-medium cursor-default max-w-[200px]'>
-                                  {truncateText(ad.title, 25)}
+                                <div className='font-medium cursor-default truncate'>
+                                  {ad.title}
                                 </div>
                               </TooltipTrigger>
-                              {ad.title.length > 25 && (
-                                <TooltipContent>
-                                  <p>{ad.title}</p>
-                                </TooltipContent>
-                              )}
+                              <TooltipContent>
+                                <p>{ad.title}</p>
+                              </TooltipContent>
                             </Tooltip>
                             {ad.linkUrl && (
                               <a
@@ -1543,32 +1535,28 @@ export default function AdsManagementPage() {
                               </a>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className='max-w-[150px]'>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className='cursor-default max-w-[150px]'>
-                                  {truncateText(
-                                    ad.advertisers?.businessName || '-',
-                                    20
-                                  )}
+                                <div className='cursor-default truncate'>
+                                  {ad.advertisers?.businessName || '-'}
                                 </div>
                               </TooltipTrigger>
-                              {ad.advertisers?.businessName &&
-                                ad.advertisers.businessName.length > 20 && (
-                                  <TooltipContent>
-                                    <p>{ad.advertisers.businessName}</p>
-                                  </TooltipContent>
-                                )}
+                              {ad.advertisers?.businessName && (
+                                <TooltipContent>
+                                  <p>{ad.advertisers.businessName}</p>
+                                </TooltipContent>
+                              )}
                             </Tooltip>
                           </TableCell>
                           <TableCell>
                             <div className='space-y-1 text-sm'>
-                              <div className='font-medium'>
+                              <div className='font-medium truncate'>
                                 <span className='text-xs text-muted-foreground'>연락처: </span>
                                 {ad.advertisers?.contactPhoneNumber || '-'}
                               </div>
                               {ad.advertisers?.displayPhoneNumber && (
-                                <div className='text-xs text-muted-foreground'>
+                                <div className='text-xs text-muted-foreground truncate'>
                                   <span>표시용: </span>
                                   {ad.advertisers.displayPhoneNumber}
                                 </div>
@@ -1579,10 +1567,10 @@ export default function AdsManagementPage() {
                             {ad.ad_categories ? (
                               <Badge
                                 variant='outline'
-                                className='font-normal'
+                                className='font-normal max-w-full'
                               >
-                                <Tag className='mr-1 h-3 w-3' />
-                                {ad.ad_categories.categoryName}
+                                <Tag className='mr-1 h-3 w-3 flex-shrink-0' />
+                                <span className='truncate'>{ad.ad_categories.categoryName}</span>
                               </Badge>
                             ) : (
                               <span className='text-sm text-muted-foreground'>
@@ -1683,21 +1671,15 @@ export default function AdsManagementPage() {
                                 {ad.advertisers?.contractMemo ? (
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <div className='max-w-[180px]'>
-                                        {truncateText(
-                                          ad.advertisers.contractMemo,
-                                          50
-                                        )}
+                                      <div className='truncate'>
+                                        {ad.advertisers.contractMemo}
                                       </div>
                                     </TooltipTrigger>
-                                    {ad.advertisers.contractMemo.length >
-                                      50 && (
-                                      <TooltipContent>
-                                        <p className='max-w-xs whitespace-pre-wrap'>
-                                          {ad.advertisers.contractMemo}
-                                        </p>
-                                      </TooltipContent>
-                                    )}
+                                    <TooltipContent>
+                                      <p className='max-w-xs whitespace-pre-wrap'>
+                                        {ad.advertisers.contractMemo}
+                                      </p>
+                                    </TooltipContent>
                                   </Tooltip>
                                 ) : (
                                   <span className='text-muted-foreground italic'>
@@ -1897,37 +1879,6 @@ export default function AdsManagementPage() {
                       }
                       placeholder='영업점 주소를 입력 하세요'
                     />
-                  </div>
-
-                  <div className='grid grid-cols-2 gap-3'>
-                    <div className='space-y-2'>
-                      <Label>로고 이미지</Label>
-                      <ImageUpload
-                        value={advertiserFormData.logo}
-                        onChange={(url) =>
-                          setAdvertiserFormData({
-                            ...advertiserFormData,
-                            logo: url,
-                          })
-                        }
-                        bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}/logos`}
-                      />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label>대표 이미지</Label>
-                      <ImageUpload
-                        value={advertiserFormData.representativeImage}
-                        onChange={(url) =>
-                          setAdvertiserFormData({
-                            ...advertiserFormData,
-                            representativeImage: url,
-                          })
-                        }
-                        bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}/representative-images`}
-                      />
-                    </div>
                   </div>
 
                   <div className='grid grid-cols-2 gap-3'>
@@ -2179,6 +2130,23 @@ export default function AdsManagementPage() {
                               }
                             />
                           </div>
+                        </div>
+                        <div className='space-y-2'>
+                          <Label htmlFor='eventDescription'>
+                            이벤트 소개글
+                          </Label>
+                          <Textarea
+                            id='eventDescription'
+                            value={adFormData.eventDescription}
+                            onChange={(e) =>
+                              setAdFormData({
+                                ...adFormData,
+                                eventDescription: e.target.value,
+                              })
+                            }
+                            placeholder='이벤트에 대한 소개글을 입력하세요'
+                            className='min-h-[100px]'
+                          />
                         </div>
                       </>
                     )}
