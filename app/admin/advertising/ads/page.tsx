@@ -391,17 +391,24 @@ export default function AdsManagementPage() {
     const initializeData = async () => {
       const roles = await getUserRoles();
       setUserRoles(roles);
-      await fetchData();
+      await fetchData(roles);
     };
     initializeData();
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (roles?: string[]) => {
     try {
       setLoading(true);
 
+      // 현재 사용자 정보 가져오기
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // roles가 전달되지 않으면 userRoles 상태 사용
+      const currentRoles = roles || userRoles;
+      const isManager = currentRoles.includes('MANAGER');
+
       // 광고 데이터 로드
-      const { data: adsData, error: adsError } = await supabase
+      let query = supabase
         .from('advertisements')
         .select(`
           *,
@@ -432,16 +439,29 @@ export default function AdsManagementPage() {
             name,
             phoneNumber
           )
-        `)
+        `);
+
+      // MANAGER인 경우 자신이 등록한 광고만 필터링
+      if (isManager && user) {
+        query = query.eq('createdBy', user.id);
+      }
+
+      const { data: adsData, error: adsError } = await query
         .order('createdAt', { ascending: false });
 
       if (adsError) throw adsError;
       setAdvertisements(adsData || []);
 
-      // 광고주 목록 로드
-      const { data: advertisersData, error: advertisersError } = await supabase
+      // 광고주 목록 로드 (MANAGER인 경우 자신이 등록한 광고주만)
+      let advertisersQuery = supabase
         .from('advertisers')
-        .select('id, businessName')
+        .select('id, businessName');
+
+      if (isManager && user) {
+        advertisersQuery = advertisersQuery.eq('createdBy', user.id);
+      }
+
+      const { data: advertisersData, error: advertisersError } = await advertisersQuery
         .order('businessName');
 
       if (advertisersError) throw advertisersError;
@@ -457,10 +477,29 @@ export default function AdsManagementPage() {
       if (categoriesError) throw categoriesError;
       setCategories(categoriesData || []);
 
-      // 아파트 로드
-      const { data: apartmentsData, error: apartmentsError } = await supabase
+      // 아파트 로드 (MANAGER인 경우 자신이 관리하는 아파트만)
+      let apartmentsQuery = supabase
         .from('apartments')
-        .select('id, name')
+        .select('id, name');
+
+      if (isManager && user) {
+        // MANAGER가 관리하는 아파트 ID 목록 가져오기
+        const { data: managerApartments } = await supabase
+          .from('manager_apartments')
+          .select('apartmentId')
+          .eq('managerId', user.id);
+
+        if (managerApartments && managerApartments.length > 0) {
+          const apartmentIds = managerApartments.map(ma => ma.apartmentId);
+          apartmentsQuery = apartmentsQuery.in('id', apartmentIds);
+        } else {
+          // 관리하는 아파트가 없으면 빈 배열
+          setApartments([]);
+          return;
+        }
+      }
+
+      const { data: apartmentsData, error: apartmentsError } = await apartmentsQuery
         .order('name');
 
       if (apartmentsError) throw apartmentsError;
