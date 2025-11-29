@@ -60,6 +60,7 @@ interface Apartment {
   createdAt: string;
   createdBy: string | null;
   createdByName: string | null;
+  createdByPhone: string | null;
   status: 'active' | 'pending' | 'inactive';
 }
 
@@ -98,7 +99,8 @@ export default function ApartmentsPage() {
           createdAt,
           createdBy,
           user:createdBy (
-            name
+            name,
+            phoneNumber
           ),
           apartment_buildings (
             id,
@@ -191,6 +193,7 @@ export default function ApartmentsPage() {
           createdAt: new Date(apt.createdAt).toLocaleDateString('ko-KR'),
           createdBy: (apt as any).createdBy || null,
           createdByName: (apt as any).user?.name || null,
+          createdByPhone: (apt as any).user?.phoneNumber || null,
           status: 'active' as const,
         };
       }) || [];
@@ -424,9 +427,16 @@ export default function ApartmentsPage() {
                       </TableCell>
                       <TableCell className="text-center text-sm">
                         {apartment.createdByName ? (
-                          <Badge variant="secondary" className="font-normal">
-                            {apartment.createdByName}
-                          </Badge>
+                          <div>
+                            <div className="font-medium">
+                              {apartment.createdByName}
+                            </div>
+                            {apartment.createdByPhone && (
+                              <div className="text-xs text-muted-foreground">
+                                {apartment.createdByPhone}
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

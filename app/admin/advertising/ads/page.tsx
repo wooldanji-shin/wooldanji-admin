@@ -283,6 +283,11 @@ interface Advertisement {
     regionSigungu: string | null;
     regionDong: string | null;
   }[];
+  user?: {
+    id: string;
+    name: string;
+    phoneNumber: string | null;
+  } | null;
 }
 
 interface Advertiser {
@@ -421,6 +426,11 @@ export default function AdsManagementPage() {
             regionSido,
             regionSigungu,
             regionDong
+          ),
+          user:createdBy (
+            id,
+            name,
+            phoneNumber
           )
         `)
         .order('createdAt', { ascending: false });
@@ -1469,6 +1479,7 @@ export default function AdsManagementPage() {
                         <TableHead className='w-[120px]'>카테고리</TableHead>
                         <TableHead className='w-[100px]'>타입</TableHead>
                         <TableHead className='w-[180px]'>게시 기간</TableHead>
+                        <TableHead className='w-[150px]'>게시자</TableHead>
                         <TableHead className='w-[200px]'>계약메모</TableHead>
                         <TableHead className='w-[100px] text-center'>광고 클릭수</TableHead>
                         <TableHead className='w-[100px] text-center'>클릭 수</TableHead>
@@ -1626,6 +1637,18 @@ export default function AdsManagementPage() {
                                     <Calendar className='h-3 w-3' />
                                     {formatDisplayDate(ad.eventEndDate)}
                                   </div>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='text-sm'>
+                              <div className='font-medium truncate'>
+                                {ad.user?.name || '-'}
+                              </div>
+                              {ad.user?.phoneNumber && (
+                                <div className='text-xs text-muted-foreground truncate'>
+                                  {ad.user.phoneNumber}
                                 </div>
                               )}
                             </div>
