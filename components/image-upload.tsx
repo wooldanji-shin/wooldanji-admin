@@ -108,6 +108,77 @@ export function ImageUpload({
     return [];
   });
 
+  // 이미지 비율 체크 함수 (1:1, 3:4, 2:3 허용, ±5% 허용치)
+  const checkImageRatio = async (file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const img = new Image();
+
+        img.onload = () => {
+          const ratio = img.width / img.height;
+
+          // 1:1 비율 체크 (0.95 ~ 1.05)
+          const isSquare = ratio >= 0.95 && ratio <= 1.05;
+
+          // 3:4 비율 체크 세로 (0.714 ~ 0.789)
+          const is3to4Portrait = ratio >= 0.714 && ratio <= 0.789;
+
+          // 2:3 비율 체크 세로 (0.633 ~ 0.700)
+          const is2to3Portrait = ratio >= 0.633 && ratio <= 0.700;
+
+          if (isSquare || is3to4Portrait || is2to3Portrait) {
+            resolve();
+          } else {
+            // 추천 크기 계산
+            let recommendations = '';
+
+            // 1:1 정사각형 추천
+            const squareSize = Math.min(img.width, img.height);
+            recommendations += `\n\n추천 크기:\n`;
+            recommendations += `• 1:1 (정사각형): ${squareSize} x ${squareSize}\n`;
+
+            // 2:3 세로 추천 (가로 기준)
+            const height2to3FromWidth = Math.round(img.width * 3 / 2);
+            recommendations += `• 2:3 (세로, 가로 기준): ${img.width} x ${height2to3FromWidth}\n`;
+
+            // 2:3 세로 추천 (세로 기준)
+            const width2to3FromHeight = Math.round(img.height * 2 / 3);
+            recommendations += `• 2:3 (세로, 세로 기준): ${width2to3FromHeight} x ${img.height}\n`;
+
+            // 3:4 세로 추천 (가로 기준)
+            const height3to4FromWidth = Math.round(img.width * 4 / 3);
+            recommendations += `• 3:4 (세로, 가로 기준): ${img.width} x ${height3to4FromWidth}\n`;
+
+            // 3:4 세로 추천 (세로 기준)
+            const width3to4FromHeight = Math.round(img.height * 3 / 4);
+            recommendations += `• 3:4 (세로, 세로 기준): ${width3to4FromHeight} x ${img.height}`;
+
+            reject(new Error(
+              `이미지 비율이 맞지 않습니다.\n` +
+              `허용 비율: 1:1 (정사각형), 2:3 (세로), 3:4 (세로)\n` +
+              `현재 이미지: ${img.width} x ${img.height} (비율: ${ratio.toFixed(2)}:1)` +
+              recommendations
+            ));
+          }
+        };
+
+        img.onerror = () => {
+          reject(new Error('이미지를 로드할 수 없습니다.'));
+        };
+
+        img.src = e.target?.result as string;
+      };
+
+      reader.onerror = () => {
+        reject(new Error('파일을 읽을 수 없습니다.'));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  };
+
   // 이미지를 WebP로 변환하는 함수 (크기 제한 + 고품질)
   const convertToWebP = async (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
@@ -186,13 +257,19 @@ export function ImageUpload({
         throw new Error(`파일 크기는 ${maxSizeMB}MB 이하여야 합니다.`);
       }
 
+      // 이미지 파일인지 확인 (jpg, jpeg, png는 webp로 변환)
+      const isImageFile = file.type.startsWith('image/');
+
+      // 이미지 파일인 경우 비율 체크 (광고 이미지만 체크하도록)
+      if (isImageFile && storagePath.includes('ads/')) {
+        await checkImageRatio(file);
+      }
+
       // 파일명 처리: 원본파일명_타임스탬프.확장자
       const timestamp = Date.now();
       const originalName = file.name.substring(0, file.name.lastIndexOf('.'));
       const sanitizedName = sanitizeFileName(originalName);
 
-      // 이미지 파일인지 확인 (jpg, jpeg, png는 webp로 변환)
-      const isImageFile = file.type.startsWith('image/');
       const shouldConvertToWebP = isImageFile &&
         (file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/jpg');
 
@@ -449,7 +526,7 @@ export function ImageUpload({
       {/* 파일이 있을 때: 업로드된 파일 목록 표시 */}
       {uploadedFiles.length > 0 && (
         <div className='space-y-2'>
-          {uploadedFiles.map((file, index) => {
+          {uploadedFiles.map((file) => {
             const cleanUrl = file.url.split('?')[0];
             // 원본 파일명이 있으면 사용, 없으면 Storage 파일명 사용
             const nameToDisplay = file.originalFileName || file.fileName;

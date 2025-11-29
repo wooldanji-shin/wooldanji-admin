@@ -81,30 +81,32 @@ import { createClient } from '@/lib/supabase/client';
 import { getCurrentUser, getUserRoles } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/image-upload';
+import { format, parseISO } from 'date-fns';
 
-// 날짜를 시작 시간(00:00:00)으로 변환 (UTC 기준)
+// 날짜를 시작 시간(00:00:00)으로 변환 (로컬 → UTC)
 const formatDateToStartOfDay = (date: string): string => {
   if (!date) return '';
-  // 로컬 타임존의 자정(00:00:00)을 UTC로 변환
-  const localDate = new Date(date + 'T00:00:00');
+  const localDate = parseISO(date + 'T00:00:00');
   return localDate.toISOString();
 };
 
-// 날짜를 종료 시간(23:59:59)으로 변환 (로컬 타임존 기준 → UTC)
+// 날짜를 종료 시간(23:59:59)으로 변환 (로컬 → UTC)
 const formatDateToEndOfDay = (date: string): string => {
   if (!date) return '';
-  // 로컬 타임존의 23:59:59를 UTC로 변환
-  const localDate = new Date(date + 'T23:59:59.999');
+  const localDate = parseISO(date + 'T23:59:59.999');
   return localDate.toISOString();
 };
 
-// UTC 날짜 문자열을 로컬 날짜 문자열로 변환 (표시용)
+// UTC 날짜를 한국 시간으로 표시 (예: 2024년 11월 27일)
 const formatDisplayDate = (dateString: string): string => {
   if (!dateString) return '';
-  // UTC 날짜를 그대로 파싱 (타임존 변환 없이)
-  const date = dateString.split('T')[0]; // YYYY-MM-DD 추출
-  const [year, month, day] = date.split('-');
-  return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+  return format(parseISO(dateString), 'yyyy년 M월 d일');
+};
+
+// UTC 날짜를 input[type="date"] 형식으로 변환 (예: 2024-11-27)
+const formatDateForInput = (dateString: string): string => {
+  if (!dateString) return '';
+  return format(parseISO(dateString), 'yyyy-MM-dd');
 };
 
 // 통합 전화번호 포맷팅 함수 (휴대폰 및 유선전화 모두 지원)
@@ -252,6 +254,7 @@ interface Advertisement {
   eventEndDate: string | null;
   eventDescription: string | null;
   clickCount: number;
+  adClickCount: number;
   createdAt: string;
   advertisers: {
     id: string;
@@ -690,12 +693,12 @@ export default function AdsManagementPage() {
         description: ad.description || '',
         imageUrl: ad.imageUrl,
         linkUrl: ad.linkUrl || '',
-        startDate: ad.startDate.split('T')[0],
-        endDate: ad.endDate.split('T')[0],
+        startDate: formatDateForInput(ad.startDate),
+        endDate: formatDateForInput(ad.endDate),
         isActive: ad.isActive,
         isEvent: ad.isEvent || false,
-        eventStartDate: ad.eventStartDate ? ad.eventStartDate.split('T')[0] : '',
-        eventEndDate: ad.eventEndDate ? ad.eventEndDate.split('T')[0] : '',
+        eventStartDate: ad.eventStartDate ? formatDateForInput(ad.eventStartDate) : '',
+        eventEndDate: ad.eventEndDate ? formatDateForInput(ad.eventEndDate) : '',
         eventDescription: ad.eventDescription || '',
         selectedApartments: ad.advertisement_apartments?.map(aa => aa.apartments.id) || [],
         selectedRegions: ad.advertisement_regions || [],
@@ -1467,6 +1470,7 @@ export default function AdsManagementPage() {
                         <TableHead className='w-[100px]'>타입</TableHead>
                         <TableHead className='w-[180px]'>게시 기간</TableHead>
                         <TableHead className='w-[200px]'>계약메모</TableHead>
+                        <TableHead className='w-[100px] text-center'>광고 클릭수</TableHead>
                         <TableHead className='w-[100px] text-center'>클릭 수</TableHead>
                         <TableHead className='text-right w-[120px]'>
                           작업
@@ -1688,6 +1692,11 @@ export default function AdsManagementPage() {
                                 )}
                               </div>
                             )}
+                          </TableCell>
+                          <TableCell className='text-center'>
+                            <span>
+                              {ad.adClickCount?.toLocaleString() || '0'}
+                            </span>
                           </TableCell>
                           <TableCell className='text-center'>
                             <span>
