@@ -102,7 +102,7 @@ export async function POST(request: Request) {
         phoneNumber: phoneNumber || null,
         apartmentId: null, // 매니저는 아파트와 직접 연결되지 않음
         registerMethods: ['local'],
-        registrationType: 'GENERAL',
+        registrationType: 'APARTMENT',
         premium: false,
         shareUserCount: 0,
         openDoorCount: 0,

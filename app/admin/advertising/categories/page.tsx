@@ -330,12 +330,26 @@ export default function AdCategoriesPage() {
     for (const section of sections) {
       if (section.id === currentSectionId) continue;
       if (!section.autoSelectStartTime) continue;
-      
-      const existingStart = new Date(`${section.autoSelectStartDate}T${section.autoSelectStartTime}`);
-      const existingEnd = new Date(`${section.autoSelectEndDate}T${section.autoSelectEndTime}`);
 
-      // Check for overlap: (StartA < EndB) and (StartB < EndA)
-      if (newStart < existingEnd && existingStart < newEnd) {
+      // 날짜 범위가 겹치는지 먼저 확인
+      const newStartDate = new Date(autoSelectStartDate);
+      const newEndDate = new Date(autoSelectEndDate);
+      const existingStartDate = new Date(section.autoSelectStartDate!);
+      const existingEndDate = new Date(section.autoSelectEndDate!);
+
+      // 날짜 범위가 겹치지 않으면 패스
+      if (newEndDate < existingStartDate || existingEndDate < newStartDate) {
+        continue;
+      }
+
+      // 날짜 범위가 겹칠 때만 시간 체크
+      const newStartTimeMinutes = parseInt(autoSelectStartTime.split(':')[0]) * 60 + parseInt(autoSelectStartTime.split(':')[1]);
+      const newEndTimeMinutes = parseInt(autoSelectEndTime.split(':')[0]) * 60 + parseInt(autoSelectEndTime.split(':')[1]);
+      const existingStartTimeMinutes = parseInt(section.autoSelectStartTime.split(':')[0]) * 60 + parseInt(section.autoSelectStartTime.split(':')[1]);
+      const existingEndTimeMinutes = parseInt(section.autoSelectEndTime.split(':')[0]) * 60 + parseInt(section.autoSelectEndTime.split(':')[1]);
+
+      // 시간이 겹치는지 확인: (StartA < EndB) and (StartB < EndA)
+      if (newStartTimeMinutes < existingEndTimeMinutes && existingStartTimeMinutes < newEndTimeMinutes) {
         setScheduleError(`'${section.categoryName || section.displayName}' 섹션의 스케줄과 겹칩니다.`);
         return;
       }

@@ -1284,3 +1284,186 @@ UPDATE cron.job SET active = false WHERE jobname = 'job-name';
 -- 활성화
 UPDATE cron.job SET active = true WHERE jobname = 'job-name';
 ```
+
+---
+
+## ✓ 문의하기 시스템
+
+### Table: `inquiries` (문의사항)
+
+| Column      | Type        | Notes                                        |
+| ----------- | ----------- | -------------------------------------------- |
+| id          | uuid        | **PK**                                       |
+| createdAt   | timestamptz | DEFAULT now()                                |
+| userId      | uuid        | **FK** → `user.id` **ON DELETE CASCADE**     |
+| content     | text        | 문의 내용                                    |
+| imageUrls   | text[]      | 첨부 이미지 URL 배열 (NULL 가능)             |
+| status      | text        | `PENDING` \| `ANSWERED` - 답변 상태          |
+| lastReplyAt | timestamptz | 마지막 답변 시간 (DEFAULT now())             |
+
+> **설명**:
+>
+> - 사용자가 작성한 문의사항 관리
+> - 1:N 관계로 하나의 문의에 여러 답변 가능 (채팅 방식)
+> - 이미지는 문의 작성 시에만 첨부 가능 (답변에는 텍스트만)
+>
+> **제약조건**:
+>
+> - `CHECK (status IN ('PENDING', 'ANSWERED'))`
+> - **ON DELETE CASCADE**: 사용자 삭제 시 문의도 함께 삭제
+>
+> **RLS 정책**:
+>
+> ```sql
+> -- 사용자는 자신의 문의만 조회/생성/수정/삭제
+> CREATE POLICY "Users can view their own inquiries"
+> ON inquiries FOR SELECT
+> USING (auth.uid() = "userId");
+>
+> CREATE POLICY "Users can create their own inquiries"
+> ON inquiries FOR INSERT
+> WITH CHECK (auth.uid() = "userId");
+>
+> CREATE POLICY "Users can update their own inquiries"
+> ON inquiries FOR UPDATE
+> USING (auth.uid() = "userId");
+>
+> CREATE POLICY "Users can delete their own inquiries"
+> ON inquiries FOR DELETE
+> USING (auth.uid() = "userId");
+> ```
+
+---
+
+### Table: `inquiry_replies` (문의 답변)
+
+| Column     | Type        | Notes                                        |
+| ---------- | ----------- | -------------------------------------------- |
+| id         | uuid        | **PK**                                       |
+| inquiryId  | uuid        | **FK** → `inquiries.id` **ON DELETE CASCADE** |
+| createdAt  | timestamptz | DEFAULT now()                                |
+| userId     | uuid        | **FK** → `user.id` **ON DELETE SET NULL** (NULL 가능) |
+| content    | text        | 답변 내용 (텍스트만, 이미지 없음)            |
+| isAdmin    | bool        | DEFAULT false - 관리자 답변 여부             |
+
+> **설명**:
+>
+> - 문의에 대한 답변 및 추가 대화 관리
+> - 채팅 방식으로 사용자와 관리자가 주고받을 수 있음
+> - 답변에는 텍스트만 가능 (이미지 첨부 불가)
+> - `isAdmin = true`: 관리자 답변, `isAdmin = false`: 사용자 추가 문의
+>
+> **제약조건**:
+>
+> - **ON DELETE CASCADE**: 문의 삭제 시 답변도 함께 삭제
+> - **ON DELETE SET NULL**: 답변 작성자가 삭제되어도 답변은 유지
+>
+> **RLS 정책**:
+>
+> ```sql
+> -- 사용자는 자신의 문의에 달린 답변만 조회
+> CREATE POLICY "Users can view replies to their inquiries"
+> ON inquiry_replies FOR SELECT
+> USING (
+>   EXISTS (
+>     SELECT 1 FROM inquiries
+>     WHERE inquiries.id = inquiry_replies."inquiryId"
+>     AND inquiries."userId" = auth.uid()
+>   )
+> );
+>
+> -- 사용자는 자신의 문의에 답변 추가 가능
+> CREATE POLICY "Users can create replies to their inquiries"
+> ON inquiry_replies FOR INSERT
+> WITH CHECK (
+>   EXISTS (
+>     SELECT 1 FROM inquiries
+>     WHERE inquiries.id = inquiry_replies."inquiryId"
+>     AND inquiries."userId" = auth.uid()
+>   )
+> );
+>
+> -- 관리자는 모든 문의에 답변 가능
+> CREATE POLICY "Admins can create replies to any inquiry"
+> ON inquiry_replies FOR INSERT
+> WITH CHECK ("isAdmin" = true);
+> ```
+
+---
+
+### 문의하기 사용 예시
+
+#### 1. 문의 작성
+```dart
+// 문의 생성
+await supabase.from('inquiries').insert({
+  'userId': currentUserId,
+  'title': '문열기 오류 문의',
+  'content': '문이 열리지 않습니다. 도와주세요.',
+  'imageUrls': ['image1.jpg', 'image2.jpg'],
+  'status': 'PENDING',
+});
+```
+
+#### 2. 내 문의 목록 조회
+```dart
+final inquiries = await supabase
+  .from('inquiries')
+  .select()
+  .eq('userId', currentUserId)
+  .order('createdAt', ascending: false);
+```
+
+#### 3. 문의 상세 조회 (답변 포함)
+```dart
+// 문의 정보
+final inquiry = await supabase
+  .from('inquiries')
+  .select()
+  .eq('id', inquiryId)
+  .single();
+
+// 답변 목록
+final replies = await supabase
+  .from('inquiry_replies')
+  .select()
+  .eq('inquiryId', inquiryId)
+  .order('createdAt', ascending: true);
+```
+
+#### 4. 사용자 추가 문의 (답변)
+```dart
+await supabase.from('inquiry_replies').insert({
+  'inquiryId': inquiryId,
+  'userId': currentUserId,
+  'content': '빠른 답변 부탁드립니다.',
+  'isAdmin': false,
+});
+```
+
+#### 5. 관리자 답변
+```dart
+// 답변 작성
+await supabase.from('inquiry_replies').insert({
+  'inquiryId': inquiryId,
+  'userId': adminUserId,
+  'content': '확인했습니다. 기기를 점검하겠습니다.',
+  'isAdmin': true,
+});
+
+// 문의 상태 업데이트
+await supabase.from('inquiries')
+  .update({'status': 'ANSWERED', 'lastReplyAt': DateTime.now().toUtc()})
+  .eq('id', inquiryId);
+```
+
+---
+
+### 문의하기 시스템 관계 다이어그램
+
+```
+user.id
+  └─< inquiries.userId (사용자의 문의)
+       └─< inquiry_replies.inquiryId (문의에 대한 답변들)
+            └─> inquiry_replies.userId (답변 작성자)
+```

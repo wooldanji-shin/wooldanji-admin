@@ -18,6 +18,7 @@ import {
   LayoutList,
   Briefcase,
   FileText,
+  HelpCircle,
 } from 'lucide-react';
 import { logout, getUserRoles } from '@/lib/auth';
 import { useState, useEffect } from 'react';
@@ -40,6 +41,12 @@ const navigationItems = [
     href: '/admin/users',
     icon: Users,
     roles: ['SUPER_ADMIN', 'APT_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '문의 관리',
+    href: '/admin/inquiries',
+    icon: HelpCircle,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
     name: '관리자 관리',
