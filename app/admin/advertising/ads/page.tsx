@@ -52,6 +52,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Search,
   Plus,
@@ -76,6 +77,7 @@ import {
   ExternalLink,
   Loader2,
   Package,
+  Download,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -385,6 +387,10 @@ export default function AdsManagementPage() {
   // 계약메모 인라인 수정 상태
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [editingMemoValue, setEditingMemoValue] = useState('');
+
+  // 클릭수 표시 상태 (광고 ID별로 관리)
+  const [showClickCounts, setShowClickCounts] = useState<Record<string, boolean>>({});
+  const [showAllClickCounts, setShowAllClickCounts] = useState(false);
 
   // 데이터 로드
   useEffect(() => {
@@ -1238,6 +1244,119 @@ export default function AdsManagementPage() {
     return text.substring(0, maxLength) + '...';
   };
 
+  // CSV 내보내기 함수
+  const handleExportCSV = () => {
+    // 현재 필터링된 광고 목록 사용
+    const dataToExport = filteredAds;
+
+    if (dataToExport.length === 0) {
+      toast.error('내보낼 데이터가 없습니다.');
+      return;
+    }
+
+    // CSV 헤더
+    const headers = [
+      '광고 제목',
+      '광고주',
+      '광고주 연락처',
+      '광고주 표시용 연락처',
+      '광고주 주소',
+      '카테고리',
+      '광고 타입',
+      '범위',
+      '게시 시작일',
+      '게시 종료일',
+      '활성화 상태',
+      '이벤트 여부',
+      '이벤트 시작일',
+      '이벤트 종료일',
+      '광고 클릭수',
+      '클릭 수',
+      '게시자',
+      '게시자 연락처',
+      '등록일',
+      '계약 메모',
+    ];
+
+    // CSV 데이터 생성
+    const csvData = dataToExport.map(ad => {
+      // 범위 정보 생성
+      let scope = '';
+      if (ad.adType === 'NEIGHBORHOOD') {
+        if (ad.advertisement_apartments && ad.advertisement_apartments.length > 0) {
+          scope = ad.advertisement_apartments
+            .map(aa => aa.apartments.name)
+            .join('; ');
+        }
+      } else {
+        if (ad.advertisement_regions && ad.advertisement_regions.length > 0) {
+          scope = ad.advertisement_regions
+            .map(region => {
+              let parts = [region.regionSido];
+              if (region.regionSigungu) parts.push(region.regionSigungu);
+              if (region.regionDong) parts.push(region.regionDong);
+              return parts.join(' ');
+            })
+            .join('; ');
+        }
+      }
+
+      return [
+        ad.title,
+        ad.advertisers?.businessName || '',
+        ad.advertisers?.contactPhoneNumber || '',
+        ad.advertisers?.displayPhoneNumber || '',
+        ad.advertisers?.address || '',
+        ad.ad_categories?.categoryName || '',
+        ad.adType === 'NEIGHBORHOOD' ? '동네 광고' : '지역 광고',
+        scope,
+        formatDisplayDate(ad.startDate),
+        formatDisplayDate(ad.endDate),
+        ad.isActive ? '활성' : '비활성',
+        ad.isEvent ? '이벤트' : '일반',
+        ad.eventStartDate ? formatDisplayDate(ad.eventStartDate) : '',
+        ad.eventEndDate ? formatDisplayDate(ad.eventEndDate) : '',
+        ad.adClickCount?.toString() || '0',
+        ad.clickCount?.toString() || '0',
+        ad.user?.name || '',
+        ad.user?.phoneNumber || '',
+        formatDisplayDate(ad.createdAt),
+        ad.advertisers?.contractMemo || '',
+      ];
+    });
+
+    // CSV 문자열 생성
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row =>
+        row.map(cell => {
+          // 쉼표, 줄바꿈, 따옴표가 포함된 경우 따옴표로 감싸기
+          const cellStr = String(cell);
+          if (cellStr.includes(',') || cellStr.includes('\n') || cellStr.includes('"')) {
+            return `"${cellStr.replace(/"/g, '""')}"`;
+          }
+          return cellStr;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // BOM 추가 (Excel에서 한글 깨짐 방지)
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+
+    // 파일 다운로드
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `광고목록_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success(`${dataToExport.length}개의 광고를 CSV로 내보냈습니다.`);
+  };
+
   if (loading) {
     return (
       <div className='flex h-full items-center justify-center'>
@@ -1368,6 +1487,16 @@ export default function AdsManagementPage() {
                     ) : (
                       <ChevronDown className='ml-2 h-4 w-4' />
                     )}
+                  </Button>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    className='px-4'
+                    onClick={handleExportCSV}
+                    disabled={filteredAds.length === 0}
+                  >
+                    <Download className='mr-2 h-4 w-4' />
+                    CSV 내보내기
                   </Button>
                   <Button
                     onClick={() => handleOpenDialog()}
@@ -1517,11 +1646,34 @@ export default function AdsManagementPage() {
                         <TableHead className='w-[140px]'>연락처</TableHead>
                         <TableHead className='w-[120px]'>카테고리</TableHead>
                         <TableHead className='w-[100px]'>타입</TableHead>
+                        <TableHead className='w-[180px]'>범위</TableHead>
                         <TableHead className='w-[180px]'>게시 기간</TableHead>
                         <TableHead className='w-[150px]'>게시자</TableHead>
                         <TableHead className='w-[200px]'>계약메모</TableHead>
                         <TableHead className='w-[100px] text-center'>광고 클릭수</TableHead>
                         <TableHead className='w-[100px] text-center'>클릭 수</TableHead>
+                        <TableHead className='w-[80px] text-center'>
+                          <div className='flex items-center justify-center gap-1'>
+                            <span>보기</span>
+                            <Checkbox
+                              id='show-all-click-counts'
+                              checked={showAllClickCounts}
+                              onCheckedChange={(checked) => {
+                                const newValue = checked === true;
+                                setShowAllClickCounts(newValue);
+                                if (newValue) {
+                                  const allChecked: Record<string, boolean> = {};
+                                  filteredAds.forEach(ad => {
+                                    allChecked[ad.id] = true;
+                                  });
+                                  setShowClickCounts(allChecked);
+                                } else {
+                                  setShowClickCounts({});
+                                }
+                              }}
+                            />
+                          </div>
+                        </TableHead>
                         <TableHead className='text-right w-[120px]'>
                           작업
                         </TableHead>
@@ -1652,6 +1804,75 @@ export default function AdsManagementPage() {
                             )}
                           </TableCell>
                           <TableCell>
+                            {ad.adType === 'NEIGHBORHOOD' ? (
+                              ad.advertisement_apartments && ad.advertisement_apartments.length > 0 ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className='text-sm cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors'>
+                                      <div className='flex items-center gap-1'>
+                                        <Building2 className='h-3 w-3 text-muted-foreground' />
+                                        <span className='truncate max-w-[120px]'>
+                                          {ad.advertisement_apartments[0].apartments.name}
+                                        </span>
+                                        {ad.advertisement_apartments.length > 1 && (
+                                          <Badge variant='secondary' className='text-xs'>
+                                            +{ad.advertisement_apartments.length - 1}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent className='max-w-xs max-h-64 overflow-y-auto bg-white text-black border border-gray-200 shadow-lg'>
+                                    <div className='space-y-1'>
+                                      {ad.advertisement_apartments.map((aa, idx) => (
+                                        <div key={idx} className='text-sm py-1'>
+                                          <div className='font-medium'>{aa.apartments.name}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className='text-sm text-muted-foreground'>-</span>
+                              )
+                            ) : (
+                              ad.advertisement_regions && ad.advertisement_regions.length > 0 ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className='text-sm cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors'>
+                                      <div className='flex items-center gap-1'>
+                                        <MapPin className='h-3 w-3 text-muted-foreground' />
+                                        <span className='truncate max-w-[120px]'>
+                                          {ad.advertisement_regions[0].regionSido}
+                                          {ad.advertisement_regions[0].regionSigungu && ` ${ad.advertisement_regions[0].regionSigungu}`}
+                                          {ad.advertisement_regions[0].regionDong && ` ${ad.advertisement_regions[0].regionDong}`}
+                                        </span>
+                                        {ad.advertisement_regions.length > 1 && (
+                                          <Badge variant='secondary' className='text-xs'>
+                                            +{ad.advertisement_regions.length - 1}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent className='max-w-xs max-h-64 overflow-y-auto bg-white text-black border border-gray-200 shadow-lg'>
+                                    <div className='space-y-1'>
+                                      {ad.advertisement_regions.map((region, idx) => (
+                                        <div key={idx} className='text-sm py-1'>
+                                          {region.regionSido}
+                                          {region.regionSigungu && ` > ${region.regionSigungu}`}
+                                          {region.regionDong && ` > ${region.regionDong}`}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className='text-sm text-muted-foreground'>-</span>
+                              )
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <div className='space-y-2'>
                               <div className='space-y-1 text-sm'>
                                 <div className='flex items-center gap-1 text-muted-foreground'>
@@ -1756,17 +1977,39 @@ export default function AdsManagementPage() {
                             )}
                           </TableCell>
                           <TableCell className='text-center'>
-                            <span>
-                              {ad.adClickCount?.toLocaleString() || '0'}
-                            </span>
+                            {showClickCounts[ad.id] ? (
+                              <span>
+                                {ad.adClickCount?.toLocaleString() || '0'}
+                              </span>
+                            ) : (
+                              <span className='text-muted-foreground'>•••</span>
+                            )}
                           </TableCell>
                           <TableCell className='text-center'>
-                            <span>
-                              {ad.clickCount?.toLocaleString() || '0'}
-                            </span>
+                            {showClickCounts[ad.id] ? (
+                              <span>
+                                {ad.clickCount?.toLocaleString() || '0'}
+                              </span>
+                            ) : (
+                              <span className='text-muted-foreground'>•••</span>
+                            )}
+                          </TableCell>
+                          <TableCell className='text-center'>
+                            <div className='flex items-center justify-center'>
+                              <Checkbox
+                                id={`show-count-${ad.id}`}
+                                checked={showClickCounts[ad.id] || false}
+                                onCheckedChange={(checked) => {
+                                  setShowClickCounts(prev => ({
+                                    ...prev,
+                                    [ad.id]: checked === true
+                                  }));
+                                }}
+                              />
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <div className='flex justify-end gap-2'>
+                            <div className='flex justify-end gap-2 items-center'>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
@@ -2488,6 +2731,60 @@ export default function AdsManagementPage() {
                       광고 즉시 활성화 (체크하면 설정한 게시 기간에 노출됩니다)
                     </Label>
                   </div>
+
+                  {/* 클릭수 초기화 (수정 모드에만 표시) */}
+                  {selectedAd && (
+                    <div className='space-y-2 p-4 rounded-lg bg-orange-50 border border-orange-200'>
+                      <div className='flex items-center justify-between'>
+                        <div>
+                          <Label className='text-sm font-semibold text-orange-900'>
+                            클릭수 통계
+                          </Label>
+                          <p className='text-xs text-orange-700 mt-1'>
+                            광고 클릭수: {selectedAd.adClickCount?.toLocaleString() || '0'} /
+                            클릭 수: {selectedAd.clickCount?.toLocaleString() || '0'}
+                          </p>
+                        </div>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={async () => {
+                            if (!window.confirm('클릭수를 0으로 초기화하시겠습니까?')) return;
+
+                            try {
+                              const { error } = await supabase
+                                .from('advertisements')
+                                .update({
+                                  adClickCount: 0,
+                                  clickCount: 0,
+                                })
+                                .eq('id', selectedAd.id);
+
+                              if (error) throw error;
+
+                              toast.success('클릭수가 초기화되었습니다.');
+                              await fetchData();
+
+                              // selectedAd 업데이트
+                              setSelectedAd({
+                                ...selectedAd,
+                                adClickCount: 0,
+                                clickCount: 0,
+                              });
+                            } catch (error: any) {
+                              console.error('Error resetting click counts:', error);
+                              toast.error('클릭수 초기화에 실패했습니다.');
+                            }
+                          }}
+                          className='text-orange-700 border-orange-300 hover:bg-orange-100'
+                        >
+                          <X className='mr-1 h-3 w-3' />
+                          초기화
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

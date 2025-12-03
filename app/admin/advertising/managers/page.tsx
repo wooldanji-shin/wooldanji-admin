@@ -98,6 +98,7 @@ export default function AdvertisingManagersPage() {
     address: '',
     businessRegistration: '',
     memo: '',
+    approvalStatus: 'approve' as 'approve' | 'pending',
   });
   const [tempManagerId, setTempManagerId] = useState<string>('');
   const [uploadedCreateImage, setUploadedCreateImage] = useState<string>(''); // 업로드된 생성 이미지 추적
@@ -224,6 +225,7 @@ export default function AdvertisingManagersPage() {
         address: '',
         businessRegistration: '',
         memo: '',
+        approvalStatus: 'approve',
       });
       setShowPassword(false);
       setUploadedCreateImage(''); // Reset tracking on successful save
@@ -490,6 +492,7 @@ export default function AdvertisingManagersPage() {
               address: '',
               businessRegistration: '',
               memo: '',
+              approvalStatus: 'approve',
             });
             setShowPassword(false);
             setTempManagerId('');
@@ -599,6 +602,34 @@ export default function AdvertisingManagersPage() {
                 placeholder='영업 담당 지역, 특이사항 등'
                 rows={3}
               />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='approvalStatus'>승인 상태</Label>
+              <Select
+                value={createForm.approvalStatus}
+                onValueChange={(value: 'approve' | 'pending') =>
+                  setCreateForm({ ...createForm, approvalStatus: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='approve'>
+                    <div className='flex items-center gap-2'>
+                      <div className='w-2 h-2 rounded-full bg-green-500' />
+                      승인
+                    </div>
+                  </SelectItem>
+                  <SelectItem value='pending'>
+                    <div className='flex items-center gap-2'>
+                      <div className='w-2 h-2 rounded-full bg-gray-500' />
+                      대기
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

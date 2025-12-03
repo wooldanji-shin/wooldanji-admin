@@ -20,6 +20,8 @@ import {
   AlertCircle,
   Edit,
   Trash2,
+  Home,
+  Building2,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
@@ -43,6 +45,12 @@ interface Inquiry {
     email: string | null;
     phoneNumber: string | null;
     apartmentId: string | null;
+    registrationType: 'APARTMENT' | 'GENERAL' | null;
+    buildingNumber: number | null;
+    unit: number | null;
+    apartments?: {
+      name: string;
+    } | null;
   };
 }
 
@@ -106,7 +114,11 @@ export default function InquiryDetailPage() {
             name,
             email,
             phoneNumber,
-            apartmentId
+            apartmentId,
+            registrationType,
+            buildingNumber,
+            unit,
+            apartments:apartmentId(name)
           )
         `)
         .eq('id', inquiryId)
@@ -427,6 +439,31 @@ export default function InquiryDetailPage() {
                       <span>{inquiry.user.phoneNumber}</span>
                     </div>
                   )}
+                </div>
+
+                {/* User Type Information */}
+                <div className='pt-2 border-t border-border/50'>
+                  {inquiry.user?.registrationType === 'APARTMENT' ? (
+                    <div className='flex items-center gap-2 text-sm'>
+                      <Home className='h-4 w-4 text-primary' />
+                      <span className='font-medium'>아파트 회원:</span>
+                      <span className='text-muted-foreground'>
+                        {inquiry.user.apartments?.name || '정보 없음'}
+                        {inquiry.user.buildingNumber && inquiry.user.unit && (
+                          <>
+                            {' '}
+                            <Building2 className='h-3 w-3 inline mx-1' />
+                            {inquiry.user.buildingNumber}동 {inquiry.user.unit}호
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ) : inquiry.user?.registrationType === 'GENERAL' ? (
+                    <div className='flex items-center gap-2 text-sm'>
+                      <User className='h-4 w-4 text-muted-foreground' />
+                      <span className='text-muted-foreground'>일반회원</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

@@ -4,7 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name, phoneNumber, address, businessRegistration, memo } = body;
+    const { email, password, name, phoneNumber, address, businessRegistration, memo, approvalStatus } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
         shareUserCount: 0,
         openDoorCount: 0,
         rssLevel: -80, // 기본 RSS 레벨
-        approvalStatus: 'approve', // 매니저는 승인 필요 없음
+        approvalStatus: approvalStatus || 'approve', // 프론트엔드에서 받은 값 사용, 없으면 기본값 'approve'
         termsAgreed: true,
         privacyAgreed: true,
         marketingAgreed: false,
