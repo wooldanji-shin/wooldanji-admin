@@ -323,6 +323,7 @@ export default function AdsManagementPage() {
   const [filterAdType, setFilterAdType] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterAdvertiser, setFilterAdvertiser] = useState<string>('all');
+  const [filterCreator, setFilterCreator] = useState<string>('all');
   const [isFilterExpanded, setIsFilterExpanded] = useState(true);
 
   // UI 상태
@@ -538,6 +539,20 @@ export default function AdsManagementPage() {
     return 'active';
   };
 
+  // 게시자 목록 추출 (중복 제거)
+  const creators = useMemo(() => {
+    const uniqueCreators = new Map<string, { id: string; name: string }>();
+    advertisements.forEach(ad => {
+      if (ad.user && ad.user.id) {
+        uniqueCreators.set(ad.user.id, {
+          id: ad.user.id,
+          name: ad.user.name || '알 수 없음'
+        });
+      }
+    });
+    return Array.from(uniqueCreators.values());
+  }, [advertisements]);
+
   // 필터링 로직
   const filterAdvertisements = useCallback(() => {
     let filtered = [...advertisements];
@@ -585,8 +600,13 @@ export default function AdsManagementPage() {
       filtered = filtered.filter(ad => ad.advertiserId === filterAdvertiser);
     }
 
+    // 게시자 필터
+    if (filterCreator !== 'all') {
+      filtered = filtered.filter(ad => ad.createdBy === filterCreator);
+    }
+
     setFilteredAds(filtered);
-  }, [advertisements, activeTab, searchTerm, filterAdType, filterCategory, filterAdvertiser]);
+  }, [advertisements, activeTab, searchTerm, filterAdType, filterCategory, filterAdvertiser, filterCreator]);
 
   // 필터링 useEffect
   useEffect(() => {
@@ -1192,6 +1212,7 @@ export default function AdsManagementPage() {
     if (filterAdType !== 'all') count++;
     if (filterCategory !== 'all') count++;
     if (filterAdvertiser !== 'all') count++;
+    if (filterCreator !== 'all') count++;
     return count;
   };
 
@@ -1580,6 +1601,26 @@ export default function AdsManagementPage() {
                       </SelectContent>
                     </Select>
 
+                    <Select
+                      value={filterCreator}
+                      onValueChange={setFilterCreator}
+                    >
+                      <SelectTrigger className='w-[200px]'>
+                        <SelectValue placeholder='게시자' />
+                      </SelectTrigger>
+                      <SelectContent align='start'>
+                        <SelectItem value='all'>전체 게시자</SelectItem>
+                        {creators.map((creator) => (
+                          <SelectItem
+                            key={creator.id}
+                            value={creator.id}
+                          >
+                            {creator.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
                     <Button
                       variant='outline'
                       onClick={() => {
@@ -1587,6 +1628,7 @@ export default function AdsManagementPage() {
                         setFilterAdType('all');
                         setFilterCategory('all');
                         setFilterAdvertiser('all');
+                        setFilterCreator('all');
                       }}
                       className='w-[120px]'
                     >
