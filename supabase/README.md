@@ -77,7 +77,7 @@ VALUES (
      EXISTS (
        SELECT 1 FROM user_roles
        WHERE user_roles."userId" = auth.uid()
-       AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+       AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
      )
      ```
    - Target roles: `authenticated` (체크)
@@ -93,7 +93,7 @@ VALUES (
      EXISTS (
        SELECT 1 FROM user_roles
        WHERE user_roles."userId" = auth.uid()
-       AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+       AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
      )
      ```
    - Target roles: `authenticated` (체크)
@@ -109,7 +109,7 @@ VALUES (
      EXISTS (
        SELECT 1 FROM user_roles
        WHERE user_roles."userId" = auth.uid()
-       AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+       AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
      )
      ```
    - Target roles: `authenticated` (체크)
@@ -202,7 +202,7 @@ images: {
 ### 테이블 접근 권한
 - `SUPER_ADMIN`: 모든 권한
 - `APT_ADMIN`: 아파트 관리자
-- `REGION_ADMIN`: 지역 관리자
+- `MANAGER`: 매니저 (광고 및 콘텐츠 관리)
 
 모든 admin 역할은 헤더/알림 관리 가능합니다.
 

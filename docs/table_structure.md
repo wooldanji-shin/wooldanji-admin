@@ -437,6 +437,40 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ---
 
+### Table: `home_banners`
+
+| Column     | Type        | Notes                                    |
+| ---------- | ----------- | ---------------------------------------- |
+| id         | uuid        | **PK**                                   |
+| createdAt  | timestamptz | DEFAULT now()                            |
+| imageUrl   | text        | 배너 이미지 URL (Supabase Storage)       |
+| linkUrl    | text        | 클릭 시 이동할 URL (NULL 가능)           |
+| orderIndex | int4        | 표시 순서 (작을수록 먼저 표시)           |
+| isActive   | bool        | DEFAULT true - 활성화 여부               |
+
+> **설명**:
+>
+> - 홈 화면 상단 배너 슬라이더 관리
+> - 관리자가 배너 이미지를 동적으로 추가/수정/삭제 가능
+> - 자동 재생 슬라이더로 표시 (CarouselSlider)
+> - Storage 경로: `home-content/banners/{banner-id}.jpg`
+>
+> **제약조건**:
+>
+> - `UNIQUE (orderIndex)`: 순서 중복 불가
+>
+> **사용 예시**:
+>
+> ```sql
+> -- 배너 등록
+> INSERT INTO home_banners (imageUrl, linkUrl, orderIndex) VALUES
+>   ('banners/banner-1.jpg', 'https://example.com/promotion', 1),
+>   ('banners/banner-2.jpg', NULL, 2),
+>   ('banners/banner-3.jpg', 'https://example.com/event', 3);
+> ```
+
+---
+
 ### Table: `home_sections`
 
 | Column               | Type        | Notes                                                                                           |
@@ -1108,11 +1142,13 @@ USING (
 
 ```
 home-content/
+├── banners/ # 홈 화면 배너 이미지
+│   └── {banner-id}.jpg
 └── notifications/ # 홈 화면 알림 이미지
     └── {notification-id}.jpg
 ```
 
-> **용도**: 앱 전역에서 사용되는 콘텐츠 (홈 알림, 배너 등)
+> **용도**: 앱 전역에서 사용되는 콘텐츠 (배너, 홈 알림 등)
 
 ---
 
@@ -1163,6 +1199,7 @@ managers/
 
 | 항목                   | 버킷              | 경로                                              |
 | ---------------------- | ----------------- | ------------------------------------------------- |
+| **홈 배너 이미지**     | home-content      | `banners/{banner-id}.jpg`                         |
 | 홈 알림 이미지         | home-content      | `notifications/{notification-id}.jpg`             |
 | 카테고리 아이콘        | advertisements    | `categories/icons/{category-id}.png`              |
 | **고정 섹션 아이콘**   | advertisements    | `sections/icons/{section-id}.png`                 |

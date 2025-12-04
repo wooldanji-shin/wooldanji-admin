@@ -19,6 +19,7 @@ import {
   Briefcase,
   FileText,
   HelpCircle,
+  Image,
 } from 'lucide-react';
 import { logout, getUserRoles } from '@/lib/auth';
 import { useState, useEffect } from 'react';
@@ -86,6 +87,11 @@ const settingsMenu = {
       name: '헤더 설정',
       href: '/admin/settings/header',
       icon: Palette,
+    },
+    {
+      name: '배너 관리',
+      href: '/admin/settings/banners',
+      icon: Image,
     },
     {
       name: '알림 관리',

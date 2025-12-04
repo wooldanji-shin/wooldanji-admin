@@ -17,14 +17,14 @@ export async function PUT(
       );
     }
 
-    // 관리자 권한 확인 (APT_ADMIN, REGION_ADMIN, SUPER_ADMIN만 가능)
+    // 관리자 권한 확인 (APT_ADMIN, SUPER_ADMIN, MANAGER 가능)
     const { data: roles } = await supabase
       .from('user_roles')
       .select('role')
       .eq('userId', currentUser.id);
 
     const isAdmin = roles?.some(r =>
-      ['APT_ADMIN', 'REGION_ADMIN', 'SUPER_ADMIN'].includes(r.role)
+      ['APT_ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(r.role)
     );
 
     if (!isAdmin) {

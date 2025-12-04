@@ -386,7 +386,7 @@ export default function UsersPage() {
     const roleMap: Record<string, string> = {
       'APP_USER': '앱 사용자',
       'APT_ADMIN': '아파트 관리자',
-      'REGION_ADMIN': '지역 관리자',
+      'MANAGER': '매니저',
       'SUPER_ADMIN': '최고 관리자'
     };
     return roles.map(r => roleMap[r.role] || r.role).join(', ');

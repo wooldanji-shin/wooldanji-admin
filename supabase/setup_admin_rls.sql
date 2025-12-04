@@ -25,7 +25,7 @@ USING (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 
@@ -38,7 +38,7 @@ WITH CHECK (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 
@@ -51,14 +51,14 @@ USING (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 
@@ -71,7 +71,7 @@ USING (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 
@@ -91,7 +91,7 @@ USING (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 
@@ -104,7 +104,7 @@ WITH CHECK (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 
@@ -117,14 +117,14 @@ USING (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 
@@ -137,7 +137,7 @@ USING (
   EXISTS (
     SELECT 1 FROM user_roles
     WHERE user_roles."userId" = auth.uid()
-    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'REGION_ADMIN')
+    AND user_roles.role IN ('SUPER_ADMIN', 'APT_ADMIN', 'MANAGER')
   )
 );
 

@@ -539,8 +539,13 @@ export default function AdsManagementPage() {
     return 'active';
   };
 
-  // 게시자 목록 추출 (중복 제거)
+  // 게시자 목록 추출 (중복 제거) - SUPER_ADMIN만 사용
   const creators = useMemo(() => {
+    // SUPER_ADMIN이 아니면 빈 배열 반환
+    if (!userRoles.includes('SUPER_ADMIN')) {
+      return [];
+    }
+
     const uniqueCreators = new Map<string, { id: string; name: string }>();
     advertisements.forEach(ad => {
       if (ad.user && ad.user.id) {
@@ -551,7 +556,7 @@ export default function AdsManagementPage() {
       }
     });
     return Array.from(uniqueCreators.values());
-  }, [advertisements]);
+  }, [advertisements, userRoles]);
 
   // 필터링 로직
   const filterAdvertisements = useCallback(() => {
@@ -600,13 +605,13 @@ export default function AdsManagementPage() {
       filtered = filtered.filter(ad => ad.advertiserId === filterAdvertiser);
     }
 
-    // 게시자 필터
-    if (filterCreator !== 'all') {
+    // 게시자 필터 (SUPER_ADMIN만 적용)
+    if (filterCreator !== 'all' && userRoles.includes('SUPER_ADMIN')) {
       filtered = filtered.filter(ad => ad.createdBy === filterCreator);
     }
 
     setFilteredAds(filtered);
-  }, [advertisements, activeTab, searchTerm, filterAdType, filterCategory, filterAdvertiser, filterCreator]);
+  }, [advertisements, activeTab, searchTerm, filterAdType, filterCategory, filterAdvertiser, filterCreator, userRoles]);
 
   // 필터링 useEffect
   useEffect(() => {
@@ -1212,7 +1217,8 @@ export default function AdsManagementPage() {
     if (filterAdType !== 'all') count++;
     if (filterCategory !== 'all') count++;
     if (filterAdvertiser !== 'all') count++;
-    if (filterCreator !== 'all') count++;
+    // 게시자 필터는 SUPER_ADMIN만 카운트
+    if (filterCreator !== 'all' && userRoles.includes('SUPER_ADMIN')) count++;
     return count;
   };
 
@@ -1601,25 +1607,28 @@ export default function AdsManagementPage() {
                       </SelectContent>
                     </Select>
 
-                    <Select
-                      value={filterCreator}
-                      onValueChange={setFilterCreator}
-                    >
-                      <SelectTrigger className='w-[200px]'>
-                        <SelectValue placeholder='게시자' />
-                      </SelectTrigger>
-                      <SelectContent align='start'>
-                        <SelectItem value='all'>전체 게시자</SelectItem>
-                        {creators.map((creator) => (
-                          <SelectItem
-                            key={creator.id}
-                            value={creator.id}
-                          >
-                            {creator.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {/* 게시자 필터 (SUPER_ADMIN만 표시) */}
+                    {userRoles.includes('SUPER_ADMIN') && (
+                      <Select
+                        value={filterCreator}
+                        onValueChange={setFilterCreator}
+                      >
+                        <SelectTrigger className='w-[200px]'>
+                          <SelectValue placeholder='게시자' />
+                        </SelectTrigger>
+                        <SelectContent align='start'>
+                          <SelectItem value='all'>전체 게시자</SelectItem>
+                          {creators.map((creator) => (
+                            <SelectItem
+                              key={creator.id}
+                              value={creator.id}
+                            >
+                              {creator.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
 
                     <Button
                       variant='outline'
