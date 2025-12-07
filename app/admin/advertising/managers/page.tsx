@@ -499,7 +499,7 @@ export default function AdvertisingManagersPage() {
           }
         }}
       >
-        <DialogContent className='sm:max-w-[500px]'>
+        <DialogContent className='sm:max-w-[500px] max-h-[90vh] overflow-y-auto'>
           <DialogHeader>
             <DialogTitle>매니저 추가</DialogTitle>
             <DialogDescription>
@@ -602,34 +602,6 @@ export default function AdvertisingManagersPage() {
                 placeholder='영업 담당 지역, 특이사항 등'
                 rows={3}
               />
-            </div>
-
-            <div className='space-y-2'>
-              <Label htmlFor='approvalStatus'>승인 상태</Label>
-              <Select
-                value={createForm.approvalStatus}
-                onValueChange={(value: 'approve' | 'pending') =>
-                  setCreateForm({ ...createForm, approvalStatus: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='approve'>
-                    <div className='flex items-center gap-2'>
-                      <div className='w-2 h-2 rounded-full bg-green-500' />
-                      승인
-                    </div>
-                  </SelectItem>
-                  <SelectItem value='pending'>
-                    <div className='flex items-center gap-2'>
-                      <div className='w-2 h-2 rounded-full bg-gray-500' />
-                      대기
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
