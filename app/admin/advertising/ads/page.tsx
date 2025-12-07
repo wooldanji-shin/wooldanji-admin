@@ -518,7 +518,7 @@ export default function AdsManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, userRoles]);
 
   // 광고 상태 계산
   const getAdStatus = (ad: Advertisement): AdStatus => {

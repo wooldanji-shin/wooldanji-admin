@@ -1308,9 +1308,7 @@ export default function AdvertisementsPage() {
                   setUploadedImageUrl(url);
                 }}
                 accept='image/*'
-                maxSizeMB={5}
                 previewSize='md'
-                description='최대 5MB'
               />
             </div>
 

@@ -190,21 +190,9 @@ export function ImageUpload({
         img.onload = () => {
           const canvas = document.createElement('canvas');
 
-          // 최대 크기 제한 (긴 쪽 기준)
-          const MAX_SIZE = 1080; // 모바일 광고에 최적화된 크기
+          // 원본 크기 사용 (크기 제한 없음)
           let width = img.width;
           let height = img.height;
-
-          // 비율 유지하면서 크기 조절
-          if (width > MAX_SIZE || height > MAX_SIZE) {
-            if (width > height) {
-              height = (height * MAX_SIZE) / width;
-              width = MAX_SIZE;
-            } else {
-              width = (width * MAX_SIZE) / height;
-              height = MAX_SIZE;
-            }
-          }
 
           canvas.width = width;
           canvas.height = height;
@@ -252,18 +240,8 @@ export function ImageUpload({
     setError(null);
 
     try {
-      // 파일 크기 체크
-      if (file.size > maxSizeMB * 1024 * 1024) {
-        throw new Error(`파일 크기는 ${maxSizeMB}MB 이하여야 합니다.`);
-      }
-
       // 이미지 파일인지 확인 (jpg, jpeg, png는 webp로 변환)
       const isImageFile = file.type.startsWith('image/');
-
-      // 이미지 파일인 경우 비율 체크 (광고 이미지만 체크하도록)
-      if (isImageFile && storagePath.includes('ads/')) {
-        await checkImageRatio(file);
-      }
 
       // 파일명 처리: 원본파일명_타임스탬프.확장자
       const timestamp = Date.now();

@@ -56,6 +56,7 @@ interface Apartment {
   buildingCount: number;
   totalUnits: number;
   totalDevices: number;
+  memberCount: number;
   totalOpenDoorCount: number;
   lineRanges: { id: string; line: number[] }[];
   createdAt: string;
@@ -65,7 +66,7 @@ interface Apartment {
   status: 'active' | 'pending' | 'inactive';
 }
 
-type SortField = 'name' | 'buildingCount' | 'totalUnits' | 'totalDevices' | 'createdAt';
+type SortField = 'name' | 'buildingCount' | 'totalUnits' | 'totalDevices' | 'memberCount' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
 
 export default function ApartmentsPage() {
@@ -179,10 +180,12 @@ export default function ApartmentsPage() {
           });
         });
 
+        // 회원 수 계산
+        const apartmentUsers = (allUsers || []).filter((u: any) => u.apartmentId === apt.id);
+        const memberCount = apartmentUsers.length;
+
         // 총 문 열기 횟수 계산
-        const totalOpenDoorCount = (allUsers || [])
-          .filter((u: any) => u.apartmentId === apt.id)
-          .reduce((sum: number, u: any) => sum + (u.openDoorCount || 0), 0);
+        const totalOpenDoorCount = apartmentUsers.reduce((sum: number, u: any) => sum + (u.openDoorCount || 0), 0);
 
         return {
           id: apt.id,
@@ -191,6 +194,7 @@ export default function ApartmentsPage() {
           buildingCount,
           totalUnits,
           totalDevices,
+          memberCount,
           totalOpenDoorCount,
           lineRanges,
           createdAt: new Date(apt.createdAt).toLocaleDateString('ko-KR'),
@@ -359,6 +363,15 @@ export default function ApartmentsPage() {
                       {getSortIcon('totalDevices')}
                     </div>
                   </TableHead>
+                  <TableHead
+                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
+                    onClick={() => handleSort('memberCount')}
+                  >
+                    <div className="flex items-center justify-center">
+                      회원수
+                      {getSortIcon('memberCount')}
+                    </div>
+                  </TableHead>
                   <TableHead className="text-muted-foreground text-center">
                     문 연 횟수
                   </TableHead>
@@ -403,7 +416,7 @@ export default function ApartmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
                         데이터를 불러오는 중...
@@ -412,7 +425,7 @@ export default function ApartmentsPage() {
                   </TableRow>
                 ) : filteredApartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                       {searchTerm ? '검색 결과가 없습니다.' : '등록된 아파트가 없습니다.'}
                     </TableCell>
                   </TableRow>
@@ -442,6 +455,11 @@ export default function ApartmentsPage() {
                       <TableCell className="text-center">
                         <Badge variant="outline" className="font-normal">
                           {apartment.totalDevices}대
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="font-normal">
+                          {apartment.memberCount}명
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center text-muted-foreground">
