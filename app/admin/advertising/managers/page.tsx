@@ -580,7 +580,6 @@ export default function AdvertisingManagersPage() {
               <ImageUpload
                 bucket='managers'
                 storagePath='business-registrations'
-                fileName={tempManagerId}
                 value={createForm.businessRegistration}
                 onChange={(url) => {
                   setCreateForm({ ...createForm, businessRegistration: url });
@@ -588,7 +587,6 @@ export default function AdvertisingManagersPage() {
                 }}
                 accept='image/*'
                 maxSizeMB={5}
-                previewSize='sm'
                 description='이미지 파일, 최대 5MB'
               />
             </div>
@@ -711,7 +709,6 @@ export default function AdvertisingManagersPage() {
               <ImageUpload
                 bucket='managers'
                 storagePath='business-registrations'
-                fileName={editingManagerId}
                 value={editForm.businessRegistration}
                 onChange={(url) => {
                   setEditForm({ ...editForm, businessRegistration: url });
@@ -719,7 +716,6 @@ export default function AdvertisingManagersPage() {
                 }}
                 accept='image/*'
                 maxSizeMB={5}
-                previewSize='sm'
                 description='이미지 파일, 최대 5MB'
               />
             </div>
