@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2, Ban } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { UserFullDetails } from '@/lib/supabase/types';
 import { getUserRoles } from '@/lib/auth';
@@ -84,6 +84,9 @@ export default function UsersPage() {
   }, [imagePreview]);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserFullDetails | null>(null);
+  const [suspendDialog, setSuspendDialog] = useState(false);
+  const [suspendingUser, setSuspendingUser] = useState<UserFullDetails | null>(null);
+  const [suspensionReason, setSuspensionReason] = useState('');
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
 
@@ -330,6 +333,45 @@ export default function UsersPage() {
     }
   };
 
+  const handleSuspendClick = (user: UserFullDetails) => {
+    setSuspendingUser(user);
+    setSuspensionReason('');
+    setSuspendDialog(true);
+  };
+
+  const handleSuspendConfirm = async () => {
+    if (!suspendingUser) return;
+
+    if (!suspensionReason.trim()) {
+      toast.error('보류 사유를 입력해주세요.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${suspendingUser.id}/suspend`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ suspensionReason: suspensionReason.trim() }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to suspend user');
+      }
+
+      toast.success('회원이 승인 보류 처리되었습니다.');
+      setSuspendDialog(false);
+      setSuspendingUser(null);
+      setSuspensionReason('');
+      fetchUsers();
+    } catch (err) {
+      console.error('Failed to suspend user:', err);
+      toast.error('승인 보류 처리에 실패했습니다.');
+    }
+  };
+
   const handleDeleteClick = (user: UserFullDetails) => {
     setDeletingUser(user);
     setDeleteDialog(true);
@@ -365,8 +407,13 @@ export default function UsersPage() {
       case 'approve':
         return <Badge className="bg-green-500 text-white">승인</Badge>;
       case 'pending':
-      default:
         return <Badge variant="secondary">대기</Badge>;
+      case 'suspended':
+        return <Badge className="bg-yellow-500 text-white">보류</Badge>;
+      case 'inactive':
+        return <Badge className="bg-gray-500 text-white">비활성</Badge>;
+      default:
+        return <Badge variant="secondary">-</Badge>;
     }
   };
 
@@ -611,6 +658,15 @@ export default function UsersPage() {
                                   승인 취소
                                 </DropdownMenuItem>
                               )}
+                              {user.registrationType === 'APARTMENT' && user.approvalStatus !== 'suspended' && (
+                                <DropdownMenuItem
+                                  onClick={() => handleSuspendClick(user)}
+                                  className='text-yellow-600'
+                                >
+                                  <Ban className='mr-2 h-4 w-4' />
+                                  승인 보류
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(user)}
                                 className='text-destructive'
@@ -726,6 +782,36 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Suspend Confirmation Dialog */}
+      <Dialog open={suspendDialog} onOpenChange={setSuspendDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>승인 보류</DialogTitle>
+            <DialogDescription>
+              <strong>{suspendingUser?.name || suspendingUser?.email}</strong>님의 승인을 보류하시겠습니까?
+              <br />
+              보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='py-4'>
+            <textarea
+              className='w-full min-h-[100px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary'
+              placeholder='보류 사유를 입력해주세요...'
+              value={suspensionReason}
+              onChange={(e) => setSuspensionReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setSuspendDialog(false)}>
+              취소
+            </Button>
+            <Button variant='default' onClick={handleSuspendConfirm} className='bg-yellow-600 hover:bg-yellow-700'>
+              승인 보류
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>

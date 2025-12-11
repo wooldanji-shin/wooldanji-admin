@@ -23,7 +23,8 @@
 | recommendCode     | text        |                                                                                                   |
 | openDoorCount     | int4        |                                                                                                   |
 | rssLevel          | int4        |                                                                                                   |
-| approvalStatus              | text        | `pending` \| `approve` \| `inactive`                                                              |
+| approvalStatus              | text        | `pending` \| `approve` \| `inactive` \| `suspended`                                               |
+| suspensionReason            | text        | 승인 보류/취소 이유 (approvalStatus가 suspended 또는 inactive일 때 관리자가 작성)                |
 | registerMethods             | text[]      | 가입 방법 배열 (예: `['google', 'kakao']`)                                                        |
 | registrationType            | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원                                            |
 | apartmentId       | uuid        | **FK** → `apartments.id` **ON DELETE SET NULL** (APARTMENT 타입인 경우 필수, GENERAL인 경우 NULL) |
@@ -61,6 +62,93 @@
 >
 > - `CHECK (registrationType IN ('GENERAL', 'APARTMENT'))`
 > - `CHECK (registrationType = 'APARTMENT' AND apartmentId IS NOT NULL AND buildingNumber IS NOT NULL AND unit IS NOT NULL)` 또는 `registrationType = 'GENERAL'`
+> - `CHECK (approvalStatus IN ('pending', 'approve', 'inactive', 'suspended'))`
+
+---
+
+## Table: `user_reconfirm` (재신청)
+
+| Column             | Type        | Notes                                                                 |
+| ------------------ | ----------- | --------------------------------------------------------------------- |
+| id                 | uuid        | **PK**                                                                |
+| userId             | uuid        | **FK** → `user.id` **ON DELETE CASCADE**                              |
+| reConfirmImageUrl  | text        | 재신청 인증 이미지 URL                                                |
+| status             | text        | `pending` \| `approve` \| `rejected` - 재신청 상태 (DEFAULT PENDING) |
+| previousStatus     | text        | 재신청 당시 유저 상태 (`pending`, `approve`, `inactive`, `suspended`) |
+| reviewedBy         | uuid        | **FK** → `user.id` **ON DELETE SET NULL** - 검토한 관리자 (NULL 가능) |
+| reviewedAt         | timestamptz | 검토 완료 시간 (NULL 가능)                                            |
+| rejectionReason    | text        | 거절 사유 (status가 'reject'일 때 작성, NULL 가능)                   |
+| createdAt          | timestamptz | DEFAULT now() - 재신청 생성 시간                                      |
+
+> **설명**:
+>
+> - `suspended` 또는 `inactive` 상태인 유저가 인증 사진을 재제출하여 재심사를 요청하는 테이블
+> - 관리자가 pending 상태의 유저를 반려하면 `suspended` 상태가 되고, 해당 유저는 재신청 가능
+> - 재신청 이력이 모두 기록되어 통계 및 추적 가능
+>
+> **제약조건**:
+>
+> - `CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'))`
+> - `CHECK (previousStatus IN ('pending', 'approve', 'inactive', 'suspended'))`
+> - **ON DELETE CASCADE**: 사용자 삭제 시 재신청도 함께 삭제
+> - **ON DELETE SET NULL**: 검토자 삭제 시 재신청은 유지하되 reviewedBy만 NULL
+>
+> **RLS 정책**:
+>
+> - **일반 사용자**: 자신의 재신청만 조회/생성 가능 (수정/삭제 불가)
+> - **MANAGER, SUPER_ADMIN**: 모든 재신청 조회/수정/삭제 가능
+> - **APT_ADMIN**: 재신청 관리 권한 없음 (본인도 반려될 수 있음)
+>
+> **사용 예시**:
+>
+> ```dart
+> // 1. suspended 유저가 재신청 제출
+> await supabase.from('user_reconfirm').insert({
+>   'userId': currentUserId,
+>   'reConfirmImageUrl': newImageUrl,
+>   'previousStatus': 'suspended', // 현재 유저 상태
+>   'status': 'PENDING',
+> });
+>
+> // 2. 관리자가 재신청 목록 조회
+> final reconfirms = await supabase
+>   .from('user_reconfirm')
+>   .select('''
+>     *,
+>     user:userId (
+>       id,
+>       name,
+>       email,
+>       phoneNumber,
+>       approvalStatus
+>     )
+>   ''')
+>   .eq('status', 'PENDING')
+>   .order('createdAt', ascending: false);
+>
+> // 3. 관리자가 승인
+> // Step 1: user 테이블 업데이트
+> await supabase.from('user').update({
+>   'confirmImageUrl': reConfirmImageUrl,
+>   'approvalStatus': 'approve',
+> }).eq('id', userId);
+>
+> // Step 2: user_reconfirm 업데이트
+> await supabase.from('user_reconfirm').update({
+>   'status': 'APPROVED',
+>   'reviewedBy': adminUserId,
+>   'reviewedAt': DateTime.now().toUtc().toIso8601String(),
+> }).eq('id', reconfirmId);
+>
+> // 4. 관리자가 거절
+> await supabase.from('user_reconfirm').update({
+>   'status': 'REJECTED',
+>   'reviewedBy': adminUserId,
+>   'reviewedAt': DateTime.now().toUtc().toIso8601String(),
+>   'rejectionReason': '고지서 이미지가 불명확합니다. 다시 제출해주세요.',
+> }).eq('id', reconfirmId);
+> // user는 suspended 상태 유지
+> ```
 
 ---
 
@@ -238,6 +326,8 @@ auth.users.id
       ▼
 user.id (PK)
   ├─< user_roles.userId
+  ├─< user_reconfirm.userId
+  ├─< user_reconfirm.reviewedBy
   ├─< admin_scopes.userId
   ├─< user_line_access.userId
   ├─< user_line_access.grantedBy
@@ -1503,4 +1593,414 @@ user.id
   └─< inquiries.userId (사용자의 문의)
        └─< inquiry_replies.inquiryId (문의에 대한 답변들)
             └─> inquiry_replies.userId (답변 작성자)
+```
+
+---
+
+## ✓ Edge Functions (Supabase Functions)
+
+### 1. send-approval-notification (승인 알림)
+
+**경로**: `supabase/functions/send-approval-notification/index.ts`
+
+**트리거**: `trigger_user_approval` (user 테이블)
+- **조건**: `approvalStatus`가 'approve'로 변경될 때
+- **호출 함수**: `notify_user_approval()`
+
+**파라미터**:
+```json
+{
+  "userId": "uuid",
+  "userName": "string"
+}
+```
+
+**기능**:
+- 사용자 승인 완료 시 FCM 푸시 알림 전송
+- 알림 내용: "{userName}님, 회원 승인이 완료되었습니다."
+- 사용자의 모든 FCM 토큰으로 전송 (다중 기기 지원)
+- UNREGISTERED 토큰 자동 정리
+
+**호출 방식**:
+- Database Trigger에서 자동 호출 (pg_net.http_post)
+- user 테이블의 approvalStatus가 'approve'로 변경되면 자동 실행
+
+---
+
+### 2. send-inquiry-reply-notification (문의 답변 알림)
+
+**경로**: `supabase/functions/send-inquiry-reply-notification/index.ts`
+
+**트리거**: 수동 호출 (관리자가 문의에 답변할 때 애플리케이션에서 호출)
+
+**파라미터**:
+```json
+{
+  "userId": "uuid",
+  "inquiryId": "uuid",
+  "replyContent": "string"
+}
+```
+
+**기능**:
+- 문의 답변 도착 시 FCM 푸시 알림 전송
+- 알림 내용: "문의하신 내용에 답변이 도착했습니다"
+- 사용자의 모든 FCM 토큰으로 전송 (다중 기기 지원)
+- UNREGISTERED 토큰 자동 정리
+
+**호출 방식**:
+- 관리자 앱에서 답변 작성 후 직접 호출
+- HTTP POST 요청
+
+---
+
+### 3. send-status-change-notification (상태 변경 알림)
+
+**경로**: `supabase/functions/send-status-change-notification/index.ts`
+
+**트리거**: `trigger_user_status_change` (user 테이블)
+- **조건**: `approvalStatus`가 'suspended' 또는 'inactive'로 변경될 때
+- **호출 함수**: `notify_user_status_change()`
+
+**파라미터**:
+```json
+{
+  "userId": "uuid",
+  "status": "suspended" | "inactive"
+}
+```
+
+**기능**:
+- 사용자 상태 변경 시 FCM 푸시 알림 전송
+- **suspended 알림**:
+  - 제목: "승인 보류"
+  - 내용: "{userName}님, 승인이 보류되었습니다. 관리비,고지서 등 다시 첨부해주세요"
+- **inactive 알림**:
+  - 제목: "승인 취소"
+  - 내용: "{userName}님, 30일동안 이용하지 않으셔서 승인이 취소되었습니다."
+- 사용자의 모든 FCM 토큰으로 전송 (다중 기기 지원)
+- UNREGISTERED 토큰 자동 정리
+
+**호출 방식**:
+- Database Trigger에서 자동 호출 (pg_net.http_post)
+- user 테이블의 approvalStatus가 'suspended' 또는 'inactive'로 변경되면 자동 실행
+
+---
+
+### 4. send-reconfirm-rejection-notification (재신청 거절 알림)
+
+**경로**: `supabase/functions/send-reconfirm-rejection-notification/index.ts`
+
+**트리거**: `trigger_reconfirm_rejection` (user_reconfirm 테이블)
+- **조건**: `status`가 'pending'에서 'reject'로 변경될 때
+- **호출 함수**: `notify_reconfirm_rejection()`
+
+**파라미터**:
+```json
+{
+  "userId": "uuid",
+  "reconfirmId": "uuid",
+  "rejectionReason": "string"
+}
+```
+
+**기능**:
+- 재신청 거절 시 FCM 푸시 알림 전송
+- 알림 내용: "재신청이 거절되었습니다. 사유: {rejectionReason}"
+- 사용자의 모든 FCM 토큰으로 전송 (다중 기기 지원)
+- UNREGISTERED 토큰 자동 정리
+
+**호출 방식**:
+- Database Trigger에서 자동 호출 (pg_net.http_post)
+- user_reconfirm 테이블의 status가 'pending'에서 'reject'로 변경되면 자동 실행
+
+**재신청 승인 알림은?**
+- 재신청 승인 시 user.approvalStatus도 'approve'로 변경됨
+- 따라서 `send-approval-notification`이 자동으로 실행됨
+- 별도 알림 불필요 (중복 방지)
+
+---
+
+## ✓ Database Triggers & Functions
+
+### 1. notify_user_approval() + trigger_user_approval
+
+**함수**: `notify_user_approval()`
+**트리거**: `trigger_user_approval`
+**테이블**: `user`
+**조건**: `NEW.approvalStatus = 'approve'`
+
+**동작**:
+1. user 테이블의 approvalStatus가 'approve'로 변경됨
+2. Trigger가 발동하여 `notify_user_approval()` 함수 실행
+3. 함수 내부에서 `pg_net.http_post`로 Edge Function 호출
+4. `send-approval-notification` Edge Function이 FCM 알림 전송
+
+**함수 정의**:
+```sql
+CREATE OR REPLACE FUNCTION public.notify_user_approval()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  request_id bigint;
+BEGIN
+  IF NEW."approvalStatus" = 'approve' AND
+     (OLD."approvalStatus" IS NULL OR OLD."approvalStatus" != 'approve') THEN
+
+    SELECT INTO request_id net.http_post(
+      url := 'https://{project-ref}.supabase.co/functions/v1/send-approval-notification',
+      headers := jsonb_build_object('Content-Type', 'application/json'),
+      body := jsonb_build_object(
+        'userId', NEW.id,
+        'userName', NEW.name
+      )
+    );
+
+    RAISE LOG 'FCM 알림 요청 전송: userId=%, userName=%, request_id=%',
+      NEW.id, NEW.name, request_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+```
+
+---
+
+### 2. notify_user_status_change() + trigger_user_status_change
+
+**함수**: `notify_user_status_change()`
+**트리거**: `trigger_user_status_change`
+**테이블**: `user`
+**조건**: `NEW.approvalStatus IN ('suspended', 'inactive')`
+
+**동작**:
+1. user 테이블의 approvalStatus가 'suspended' 또는 'inactive'로 변경됨
+2. Trigger가 발동하여 `notify_user_status_change()` 함수 실행
+3. 함수 내부에서 `pg_net.http_post`로 Edge Function 호출
+4. `send-status-change-notification` Edge Function이 FCM 알림 전송
+
+**중복 알림 방지**:
+- `pending` → `suspended`: ✅ 알림 발송
+- `approve` → `inactive`: ✅ 알림 발송
+- `suspended` → `inactive`: ❌ 알림 없음 (이전 상태도 suspended/inactive)
+- `inactive` → `suspended`: ❌ 알림 없음 (이전 상태도 suspended/inactive)
+
+**함수 정의**:
+```sql
+CREATE OR REPLACE FUNCTION public.notify_user_status_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  request_id bigint;
+BEGIN
+  IF NEW."approvalStatus" IN ('suspended', 'inactive') AND
+     (OLD."approvalStatus" IS NULL OR
+      OLD."approvalStatus" NOT IN ('suspended', 'inactive')) THEN
+
+    SELECT INTO request_id net.http_post(
+      url := 'https://{project-ref}.supabase.co/functions/v1/send-status-change-notification',
+      headers := jsonb_build_object('Content-Type', 'application/json'),
+      body := jsonb_build_object(
+        'userId', NEW.id,
+        'status', NEW."approvalStatus"
+      )
+    );
+
+    RAISE LOG 'FCM 상태변경 알림 요청 전송: userId=%, status=%, request_id=%',
+      NEW.id, NEW."approvalStatus", request_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+```
+
+---
+
+### 3. notify_reconfirm_rejection() + trigger_reconfirm_rejection
+
+**함수**: `notify_reconfirm_rejection()`
+**트리거**: `trigger_reconfirm_rejection`
+**테이블**: `user_reconfirm`
+**조건**: `OLD.status = 'pending' AND NEW.status = 'reject'`
+
+**동작**:
+1. user_reconfirm 테이블의 status가 'pending'에서 'reject'로 변경됨
+2. Trigger가 발동하여 `notify_reconfirm_rejection()` 함수 실행
+3. 함수 내부에서 `pg_net.http_post`로 Edge Function 호출
+4. `send-reconfirm-rejection-notification` Edge Function이 FCM 알림 전송
+
+**함수 정의**:
+```sql
+CREATE OR REPLACE FUNCTION public.notify_reconfirm_rejection()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  function_url TEXT;
+BEGIN
+  function_url := current_setting('app.settings.supabase_url', true) || '/functions/v1/send-reconfirm-rejection-notification';
+
+  PERFORM net.http_post(
+    url := function_url,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || current_setting('app.settings.supabase_service_role_key', true)
+    ),
+    body := jsonb_build_object(
+      'userId', NEW."userId",
+      'reconfirmId', NEW.id,
+      'rejectionReason', COALESCE(NEW."rejectionReason", '')
+    )
+  );
+
+  RETURN NEW;
+END;
+$function$;
+```
+
+**트리거 정의**:
+```sql
+CREATE TRIGGER trigger_reconfirm_rejection
+AFTER UPDATE ON user_reconfirm
+FOR EACH ROW
+WHEN (OLD.status = 'pending' AND NEW.status = 'reject')
+EXECUTE FUNCTION notify_reconfirm_rejection();
+```
+
+---
+
+## ✓ FCM 토큰 관리
+
+### Database Functions (RPC)
+
+#### 1. add_fcm_token(user_id uuid, new_token text)
+
+**기능**: 사용자의 FCM 토큰 배열에 새 토큰 추가 (중복 방지)
+
+```sql
+CREATE OR REPLACE FUNCTION add_fcm_token(
+  user_id uuid,
+  new_token text
+)
+RETURNS void AS $$
+BEGIN
+  UPDATE "user"
+  SET "fcmToken" = array_append(
+    COALESCE("fcmToken", ARRAY[]::text[]),
+    new_token
+  )
+  WHERE id = user_id
+    AND (
+      "fcmToken" IS NULL
+      OR NOT (new_token = ANY("fcmToken"))
+    );
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**사용 예시**:
+```dart
+await supabase.rpc('add_fcm_token', params: {
+  'user_id': currentUserId,
+  'new_token': fcmToken,
+});
+```
+
+---
+
+#### 2. remove_fcm_token(user_id uuid, token_to_remove text)
+
+**기능**: 사용자의 FCM 토큰 배열에서 무효한 토큰 제거
+
+```sql
+CREATE OR REPLACE FUNCTION remove_fcm_token(
+  user_id uuid,
+  token_to_remove text
+)
+RETURNS void AS $$
+BEGIN
+  UPDATE "user"
+  SET "fcmToken" = array_remove("fcmToken", token_to_remove)
+  WHERE id = user_id;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**자동 호출**:
+- Edge Function에서 FCM 전송 실패 시 (UNREGISTERED 에러)
+- 무효한 토큰을 자동으로 DB에서 제거
+
+---
+
+## ✓ Edge Functions 배포
+
+### Dev 환경 배포
+```bash
+# 개별 배포
+supabase functions deploy send-approval-notification --project-ref rlpcgnoebbclgoojylpv
+supabase functions deploy send-inquiry-reply-notification --project-ref rlpcgnoebbclgoojylpv
+supabase functions deploy send-status-change-notification --project-ref rlpcgnoebbclgoojylpv
+supabase functions deploy send-reconfirm-rejection-notification --project-ref rlpcgnoebbclgoojylpv
+
+# 전체 배포 (한번에)
+supabase functions deploy send-approval-notification send-inquiry-reply-notification send-status-change-notification send-reconfirm-rejection-notification --project-ref rlpcgnoebbclgoojylpv
+```
+
+### Prod 환경 배포
+```bash
+# 개별 배포
+supabase functions deploy send-approval-notification --project-ref szszfmjrfyqmgdklybts
+supabase functions deploy send-inquiry-reply-notification --project-ref szszfmjrfyqmgdklybts
+supabase functions deploy send-status-change-notification --project-ref szszfmjrfyqmgdklybts
+supabase functions deploy send-reconfirm-rejection-notification --project-ref szszfmjrfyqmgdklybts
+
+# 전체 배포 (한번에)
+supabase functions deploy send-approval-notification send-inquiry-reply-notification send-status-change-notification send-reconfirm-rejection-notification --project-ref szszfmjrfyqmgdklybts
+```
+
+---
+
+## ✓ Edge Functions 흐름도
+
+```
+user 테이블 변경
+  │
+  ├─ approvalStatus → 'approve'
+  │   └─> trigger_user_approval
+  │       └─> notify_user_approval()
+  │           └─> pg_net.http_post()
+  │               └─> send-approval-notification Edge Function
+  │                   └─> FCM 푸시 알림 전송
+  │                       └─> UNREGISTERED 토큰 자동 제거
+  │
+  └─ approvalStatus → 'suspended' or 'inactive'
+      └─> trigger_user_status_change
+          └─> notify_user_status_change()
+              └─> pg_net.http_post()
+                  └─> send-status-change-notification Edge Function
+                      └─> FCM 푸시 알림 전송
+                          └─> UNREGISTERED 토큰 자동 제거
+
+user_reconfirm 테이블 변경
+  │
+  └─ status: 'pending' → 'reject'
+      └─> trigger_reconfirm_rejection
+          └─> notify_reconfirm_rejection()
+              └─> pg_net.http_post()
+                  └─> send-reconfirm-rejection-notification Edge Function
+                      └─> FCM 푸시 알림 전송 (거절 사유 포함)
+                          └─> UNREGISTERED 토큰 자동 제거
+
+재신청 승인 플로우 (status: 'pending' → 'approve'):
+  - user_reconfirm.status → 'approve'
+  - user.approvalStatus → 'approve' (동시 변경)
+  - 위의 user 테이블 trigger_user_approval이 실행됨
+  - 별도 알림 불필요 (중복 방지)
 ```
