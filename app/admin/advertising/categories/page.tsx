@@ -417,8 +417,10 @@ export default function AdCategoriesPage() {
         autoSelectEndTime: form.useSchedule ? form.autoSelectEndTime : null,
       };
 
-      if (editingSection?.isFixed || isCreatingAdCategory) {
-        sectionData.displayName = editingSection?.displayName || form.categoryName;
+      // 고정 섹션(NOTIFICATION, ANNOUNCEMENT, EVENT)인 경우에만 iconUrl과 displayName 설정
+      // AD_CATEGORY는 ad_categories 테이블의 iconUrl을 사용하므로 home_sections에는 NULL이어야 함
+      if (editingSection?.isFixed) {
+        sectionData.displayName = editingSection?.displayName;
         sectionData.iconUrl = form.iconUrl || null;
       }
       
