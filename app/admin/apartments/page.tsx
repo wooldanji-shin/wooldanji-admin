@@ -80,8 +80,7 @@ export default function ApartmentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [showOpenDoorCounts, setShowOpenDoorCounts] = useState<Record<string, boolean>>({});
-  const [showAllOpenDoorCounts, setShowAllOpenDoorCounts] = useState(false);
+  const [hideOpenDoorColumn, setHideOpenDoorColumn] = useState(false);
   const ITEMS_PER_PAGE = 15;
 
   useEffect(() => {
@@ -302,10 +301,25 @@ export default function ApartmentsPage() {
             등록된 아파트 정보를 관리합니다
           </p>
         </div>
-        <Button onClick={() => router.push('/admin/apartments/new')}>
-          <Plus className="mr-2 h-4 w-4" />
-          새 아파트 등록
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="hide-open-door-column"
+              checked={hideOpenDoorColumn}
+              onCheckedChange={(checked) => setHideOpenDoorColumn(checked === true)}
+            />
+            <label
+              htmlFor="hide-open-door-column"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              문 열기 횟수 숨기기
+            </label>
+          </div>
+          <Button onClick={() => router.push('/admin/apartments/new')}>
+            <Plus className="mr-2 h-4 w-4" />
+            새 아파트 등록
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -372,32 +386,11 @@ export default function ApartmentsPage() {
                       {getSortIcon('memberCount')}
                     </div>
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-center">
-                    문 연 횟수
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <span>보기</span>
-                      <Checkbox
-                        id="show-all-open-door-counts"
-                        checked={showAllOpenDoorCounts}
-                        onCheckedChange={(checked) => {
-                          const newValue = checked === true;
-                          setShowAllOpenDoorCounts(newValue);
-                          // 전체 토글 시 모든 개별 상태도 업데이트
-                          if (newValue) {
-                            const allChecked: Record<string, boolean> = {};
-                            apartments.forEach(apt => {
-                              allChecked[apt.id] = true;
-                            });
-                            setShowOpenDoorCounts(allChecked);
-                          } else {
-                            setShowOpenDoorCounts({});
-                          }
-                        }}
-                      />
-                    </div>
-                  </TableHead>
+                  {!hideOpenDoorColumn && (
+                    <TableHead className="text-muted-foreground text-center">
+                      문 연 횟수
+                    </TableHead>
+                  )}
                   <TableHead className="text-muted-foreground text-center">
                     등록자
                   </TableHead>
@@ -416,7 +409,7 @@ export default function ApartmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="text-center py-12 text-muted-foreground">
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
                         데이터를 불러오는 중...
@@ -425,7 +418,7 @@ export default function ApartmentsPage() {
                   </TableRow>
                 ) : filteredApartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="text-center py-12 text-muted-foreground">
                       {searchTerm ? '검색 결과가 없습니다.' : '등록된 아파트가 없습니다.'}
                     </TableCell>
                   </TableRow>
@@ -462,31 +455,15 @@ export default function ApartmentsPage() {
                           {apartment.memberCount}명
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
-                        {showOpenDoorCounts[apartment.id] ? (
-                          apartment.totalOpenDoorCount > 0 ? (
+                      {!hideOpenDoorColumn && (
+                        <TableCell className="text-center text-muted-foreground">
+                          {apartment.totalOpenDoorCount > 0 ? (
                             <span>{apartment.totalOpenDoorCount}회</span>
                           ) : (
                             <span>-</span>
-                          )
-                        ) : (
-                          <span className='text-muted-foreground'>•••</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center">
-                          <Checkbox
-                            id={`show-count-${apartment.id}`}
-                            checked={showOpenDoorCounts[apartment.id] || false}
-                            onCheckedChange={(checked) => {
-                              setShowOpenDoorCounts(prev => ({
-                                ...prev,
-                                [apartment.id]: checked === true
-                              }));
-                            }}
-                          />
-                        </div>
-                      </TableCell>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-center text-sm">
                         {apartment.createdByName ? (
                           <div>

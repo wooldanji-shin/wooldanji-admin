@@ -389,9 +389,8 @@ export default function AdsManagementPage() {
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [editingMemoValue, setEditingMemoValue] = useState('');
 
-  // 클릭수 표시 상태 (광고 ID별로 관리)
-  const [showClickCounts, setShowClickCounts] = useState<Record<string, boolean>>({});
-  const [showAllClickCounts, setShowAllClickCounts] = useState(false);
+  // 클릭수 컬럼 숨김 상태
+  const [hideClickColumn, setHideClickColumn] = useState(false);
 
   // 데이터 로드
   useEffect(() => {
@@ -1525,6 +1524,19 @@ export default function AdsManagementPage() {
                     <Download className='mr-2 h-4 w-4' />
                     CSV 내보내기
                   </Button>
+                  <div className='flex items-center gap-2'>
+                    <Checkbox
+                      id='hide-click-column'
+                      checked={hideClickColumn}
+                      onCheckedChange={(checked) => setHideClickColumn(checked === true)}
+                    />
+                    <label
+                      htmlFor='hide-click-column'
+                      className='text-sm font-medium leading-none cursor-pointer'
+                    >
+                      광고 클릭수 숨기기
+                    </label>
+                  </div>
                   <Button
                     onClick={() => handleOpenDialog()}
                     size='lg'
@@ -1701,30 +1713,12 @@ export default function AdsManagementPage() {
                         <TableHead className='w-[180px]'>게시 기간</TableHead>
                         <TableHead className='w-[150px]'>게시자</TableHead>
                         <TableHead className='w-[200px]'>계약메모</TableHead>
-                        <TableHead className='w-[100px] text-center'>광고 클릭수</TableHead>
-                        <TableHead className='w-[100px] text-center'>클릭 수</TableHead>
-                        <TableHead className='w-[80px] text-center'>
-                          <div className='flex items-center justify-center gap-1'>
-                            <span>보기</span>
-                            <Checkbox
-                              id='show-all-click-counts'
-                              checked={showAllClickCounts}
-                              onCheckedChange={(checked) => {
-                                const newValue = checked === true;
-                                setShowAllClickCounts(newValue);
-                                if (newValue) {
-                                  const allChecked: Record<string, boolean> = {};
-                                  filteredAds.forEach(ad => {
-                                    allChecked[ad.id] = true;
-                                  });
-                                  setShowClickCounts(allChecked);
-                                } else {
-                                  setShowClickCounts({});
-                                }
-                              }}
-                            />
-                          </div>
-                        </TableHead>
+                        {!hideClickColumn && (
+                          <>
+                            <TableHead className='w-[100px] text-center'>광고 클릭수</TableHead>
+                            <TableHead className='w-[100px] text-center'>클릭 수</TableHead>
+                          </>
+                        )}
                         <TableHead className='text-right w-[120px]'>
                           작업
                         </TableHead>
@@ -2027,38 +2021,20 @@ export default function AdsManagementPage() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className='text-center'>
-                            {showClickCounts[ad.id] ? (
-                              <span>
-                                {ad.adClickCount?.toLocaleString() || '0'}
-                              </span>
-                            ) : (
-                              <span className='text-muted-foreground'>•••</span>
-                            )}
-                          </TableCell>
-                          <TableCell className='text-center'>
-                            {showClickCounts[ad.id] ? (
-                              <span>
-                                {ad.clickCount?.toLocaleString() || '0'}
-                              </span>
-                            ) : (
-                              <span className='text-muted-foreground'>•••</span>
-                            )}
-                          </TableCell>
-                          <TableCell className='text-center'>
-                            <div className='flex items-center justify-center'>
-                              <Checkbox
-                                id={`show-count-${ad.id}`}
-                                checked={showClickCounts[ad.id] || false}
-                                onCheckedChange={(checked) => {
-                                  setShowClickCounts(prev => ({
-                                    ...prev,
-                                    [ad.id]: checked === true
-                                  }));
-                                }}
-                              />
-                            </div>
-                          </TableCell>
+                          {!hideClickColumn && (
+                            <>
+                              <TableCell className='text-center'>
+                                <span>
+                                  {ad.adClickCount?.toLocaleString() || '0'}
+                                </span>
+                              </TableCell>
+                              <TableCell className='text-center'>
+                                <span>
+                                  {ad.clickCount?.toLocaleString() || '0'}
+                                </span>
+                              </TableCell>
+                            </>
+                          )}
                           <TableCell>
                             <div className='flex justify-end gap-2 items-center'>
                               <Tooltip>
