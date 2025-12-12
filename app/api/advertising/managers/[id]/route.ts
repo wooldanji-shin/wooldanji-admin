@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const managerId = params.id;
+    const supabase = createAdminClient();
+    const { id: managerId } = await params;
 
     // 1. Auth 사용자 삭제 (CASCADE로 관련 데이터 자동 삭제)
     const { error: authError } = await supabase.auth.admin.deleteUser(managerId);

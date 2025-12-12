@@ -641,31 +641,35 @@ export default function UsersPage() {
                                   인증 사진 보기
                                 </DropdownMenuItem>
                               )}
-                              {user.approvalStatus !== 'approve' ? (
-                                <DropdownMenuItem
-                                  onClick={() => handleApprovalStatusChange(user.id, 'approve')}
-                                  className='text-green-600'
-                                >
-                                  <Check className='mr-2 h-4 w-4' />
-                                  승인하기
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={() => handleApprovalStatusChange(user.id, 'pending')}
-                                  className='text-orange-600'
-                                >
-                                  <X className='mr-2 h-4 w-4' />
-                                  승인 취소
-                                </DropdownMenuItem>
-                              )}
-                              {user.registrationType === 'APARTMENT' && user.approvalStatus !== 'suspended' && (
-                                <DropdownMenuItem
-                                  onClick={() => handleSuspendClick(user)}
-                                  className='text-yellow-600'
-                                >
-                                  <Ban className='mr-2 h-4 w-4' />
-                                  승인 보류
-                                </DropdownMenuItem>
+                              {user.registrationType === 'APARTMENT' && (
+                                <>
+                                  {user.approvalStatus !== 'approve' ? (
+                                    <DropdownMenuItem
+                                      onClick={() => handleApprovalStatusChange(user.id, 'approve')}
+                                      className='text-green-600'
+                                    >
+                                      <Check className='mr-2 h-4 w-4' />
+                                      승인하기
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={() => handleApprovalStatusChange(user.id, 'pending')}
+                                      className='text-orange-600'
+                                    >
+                                      <X className='mr-2 h-4 w-4' />
+                                      승인 취소
+                                    </DropdownMenuItem>
+                                  )}
+                                  {user.approvalStatus !== 'suspended' && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleSuspendClick(user)}
+                                      className='text-yellow-600'
+                                    >
+                                      <Ban className='mr-2 h-4 w-4' />
+                                      승인 보류
+                                    </DropdownMenuItem>
+                                  )}
+                                </>
                               )}
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(user)}
