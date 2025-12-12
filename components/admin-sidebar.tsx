@@ -45,18 +45,6 @@ const navigationItems = [
     roles: ['SUPER_ADMIN', 'APT_ADMIN', 'MANAGER'],
   },
   {
-    name: '승인보류/거절 관리',
-    href: '/admin/user-reconfirm',
-    icon: ShieldAlert,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    name: '문의 관리',
-    href: '/admin/inquiries',
-    icon: HelpCircle,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
     name: '관리자 관리',
     href: '/admin/managers',
     icon: UserCog,
@@ -67,6 +55,18 @@ const navigationItems = [
     href: '/admin/advertising/managers',
     icon: Briefcase,
     roles: ['SUPER_ADMIN'],
+  },
+  {
+    name: '승인보류/거절 관리',
+    href: '/admin/user-reconfirm',
+    icon: ShieldAlert,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '문의 관리',
+    href: '/admin/inquiries',
+    icon: HelpCircle,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
   },
 ];
 

@@ -33,6 +33,7 @@ type UserReconfirmDetails = {
     buildingNumber: number | null;
     unit: number | null;
     apartmentId: string | null;
+    user_roles?: { role: string }[];
     apartments: {
       id: string;
       name: string;
@@ -76,10 +77,11 @@ export default function UserReconfirmPage() {
             unit,
             apartmentId,
             registrationType,
+            user_roles(role),
             apartments:apartmentId(id, name)
           )
         `)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'rejected'])
         .not('user.registrationType', 'is', null)
         .eq('user.registrationType', 'APARTMENT');
 
@@ -126,6 +128,17 @@ export default function UserReconfirmPage() {
     return new Date(dateString).toLocaleDateString('ko-KR');
   };
 
+  const getUserRole = (roles?: { role: string }[]) => {
+    if (!roles || roles.length === 0) return '-';
+    const roleMap: Record<string, string> = {
+      'APP_USER': '앱 사용자',
+      'APT_ADMIN': '아파트 관리자',
+      'MANAGER': '매니저',
+      'SUPER_ADMIN': '최고 관리자'
+    };
+    return roles.map(r => roleMap[r.role] || r.role).join(', ');
+  };
+
   const handleRowClick = (reconfirmId: string) => {
     router.push(`/admin/user-reconfirm/${reconfirmId}`);
   };
@@ -159,7 +172,13 @@ export default function UserReconfirmPage() {
                       아파트/동/호
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
+                      권한
+                    </TableHead>
+                    <TableHead className='text-muted-foreground'>
                       이전 상태
+                    </TableHead>
+                    <TableHead className='text-muted-foreground'>
+                      현재 상태
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
                       재신청일
@@ -169,13 +188,13 @@ export default function UserReconfirmPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
                         로딩 중...
                       </TableCell>
                     </TableRow>
                   ) : reconfirms.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
                         재신청 내역이 없습니다.
                       </TableCell>
                     </TableRow>
@@ -206,13 +225,25 @@ export default function UserReconfirmPage() {
                             '-'
                           )}
                         </TableCell>
+                        <TableCell className='text-muted-foreground text-sm'>
+                          {getUserRole(reconfirm.user.user_roles)}
+                        </TableCell>
                         <TableCell>
                           {reconfirm.previousStatus === 'suspended' ? (
-                            <Badge variant="secondary">보류</Badge>
+                            <Badge className="bg-yellow-500 text-white">보류</Badge>
                           ) : reconfirm.previousStatus === 'inactive' ? (
-                            <Badge variant="secondary">비활성</Badge>
+                            <Badge className="bg-gray-500 text-white">비활성</Badge>
                           ) : (
                             <Badge variant="outline">{reconfirm.previousStatus}</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {reconfirm.status === 'pending' ? (
+                            <Badge className="bg-blue-500 text-white">대기중</Badge>
+                          ) : reconfirm.status === 'rejected' ? (
+                            <Badge className="bg-red-500 text-white">거절</Badge>
+                          ) : (
+                            <Badge variant="outline">{reconfirm.status}</Badge>
                           )}
                         </TableCell>
                         <TableCell className='text-muted-foreground'>

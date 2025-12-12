@@ -288,6 +288,14 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
                 </div>
               </div>
             )}
+            {reconfirm.rejectionReason && (
+              <div>
+                <div className='text-sm text-muted-foreground'>거절 사유</div>
+                <div className='mt-1 p-3 bg-red-50 border border-red-200 rounded-md text-red-900'>
+                  {reconfirm.rejectionReason}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -336,28 +344,30 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
         </Card>
 
         {/* Action Buttons */}
-        <div className='flex gap-4 justify-end'>
-          <Button
-            variant='destructive'
-            size='lg'
-            onClick={() => setRejectDialog(true)}
-            disabled={processing}
-            className='gap-2'
-          >
-            <X className='h-5 w-5' />
-            거절
-          </Button>
-          <Button
-            variant='default'
-            size='lg'
-            onClick={handleApprove}
-            disabled={processing}
-            className='gap-2 bg-green-600 hover:bg-green-700'
-          >
-            <Check className='h-5 w-5' />
-            승인
-          </Button>
-        </div>
+        {reconfirm.status === 'pending' && (
+          <div className='flex gap-4 justify-end'>
+            <Button
+              variant='destructive'
+              size='lg'
+              onClick={() => setRejectDialog(true)}
+              disabled={processing}
+              className='gap-2'
+            >
+              <X className='h-5 w-5' />
+              거절
+            </Button>
+            <Button
+              variant='default'
+              size='lg'
+              onClick={handleApprove}
+              disabled={processing}
+              className='gap-2 bg-green-600 hover:bg-green-700'
+            >
+              <Check className='h-5 w-5' />
+              승인
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Reject Dialog */}
