@@ -800,13 +800,45 @@ export default function AdvertisingManagersPage() {
               {viewingManager.manager_profiles?.businessRegistration && (
                 <div className='space-y-2'>
                   <h3 className='font-semibold text-lg border-b pb-2'>사업자등록증</h3>
-                  <div className='border rounded-lg overflow-hidden bg-muted'>
-                    <img
-                      src={viewingManager.manager_profiles.businessRegistration}
-                      alt='사업자등록증'
-                      className='w-full h-auto'
-                    />
-                  </div>
+                  {viewingManager.manager_profiles.businessRegistration.toLowerCase().endsWith('.pdf') ? (
+                    <div className='border rounded-lg p-4 bg-muted flex items-center justify-between'>
+                      <div className='flex items-center gap-2'>
+                        <FileText className='h-5 w-5 text-primary' />
+                        <span>사업자등록증.pdf</span>
+                      </div>
+                      <div className='flex gap-2'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() => window.open(viewingManager.manager_profiles?.businessRegistration, '_blank')}
+                        >
+                          열기
+                        </Button>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = viewingManager.manager_profiles?.businessRegistration || '';
+                            link.download = '사업자등록증.pdf';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          다운로드
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='border rounded-lg overflow-hidden bg-muted'>
+                      <img
+                        src={viewingManager.manager_profiles.businessRegistration}
+                        alt='사업자등록증'
+                        className='w-full h-auto'
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
