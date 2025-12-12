@@ -347,12 +347,14 @@ export default function ManagersPage() {
     if (!deletingManager) return;
 
     try {
-      const { error } = await supabase
-        .from('user')
-        .delete()
-        .eq('id', deletingManager.id);
+      const response = await fetch(`/api/users/${deletingManager.id}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete manager');
+      }
 
       toast.success('관리자가 삭제되었습니다.');
       setDeleteDialog(false);

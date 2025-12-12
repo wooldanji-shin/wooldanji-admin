@@ -381,12 +381,14 @@ export default function UsersPage() {
     if (!deletingUser) return;
 
     try {
-      const { error } = await supabase
-        .from('user')
-        .delete()
-        .eq('id', deletingUser.id);
+      const response = await fetch(`/api/users/${deletingUser.id}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete user');
+      }
 
       toast.success('회원이 삭제되었습니다.');
       setDeleteDialog(false);
