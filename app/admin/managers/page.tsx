@@ -54,6 +54,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { formatLineRange } from '@/lib/utils/line';
 import { toast } from 'sonner';
+import { getUserRoles } from '@/lib/auth';
 
 interface Manager {
   id: string;
@@ -126,6 +127,32 @@ export default function ManagersPage() {
     setLoading(true);
 
     try {
+      // 현재 사용자 역할 확인
+      const roles = await getUserRoles();
+      const isManager = roles.includes('MANAGER');
+
+      let managerApartmentIds: string[] = [];
+
+      // MANAGER인 경우 자신이 관리하는 아파트 ID 가져오기
+      if (isManager) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: managerApartments } = await supabase
+            .from('manager_apartments')
+            .select('apartmentId')
+            .eq('managerId', user.id);
+
+          if (managerApartments && managerApartments.length > 0) {
+            managerApartmentIds = managerApartments.map((ma: any) => ma.apartmentId);
+          } else {
+            // 관리하는 아파트가 없으면 빈 결과
+            setManagers([]);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       let query = supabase
         .from('user')
         .select(`
@@ -153,7 +180,18 @@ export default function ManagersPage() {
 
       if (fetchError) throw fetchError;
 
-      setManagers(data || []);
+      // MANAGER인 경우 자신이 관리하는 아파트의 관리자들만 필터링
+      let filteredData = data || [];
+      if (isManager && managerApartmentIds.length > 0) {
+        filteredData = filteredData.filter(manager => {
+          // admin_scopes 중 하나라도 관리하는 아파트에 속하면 포함
+          return manager.admin_scopes?.some(scope =>
+            scope.apartmentId && managerApartmentIds.includes(scope.apartmentId)
+          );
+        });
+      }
+
+      setManagers(filteredData);
     } catch (err) {
       console.error('Failed to fetch managers:', err);
       toast.error('관리자 목록을 불러오는데 실패했습니다.');
@@ -164,11 +202,41 @@ export default function ManagersPage() {
 
   // 아파트 목록 조회
   const fetchApartments = async () => {
-    const { data } = await supabase
-      .from('apartments')
-      .select('*')
-      .order('name');
-    setApartments(data || []);
+    try {
+      const roles = await getUserRoles();
+      const isManager = roles.includes('MANAGER');
+
+      let query = supabase
+        .from('apartments')
+        .select('*')
+        .order('name');
+
+      // MANAGER인 경우 자신이 관리하는 아파트만 조회
+      if (isManager) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: managerApartments } = await supabase
+            .from('manager_apartments')
+            .select('apartmentId')
+            .eq('managerId', user.id);
+
+          if (managerApartments && managerApartments.length > 0) {
+            const apartmentIds = managerApartments.map((ma: any) => ma.apartmentId);
+            query = query.in('id', apartmentIds);
+          } else {
+            // 관리하는 아파트가 없으면 빈 결과
+            setApartments([]);
+            return;
+          }
+        }
+      }
+
+      const { data } = await query;
+      setApartments(data || []);
+    } catch (err) {
+      console.error('Failed to fetch apartments:', err);
+      setApartments([]);
+    }
   };
 
   // 동 목록 조회

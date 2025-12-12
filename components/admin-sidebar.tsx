@@ -48,7 +48,7 @@ const navigationItems = [
     name: '관리자 관리',
     href: '/admin/managers',
     icon: UserCog,
-    roles: ['SUPER_ADMIN'],
+    roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
     name: '매니저 관리',
