@@ -308,12 +308,6 @@ export default function ApartmentsPage() {
               checked={hideOpenDoorColumn}
               onCheckedChange={(checked) => setHideOpenDoorColumn(checked === true)}
             />
-            <label
-              htmlFor="hide-open-door-column"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              문 열기 횟수 숨기기
-            </label>
           </div>
           <Button onClick={() => router.push('/admin/apartments/new')}>
             <Plus className="mr-2 h-4 w-4" />

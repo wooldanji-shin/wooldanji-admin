@@ -1530,12 +1530,6 @@ export default function AdsManagementPage() {
                       checked={hideClickColumn}
                       onCheckedChange={(checked) => setHideClickColumn(checked === true)}
                     />
-                    <label
-                      htmlFor='hide-click-column'
-                      className='text-sm font-medium leading-none cursor-pointer'
-                    >
-                      광고 클릭수 숨기기
-                    </label>
                   </div>
                   <Button
                     onClick={() => handleOpenDialog()}
