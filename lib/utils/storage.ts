@@ -70,3 +70,54 @@ export async function deleteFilesFromStorage(urls: string[]): Promise<number> {
 
   return results.filter(Boolean).length;
 }
+
+/**
+ * 폴더 내의 모든 파일을 삭제합니다.
+ * @param bucket - 버킷 이름
+ * @param folderPath - 삭제할 폴더 경로 (예: 'ads/uuid')
+ * @returns 성공 여부
+ */
+export async function deleteFolderFromStorage(
+  bucket: string,
+  folderPath: string
+): Promise<boolean> {
+  if (!bucket || !folderPath) return false;
+
+  try {
+    const supabase = createClient();
+
+    // 폴더 내 모든 파일 목록 가져오기
+    const { data: files, error: listError } = await supabase.storage
+      .from(bucket)
+      .list(folderPath);
+
+    if (listError) {
+      console.error('Failed to list files in folder:', listError);
+      return false;
+    }
+
+    if (!files || files.length === 0) {
+      console.log('No files found in folder:', folderPath);
+      return true;
+    }
+
+    // 모든 파일 경로 생성
+    const filePaths = files.map(file => `${folderPath}/${file.name}`);
+
+    // 모든 파일 삭제
+    const { error: removeError } = await supabase.storage
+      .from(bucket)
+      .remove(filePaths);
+
+    if (removeError) {
+      console.error('Failed to delete files from folder:', removeError);
+      return false;
+    }
+
+    console.log('Successfully deleted folder:', folderPath);
+    return true;
+  } catch (err) {
+    console.error('Error deleting folder from storage:', err);
+    return false;
+  }
+}

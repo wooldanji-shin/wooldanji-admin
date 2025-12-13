@@ -83,6 +83,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getCurrentUser, getUserRoles } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/image-upload';
+import { deleteFolderFromStorage } from '@/lib/utils/storage';
 import { format, parseISO } from 'date-fns';
 
 // 날짜를 시작 시간(00:00:00)으로 변환 (로컬 → UTC)
@@ -1085,6 +1086,27 @@ export default function AdsManagementPage() {
     if (!selectedAd) return;
 
     try {
+      // Storage에서 광고 폴더 전체 삭제
+      // URL에서 폴더 경로 추출 (예: ads/uuid)
+      if (selectedAd.imageUrl) {
+        try {
+          const url = new URL(selectedAd.imageUrl);
+          const pathParts = url.pathname.split('/').filter(Boolean);
+          const publicIndex = pathParts.findIndex(part => part === 'public');
+          if (publicIndex !== -1 && pathParts.length > publicIndex + 1) {
+            const bucketAndPath = pathParts.slice(publicIndex + 1);
+            const bucket = bucketAndPath[0]; // 'advertisements'
+            // ads/uuid 경로 추출
+            if (bucketAndPath.length > 2) {
+              const folderPath = bucketAndPath.slice(1, 3).join('/'); // 'ads/uuid'
+              await deleteFolderFromStorage(bucket, folderPath);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to delete folder:', err);
+        }
+      }
+
       const { error } = await supabase
         .from('advertisements')
         .delete()
@@ -2228,7 +2250,9 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}/business-registrations`}
+                        storagePath={`ads/${imageUploadFolderId}`}
+                        accept='image/*,application/pdf'
+                        maxSizeMB={10}
                       />
                     </div>
                     <div className='space-y-2'>
@@ -2242,7 +2266,9 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}/contracts`}
+                        storagePath={`ads/${imageUploadFolderId}`}
+                        accept='image/*,application/pdf'
+                        maxSizeMB={10}
                       />
                     </div>
                   </div>
@@ -2352,7 +2378,7 @@ export default function AdsManagementPage() {
                         setAdFormData({ ...adFormData, imageUrl: url })
                       }
                       bucket='advertisements'
-                      storagePath={`ads/${imageUploadFolderId}/images`}
+                      storagePath={`ads/${imageUploadFolderId}`}
                     />
                   </div>
 
