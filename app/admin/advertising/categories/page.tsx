@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { ImageUpload } from '@/components/image-upload';
+import { deleteFileFromStorage } from '@/lib/utils/storage';
 import {
   DndContext,
   closestCenter,
@@ -470,6 +471,12 @@ export default function AdCategoriesPage() {
     if (!deletingSection || !deletingSection.adCategoryId) return;
 
     try {
+      // Storage에서 아이콘 이미지 삭제 (있는 경우)
+      const iconUrl = deletingSection.iconUrl || deletingSection.adCategoryIconUrl;
+      if (iconUrl) {
+        await deleteFileFromStorage(iconUrl);
+      }
+
       // ad_categories에서 삭제 -> home_sections는 ON DELETE CASCADE로 자동 삭제됨
       const { error: deleteError } = await supabase
         .from('ad_categories')
@@ -477,7 +484,7 @@ export default function AdCategoriesPage() {
         .eq('id', deletingSection.adCategoryId);
 
       if (deleteError) throw deleteError;
-      
+
       toast.success('카테고리가 성공적으로 삭제되었습니다.');
       setDeleteDialog(false);
       setDeletingSection(null);
