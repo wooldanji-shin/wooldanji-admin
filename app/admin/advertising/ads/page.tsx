@@ -2250,7 +2250,7 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}`}
+                        storagePath={`ads/${imageUploadFolderId}/business-reg`}
                         accept='image/*,application/pdf'
                         maxSizeMB={10}
                       />
@@ -2266,7 +2266,7 @@ export default function AdsManagementPage() {
                           })
                         }
                         bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}`}
+                        storagePath={`ads/${imageUploadFolderId}/contract-doc`}
                         accept='image/*,application/pdf'
                         maxSizeMB={10}
                       />
@@ -2378,7 +2378,7 @@ export default function AdsManagementPage() {
                         setAdFormData({ ...adFormData, imageUrl: url })
                       }
                       bucket='advertisements'
-                      storagePath={`ads/${imageUploadFolderId}`}
+                      storagePath={`ads/${imageUploadFolderId}/ad-image`}
                     />
                   </div>
 

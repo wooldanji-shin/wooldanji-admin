@@ -280,11 +280,13 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
                 <div className='font-medium'>{formatDate(reconfirm.createdAt)}</div>
               </div>
             </div>
-            {reconfirm.user.suspensionReason && (
+            {(reconfirm.user.suspensionReason || reconfirm.previousStatus === 'inactive') && (
               <div>
                 <div className='text-sm text-muted-foreground'>보류 사유</div>
                 <div className='mt-1 p-3 bg-secondary rounded-md'>
-                  {reconfirm.user.suspensionReason}
+                  {reconfirm.previousStatus === 'inactive'
+                    ? '30일동안 이용내역이 없어 비활성화 되었습니다.'
+                    : reconfirm.user.suspensionReason}
                 </div>
               </div>
             )}
