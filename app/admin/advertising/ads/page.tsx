@@ -354,8 +354,18 @@ export default function AdsManagementPage() {
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [editingMemoValue, setEditingMemoValue] = useState('');
 
-  // 클릭수 컬럼 숨김 상태
-  const [hideClickColumn, setHideClickColumn] = useState(false);
+  // 클릭수 컬럼 숨김 상태 (localStorage와 동기화)
+  const [hideClickColumn, setHideClickColumn] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('hideClickColumn') === 'true';
+    }
+    return false;
+  });
+
+  // hideClickColumn 변경 시 localStorage에 저장
+  useEffect(() => {
+    localStorage.setItem('hideClickColumn', String(hideClickColumn));
+  }, [hideClickColumn]);
 
   // 데이터 로드
   useEffect(() => {

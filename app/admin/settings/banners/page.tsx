@@ -72,6 +72,7 @@ interface Banner {
   startDate: string | null;
   endDate: string | null;
   clickCount: number;
+  adClickCount: number;
   description: string | null;
   user?: {
     id: string;
@@ -132,6 +133,7 @@ function BannerRow({
   onToggleActive,
   canEdit,
   canDelete,
+  hideClickCounts,
 }: {
   banner: Banner;
   onEdit: (banner: Banner) => void;
@@ -139,6 +141,7 @@ function BannerRow({
   onToggleActive: (id: string, isActive: boolean) => void;
   canEdit: boolean;
   canDelete: boolean;
+  hideClickCounts: boolean;
 }) {
   return (
     <TableRow className='border-border hover:bg-secondary/50'>
@@ -259,6 +262,16 @@ function BannerRow({
           <span className='text-muted-foreground text-sm'>-</span>
         )}
       </TableCell>
+      {!hideClickCounts && (
+        <>
+          <TableCell>
+            <span className='text-sm'>{banner.adClickCount?.toLocaleString() || 0}</span>
+          </TableCell>
+          <TableCell>
+            <span className='text-sm'>{banner.clickCount?.toLocaleString() || 0}</span>
+          </TableCell>
+        </>
+      )}
       <TableCell>
         <Switch
           checked={banner.isActive}
@@ -321,6 +334,24 @@ export default function BannersPage() {
 
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // 클릭수 컬럼 숨김 상태 (localStorage에서 읽어옴 - ads 페이지와 공유)
+  const [hideClickCounts, setHideClickCounts] = useState(false);
+
+  // localStorage에서 hideClickColumn 값 읽어오기
+  useEffect(() => {
+    const stored = localStorage.getItem('hideClickColumn');
+    setHideClickCounts(stored === 'true');
+
+    // 다른 탭에서 변경 시 동기화
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'hideClickColumn') {
+        setHideClickCounts(e.newValue === 'true');
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const supabase = createClient();
 
@@ -822,6 +853,12 @@ export default function BannersPage() {
                         <TableHead className='w-28'>게시 기간</TableHead>
                         <TableHead className='w-20'>게시자</TableHead>
                         <TableHead className='w-32'>소개내용</TableHead>
+                        {!hideClickCounts && (
+                          <>
+                            <TableHead className='w-24'>광고클릭수</TableHead>
+                            <TableHead className='w-20'>클릭수</TableHead>
+                          </>
+                        )}
                         <TableHead className='w-20'>활성화</TableHead>
                         <TableHead className='w-24'>작업</TableHead>
                       </TableRow>
@@ -836,6 +873,7 @@ export default function BannersPage() {
                           onToggleActive={handleToggleActive}
                           canEdit={canEditBanner(banner)}
                           canDelete={canDeleteBanner(banner)}
+                          hideClickCounts={hideClickCounts}
                         />
                       ))}
                     </TableBody>
