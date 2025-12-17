@@ -627,6 +627,21 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       if (editingDevice) {
         // 기기 수정
         console.log('✏️ 기기 수정:', { deviceId: editingDevice.id, linePlaceId });
+
+        // 1. apartment_line_places의 placeName 업데이트
+        if (linePlaceId) {
+          const { error: placeUpdateError } = await supabase
+            .from('apartment_line_places')
+            .update({ placeName: deviceForm.placeName })
+            .eq('id', linePlaceId);
+
+          if (placeUpdateError) {
+            console.error('❌ placeName 수정 실패:', placeUpdateError);
+            throw placeUpdateError;
+          }
+        }
+
+        // 2. devices 업데이트
         const { error: updateError } = await supabase
           .from('devices')
           .update({
@@ -676,6 +691,10 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
 
     console.log('🗑️ 삭제 시도 - Device ID:', deviceToDelete);
 
+    // 삭제할 기기의 linePlaceId 저장
+    const deviceToRemove = devices.find(d => d.id === deviceToDelete);
+    const linePlaceId = deviceToRemove?.linePlaceId;
+
     // Optimistic UI: 즉시 제거
     setDevices(prev => prev.filter(d => d.id !== deviceToDelete));
     setDeleteDialog(false);
@@ -690,14 +709,29 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
     // 백그라운드에서 실제 삭제
     try {
       console.log('🗑️ Supabase DELETE 요청 시작...');
+
+      // 1. devices 삭제
       const { error: deleteError } = await supabase
         .from('devices')
         .delete()
         .eq('id', deviceToDelete);
 
       if (deleteError) {
-        console.error('❌ 삭제 실패:', deleteError);
+        console.error('❌ devices 삭제 실패:', deleteError);
         throw deleteError;
+      }
+
+      // 2. apartment_line_places 삭제 (장소 정보도 함께 삭제)
+      if (linePlaceId) {
+        const { error: placeDeleteError } = await supabase
+          .from('apartment_line_places')
+          .delete()
+          .eq('id', linePlaceId);
+
+        if (placeDeleteError) {
+          console.error('❌ apartment_line_places 삭제 실패:', placeDeleteError);
+          throw placeDeleteError;
+        }
       }
 
       console.log('✅ 삭제 성공!');
@@ -744,6 +778,11 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
 
     console.log('🗑️ 일괄 삭제 시도:', deviceIds);
 
+    // 삭제할 기기들의 linePlaceId 저장
+    const linePlaceIds = devices
+      .filter(d => selectedDevices.has(d.id) && d.linePlaceId && !d.id.startsWith('temp-'))
+      .map(d => d.linePlaceId);
+
     // Optimistic UI: 즉시 제거
     setDevices(prev => prev.filter(d => !selectedDevices.has(d.id)));
     setBulkDeleteDialog(false);
@@ -760,6 +799,8 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
     // 백그라운드에서 실제 삭제
     try {
       console.log('🗑️ Supabase 일괄 DELETE 요청 시작...');
+
+      // 1. devices 삭제
       const { error: deleteError } = await supabase
         .from('devices')
         .delete()
@@ -768,6 +809,19 @@ export default function DevicesManagementPage({ params }: { params: Promise<{ id
       if (deleteError) {
         console.error('❌ 일괄 삭제 실패:', deleteError);
         throw deleteError;
+      }
+
+      // 2. apartment_line_places 삭제
+      if (linePlaceIds.length > 0) {
+        const { error: placeDeleteError } = await supabase
+          .from('apartment_line_places')
+          .delete()
+          .in('id', linePlaceIds);
+
+        if (placeDeleteError) {
+          console.error('❌ apartment_line_places 일괄 삭제 실패:', placeDeleteError);
+          throw placeDeleteError;
+        }
       }
 
       console.log('✅ 일괄 삭제 성공!');
