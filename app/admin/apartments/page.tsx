@@ -83,6 +83,20 @@ export default function ApartmentsPage() {
   const [hideOpenDoorColumn, setHideOpenDoorColumn] = useState(false);
   const ITEMS_PER_PAGE = 15;
 
+  // localStorage에서 문 연 횟수 컬럼 숨김 설정 불러오기
+  useEffect(() => {
+    const stored = localStorage.getItem('hideOpenDoorColumn');
+    if (stored !== null) {
+      setHideOpenDoorColumn(stored === 'true');
+    }
+  }, []);
+
+  // 체크박스 변경 시 localStorage에 저장
+  const handleHideOpenDoorColumnChange = (checked: boolean) => {
+    setHideOpenDoorColumn(checked);
+    localStorage.setItem('hideOpenDoorColumn', String(checked));
+  };
+
   useEffect(() => {
     fetchApartments();
   }, []);
@@ -306,7 +320,7 @@ export default function ApartmentsPage() {
             <Checkbox
               id="hide-open-door-column"
               checked={hideOpenDoorColumn}
-              onCheckedChange={(checked) => setHideOpenDoorColumn(checked === true)}
+              onCheckedChange={(checked) => handleHideOpenDoorColumnChange(checked === true)}
             />
           </div>
           <Button onClick={() => router.push('/admin/apartments/new')}>

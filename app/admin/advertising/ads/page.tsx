@@ -32,6 +32,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -39,11 +44,6 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import {
   Tooltip,
   TooltipContent,
@@ -68,11 +68,11 @@ import {
   CheckCircle,
   XCircle,
   Check,
-  ChevronsUpDown,
   X,
   Filter,
   ChevronDown,
   ChevronUp,
+  ChevronsUpDown,
   Image as ImageIcon,
   ExternalLink,
   Loader2,
@@ -110,34 +110,6 @@ const formatDisplayDate = (dateString: string): string => {
 const formatDateForInput = (dateString: string): string => {
   if (!dateString) return '';
   return format(parseISO(dateString), 'yyyy-MM-dd');
-};
-
-// 통합 전화번호 포맷팅 함수 (휴대폰 및 유선전화 모두 지원)
-const formatPhoneNumber = (value: string): string => {
-  // 숫자만 추출
-  const numbers = value.replace(/[^\d]/g, '');
-
-  // 휴대폰번호 (010, 011, 016, 017, 018, 019로 시작)
-  if (numbers.startsWith('010') || numbers.startsWith('011') || numbers.startsWith('016') ||
-      numbers.startsWith('017') || numbers.startsWith('018') || numbers.startsWith('019')) {
-    if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
-  }
-
-  // 서울 (02로 시작): 2-3-4 또는 2-4-4
-  if (numbers.startsWith('02')) {
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 5) return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
-    if (numbers.length <= 9) return `${numbers.slice(0, 2)}-${numbers.slice(2, 5)}-${numbers.slice(5)}`;
-    return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6, 10)}`;
-  }
-
-  // 기타 지역번호 (031, 032, 033, etc): 3-3-4 또는 3-4-4
-  if (numbers.length <= 3) return numbers;
-  if (numbers.length <= 6) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-  if (numbers.length <= 10) return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
-  return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
 };
 
 // 검색 태그 자동 생성 함수
@@ -296,6 +268,7 @@ interface Advertisement {
 interface Advertiser {
   id: string;
   businessName: string;
+  representativeName: string;
 }
 
 interface Category {
@@ -306,6 +279,7 @@ interface Category {
 interface Apartment {
   id: string;
   name: string;
+  address: string;
 }
 
 export default function AdsManagementPage() {
@@ -335,18 +309,9 @@ export default function AdsManagementPage() {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 광고 등록/수정 폼 상태 - 광고주 정보
-  const [advertiserFormData, setAdvertiserFormData] = useState({
-    businessName: '',
-    representativeName: '',
-    email: '',
-    contactPhoneNumber: '',
-    displayPhoneNumber: '',
-    address: '',
-    businessRegistration: '',
-    contractDocument: '',
-    contractMemo: '',
-  });
+  // 선택된 광고주 ID
+  const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string>('');
+  const [advertiserPopoverOpen, setAdvertiserPopoverOpen] = useState(false);
 
   // 광고 등록/수정 폼 상태 - 광고 정보
   const [adFormData, setAdFormData] = useState({
@@ -383,7 +348,6 @@ export default function AdsManagementPage() {
   const [regionDong, setRegionDong] = useState('');
 
   // 아파트 검색 상태
-  const [apartmentSearchOpen, setApartmentSearchOpen] = useState(false);
   const [apartmentSearch, setApartmentSearch] = useState('');
 
   // 계약메모 인라인 수정 상태
@@ -462,7 +426,7 @@ export default function AdsManagementPage() {
       // 광고주 목록 로드 (MANAGER인 경우 자신이 등록한 광고주만)
       let advertisersQuery = supabase
         .from('advertisers')
-        .select('id, businessName');
+        .select('id, businessName, representativeName');
 
       if (isManager && user) {
         advertisersQuery = advertisersQuery.eq('createdBy', user.id);
@@ -487,7 +451,7 @@ export default function AdsManagementPage() {
       // 아파트 로드 (MANAGER인 경우 자신이 관리하는 아파트만)
       let apartmentsQuery = supabase
         .from('apartments')
-        .select('id, name');
+        .select('id, name, address');
 
       if (isManager && user) {
         // MANAGER가 관리하는 아파트 ID 목록 가져오기
@@ -637,17 +601,6 @@ export default function AdsManagementPage() {
     return grouped;
   }, [filteredAds]);
 
-  // 전화번호 변경 핸들러 (메모이제이션)
-  const handleContactPhoneChange = useCallback((value: string) => {
-    const formatted = formatPhoneNumber(value);
-    setAdvertiserFormData(prev => ({ ...prev, contactPhoneNumber: formatted }));
-  }, []);
-
-  const handleDisplayPhoneChange = useCallback((value: string) => {
-    const formatted = formatPhoneNumber(value);
-    setAdvertiserFormData(prev => ({ ...prev, displayPhoneNumber: formatted }));
-  }, []);
-
   // 계약메모 인라인 수정
   const handleMemoEdit = (advertiserId: string, currentMemo: string | null) => {
     setEditingMemoId(advertiserId);
@@ -746,24 +699,15 @@ export default function AdsManagementPage() {
 
   // 광고 등록/수정 다이얼로그 열기
   const handleOpenDialog = (ad?: Advertisement) => {
+    setApartmentSearch('');
     if (ad) {
       setSelectedAd(ad);
 
       // 수정 모드: 기존 광고 ID를 폴더명으로 사용
       setImageUploadFolderId(ad.id);
 
-      // 광고주 정보 설정
-      setAdvertiserFormData({
-        businessName: ad.advertisers.businessName,
-        representativeName: ad.advertisers.representativeName,
-        email: ad.advertisers.email || '',
-        contactPhoneNumber: ad.advertisers.contactPhoneNumber,
-        displayPhoneNumber: ad.advertisers.displayPhoneNumber || '',
-        address: ad.advertisers.address,
-        businessRegistration: ad.advertisers.businessRegistration || '',
-        contractDocument: ad.advertisers.contractDocument || '',
-        contractMemo: ad.advertisers.contractMemo || '',
-      });
+      // 광고주 ID 설정
+      setSelectedAdvertiserId(ad.advertiserId);
 
       // 광고 정보 설정
       setAdFormData({
@@ -789,17 +733,7 @@ export default function AdsManagementPage() {
       // 등록 모드: 새로운 UUID 생성
       setImageUploadFolderId(generateUUID());
 
-      setAdvertiserFormData({
-        businessName: '',
-        representativeName: '',
-        email: '',
-        contactPhoneNumber: '',
-        displayPhoneNumber: '',
-        address: '',
-        businessRegistration: '',
-        contractDocument: '',
-        contractMemo: '',
-      });
+      setSelectedAdvertiserId('');
       setAdFormData({
         categoryId: '',
         adType: 'NEIGHBORHOOD',
@@ -827,17 +761,8 @@ export default function AdsManagementPage() {
       setIsSaving(true);
 
       // 유효성 검사
-      if (!advertiserFormData.businessName.trim()) {
-        throw new Error('상호명을 입력해주세요');
-      }
-      if (!advertiserFormData.representativeName.trim()) {
-        throw new Error('대표자명을 입력해주세요');
-      }
-      if (!advertiserFormData.contactPhoneNumber.trim()) {
-        throw new Error('광고주 연락처를 입력해주세요');
-      }
-      if (!advertiserFormData.address.trim()) {
-        throw new Error('영업점 주소를 입력해주세요');
+      if (!selectedAdvertiserId) {
+        throw new Error('광고주를 선택해주세요');
       }
       if (!adFormData.title.trim()) {
         throw new Error('광고 제목을 입력해주세요');
@@ -862,28 +787,11 @@ export default function AdsManagementPage() {
 
       if (selectedAd) {
         // 수정 모드
-        // 광고주 정보 업데이트
-        const { error: advertiserError } = await supabase
-          .from('advertisers')
-          .update({
-            businessName: advertiserFormData.businessName,
-            representativeName: advertiserFormData.representativeName,
-            email: advertiserFormData.email || null,
-            contactPhoneNumber: advertiserFormData.contactPhoneNumber,
-            displayPhoneNumber: advertiserFormData.displayPhoneNumber || null,
-            address: advertiserFormData.address,
-            businessRegistration: advertiserFormData.businessRegistration || null,
-            contractDocument: advertiserFormData.contractDocument || null,
-            contractMemo: advertiserFormData.contractMemo || null,
-          })
-          .eq('id', selectedAd.advertiserId);
-
-        if (advertiserError) throw advertiserError;
-
-        // 광고 정보 업데이트
+        // 광고 정보 업데이트 (광고주 변경 가능)
         const { error: adError } = await supabase
           .from('advertisements')
           .update({
+            advertiserId: selectedAdvertiserId,
             categoryId: adFormData.categoryId || null,
             adType: adFormData.adType,
             title: adFormData.title,
@@ -906,36 +814,15 @@ export default function AdsManagementPage() {
         await updateAdConnections(selectedAd.id);
 
         // 검색 태그 생성 및 업데이트
-        await updateAdvertiserSearchTags(selectedAd.advertiserId, adFormData.adType);
+        await updateAdvertiserSearchTags(selectedAdvertiserId, adFormData.adType);
 
         toast.success('광고가 수정되었습니다');
       } else {
-        // 등록 모드
-        // 1. 광고주 등록
-        const { data: advertiserData, error: advertiserError } = await supabase
-          .from('advertisers')
-          .insert({
-            businessName: advertiserFormData.businessName,
-            representativeName: advertiserFormData.representativeName,
-            email: advertiserFormData.email || null,
-            contactPhoneNumber: advertiserFormData.contactPhoneNumber,
-            displayPhoneNumber: advertiserFormData.displayPhoneNumber || null,
-            address: advertiserFormData.address,
-            businessRegistration: advertiserFormData.businessRegistration || null,
-            contractDocument: advertiserFormData.contractDocument || null,
-            contractMemo: advertiserFormData.contractMemo || null,
-            createdBy: currentUser.id,
-          })
-          .select()
-          .single();
-
-        if (advertiserError) throw advertiserError;
-
-        // 2. 광고 등록
+        // 등록 모드 - 선택된 광고주 ID 사용
         const { data: adData, error: adError } = await supabase
           .from('advertisements')
           .insert({
-            advertiserId: advertiserData.id,
+            advertiserId: selectedAdvertiserId,
             categoryId: adFormData.categoryId || null,
             adType: adFormData.adType,
             title: adFormData.title,
@@ -956,11 +843,11 @@ export default function AdsManagementPage() {
 
         if (adError) throw adError;
 
-        // 3. 아파트/지역 연결
+        // 아파트/지역 연결
         await updateAdConnections(adData.id);
 
-        // 4. 검색 태그 생성 및 업데이트
-        await updateAdvertiserSearchTags(advertiserData.id, adFormData.adType);
+        // 검색 태그 생성 및 업데이트
+        await updateAdvertiserSearchTags(selectedAdvertiserId, adFormData.adType);
 
         toast.success('광고가 등록되었습니다');
       }
@@ -1201,11 +1088,8 @@ export default function AdsManagementPage() {
 
   // 필수 입력 항목 검증
   const isFormValid = () => {
-    // 광고주 정보 필수 항목
-    if (!advertiserFormData.businessName.trim()) return false;
-    if (!advertiserFormData.representativeName.trim()) return false;
-    if (!advertiserFormData.contactPhoneNumber.trim()) return false;
-    if (!advertiserFormData.address.trim()) return false;
+    // 광고주 선택 필수
+    if (!selectedAdvertiserId) return false;
 
     // 광고 정보 필수 항목
     if (!adFormData.title.trim()) return false;
@@ -1422,7 +1306,6 @@ export default function AdsManagementPage() {
       <div className='flex h-full flex-col'>
         <AdminHeader
           title='광고 등록/수정'
-          description='광고주 정보와 광고를 한 번에 관리합니다'
         />
 
         <div className='flex-1 space-y-4 p-4 md:p-6'>
@@ -2109,202 +1992,76 @@ export default function AdsManagementPage() {
             }
           }}
         >
-          <DialogContent className='max-h-[90vh] w-[95vw] max-w-6xl sm:max-w-6xl overflow-y-auto'>
+          <DialogContent className='max-h-[90vh] w-[95vw] max-w-3xl sm:max-w-3xl overflow-y-auto'>
             <DialogHeader>
               <DialogTitle className='text-2xl'>
                 {selectedAd ? '광고 수정' : '새 광고 등록'}
               </DialogTitle>
               <DialogDescription>
-                광고주 정보와 광고 내용을 입력하세요. 모든 필수 항목(*)을
+                광고주를 선택하고 광고 내용을 입력하세요. 모든 필수 항목(*)을
                 입력해야 합니다.
               </DialogDescription>
             </DialogHeader>
 
-            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-              {/* 왼쪽: 광고주 정보 */}
-              <div className='space-y-4'>
-                <div className='sticky top-0 bg-background pb-3 border-b-2 border-primary'>
-                  <h3 className='text-lg font-semibold flex items-center gap-2'>
-                    <Building2 className='h-5 w-5' />
-                    광고주 정보
-                  </h3>
-                  <p className='text-sm text-muted-foreground mt-1'>
-                    광고주의 기본 정보와 연락처
-                  </p>
-                </div>
-
-                <div className='space-y-4'>
-                  <div className='grid grid-cols-2 gap-3'>
-                    <div className='space-y-2'>
-                      <Label
-                        htmlFor='businessName'
-                        className='required'
-                      >
-                        상호명 <span className='text-destructive'>*</span>
-                      </Label>
-                      <Input
-                        id='businessName'
-                        value={advertiserFormData.businessName}
-                        onChange={(e) =>
-                          setAdvertiserFormData({
-                            ...advertiserFormData,
-                            businessName: e.target.value,
-                          })
-                        }
-                        placeholder='상호명을 적어주세요'
-                      />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='representativeName'>
-                        대표자명 <span className='text-destructive'>*</span>
-                      </Label>
-                      <Input
-                        id='representativeName'
-                        value={advertiserFormData.representativeName}
-                        onChange={(e) =>
-                          setAdvertiserFormData({
-                            ...advertiserFormData,
-                            representativeName: e.target.value,
-                          })
-                        }
-                        placeholder='홍길동'
-                      />
-                    </div>
-                  </div>
-
-                  <div className='grid grid-cols-2 gap-3'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='contactPhoneNumber'>
-                        광고주 연락처 <span className='text-destructive'>*</span>
-                      </Label>
-                      <Input
-                        id='contactPhoneNumber'
-                        value={advertiserFormData.contactPhoneNumber}
-                        onChange={(e) =>
-                          handleContactPhoneChange(e.target.value)
-                        }
-                        placeholder='010-1234-5678 또는 02-123-4567'
-                      />
-                      <p className='text-xs text-muted-foreground'>
-                        관리용 연락처 (비공개)
-                      </p>
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='displayPhoneNumber'>광고 표시용 전화번호</Label>
-                      <Input
-                        id='displayPhoneNumber'
-                        value={advertiserFormData.displayPhoneNumber}
-                        onChange={(e) =>
-                          handleDisplayPhoneChange(e.target.value)
-                        }
-                        placeholder='010-1234-5678 또는 02-123-4567'
-                      />
-                      <p className='text-xs text-muted-foreground'>
-                        앱에서 고객에게 보여질 번호
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='email'>이메일</Label>
-                    <Input
-                      id='email'
-                      type='email'
-                      value={advertiserFormData.email}
-                      onChange={(e) =>
-                        setAdvertiserFormData({
-                          ...advertiserFormData,
-                          email: e.target.value,
-                        })
-                      }
-                      placeholder='example@company.com'
-                    />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='address'>
-                      영업점 주소 <span className='text-destructive'>*</span>
-                    </Label>
-                    <Input
-                      id='address'
-                      value={advertiserFormData.address}
-                      onChange={(e) =>
-                        setAdvertiserFormData({
-                          ...advertiserFormData,
-                          address: e.target.value,
-                        })
-                      }
-                      placeholder='영업점 주소를 입력 하세요'
-                    />
-                  </div>
-
-                  <div className='grid grid-cols-2 gap-3'>
-                    <div className='space-y-2'>
-                      <Label>사업자등록증</Label>
-                      <ImageUpload
-                        value={advertiserFormData.businessRegistration}
-                        onChange={(url) =>
-                          setAdvertiserFormData({
-                            ...advertiserFormData,
-                            businessRegistration: url,
-                          })
-                        }
-                        bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}/business-reg`}
-                        accept='image/*,application/pdf'
-                        maxSizeMB={10}
-                      />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label>계약서</Label>
-                      <ImageUpload
-                        value={advertiserFormData.contractDocument}
-                        onChange={(url) =>
-                          setAdvertiserFormData({
-                            ...advertiserFormData,
-                            contractDocument: url,
-                          })
-                        }
-                        bucket='advertisements'
-                        storagePath={`ads/${imageUploadFolderId}/contract-doc`}
-                        accept='image/*,application/pdf'
-                        maxSizeMB={10}
-                      />
-                    </div>
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='contractMemo'>계약 메모</Label>
-                    <Textarea
-                      id='contractMemo'
-                      value={advertiserFormData.contractMemo}
-                      onChange={(e) =>
-                        setAdvertiserFormData({
-                          ...advertiserFormData,
-                          contractMemo: e.target.value,
-                        })
-                      }
-                      placeholder='계약 관련 메모를 입력하세요'
-                      rows={3}
-                      className='resize-none'
-                    />
-                  </div>
-                </div>
+            <div className='space-y-6'>
+              {/* 광고주 선택 */}
+              <div className='space-y-2'>
+                <Label className='text-sm font-medium flex items-center gap-2'>
+                  <Building2 className='h-4 w-4' />
+                  광고주 선택 <span className='text-destructive'>*</span>
+                </Label>
+                <Popover open={advertiserPopoverOpen} onOpenChange={setAdvertiserPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant='outline'
+                      role='combobox'
+                      aria-expanded={advertiserPopoverOpen}
+                      className='w-full justify-between font-normal'
+                    >
+                      {selectedAdvertiserId
+                        ? advertisers.find((adv) => adv.id === selectedAdvertiserId)
+                          ? `${advertisers.find((adv) => adv.id === selectedAdvertiserId)?.businessName} (${advertisers.find((adv) => adv.id === selectedAdvertiserId)?.representativeName})`
+                          : '광고주를 선택하세요'
+                        : '광고주를 선택하세요'}
+                      <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className='w-[400px] p-0' align='start'>
+                    <Command>
+                      <CommandInput placeholder='광고주 검색...' />
+                      <CommandList>
+                        <CommandEmpty>광고주를 찾을 수 없습니다.</CommandEmpty>
+                        <CommandGroup>
+                          {advertisers.map((adv) => (
+                            <CommandItem
+                              key={adv.id}
+                              value={`${adv.businessName} ${adv.representativeName}`}
+                              onSelect={() => {
+                                setSelectedAdvertiserId(adv.id);
+                                setAdvertiserPopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedAdvertiserId === adv.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {adv.businessName} ({adv.representativeName})
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className='text-xs text-muted-foreground'>
+                  광고주가 없다면 먼저 광고주 관리 페이지에서 등록하세요.
+                </p>
               </div>
 
-              {/* 오른쪽: 광고 정보 */}
+              {/* 광고 정보 */}
               <div className='space-y-4'>
-                <div className='sticky top-0 bg-background pb-3 border-b-2 border-primary'>
-                  <h3 className='text-lg font-semibold flex items-center gap-2'>
-                    <Tag className='h-5 w-5' />
-                    광고 정보
-                  </h3>
-                  <p className='text-sm text-muted-foreground mt-1'>
-                    광고 콘텐츠와 노출 설정
-                  </p>
-                </div>
-
-                <div className='space-y-4'>
                   <div className='grid grid-cols-2 gap-3'>
                     <div className='space-y-2'>
                       <Label htmlFor='title'>
@@ -2398,38 +2155,62 @@ export default function AdsManagementPage() {
                     />
                   </div>
 
-                  <div className='grid grid-cols-2 gap-3'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='startDate'>
-                        게시 시작일 <span className='text-destructive'>*</span>
-                      </Label>
-                      <Input
-                        id='startDate'
-                        type='date'
-                        value={adFormData.startDate}
-                        onChange={(e) =>
-                          setAdFormData({
-                            ...adFormData,
-                            startDate: e.target.value,
-                          })
-                        }
-                      />
+                  <div className='space-y-2'>
+                    <div className='grid grid-cols-2 gap-3'>
+                      <div className='space-y-2'>
+                        <Label htmlFor='startDate'>
+                          게시 시작일 <span className='text-destructive'>*</span>
+                        </Label>
+                        <Input
+                          id='startDate'
+                          type='date'
+                          value={adFormData.startDate}
+                          onChange={(e) =>
+                            setAdFormData({
+                              ...adFormData,
+                              startDate: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <Label htmlFor='endDate'>
+                          게시 종료일 <span className='text-destructive'>*</span>
+                        </Label>
+                        <Input
+                          id='endDate'
+                          type='date'
+                          value={adFormData.endDate}
+                          onChange={(e) =>
+                            setAdFormData({
+                              ...adFormData,
+                              endDate: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='endDate'>
-                        게시 종료일 <span className='text-destructive'>*</span>
-                      </Label>
-                      <Input
-                        id='endDate'
-                        type='date'
-                        value={adFormData.endDate}
-                        onChange={(e) =>
-                          setAdFormData({
-                            ...adFormData,
-                            endDate: e.target.value,
-                          })
-                        }
-                      />
+                    <div className='flex gap-2'>
+                      {[30, 60, 90].map((days) => (
+                        <Button
+                          key={days}
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => {
+                            const today = new Date();
+                            const endDate = new Date();
+                            endDate.setDate(today.getDate() + days);
+                            setAdFormData({
+                              ...adFormData,
+                              startDate: today.toISOString().split('T')[0],
+                              endDate: endDate.toISOString().split('T')[0],
+                            });
+                          }}
+                        >
+                          {days}일
+                        </Button>
+                      ))}
                     </div>
                   </div>
 
@@ -2458,38 +2239,62 @@ export default function AdsManagementPage() {
                         <p className='text-sm text-muted-foreground'>
                           이벤트 기간 동안만 이벤트 섹션에 표시됩니다
                         </p>
-                        <div className='grid grid-cols-2 gap-3'>
-                          <div className='space-y-2'>
-                            <Label htmlFor='eventStartDate'>
-                              이벤트 시작일 <span className='text-destructive'>*</span>
-                            </Label>
-                            <Input
-                              id='eventStartDate'
-                              type='date'
-                              value={adFormData.eventStartDate}
-                              onChange={(e) =>
-                                setAdFormData({
-                                  ...adFormData,
-                                  eventStartDate: e.target.value,
-                                })
-                              }
-                            />
+                        <div className='space-y-2'>
+                          <div className='grid grid-cols-2 gap-3'>
+                            <div className='space-y-2'>
+                              <Label htmlFor='eventStartDate'>
+                                이벤트 시작일 <span className='text-destructive'>*</span>
+                              </Label>
+                              <Input
+                                id='eventStartDate'
+                                type='date'
+                                value={adFormData.eventStartDate}
+                                onChange={(e) =>
+                                  setAdFormData({
+                                    ...adFormData,
+                                    eventStartDate: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className='space-y-2'>
+                              <Label htmlFor='eventEndDate'>
+                                이벤트 종료일 <span className='text-destructive'>*</span>
+                              </Label>
+                              <Input
+                                id='eventEndDate'
+                                type='date'
+                                value={adFormData.eventEndDate}
+                                onChange={(e) =>
+                                  setAdFormData({
+                                    ...adFormData,
+                                    eventEndDate: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
                           </div>
-                          <div className='space-y-2'>
-                            <Label htmlFor='eventEndDate'>
-                              이벤트 종료일 <span className='text-destructive'>*</span>
-                            </Label>
-                            <Input
-                              id='eventEndDate'
-                              type='date'
-                              value={adFormData.eventEndDate}
-                              onChange={(e) =>
-                                setAdFormData({
-                                  ...adFormData,
-                                  eventEndDate: e.target.value,
-                                })
-                              }
-                            />
+                          <div className='flex gap-2'>
+                            {[30, 60, 90].map((days) => (
+                              <Button
+                                key={days}
+                                type='button'
+                                variant='outline'
+                                size='sm'
+                                onClick={() => {
+                                  const today = new Date();
+                                  const endDate = new Date();
+                                  endDate.setDate(today.getDate() + days);
+                                  setAdFormData({
+                                    ...adFormData,
+                                    eventStartDate: today.toISOString().split('T')[0],
+                                    eventEndDate: endDate.toISOString().split('T')[0],
+                                  });
+                                }}
+                              >
+                                {days}일
+                              </Button>
+                            ))}
                           </div>
                         </div>
                         <div className='space-y-2'>
@@ -2549,81 +2354,100 @@ export default function AdsManagementPage() {
                       <Label>
                         노출 아파트 <span className='text-destructive'>*</span>
                       </Label>
-                      <Popover
-                        open={apartmentSearchOpen}
-                        onOpenChange={setApartmentSearchOpen}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant='outline'
-                            role='combobox'
-                            className='w-full justify-between h-auto min-h-[40px]'
-                          >
-                            <span className='truncate'>
-                              {adFormData.selectedApartments.length > 0
-                                ? `${adFormData.selectedApartments.length}개 아파트 선택됨`
-                                : '아파트를 선택하세요'}
-                            </span>
-                            <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className='w-full p-0'>
-                          <Command>
-                            <CommandInput
-                              placeholder='아파트 검색...'
+                      <div className='text-sm text-muted-foreground'>
+                        {adFormData.selectedApartments.length > 0
+                          ? `${adFormData.selectedApartments.length}개 아파트 선택됨`
+                          : '아파트를 선택하세요'}
+                      </div>
+                      <div className='flex gap-2'>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => {
+                            const filteredApts = apartments.filter(apt =>
+                              apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                              apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                            );
+                            setAdFormData({
+                              ...adFormData,
+                              selectedApartments: filteredApts.map(apt => apt.id),
+                            });
+                          }}
+                        >
+                          전체 선택
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => {
+                            setAdFormData({
+                              ...adFormData,
+                              selectedApartments: [],
+                            });
+                          }}
+                        >
+                          전체 해제
+                        </Button>
+                      </div>
+                      <div className='border rounded-md'>
+                        <div className='p-2 border-b'>
+                          <div className='relative'>
+                            <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                            <Input
+                              placeholder='아파트명 또는 주소 검색...'
                               value={apartmentSearch}
-                              onValueChange={setApartmentSearch}
+                              onChange={(e) => setApartmentSearch(e.target.value)}
+                              className='pl-8 h-8'
                             />
-                            <CommandList>
-                              <CommandEmpty>
-                                아파트를 찾을 수 없습니다.
-                              </CommandEmpty>
-                              <CommandGroup>
-                                {apartments
-                                  .filter((apt) =>
-                                    apt.name
-                                      .toLowerCase()
-                                      .includes(apartmentSearch.toLowerCase())
-                                  )
-                                  .map((apt) => (
-                                    <CommandItem
-                                      key={apt.id}
-                                      onSelect={() => {
-                                        const isSelected =
-                                          adFormData.selectedApartments.includes(
-                                            apt.id
-                                          );
-                                        setAdFormData({
-                                          ...adFormData,
-                                          selectedApartments: isSelected
-                                            ? adFormData.selectedApartments.filter(
-                                                (id) => id !== apt.id
-                                              )
-                                            : [
-                                                ...adFormData.selectedApartments,
-                                                apt.id,
-                                              ],
-                                        });
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          'mr-2 h-4 w-4',
-                                          adFormData.selectedApartments.includes(
-                                            apt.id
-                                          )
-                                            ? 'opacity-100'
-                                            : 'opacity-0'
-                                        )}
-                                      />
-                                      {apt.name}
-                                    </CommandItem>
-                                  ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                          </div>
+                        </div>
+                        <div className='h-[200px] overflow-y-auto'>
+                          {apartments
+                            .filter(apt =>
+                              apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                              apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                            )
+                            .map((apt) => (
+                              <label
+                                key={apt.id}
+                                className='flex items-start gap-2 px-3 py-2 hover:bg-muted cursor-pointer'
+                              >
+                                <Checkbox
+                                  checked={adFormData.selectedApartments.includes(apt.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setAdFormData({
+                                        ...adFormData,
+                                        selectedApartments: [...adFormData.selectedApartments, apt.id],
+                                      });
+                                    } else {
+                                      setAdFormData({
+                                        ...adFormData,
+                                        selectedApartments: adFormData.selectedApartments.filter(id => id !== apt.id),
+                                      });
+                                    }
+                                  }}
+                                  className='mt-0.5'
+                                />
+                                <div className='flex flex-col'>
+                                  <span className='text-sm font-medium'>{apt.name}</span>
+                                  <span className='text-xs text-muted-foreground'>{apt.address}</span>
+                                </div>
+                              </label>
+                            ))}
+                          {apartments.filter(apt =>
+                            apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                            apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                          ).length === 0 && (
+                            <div className='px-3 py-4 text-sm text-muted-foreground text-center'>
+                              검색 결과가 없습니다.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* 선택된 아파트 뱃지 */}
                       {adFormData.selectedApartments.length > 0 && (
                         <div className='flex flex-wrap gap-2 pt-2'>
                           {adFormData.selectedApartments.map((aptId) => {
@@ -2632,21 +2456,25 @@ export default function AdsManagementPage() {
                               <Badge
                                 key={aptId}
                                 variant='secondary'
-                                className='font-normal'
+                                className='font-normal gap-1'
                               >
                                 {apt.name}
-                                <X
-                                  className='ml-1 h-3 w-3 cursor-pointer'
-                                  onClick={() =>
+                                <button
+                                  type='button'
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
                                     setAdFormData({
                                       ...adFormData,
-                                      selectedApartments:
-                                        adFormData.selectedApartments.filter(
-                                          (id) => id !== aptId
-                                        ),
-                                    })
-                                  }
-                                />
+                                      selectedApartments: adFormData.selectedApartments.filter(
+                                        (id) => id !== aptId
+                                      ),
+                                    });
+                                  }}
+                                  className='ml-1 rounded-full hover:bg-muted-foreground/20'
+                                >
+                                  <X className='h-3 w-3' />
+                                </button>
                               </Badge>
                             ) : null;
                           })}
@@ -2832,7 +2660,6 @@ export default function AdsManagementPage() {
                       </div>
                     </div>
                   )}
-                </div>
               </div>
             </div>
 

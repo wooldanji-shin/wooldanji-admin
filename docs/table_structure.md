@@ -73,7 +73,7 @@
 | id                 | uuid        | **PK**                                                                |
 | userId             | uuid        | **FK** → `user.id` **ON DELETE CASCADE**                              |
 | reConfirmImageUrl  | text        | 재신청 인증 이미지 URL                                                |
-| status             | text        | `pending` \| `approve` \| `rejected` - 재신청 상태 (DEFAULT PENDING) |
+| status             | text        | `pending` \| `approve` \| `reject` - 재신청 상태 (DEFAULT PENDING) |
 | previousStatus     | text        | 재신청 당시 유저 상태 (`pending`, `approve`, `inactive`, `suspended`) |
 | reviewedBy         | uuid        | **FK** → `user.id` **ON DELETE SET NULL** - 검토한 관리자 (NULL 가능) |
 | reviewedAt         | timestamptz | 검토 완료 시간 (NULL 가능)                                            |
@@ -529,14 +529,22 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `home_banners`
 
-| Column     | Type        | Notes                                    |
-| ---------- | ----------- | ---------------------------------------- |
-| id         | uuid        | **PK**                                   |
-| createdAt  | timestamptz | DEFAULT now()                            |
-| imageUrl   | text        | 배너 이미지 URL (Supabase Storage)       |
-| linkUrl    | text        | 클릭 시 이동할 URL (NULL 가능)           |
-| orderIndex | int4        | 표시 순서 (작을수록 먼저 표시)           |
-| isActive   | bool        | DEFAULT true - 활성화 여부               |
+| Column       | Type        | Notes                                                                      |
+| ------------ | ----------- | -------------------------------------------------------------------------- |
+| id           | uuid        | **PK**                                                                     |
+| createdAt    | timestamptz | DEFAULT now()                                                              |
+| imageUrl     | text        | 배너 이미지 URL (Supabase Storage)                                         |
+| linkUrl      | text        | 클릭 시 이동할 URL (NULL 가능)                                             |
+| orderIndex   | int4        | 표시 순서 (작을수록 먼저 표시)                                             |
+| isActive     | bool        | DEFAULT true - 활성화 여부                                                 |
+| isGlobal     | bool        | DEFAULT false - true면 전체 회원에게 표시                                  |
+| createdBy    | uuid        | **FK** → `auth.users.id` - 배너 생성자 (NULL 가능)                         |
+| advertiserId | uuid        | **FK** → `advertisers.id` **ON DELETE CASCADE** - 연결된 광고주 (NULL 가능) |
+| startDate    | timestamptz | 게시 시작일 (NULL 가능, isGlobal=false인 경우 사용)                        |
+| endDate      | timestamptz | 게시 종료일 (NULL 가능, isGlobal=false인 경우 사용)                        |
+| clickCount   | int4        | DEFAULT 0 - 클릭 수                                                        |
+| adClickCount | int4        | DEFAULT 0 - 광고 카드 클릭 횟수 (광고 상세 다이얼로그 열기)                |
+| description  | text        | 배너 설명 (NULL 가능)                                                      |
 
 > **설명**:
 >
@@ -544,6 +552,10 @@ await bleService.sendOpenCommand(passwordBytes);
 > - 관리자가 배너 이미지를 동적으로 추가/수정/삭제 가능
 > - 자동 재생 슬라이더로 표시 (CarouselSlider)
 > - Storage 경로: `home-content/banners/{banner-id}.jpg`
+> - **아파트별 타겟팅**: `isGlobal = false`인 배너는 `home_banner_apartments` 테이블을 통해 특정 아파트 회원에게만 표시
+> - **광고주 연결**: 타겟 아파트 배너(`isGlobal = false`)에 광고주(`advertiserId`)를 연결하여 광고로 관리 가능
+> - **게시 기간 관리**: `startDate`, `endDate`로 배너의 게시 기간을 설정하고, 해당 기간 동안에만 배너 노출
+> - **매니저 권한**: MANAGER는 자신이 생성한 배너(`createdBy`)만 수정/삭제 가능, `isGlobal = true` 사용 불가
 >
 > **제약조건**:
 >
@@ -552,11 +564,107 @@ await bleService.sendOpenCommand(passwordBytes);
 > **사용 예시**:
 >
 > ```sql
-> -- 배너 등록
-> INSERT INTO home_banners (imageUrl, linkUrl, orderIndex) VALUES
->   ('banners/banner-1.jpg', 'https://example.com/promotion', 1),
->   ('banners/banner-2.jpg', NULL, 2),
->   ('banners/banner-3.jpg', 'https://example.com/event', 3);
+> -- 전체 대상 배너 등록
+> INSERT INTO home_banners (imageUrl, linkUrl, orderIndex, isGlobal) VALUES
+>   ('banners/banner-1.jpg', 'https://example.com/promotion', 1, true);
+>
+> -- 특정 아파트 대상 배너 등록
+> INSERT INTO home_banners (imageUrl, linkUrl, orderIndex, isGlobal) VALUES
+>   ('banners/apt-banner.jpg', 'https://example.com/apt-event', 2, false);
+> -- 아파트 연결은 home_banner_apartments 테이블에서 설정
+> ```
+
+---
+
+### Table: `home_banner_apartments`
+
+| Column      | Type        | Notes                                                    |
+| ----------- | ----------- | -------------------------------------------------------- |
+| id          | uuid        | **PK**                                                   |
+| createdAt   | timestamptz | DEFAULT now()                                            |
+| bannerId    | uuid        | **FK** → `home_banners.id` **ON DELETE CASCADE**         |
+| apartmentId | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE**           |
+
+> **설명**:
+>
+> - 배너와 아파트 간의 다대다(N:M) 관계를 위한 중간 테이블
+> - `isGlobal = false`인 배너를 특정 아파트 회원에게만 표시하기 위해 사용
+> - 하나의 배너를 여러 아파트에 할당 가능
+>
+> **제약조건**:
+>
+> - `UNIQUE (bannerId, apartmentId)`: 동일 배너-아파트 조합 중복 불가
+>
+> **사용 예시**:
+>
+> ```sql
+> -- 배너를 여러 아파트에 할당
+> INSERT INTO home_banner_apartments (bannerId, apartmentId) VALUES
+>   ('배너-UUID', '아파트A-UUID'),
+>   ('배너-UUID', '아파트B-UUID'),
+>   ('배너-UUID', '아파트C-UUID');
+> ```
+
+---
+
+### Function: `get_home_banners(p_apartment_id uuid, p_user_id uuid, p_role text)`
+
+> **설명**:
+>
+> - 사용자의 역할(role)에 따라 배너 목록을 필터링하여 반환
+> - **역할별 권한**:
+>   - `SUPER_ADMIN`: 모든 배너 표시
+>   - `MANAGER`: 자신이 생성한 배너만 표시 (`createdBy = p_user_id`)
+>   - `APT_ADMIN`, `APARTMENT`: `isGlobal = true`인 배너 + 자신의 아파트에 할당된 배너
+>   - `GENERAL` (기본값): `isGlobal = true`인 배너만 표시
+>
+> **파라미터**:
+>
+> - `p_apartment_id` (uuid, optional): 사용자의 아파트 ID (APT_ADMIN, APARTMENT 역할에서 사용)
+> - `p_user_id` (uuid, optional): 사용자 ID (MANAGER 역할에서 createdBy 비교용)
+> - `p_role` (text, default: 'GENERAL'): 사용자 역할 (`SUPER_ADMIN`, `MANAGER`, `APT_ADMIN`, `APARTMENT`, `GENERAL`)
+>
+> **반환값**: `home_banners` 테이블의 레코드 목록
+>
+> **사용 예시**:
+>
+> ```sql
+> -- SUPER_ADMIN: 모든 배너 조회
+> SELECT * FROM get_home_banners(NULL, 'user-uuid', 'SUPER_ADMIN');
+>
+> -- MANAGER: 자신이 생성한 배너만 조회
+> SELECT * FROM get_home_banners(NULL, 'manager-uuid', 'MANAGER');
+>
+> -- APT_ADMIN: isGlobal + 자신의 아파트 배너 조회
+> SELECT * FROM get_home_banners('apartment-uuid', 'admin-uuid', 'APT_ADMIN');
+>
+> -- GENERAL: isGlobal 배너만 조회
+> SELECT * FROM get_home_banners(NULL, NULL, 'GENERAL');
+> ```
+>
+> **Flutter 호출**:
+>
+> ```dart
+> // home_provider.dart에서 사용자 역할 결정
+> String _getUserRole(UserModel? user) {
+>   if (user == null) return 'GENERAL';
+>   final roles = user.roles;
+>   if (roles.contains(UserRole.SUPER_ADMIN)) return 'SUPER_ADMIN';
+>   if (roles.contains(UserRole.MANAGER)) return 'MANAGER';
+>   if (roles.contains(UserRole.APT_ADMIN)) return 'APT_ADMIN';
+>   if (user.registrationType == RegistrationType.APARTMENT) return 'APARTMENT';
+>   return 'GENERAL';
+> }
+>
+> // RPC 호출
+> final banners = await supabase.rpc(
+>   'get_home_banners',
+>   params: {
+>     'p_apartment_id': user?.apartmentId,
+>     'p_user_id': user?.id,
+>     'p_role': _getUserRole(user),
+>   },
+> );
 > ```
 
 ---

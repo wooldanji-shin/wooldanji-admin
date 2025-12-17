@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2, Ban } from 'lucide-react';
+import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2, Ban, Download } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { UserFullDetails } from '@/lib/supabase/types';
 import { getUserRoles } from '@/lib/auth';
@@ -89,6 +89,25 @@ export default function UsersPage() {
   const [suspensionReason, setSuspensionReason] = useState('');
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [hideOpenDoorColumn, setHideOpenDoorColumn] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  // localStorage에서 문 연 횟수 컬럼 숨김 설정 불러오기
+  useEffect(() => {
+    const stored = localStorage.getItem('hideOpenDoorColumn');
+    if (stored !== null) {
+      setHideOpenDoorColumn(stored === 'true');
+    }
+
+    // storage 이벤트 리스너로 다른 페이지에서 변경 시 동기화
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'hideOpenDoorColumn') {
+        setHideOpenDoorColumn(e.newValue === 'true');
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const searchQuery = searchParams.get('search') || '';
   const currentPage = parseInt(searchParams.get('page') || '1');
@@ -255,6 +274,115 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // CSV 내보내기 함수
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const roles = await getUserRoles();
+      const isManager = roles.includes('MANAGER');
+
+      let query = supabase
+        .from('user')
+        .select(`
+          *,
+          user_roles!inner(id, role, createdAt),
+          apartments:apartmentId(id, name, address)
+        `)
+        .eq('user_roles.role', 'APP_USER');
+
+      // 매니저인 경우 자신이 관리하는 아파트의 회원만
+      if (isManager) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: managerApartments } = await supabase
+            .from('manager_apartments')
+            .select('apartmentId')
+            .eq('managerId', user.id);
+
+          if (managerApartments && managerApartments.length > 0) {
+            const apartmentIds = managerApartments.map((ma: any) => ma.apartmentId);
+            query = query.in('apartmentId', apartmentIds);
+          } else {
+            toast.error('관리하는 아파트가 없습니다.');
+            setExporting(false);
+            return;
+          }
+        }
+      }
+
+      const { data, error } = await query.order('createdAt', { ascending: false });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast.error('내보낼 회원 데이터가 없습니다.');
+        setExporting(false);
+        return;
+      }
+
+      // CSV 헤더
+      const headers = [
+        '이름',
+        '이메일',
+        '전화번호',
+        '회원유형',
+        '아파트',
+        '동',
+        '호',
+        '승인상태',
+        '문 연 횟수',
+        '가입일',
+      ];
+
+      // CSV 데이터 생성
+      const csvRows = data.map((user: any) => {
+        const apartment = user.apartments as any;
+        const registrationType = user.registrationType === 'APARTMENT' ? '아파트' : '일반';
+        const approvalStatus = user.approvalStatus === 'approve' ? '승인' :
+                               user.approvalStatus === 'pending' ? '대기' :
+                               user.approvalStatus === 'rejected' ? '거절' : user.approvalStatus;
+        const createdAt = new Date(user.createdAt).toLocaleDateString('ko-KR');
+
+        return [
+          user.name || '',
+          user.email || '',
+          user.phoneNumber || '',
+          registrationType,
+          apartment?.name || '',
+          user.buildingNumber || '',
+          user.unit || '',
+          approvalStatus,
+          user.openDoorCount || 0,
+          createdAt,
+        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+      });
+
+      // CSV 파일 생성
+      const BOM = '\uFEFF';
+      const csvContent = BOM + [headers.join(','), ...csvRows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      // 다운로드
+      const link = document.createElement('a');
+      link.href = url;
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      link.download = `회원목록_${dateStr}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`${data.length}명의 회원 데이터를 내보냈습니다.`);
+    } catch (err) {
+      console.error('CSV export failed:', err);
+      toast.error('CSV 내보내기에 실패했습니다.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const updateSearchParams = (params: Record<string, string>) => {
     const current = new URLSearchParams(Array.from(searchParams.entries()));
@@ -505,8 +633,19 @@ export default function UsersPage() {
             </SelectContent>
           </Select>
 
-          <div className='text-sm text-muted-foreground whitespace-nowrap lg:ml-auto'>
-            전체 {totalCount}명
+          <div className='flex items-center gap-4 lg:ml-auto'>
+            <span className='text-sm text-muted-foreground whitespace-nowrap'>
+              전체 {totalCount}명
+            </span>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={handleExportCSV}
+              disabled={exporting || totalCount === 0}
+            >
+              <Download className='h-4 w-4 mr-2' />
+              {exporting ? '내보내는 중...' : 'CSV 내보내기'}
+            </Button>
           </div>
         </div>
 
@@ -544,6 +683,11 @@ export default function UsersPage() {
                     <TableHead className='text-muted-foreground'>
                       가입일
                     </TableHead>
+                    {!hideOpenDoorColumn && (
+                      <TableHead className='text-muted-foreground text-center'>
+                        문 연 횟수
+                      </TableHead>
+                    )}
                     <TableHead className='text-muted-foreground text-right'>
                       작업
                     </TableHead>
@@ -552,13 +696,13 @@ export default function UsersPage() {
                 <TableBody>
                   {initialLoading && loading ? (
                     <TableRow>
-                      <TableCell colSpan={10} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className='text-center py-12 text-muted-foreground'>
                         로딩 중...
                       </TableCell>
                     </TableRow>
                   ) : users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className='text-center py-12 text-muted-foreground'>
                         {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
                       </TableCell>
                     </TableRow>
@@ -625,6 +769,15 @@ export default function UsersPage() {
                         <TableCell className='text-muted-foreground'>
                           {formatDate(user.createdAt)}
                         </TableCell>
+                        {!hideOpenDoorColumn && (
+                          <TableCell className='text-center text-muted-foreground'>
+                            {(user as any).openDoorCount > 0 ? (
+                              <span>{(user as any).openDoorCount}회</span>
+                            ) : (
+                              <span>-</span>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className='text-right'>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -23,7 +24,19 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { logout, getUserRoles } from '@/lib/auth';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+// 메뉴별 badgeKey 매핑
+const BADGE_KEYS: Record<string, string> = {
+  '/admin/users': 'users',
+  '/admin/user-reconfirm': 'user_reconfirm',
+  '/admin/inquiries': 'inquiries',
+  '/admin/managers': 'managers',
+};
+
+// 로컬스토리지 키 접두사
+const LAST_READ_PREFIX = 'lastRead_';
 
 const navigationItems = [
   {
@@ -78,9 +91,21 @@ const advertisingItems = [
     roles: ['SUPER_ADMIN'],
   },
   {
+    name: '광고주 관리',
+    href: '/admin/advertising/advertisers',
+    icon: Building2,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
     name: '광고 등록/수정',
     href: '/admin/advertising/ads',
     icon: Megaphone,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '배너 광고 등록/수정',
+    href: '/admin/settings/banners',
+    icon: Image,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
 ];
@@ -94,11 +119,6 @@ const settingsMenu = {
       name: '헤더 설정',
       href: '/admin/settings/header',
       icon: Palette,
-    },
-    {
-      name: '배너 관리',
-      href: '/admin/settings/banners',
-      icon: Image,
     },
     {
       name: '알림 관리',
@@ -118,13 +138,76 @@ const settingsMenu = {
   ],
 };
 
+interface NewCounts {
+  inquiries: number;
+  users: number;
+  user_reconfirm: number;
+  managers: number;
+}
+
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdvertisingOpen, setIsAdvertisingOpen] = useState(false);
   const [userRoles, setUserRoles] = useState<string[]>([]);
-  
+  const [newCounts, setNewCounts] = useState<NewCounts>({
+    inquiries: 0,
+    users: 0,
+    user_reconfirm: 0,
+    managers: 0,
+  });
+
+  const supabase = createClient();
+
+  // 로컬스토리지에서 lastRead 시간 가져오기
+  const getLastReadTimes = useCallback(() => {
+    if (typeof window === 'undefined') return {};
+
+    return {
+      inquiries: localStorage.getItem(`${LAST_READ_PREFIX}inquiries`),
+      users: localStorage.getItem(`${LAST_READ_PREFIX}users`),
+      user_reconfirm: localStorage.getItem(`${LAST_READ_PREFIX}user_reconfirm`),
+      managers: localStorage.getItem(`${LAST_READ_PREFIX}managers`),
+    };
+  }, []);
+
+  // 새 항목 개수 조회
+  const fetchNewCounts = useCallback(async () => {
+    try {
+      const lastReadTimes = getLastReadTimes();
+
+      const { data, error } = await (supabase.rpc as any)('get_menu_new_counts', {
+        p_last_read_inquiries: lastReadTimes.inquiries || null,
+        p_last_read_users: lastReadTimes.users || null,
+        p_last_read_user_reconfirm: lastReadTimes.user_reconfirm || null,
+        p_last_read_managers: lastReadTimes.managers || null,
+      });
+
+      if (error) {
+        console.error('Failed to fetch new counts:', error);
+        return;
+      }
+
+      if (data) {
+        setNewCounts(data as NewCounts);
+      }
+    } catch (err) {
+      console.error('Failed to fetch new counts:', err);
+    }
+  }, [supabase, getLastReadTimes]);
+
+  // 메뉴 클릭 시 lastRead 시간 저장
+  const handleMenuClick = (href: string) => {
+    const badgeKey = BADGE_KEYS[href];
+    if (badgeKey && typeof window !== 'undefined') {
+      localStorage.setItem(`${LAST_READ_PREFIX}${badgeKey}`, new Date().toISOString());
+      // 해당 메뉴의 카운트 초기화
+      setNewCounts(prev => ({ ...prev, [badgeKey]: 0 }));
+    }
+    router.push(href);
+  };
+
   useEffect(() => {
     const fetchRoles = async () => {
       const roles = await getUserRoles();
@@ -132,6 +215,15 @@ export function AdminSidebar() {
     };
     fetchRoles();
   }, []);
+
+  // 새 항목 개수 조회 (마운트 시 + 주기적)
+  useEffect(() => {
+    fetchNewCounts();
+
+    // 30초마다 새로고침
+    const interval = setInterval(fetchNewCounts, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNewCounts]);
 
   const handleLogout = async () => {
     await logout();
@@ -141,6 +233,13 @@ export function AdminSidebar() {
 
   const hasAccess = (requiredRoles: string[]) => {
     return requiredRoles.some(role => userRoles.includes(role));
+  };
+
+  // 메뉴별 뱃지 카운트 가져오기
+  const getBadgeCount = (href: string): number => {
+    const badgeKey = BADGE_KEYS[href];
+    if (!badgeKey) return 0;
+    return newCounts[badgeKey as keyof NewCounts] || 0;
   };
 
   const navigation = navigationItems.filter(item => hasAccess(item.roles));
@@ -160,6 +259,7 @@ export function AdminSidebar() {
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
+          const badgeCount = getBadgeCount(item.href);
 
           return (
             <Button
@@ -170,10 +270,18 @@ export function AdminSidebar() {
                 isActive &&
                   'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90'
               )}
-              onClick={() => router.push(item.href)}
+              onClick={() => handleMenuClick(item.href)}
             >
               <Icon className='h-5 w-5' />
-              {item.name}
+              <span className='flex-1 text-left'>{item.name}</span>
+              {badgeCount > 0 && (
+                <Badge
+                  variant='destructive'
+                  className='h-5 min-w-5 px-1.5 text-xs font-medium'
+                >
+                  {badgeCount > 99 ? '99+' : badgeCount}
+                </Badge>
+              )}
             </Button>
           );
         })}
@@ -187,10 +295,10 @@ export function AdminSidebar() {
               onClick={() => setIsAdvertisingOpen(!isAdvertisingOpen)}
             >
               <Megaphone className='h-5 w-5' />
-              광고 시스템
+              <span className='flex-1 text-left'>광고 시스템</span>
               <ChevronDown
                 className={cn(
-                  'ml-auto h-4 w-4 transition-transform duration-200',
+                  'h-4 w-4 transition-transform duration-200',
                   isAdvertisingOpen && 'rotate-180'
                 )}
               />

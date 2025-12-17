@@ -29,6 +29,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Label } from '@/components/ui/label';
 import {
   Search,
@@ -41,6 +54,11 @@ import {
   EyeOff,
   FileText,
   MapPin,
+  ArrowRightLeft,
+  Check,
+  ChevronsUpDown,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Textarea } from '@/components/ui/textarea';
@@ -123,6 +141,11 @@ export default function AdvertisingManagersPage() {
     businessRegistration: '',
     memo: '',
   });
+
+  // 아파트 이전 관련 상태
+  const [transferringApartmentId, setTransferringApartmentId] = useState<string | null>(null);
+  const [transferPopoverOpen, setTransferPopoverOpen] = useState<string | null>(null);
+  const [transferLoading, setTransferLoading] = useState(false);
 
   // 매니저 목록 조회
   const fetchManagers = useCallback(async () => {
@@ -317,6 +340,86 @@ export default function AdvertisingManagersPage() {
       toast.error('매니저 삭제에 실패했습니다.');
     }
   };
+
+  // 아파트 담당 매니저 변경 (완전 이전: 관련 데이터의 createdBy도 함께 변경)
+  const handleTransferApartment = async (
+    managerApartmentId: string,
+    apartmentId: string,
+    newManagerId: string,
+    newManagerName: string
+  ) => {
+    if (!viewingManager) return;
+
+    setTransferLoading(true);
+    try {
+      // 1. manager_apartments 테이블에서 managerId 업데이트
+      const { error: maError } = await supabase
+        .from('manager_apartments')
+        .update({ managerId: newManagerId } as any)
+        .eq('id', managerApartmentId);
+
+      if (maError) throw maError;
+
+      // 2. apartments 테이블의 createdBy 업데이트 (현재 매니저가 만든 경우만)
+      await supabase
+        .from('apartments')
+        .update({ createdBy: newManagerId } as any)
+        .eq('id', apartmentId)
+        .eq('createdBy', viewingManager.id);
+
+      // 3. 해당 아파트에 연결된 배너들의 createdBy 업데이트
+      const { data: bannerApartments } = await supabase
+        .from('home_banner_apartments')
+        .select('bannerId')
+        .eq('apartmentId', apartmentId);
+
+      if (bannerApartments && bannerApartments.length > 0) {
+        const bannerIds = (bannerApartments as any[]).map(ba => ba.bannerId);
+        await supabase
+          .from('home_banners')
+          .update({ createdBy: newManagerId } as any)
+          .in('id', bannerIds)
+          .eq('createdBy', viewingManager.id);
+      }
+
+      // 4. 해당 아파트에 연결된 광고들의 createdBy 업데이트
+      const { data: adApartments } = await supabase
+        .from('advertisement_apartments')
+        .select('advertisementId')
+        .eq('apartmentId', apartmentId);
+
+      if (adApartments && adApartments.length > 0) {
+        const adIds = (adApartments as any[]).map(aa => aa.advertisementId);
+        await supabase
+          .from('advertisements')
+          .update({ createdBy: newManagerId } as any)
+          .in('id', adIds)
+          .eq('createdBy', viewingManager.id);
+      }
+
+      toast.success(`아파트가 ${newManagerName}님에게 완전 이전되었습니다.`);
+
+      // 현재 보고 있는 매니저의 아파트 목록 업데이트
+      setViewingManager({
+        ...viewingManager,
+        manager_apartments: viewingManager.manager_apartments?.filter(
+          ma => ma.id !== managerApartmentId
+        ),
+      });
+
+      // 전체 매니저 목록 새로고침
+      fetchManagers();
+      setTransferPopoverOpen(null);
+    } catch (err) {
+      console.error('Failed to transfer apartment:', err);
+      toast.error('아파트 이전에 실패했습니다.');
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  // 현재 매니저를 제외한 다른 매니저 목록
+  const otherManagers = managers.filter(m => m.id !== viewingManager?.id);
 
   const filteredManagers = managers.filter(
     (manager) =>
@@ -843,22 +946,106 @@ export default function AdvertisingManagersPage() {
               )}
 
               {/* 관리 아파트 */}
-              <div className='space-y-2'>
-                <h3 className='font-semibold text-lg border-b pb-2'>관리 아파트</h3>
+              <div className='space-y-3'>
+                <div className='flex items-center justify-between border-b pb-2'>
+                  <h3 className='font-semibold text-lg'>관리 아파트</h3>
+                  {viewingManager.manager_apartments && viewingManager.manager_apartments.length > 0 && (
+                    <span className='text-sm text-muted-foreground'>
+                      총 {viewingManager.manager_apartments.length}개
+                    </span>
+                  )}
+                </div>
                 {viewingManager.manager_apartments && viewingManager.manager_apartments.length > 0 ? (
                   <div className='grid gap-2'>
                     {viewingManager.manager_apartments.map((ma: any) => (
-                      <div key={ma.id} className='flex items-center gap-2 p-3 bg-muted rounded-lg'>
-                        <Building2 className='h-5 w-5 text-primary' />
-                        <div>
-                          <p className='font-medium'>{ma.apartments?.name}</p>
-                          <p className='text-sm text-muted-foreground'>{ma.apartments?.address}</p>
+                      <div
+                        key={ma.id}
+                        className='flex items-center justify-between p-3 bg-muted rounded-lg group hover:bg-muted/80 transition-colors'
+                      >
+                        <div className='flex items-center gap-3'>
+                          <div className='p-2 bg-primary/10 rounded-lg'>
+                            <Building2 className='h-5 w-5 text-primary' />
+                          </div>
+                          <div>
+                            <p className='font-medium'>{ma.apartments?.name}</p>
+                            <p className='text-sm text-muted-foreground'>{ma.apartments?.address}</p>
+                          </div>
                         </div>
+
+                        {/* 담당자 변경 버튼 */}
+                        <Popover
+                          open={transferPopoverOpen === ma.id}
+                          onOpenChange={(open) => setTransferPopoverOpen(open ? ma.id : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='opacity-0 group-hover:opacity-100 transition-opacity'
+                            >
+                              <ArrowRightLeft className='h-4 w-4 mr-2' />
+                              담당 변경
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className='w-80 p-0' align='end'>
+                            <div className='p-3 border-b bg-muted/50'>
+                              <p className='font-medium text-sm'>담당 매니저 변경</p>
+                              <p className='text-xs text-muted-foreground mt-1'>
+                                <span className='font-medium'>{ma.apartments?.name}</span>을(를) 다른 매니저에게 이전합니다.
+                              </p>
+                            </div>
+                            <Command>
+                              <CommandInput placeholder='매니저 검색...' />
+                              <CommandList className='max-h-[200px]'>
+                                <CommandEmpty>매니저를 찾을 수 없습니다.</CommandEmpty>
+                                <CommandGroup>
+                                  {otherManagers.map((manager) => (
+                                    <CommandItem
+                                      key={manager.id}
+                                      value={manager.name || manager.email}
+                                      onSelect={() => {
+                                        handleTransferApartment(
+                                          ma.id,
+                                          ma.apartmentId,
+                                          manager.id,
+                                          manager.name || manager.email
+                                        );
+                                      }}
+                                      disabled={transferLoading}
+                                      className='cursor-pointer'
+                                    >
+                                      <div className='flex items-center gap-3 w-full'>
+                                        <div className='flex-1'>
+                                          <p className='font-medium'>{manager.name || '-'}</p>
+                                          <p className='text-xs text-muted-foreground'>{manager.email}</p>
+                                        </div>
+                                        {manager.manager_apartments && manager.manager_apartments.length > 0 && (
+                                          <Badge variant='secondary' className='text-xs'>
+                                            {manager.manager_apartments.length}개 관리중
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                            {transferLoading && (
+                              <div className='p-3 border-t flex items-center justify-center gap-2 text-sm text-muted-foreground'>
+                                <Loader2 className='h-4 w-4 animate-spin' />
+                                이전 중...
+                              </div>
+                            )}
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className='text-muted-foreground text-sm'>관리 중인 아파트가 없습니다.</p>
+                  <div className='text-center py-8 text-muted-foreground'>
+                    <Building2 className='h-12 w-12 mx-auto mb-3 opacity-20' />
+                    <p className='text-sm'>관리 중인 아파트가 없습니다.</p>
+                  </div>
                 )}
               </div>
             </div>
