@@ -39,12 +39,12 @@ const BADGE_KEYS: Record<string, string> = {
 const LAST_READ_PREFIX = 'lastRead_';
 
 const navigationItems = [
-  {
-    name: '대시보드',
-    href: '/admin/dashboard',
-    icon: LayoutDashboard,
-    roles: ['SUPER_ADMIN', 'APT_ADMIN', 'MANAGER'],
-  },
+  // {
+  //   name: '대시보드',
+  //   href: '/admin/dashboard',
+  //   icon: LayoutDashboard,
+  //   roles: ['SUPER_ADMIN', 'APT_ADMIN', 'MANAGER'],
+  // },
   {
     name: '아파트 관리',
     href: '/admin/apartments',

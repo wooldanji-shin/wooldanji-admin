@@ -269,6 +269,7 @@ interface Advertiser {
   id: string;
   businessName: string;
   representativeName: string;
+  categoryId: string | null;
 }
 
 interface Category {
@@ -312,6 +313,22 @@ export default function AdsManagementPage() {
   // 선택된 광고주 ID
   const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string>('');
   const [advertiserPopoverOpen, setAdvertiserPopoverOpen] = useState(false);
+
+  // 이미 광고가 있는 광고주 제외 (1:1 매칭)
+  const availableAdvertisers = useMemo(() => {
+    const usedAdvertiserIds = new Set(
+      advertisements.map(ad => ad.advertiserId).filter(Boolean)
+    );
+
+    return advertisers.filter(adv => {
+      // 수정 모드에서는 현재 광고의 광고주는 선택 가능
+      if (selectedAd && selectedAd.advertiserId === adv.id) {
+        return true;
+      }
+      // 이미 광고가 있는 광고주는 제외
+      return !usedAdvertiserIds.has(adv.id);
+    });
+  }, [advertisers, advertisements, selectedAd]);
 
   // 광고 등록/수정 폼 상태 - 광고 정보
   const [adFormData, setAdFormData] = useState({
@@ -436,7 +453,7 @@ export default function AdsManagementPage() {
       // 광고주 목록 로드 (MANAGER인 경우 자신이 등록한 광고주만)
       let advertisersQuery = supabase
         .from('advertisers')
-        .select('id, businessName, representativeName');
+        .select('id, businessName, representativeName, categoryId');
 
       if (isManager && user) {
         advertisersQuery = advertisersQuery.eq('createdBy', user.id);
@@ -1620,7 +1637,7 @@ export default function AdsManagementPage() {
                         <TableHead className='w-[100px]'>타입</TableHead>
                         <TableHead className='w-[180px]'>범위</TableHead>
                         <TableHead className='w-[180px]'>게시 기간</TableHead>
-                        <TableHead className='w-[150px]'>게시자</TableHead>
+                        <TableHead className='w-[150px]'>등록자</TableHead>
                         <TableHead className='w-[200px]'>계약메모</TableHead>
                         {!hideClickColumn && (
                           <>
@@ -1711,16 +1728,16 @@ export default function AdsManagementPage() {
                           </TableCell>
                           <TableCell>
                             <div className='space-y-1 text-sm'>
-                              <div className='font-medium truncate'>
-                                <span className='text-xs text-muted-foreground'>연락처: </span>
-                                {ad.advertisers?.contactPhoneNumber || '-'}
-                              </div>
                               {ad.advertisers?.displayPhoneNumber && (
-                                <div className='text-xs text-muted-foreground truncate'>
-                                  <span>표시용: </span>
+                                <div className='font-medium truncate'>
+                                  <span className='text-xs text-muted-foreground'>표시용: </span>
                                   {ad.advertisers.displayPhoneNumber}
                                 </div>
                               )}
+                              <div className='text-xs text-muted-foreground truncate'>
+                                <span>연락처: </span>
+                                {ad.advertisers?.contactPhoneNumber || '-'}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -2029,8 +2046,8 @@ export default function AdsManagementPage() {
                       className='w-full justify-between font-normal'
                     >
                       {selectedAdvertiserId
-                        ? advertisers.find((adv) => adv.id === selectedAdvertiserId)
-                          ? `${advertisers.find((adv) => adv.id === selectedAdvertiserId)?.businessName} (${advertisers.find((adv) => adv.id === selectedAdvertiserId)?.representativeName})`
+                        ? availableAdvertisers.find((adv) => adv.id === selectedAdvertiserId)
+                          ? `${availableAdvertisers.find((adv) => adv.id === selectedAdvertiserId)?.businessName} (${availableAdvertisers.find((adv) => adv.id === selectedAdvertiserId)?.representativeName})`
                           : '광고주를 선택하세요'
                         : '광고주를 선택하세요'}
                       <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
@@ -2040,14 +2057,21 @@ export default function AdsManagementPage() {
                     <Command>
                       <CommandInput placeholder='광고주 검색...' />
                       <CommandList>
-                        <CommandEmpty>광고주를 찾을 수 없습니다.</CommandEmpty>
+                        <CommandEmpty>선택 가능한 광고주가 없습니다.</CommandEmpty>
                         <CommandGroup>
-                          {advertisers.map((adv) => (
+                          {availableAdvertisers.map((adv) => (
                             <CommandItem
                               key={adv.id}
                               value={`${adv.businessName} ${adv.representativeName}`}
                               onSelect={() => {
                                 setSelectedAdvertiserId(adv.id);
+                                // 광고주의 카테고리 자동 적용
+                                if (adv.categoryId) {
+                                  setAdFormData(prev => ({
+                                    ...prev,
+                                    categoryId: adv.categoryId || '',
+                                  }));
+                                }
                                 setAdvertiserPopoverOpen(false);
                               }}
                             >
@@ -2066,7 +2090,7 @@ export default function AdsManagementPage() {
                   </PopoverContent>
                 </Popover>
                 <p className='text-xs text-muted-foreground'>
-                  광고주가 없다면 먼저 광고주 관리 페이지에서 등록하세요.
+                  이미 광고가 등록된 광고주는 선택할 수 없습니다.
                 </p>
               </div>
 
@@ -2091,28 +2115,15 @@ export default function AdsManagementPage() {
                     </div>
                     <div className='space-y-2'>
                       <Label htmlFor='categoryId'>
-                        카테고리<span className='text-destructive'>*</span>
+                        카테고리
                       </Label>
-                      <Select
-                        value={adFormData.categoryId}
-                        onValueChange={(value) =>
-                          setAdFormData({ ...adFormData, categoryId: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder='선택하세요' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem
-                              key={cat.id}
-                              value={cat.id}
-                            >
-                              {cat.categoryName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        id='categoryId'
+                        value={categories.find(c => c.id === adFormData.categoryId)?.categoryName || ''}
+                        disabled
+                        placeholder='광고주 선택 시 자동 설정'
+                        className='bg-muted'
+                      />
                     </div>
                   </div>
 
@@ -2201,7 +2212,12 @@ export default function AdsManagementPage() {
                       </div>
                     </div>
                     <div className='flex gap-2'>
-                      {[30, 60, 90].map((days) => (
+                      {[
+                        { days: 14, label: '14일' },
+                        { days: 30, label: '1개월' },
+                        { days: 180, label: '6개월' },
+                        { days: 365, label: '12개월' },
+                      ].map(({ days, label }) => (
                         <Button
                           key={days}
                           type='button'
@@ -2218,7 +2234,7 @@ export default function AdsManagementPage() {
                             });
                           }}
                         >
-                          {days}일
+                          {label}
                         </Button>
                       ))}
                     </div>
@@ -2285,7 +2301,12 @@ export default function AdsManagementPage() {
                             </div>
                           </div>
                           <div className='flex gap-2'>
-                            {[30, 60, 90].map((days) => (
+                            {[
+                              { days: 14, label: '14일' },
+                              { days: 30, label: '1개월' },
+                              { days: 180, label: '6개월' },
+                              { days: 365, label: '12개월' },
+                            ].map(({ days, label }) => (
                               <Button
                                 key={days}
                                 type='button'
@@ -2302,7 +2323,7 @@ export default function AdsManagementPage() {
                                   });
                                 }}
                               >
-                                {days}일
+                                {label}
                               </Button>
                             ))}
                           </div>

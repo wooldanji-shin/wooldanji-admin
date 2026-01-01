@@ -29,7 +29,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2, Ban, Download } from 'lucide-react';
+import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2, Ban, Download, Edit, Loader2 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { createClient } from '@/lib/supabase/client';
 import type { UserFullDetails } from '@/lib/supabase/types';
 import { getUserRoles } from '@/lib/auth';
@@ -42,7 +44,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 type Apartment = {
   id: string;
@@ -91,6 +93,12 @@ export default function UsersPage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [hideOpenDoorColumn, setHideOpenDoorColumn] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // 전체보기/수정 다이얼로그
+  const [detailDialog, setDetailDialog] = useState(false);
+  const [detailUser, setDetailUser] = useState<UserFullDetails | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [saving, setSaving] = useState(false);
 
   // localStorage에서 문 연 횟수 컬럼 숨김 설정 불러오기
   useEffect(() => {
@@ -282,16 +290,8 @@ export default function UsersPage() {
       const roles = await getUserRoles();
       const isManager = roles.includes('MANAGER');
 
-      let query = supabase
-        .from('user')
-        .select(`
-          *,
-          user_roles!inner(id, role, createdAt),
-          apartments:apartmentId(id, name, address)
-        `)
-        .eq('user_roles.role', 'APP_USER');
-
-      // 매니저인 경우 자신이 관리하는 아파트의 회원만
+      // 매니저인 경우 아파트 ID 목록 먼저 가져오기
+      let apartmentIds: string[] = [];
       if (isManager) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -301,8 +301,7 @@ export default function UsersPage() {
             .eq('managerId', user.id);
 
           if (managerApartments && managerApartments.length > 0) {
-            const apartmentIds = managerApartments.map((ma: any) => ma.apartmentId);
-            query = query.in('apartmentId', apartmentIds);
+            apartmentIds = managerApartments.map((ma: any) => ma.apartmentId);
           } else {
             toast.error('관리하는 아파트가 없습니다.');
             setExporting(false);
@@ -311,15 +310,44 @@ export default function UsersPage() {
         }
       }
 
-      const { data, error } = await query.order('createdAt', { ascending: false });
+      // 페이지네이션으로 모든 데이터 가져오기
+      const allData: any[] = [];
+      const pageSize = 1000;
+      let from = 0;
 
-      if (error) throw error;
+      while (true) {
+        let query = supabase
+          .from('user')
+          .select(`
+            *,
+            user_roles!inner(id, role, createdAt),
+            apartments:apartmentId(id, name, address)
+          `)
+          .eq('user_roles.role', 'APP_USER')
+          .order('createdAt', { ascending: false })
+          .range(from, from + pageSize - 1);
 
-      if (!data || data.length === 0) {
+        if (isManager && apartmentIds.length > 0) {
+          query = query.in('apartmentId', apartmentIds);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        allData.push(...data);
+        if (data.length < pageSize) break; // 마지막 페이지
+        from += pageSize;
+      }
+
+      if (allData.length === 0) {
         toast.error('내보낼 회원 데이터가 없습니다.');
         setExporting(false);
         return;
       }
+
+      const data = allData;
 
       // CSV 헤더
       const headers = [
@@ -528,6 +556,107 @@ export default function UsersPage() {
     }
   };
 
+  // 전체보기 다이얼로그 열기
+  const handleDetailClick = (user: UserFullDetails) => {
+    setDetailUser(user);
+    setEditForm({
+      name: user.name || '',
+      email: user.email || '',
+      phoneNumber: user.phoneNumber || '',
+      address: user.address || '',
+      detailAddress: user.detailAddress || '',
+      birthDay: user.birthDay || '',
+      buildingNumber: user.buildingNumber || '',
+      unit: user.unit || '',
+      approvalStatus: user.approvalStatus || 'pending',
+      registrationType: user.registrationType || '',
+      premium: user.premium || false,
+      premiumExpiryDate: user.premiumExpiryDate ? user.premiumExpiryDate.split('T')[0] : '',
+      openDoorCount: user.openDoorCount || 0,
+      shareUserCount: user.shareUserCount || 0,
+      rssLevel: user.rssLevel || 0,
+      suspensionReason: user.suspensionReason || '',
+      regionSido: user.regionSido || '',
+      regionSigungu: user.regionSigungu || '',
+      regionDong: user.regionDong || '',
+    });
+    setDetailDialog(true);
+  };
+
+  // 호수에서 라인 추출 (끝 2자리)
+  const getLineFromUnit = (unit: number): number => {
+    return unit % 100;
+  };
+
+  // 전체보기 저장
+  const handleDetailSave = async () => {
+    if (!detailUser) return;
+
+    setSaving(true);
+    try {
+      const newUnit = editForm.unit ? parseInt(editForm.unit) : null;
+      const newBuildingNumber = editForm.buildingNumber ? parseInt(editForm.buildingNumber) : null;
+
+      // 호수가 변경되었고, 아파트 회원인 경우 라인 검증
+      if (newUnit && detailUser.apartmentId && newBuildingNumber) {
+        const lineFromUnit = getLineFromUnit(newUnit);
+
+        // 해당 아파트의 동 정보 조회
+        const { data: buildingData } = await supabase
+          .from('apartment_buildings')
+          .select('id')
+          .eq('apartmentId', detailUser.apartmentId)
+          .eq('buildingNumber', newBuildingNumber)
+          .single();
+
+        if (buildingData) {
+          // 해당 동의 라인 정보 조회
+          const { data: linesData } = await supabase
+            .from('apartment_lines')
+            .select('line')
+            .eq('buildingId', buildingData.id);
+
+          if (linesData && linesData.length > 0) {
+            // 모든 라인 배열에서 해당 라인이 있는지 확인
+            const allLines = linesData.flatMap((l: { line: number[] }) => l.line);
+            if (!allLines.includes(lineFromUnit)) {
+              toast.error('해당 호수는 등록할 수 없습니다.');
+              setSaving(false);
+              return;
+            }
+          }
+        }
+      }
+
+      const updateData: Record<string, any> = {
+        name: editForm.name || null,
+        phoneNumber: editForm.phoneNumber || null,
+        birthDay: editForm.birthDay || null,
+        buildingNumber: newBuildingNumber,
+        unit: newUnit,
+        openDoorCount: parseInt(editForm.openDoorCount) || 0,
+        rssLevel: parseInt(editForm.rssLevel) || 0,
+      };
+
+      const { error } = await supabase
+        .from('user')
+        .update(updateData)
+        .eq('id', detailUser.id);
+
+      if (error) throw error;
+
+      toast.success('회원 정보가 수정되었습니다.');
+      setDetailDialog(false);
+      setDetailUser(null);
+      fetchUsers();
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      toast.error('회원 정보 수정에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ko-KR');
   };
@@ -683,11 +812,9 @@ export default function UsersPage() {
                     <TableHead className='text-muted-foreground'>
                       가입일
                     </TableHead>
-                    {!hideOpenDoorColumn && (
-                      <TableHead className='text-muted-foreground text-center'>
-                        문 연 횟수
-                      </TableHead>
-                    )}
+                    <TableHead className='text-muted-foreground text-center'>
+                      문 연 횟수
+                    </TableHead>
                     <TableHead className='text-muted-foreground text-right'>
                       작업
                     </TableHead>
@@ -696,13 +823,13 @@ export default function UsersPage() {
                 <TableBody>
                   {initialLoading && loading ? (
                     <TableRow>
-                      <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={11} className='text-center py-12 text-muted-foreground'>
                         로딩 중...
                       </TableCell>
                     </TableRow>
                   ) : users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={11} className='text-center py-12 text-muted-foreground'>
                         {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
                       </TableCell>
                     </TableRow>
@@ -710,9 +837,10 @@ export default function UsersPage() {
                     users.map((user) => (
                       <TableRow
                         key={user.id}
-                        className='border-border hover:bg-secondary/50'
+                        className='border-border hover:bg-secondary/50 cursor-pointer'
+                        onClick={() => handleDetailClick(user)}
                       >
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           {user.confirmImageUrl ? (
                             <button
                               onClick={() => setImagePreview(user.confirmImageUrl)}
@@ -769,16 +897,14 @@ export default function UsersPage() {
                         <TableCell className='text-muted-foreground'>
                           {formatDate(user.createdAt)}
                         </TableCell>
-                        {!hideOpenDoorColumn && (
-                          <TableCell className='text-center text-muted-foreground'>
-                            {(user as any).openDoorCount > 0 ? (
-                              <span>{(user as any).openDoorCount}회</span>
-                            ) : (
-                              <span>-</span>
-                            )}
-                          </TableCell>
-                        )}
-                        <TableCell className='text-right'>
+                        <TableCell className='text-center text-muted-foreground'>
+                          {(user as any).openDoorCount > 0 ? (
+                            <span>{(user as any).openDoorCount}회</span>
+                          ) : (
+                            <span>-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className='text-right' onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -790,6 +916,10 @@ export default function UsersPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align='end'>
+                              <DropdownMenuItem onClick={() => handleDetailClick(user)}>
+                                <Edit className='mr-2 h-4 w-4' />
+                                전체보기
+                              </DropdownMenuItem>
                               {user.confirmImageUrl && (
                                 <DropdownMenuItem onClick={() => setImagePreview(user.confirmImageUrl)}>
                                   <Eye className='mr-2 h-4 w-4' />
@@ -862,16 +992,16 @@ export default function UsersPage() {
                 이전
               </Button>
               <div className='flex gap-1'>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
                   let pageNum;
-                  if (totalPages <= 5) {
+                  if (totalPages <= 10) {
                     pageNum = i + 1;
-                  } else if (currentPage <= 3) {
+                  } else if (currentPage <= 5) {
                     pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                  } else if (currentPage >= totalPages - 4) {
+                    pageNum = totalPages - 9 + i;
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    pageNum = currentPage - 4 + i;
                   }
 
                   return (
@@ -989,6 +1119,208 @@ export default function UsersPage() {
             </Button>
             <Button variant='destructive' onClick={handleDeleteConfirm}>
               삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 전체보기/수정 다이얼로그 */}
+      <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
+        <DialogContent className='max-w-3xl max-h-[90vh] overflow-y-auto'>
+          <DialogHeader>
+            <DialogTitle>회원 전체보기</DialogTitle>
+            <DialogDescription>
+              회원 정보를 확인하고 수정할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='grid grid-cols-2 gap-4 py-4'>
+            {/* 기본 정보 */}
+            <div className='space-y-2'>
+              <Label htmlFor='detail-name'>이름</Label>
+              <Input
+                id='detail-name'
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-email'>이메일 </Label>
+              <Input
+                id='detail-email'
+                value={editForm.email}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-phone'>전화번호</Label>
+              <Input
+                id='detail-phone'
+                value={editForm.phoneNumber}
+                onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-birthday'>생년월일</Label>
+              <Input
+                id='detail-birthday'
+                value={editForm.birthDay}
+                onChange={(e) => setEditForm({ ...editForm, birthDay: e.target.value })}
+                placeholder='YYYY-MM-DD'
+              />
+            </div>
+
+            {/* 아파트 정보 */}
+            <div className='col-span-2 space-y-2'>
+              <Label htmlFor='detail-apartment'>아파트 </Label>
+              <Input
+                id='detail-apartment'
+                value={detailUser?.apartments?.name || '-'}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-building'>동</Label>
+              <Input
+                id='detail-building'
+                type='number'
+                value={editForm.buildingNumber}
+                onChange={(e) => setEditForm({ ...editForm, buildingNumber: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-unit'>호</Label>
+              <Input
+                id='detail-unit'
+                type='number'
+                value={editForm.unit}
+                onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+              />
+            </div>
+
+            {/* 지역 정보  */}
+            <div className='space-y-2'>
+              <Label htmlFor='detail-address'>주소 </Label>
+              <Input
+                id='detail-address'
+                value={editForm.address}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-sido'>시/도 </Label>
+              <Input
+                id='detail-sido'
+                value={editForm.regionSido}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-sigungu'>시/군/구 </Label>
+              <Input
+                id='detail-sigungu'
+                value={editForm.regionSigungu}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-dong'>읍/면/동 </Label>
+              <Input
+                id='detail-dong'
+                value={editForm.regionDong}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+
+            {/* 상태 정보  */}
+            <div className='space-y-2'>
+              <Label htmlFor='detail-registrationType'>회원유형 </Label>
+              <Select
+                value={editForm.registrationType}
+                disabled
+              >
+                <SelectTrigger className='bg-muted text-gray-700 disabled:opacity-100'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='APARTMENT'>아파트</SelectItem>
+                  <SelectItem value='GENERAL'>일반</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-approvalStatus'>승인상태 </Label>
+              <Select
+                value={editForm.approvalStatus}
+                disabled
+              >
+                <SelectTrigger className='bg-muted text-gray-700 disabled:opacity-100'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='pending'>대기</SelectItem>
+                  <SelectItem value='approve'>승인</SelectItem>
+                  <SelectItem value='suspended'>보류</SelectItem>
+                  <SelectItem value='inactive'>비활성</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 카운트 정보 */}
+            <div className='space-y-2'>
+              <Label htmlFor='detail-openDoorCount'>문 연 횟수</Label>
+              <Input
+                id='detail-openDoorCount'
+                type='number'
+                value={editForm.openDoorCount}
+                onChange={(e) => setEditForm({ ...editForm, openDoorCount: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='detail-rssLevel'>RSS 레벨</Label>
+              <Input
+                id='detail-rssLevel'
+                type='number'
+                value={editForm.rssLevel}
+                onChange={(e) => setEditForm({ ...editForm, rssLevel: e.target.value })}
+              />
+            </div>
+
+            {/* 읽기 전용 정보 */}
+            <div className='col-span-2 border-t pt-4 mt-2'>
+              <p className='text-sm text-muted-foreground mb-2'>읽기 전용 정보</p>
+              <div className='grid grid-cols-2 gap-4 text-sm'>
+                <div>
+                  <span className='text-muted-foreground'>가입일: </span>
+                  <span>{detailUser?.createdAt ? formatDate(detailUser.createdAt) : '-'}</span>
+                </div>
+                <div>
+                  <span className='text-muted-foreground'>플랫폼: </span>
+                  <span>{detailUser?.platform || '-'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setDetailDialog(false)} disabled={saving}>
+              취소
+            </Button>
+            <Button onClick={handleDetailSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  저장 중...
+                </>
+              ) : (
+                '저장'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

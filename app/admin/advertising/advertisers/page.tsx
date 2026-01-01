@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -46,6 +53,11 @@ import { createClient } from '@/lib/supabase/client';
 import { getCurrentUser, getUserRoles } from '@/lib/auth';
 import { ImageUpload } from '@/components/image-upload';
 import { deleteFileFromStorage } from '@/lib/utils/storage';
+import {
+  formatPhoneNumber,
+  formatLandlineNumber,
+  formatBusinessRegistrationNumber,
+} from '@/lib/utils/format';
 
 const BUCKET_NAME = 'advertisements';
 const STORAGE_PATH = 'advertisers';
@@ -58,6 +70,7 @@ interface Advertiser {
   displayPhoneNumber: string | null;
   email: string | null;
   address: string;
+  businessRegistrationNumber: string | null;
   businessRegistration: string | null;
   contractDocument: string | null;
   contractMemo: string | null;
@@ -67,6 +80,16 @@ interface Advertiser {
   // 조인 데이터
   bannerCount?: number;
   adCount?: number;
+  // 광고 카테고리 (1:1 매칭)
+  categoryId?: string | null;
+  categoryName?: string | null;
+  // 등록자 정보
+  creatorName?: string | null;
+}
+
+interface Category {
+  id: string;
+  categoryName: string;
 }
 
 interface AdvertiserForm {
@@ -76,6 +99,8 @@ interface AdvertiserForm {
   displayPhoneNumber: string;
   email: string;
   address: string;
+  categoryId: string;
+  businessRegistrationNumber: string;
   businessRegistration: string;
   contractDocument: string;
   contractMemo: string;
@@ -88,6 +113,8 @@ const initialFormState: AdvertiserForm = {
   displayPhoneNumber: '',
   email: '',
   address: '',
+  categoryId: '',
+  businessRegistrationNumber: '',
   businessRegistration: '',
   contractDocument: '',
   contractMemo: '',
@@ -97,9 +124,13 @@ export default function AdvertisersPage() {
   const supabase = createClient();
 
   const [advertisers, setAdvertisers] = useState<Advertiser[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterCreator, setFilterCreator] = useState<string>('all');
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -131,6 +162,14 @@ export default function AdvertisersPage() {
     try {
       setLoading(true);
 
+      // 카테고리 목록 로드 (비활성화된 카테고리도 포함)
+      const { data: categoriesData } = await supabase
+        .from('ad_categories')
+        .select('id, categoryName')
+        .order('categoryName');
+
+      setCategories(categoriesData || []);
+
       // 광고주 기본 정보 조회
       let query = supabase
         .from('advertisers')
@@ -146,8 +185,9 @@ export default function AdvertisersPage() {
 
       if (error) throw error;
 
-      // 배너/광고 카운트 조회
+      // 배너/광고 카운트, 카테고리, 등록자 정보 조회
       const advertiserIds = (advertisersData || []).map((a) => a.id);
+      const creatorIds = [...new Set((advertisersData || []).map((a) => a.createdBy).filter(Boolean))] as string[];
 
       if (advertiserIds.length > 0) {
         // 배너 카운트
@@ -156,11 +196,24 @@ export default function AdvertisersPage() {
           .select('advertiserId')
           .in('advertiserId', advertiserIds);
 
-        // 광고 카운트
-        const { data: adCounts } = await supabase
+        // 광고 정보 (카테고리 포함)
+        const { data: adsData } = await supabase
           .from('advertisements')
-          .select('advertiserId')
+          .select('advertiserId, categoryId, ad_categories(categoryName)')
           .in('advertiserId', advertiserIds);
+
+        // 등록자 정보
+        const creatorMap: Record<string, string> = {};
+        if (creatorIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('user')
+            .select('id, name')
+            .in('id', creatorIds);
+
+          (usersData || []).forEach((u: { id: string; name: string }) => {
+            creatorMap[u.id] = u.name;
+          });
+        }
 
         // 카운트 매핑
         const bannerCountMap: Record<string, number> = {};
@@ -170,14 +223,22 @@ export default function AdvertisersPage() {
           bannerCountMap[b.advertiserId] = (bannerCountMap[b.advertiserId] || 0) + 1;
         });
 
-        (adCounts || []).forEach((a) => {
+        (adsData || []).forEach((a: { advertiserId: string; categoryId: string | null; ad_categories: { categoryName: string } | null }) => {
           adCountMap[a.advertiserId] = (adCountMap[a.advertiserId] || 0) + 1;
+        });
+
+        // 카테고리 이름 매핑
+        const categoryNameMap: Record<string, string> = {};
+        (categoriesData || []).forEach((cat) => {
+          categoryNameMap[cat.id] = cat.categoryName;
         });
 
         const advertisersWithCounts = (advertisersData || []).map((advertiser) => ({
           ...advertiser,
           bannerCount: bannerCountMap[advertiser.id] || 0,
           adCount: adCountMap[advertiser.id] || 0,
+          categoryName: advertiser.categoryId ? categoryNameMap[advertiser.categoryId] || null : null,
+          creatorName: advertiser.createdBy ? creatorMap[advertiser.createdBy] || null : null,
         }));
 
         setAdvertisers(advertisersWithCounts);
@@ -198,13 +259,66 @@ export default function AdvertisersPage() {
     }
   }, [currentUserId, loadAdvertisers]);
 
-  // 검색 필터
-  const filteredAdvertisers = advertisers.filter(
-    (a) =>
+  // 등록자 목록 (필터용)
+  const creators = useMemo(() => {
+    const creatorMap = new Map<string, string>();
+    advertisers.forEach((a) => {
+      if (a.createdBy && a.creatorName) {
+        creatorMap.set(a.createdBy, a.creatorName);
+      }
+    });
+    return Array.from(creatorMap, ([id, name]) => ({ id, name }));
+  }, [advertisers]);
+
+  // 검색 및 필터
+  const filteredAdvertisers = advertisers.filter((a) => {
+    // 검색어 필터
+    const matchesSearch =
       a.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.representativeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.address.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      a.address.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // 카테고리 필터
+    const matchesCategory =
+      filterCategory === 'all' ||
+      (filterCategory === 'uncategorized' && !a.categoryId) ||
+      a.categoryId === filterCategory;
+
+    // 유형 필터 (배너/광고)
+    const hasBanner = (a.bannerCount || 0) > 0;
+    const hasAd = (a.adCount || 0) > 0;
+    const matchesType =
+      filterType === 'all' ||
+      (filterType === 'banner' && hasBanner) ||
+      (filterType === 'ad' && hasAd) ||
+      (filterType === 'none' && !hasBanner && !hasAd);
+
+    // 등록자 필터
+    const matchesCreator =
+      filterCreator === 'all' || a.createdBy === filterCreator;
+
+    return matchesSearch && matchesCategory && matchesType && matchesCreator;
+  });
+
+  // 카테고리별로 광고주 그룹화
+  const groupedAdvertisersByCategory = useMemo(() => {
+    const grouped: Record<string, { categoryName: string; advertisers: Advertiser[] }> = {};
+
+    filteredAdvertisers.forEach((advertiser) => {
+      const categoryKey = advertiser.categoryId || 'uncategorized';
+      const categoryName = advertiser.categoryName || '미분류';
+
+      if (!grouped[categoryKey]) {
+        grouped[categoryKey] = {
+          categoryName,
+          advertisers: [],
+        };
+      }
+      grouped[categoryKey].advertisers.push(advertiser);
+    });
+
+    return grouped;
+  }, [filteredAdvertisers]);
 
   // 유형 뱃지 렌더링
   const renderTypeBadge = (advertiser: Advertiser) => {
@@ -256,6 +370,8 @@ export default function AdvertisersPage() {
       displayPhoneNumber: advertiser.displayPhoneNumber || '',
       email: advertiser.email || '',
       address: advertiser.address,
+      categoryId: advertiser.categoryId || '',
+      businessRegistrationNumber: advertiser.businessRegistrationNumber || '',
       businessRegistration: advertiser.businessRegistration || '',
       contractDocument: advertiser.contractDocument || '',
       contractMemo: advertiser.contractMemo || '',
@@ -292,6 +408,8 @@ export default function AdvertisersPage() {
         displayPhoneNumber: form.displayPhoneNumber.trim() || null,
         email: form.email.trim() || null,
         address: form.address.trim(),
+        categoryId: form.categoryId || null,
+        businessRegistrationNumber: form.businessRegistrationNumber.trim() || null,
         businessRegistration: form.businessRegistration || null,
         contractDocument: form.contractDocument || null,
         contractMemo: form.contractMemo.trim() || null,
@@ -410,9 +528,10 @@ export default function AdvertisersPage() {
       <AdminHeader title='광고주 관리' />
 
       <div className='flex-1 p-6 overflow-auto'>
-        <div className='space-y-6'>
+        <div className='space-y-4'>
+          {/* 헤더 카드 */}
           <Card>
-            <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4'>
+            <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-3'>
               <CardTitle className='flex items-center gap-2'>
                 <Building2 className='h-5 w-5' />
                 광고주 목록
@@ -422,133 +541,207 @@ export default function AdvertisersPage() {
                 광고주 등록
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className='space-y-3'>
               {/* 검색 */}
-              <div className='mb-4'>
-                <div className='relative max-w-sm'>
-                  <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                  <Input
-                    placeholder='상호명, 대표자명, 주소 검색...'
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className='pl-9'
-                  />
-                </div>
+              <div className='relative w-full'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                <Input
+                  placeholder='상호명, 대표자명, 주소 검색...'
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className='pl-9 w-full'
+                />
               </div>
-
-              {/* 테이블 */}
-              {filteredAdvertisers.length === 0 ? (
-                <div className='text-center py-12 text-muted-foreground'>
-                  {searchQuery ? '검색 결과가 없습니다.' : '등록된 광고주가 없습니다.'}
-                </div>
-              ) : (
-                <div className='overflow-x-auto'>
-                <Table className='w-full'>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className='w-[180px]'>상호명</TableHead>
-                      <TableHead className='w-[120px]'>대표자명</TableHead>
-                      <TableHead className='w-[140px]'>연락처</TableHead>
-                      <TableHead className='w-[140px]'>표시 연락처</TableHead>
-                      <TableHead>주소</TableHead>
-                      <TableHead className='w-[100px]'>유형</TableHead>
-                      <TableHead className='w-[200px]'>계약메모</TableHead>
-                      <TableHead className='w-[100px]'>등록일</TableHead>
-                      <TableHead className='w-[100px]'>작업</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAdvertisers.map((advertiser) => (
-                      <TableRow key={advertiser.id}>
-                        <TableCell className='font-medium'>
-                          {advertiser.businessName}
-                        </TableCell>
-                        <TableCell>{advertiser.representativeName}</TableCell>
-                        <TableCell>{advertiser.contactPhoneNumber}</TableCell>
-                        <TableCell>{advertiser.displayPhoneNumber || '-'}</TableCell>
-                        <TableCell className='max-w-[200px] truncate'>
-                          {advertiser.address}
-                        </TableCell>
-                        <TableCell>{renderTypeBadge(advertiser)}</TableCell>
-                        <TableCell>
-                          {editingMemoId === advertiser.id ? (
-                            <div className='space-y-2'>
-                              <Textarea
-                                value={editingMemoValue}
-                                onChange={(e) => setEditingMemoValue(e.target.value)}
-                                placeholder='계약메모 입력...'
-                                rows={3}
-                                className='text-sm'
-                                autoFocus
-                              />
-                              <div className='flex gap-1'>
-                                <Button
-                                  size='sm'
-                                  onClick={() => handleSaveMemo(advertiser.id)}
-                                >
-                                  저장
-                                </Button>
-                                <Button
-                                  size='sm'
-                                  variant='outline'
-                                  onClick={() => {
-                                    setEditingMemoId(null);
-                                    setEditingMemoValue('');
-                                  }}
-                                >
-                                  취소
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              className='cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[32px] text-sm'
-                              onClick={() => {
-                                setEditingMemoId(advertiser.id);
-                                setEditingMemoValue(advertiser.contractMemo || '');
-                              }}
-                            >
-                              {advertiser.contractMemo ? (
-                                <span className='whitespace-pre-wrap line-clamp-2'>{advertiser.contractMemo}</span>
-                              ) : (
-                                <span className='text-muted-foreground'>클릭하여 입력</span>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className='text-muted-foreground text-sm'>
-                          {formatDate(advertiser.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          <div className='flex items-center gap-1'>
-                            <Button
-                              variant='ghost'
-                              size='sm'
-                              onClick={() => handleEdit(advertiser)}
-                            >
-                              <Edit className='h-4 w-4' />
-                            </Button>
-                            <Button
-                              variant='ghost'
-                              size='sm'
-                              onClick={() => handleDeleteClick(advertiser)}
-                              disabled={
-                                (advertiser.bannerCount || 0) > 0 ||
-                                (advertiser.adCount || 0) > 0
-                              }
-                            >
-                              <Trash2 className='h-4 w-4 text-destructive' />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+              {/* 필터 */}
+              <div className='flex flex-wrap gap-2'>
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                  <SelectTrigger className='w-[150px]'>
+                    <SelectValue placeholder='카테고리' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>전체 카테고리</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.categoryName}
+                      </SelectItem>
                     ))}
-                  </TableBody>
-                </Table>
-                </div>
-              )}
+                    <SelectItem value='uncategorized'>미분류</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className='w-[130px]'>
+                    <SelectValue placeholder='유형' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>전체 유형</SelectItem>
+                    <SelectItem value='banner'>배너</SelectItem>
+                    <SelectItem value='ad'>광고</SelectItem>
+                    <SelectItem value='none'>없음</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterCreator} onValueChange={setFilterCreator}>
+                  <SelectTrigger className='w-[130px]'>
+                    <SelectValue placeholder='등록자' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>전체 등록자</SelectItem>
+                    {creators.map((creator) => (
+                      <SelectItem key={creator.id} value={creator.id}>
+                        {creator.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
           </Card>
+
+          {/* 광고주 목록 - 카테고리별로 분리 */}
+          {Object.keys(groupedAdvertisersByCategory).length === 0 ? (
+            <Card>
+              <CardContent className='pt-6'>
+                <div className='flex flex-col items-center justify-center py-16 text-center'>
+                  <Building2 className='h-16 w-16 text-muted-foreground mb-4' />
+                  <h3 className='text-lg font-medium mb-2'>광고주가 없습니다</h3>
+                  <p className='text-sm text-muted-foreground mb-6'>
+                    {searchQuery
+                      ? '검색 조건에 맞는 광고주가 없습니다. 다른 조건으로 시도해보세요.'
+                      : '새로운 광고주를 등록하여 시작하세요.'}
+                  </p>
+                  {!searchQuery && (
+                    <Button onClick={handleAdd} size='lg'>
+                      <Plus className='mr-2 h-5 w-5' />첫 광고주 등록하기
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            Object.entries(groupedAdvertisersByCategory).map(([categoryId, { categoryName, advertisers: categoryAdvertisers }]) => (
+              <Card key={categoryId}>
+                <CardContent className='pt-6'>
+                  <div className='mb-4 flex items-center justify-between'>
+                    <div className='flex items-center gap-2'>
+                      <div className='text-lg font-semibold'>{categoryName}</div>
+                      <Badge variant='secondary' className='text-sm'>
+                        {categoryAdvertisers.length}개
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className='rounded-lg border overflow-hidden'>
+                    <div className='overflow-x-auto'>
+                      <Table className='w-full'>
+                        <TableHeader>
+                          <TableRow className='bg-muted/50'>
+                            <TableHead className='w-[180px]'>상호명</TableHead>
+                            <TableHead className='w-[120px]'>대표자명</TableHead>
+                            <TableHead className='w-[140px]'>연락처</TableHead>
+                            <TableHead className='w-[140px]'>표시 연락처</TableHead>
+                            <TableHead>주소</TableHead>
+                            <TableHead className='w-[100px]'>유형</TableHead>
+                            <TableHead className='w-[200px]'>계약메모</TableHead>
+                            <TableHead className='w-[80px]'>등록자</TableHead>
+                            <TableHead className='w-[100px]'>등록일</TableHead>
+                            <TableHead className='w-[100px]'>작업</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {categoryAdvertisers.map((advertiser) => (
+                            <TableRow key={advertiser.id} className='hover:bg-muted/50 transition-colors'>
+                              <TableCell className='font-medium'>
+                                {advertiser.businessName}
+                              </TableCell>
+                              <TableCell>{advertiser.representativeName}</TableCell>
+                              <TableCell>{advertiser.contactPhoneNumber}</TableCell>
+                              <TableCell>{advertiser.displayPhoneNumber || '-'}</TableCell>
+                              <TableCell className='max-w-[200px] truncate'>
+                                {advertiser.address}
+                              </TableCell>
+                              <TableCell>{renderTypeBadge(advertiser)}</TableCell>
+                              <TableCell>
+                                {editingMemoId === advertiser.id ? (
+                                  <div className='space-y-2'>
+                                    <Textarea
+                                      value={editingMemoValue}
+                                      onChange={(e) => setEditingMemoValue(e.target.value)}
+                                      placeholder='계약메모 입력...'
+                                      rows={3}
+                                      className='text-sm'
+                                      autoFocus
+                                    />
+                                    <div className='flex gap-1'>
+                                      <Button
+                                        size='sm'
+                                        onClick={() => handleSaveMemo(advertiser.id)}
+                                      >
+                                        저장
+                                      </Button>
+                                      <Button
+                                        size='sm'
+                                        variant='outline'
+                                        onClick={() => {
+                                          setEditingMemoId(null);
+                                          setEditingMemoValue('');
+                                        }}
+                                      >
+                                        취소
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className='cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[32px] text-sm'
+                                    onClick={() => {
+                                      setEditingMemoId(advertiser.id);
+                                      setEditingMemoValue(advertiser.contractMemo || '');
+                                    }}
+                                  >
+                                    {advertiser.contractMemo ? (
+                                      <span className='whitespace-pre-wrap line-clamp-2'>{advertiser.contractMemo}</span>
+                                    ) : (
+                                      <span className='text-muted-foreground'>클릭하여 입력</span>
+                                    )}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className='text-sm'>
+                                {advertiser.creatorName || '-'}
+                              </TableCell>
+                              <TableCell className='text-muted-foreground text-sm'>
+                                {formatDate(advertiser.createdAt)}
+                              </TableCell>
+                              <TableCell>
+                                <div className='flex items-center gap-1'>
+                                  <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={() => handleEdit(advertiser)}
+                                  >
+                                    <Edit className='h-4 w-4' />
+                                  </Button>
+                                  <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={() => handleDeleteClick(advertiser)}
+                                    disabled={
+                                      (advertiser.bannerCount || 0) > 0 ||
+                                      (advertiser.adCount || 0) > 0
+                                    }
+                                  >
+                                    <Trash2 className='h-4 w-4 text-destructive' />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
 
@@ -562,6 +755,7 @@ export default function AdvertisersPage() {
           </DialogHeader>
 
           <div className='space-y-4 py-4'>
+            {/* Row 1: 상호명, 대표자명 */}
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='businessName'>
@@ -591,6 +785,46 @@ export default function AdvertisersPage() {
               </div>
             </div>
 
+            {/* Row 2: 카테고리, 사업자등록번호 */}
+            <div className='grid grid-cols-2 gap-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='categoryId'>카테고리</Label>
+                <Select
+                  value={form.categoryId}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({ ...prev, categoryId: value }))
+                  }
+                >
+                  <SelectTrigger className='w-full'>
+                    <SelectValue placeholder='카테고리를 선택하세요' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.categoryName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='businessRegistrationNumber'>사업자등록번호</Label>
+                <Input
+                  id='businessRegistrationNumber'
+                  value={form.businessRegistrationNumber}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      businessRegistrationNumber: formatBusinessRegistrationNumber(e.target.value),
+                    }))
+                  }
+                  placeholder='000-00-000000'
+                  maxLength={13}
+                />
+              </div>
+            </div>
+
+            {/* Row 3: 연락처, 표시 연락처 */}
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='contactPhoneNumber'>
@@ -600,9 +834,13 @@ export default function AdvertisersPage() {
                   id='contactPhoneNumber'
                   value={form.contactPhoneNumber}
                   onChange={(e) =>
-                    setForm((prev) => ({ ...prev, contactPhoneNumber: e.target.value }))
+                    setForm((prev) => ({
+                      ...prev,
+                      contactPhoneNumber: formatPhoneNumber(e.target.value),
+                    }))
                   }
                   placeholder='010-0000-0000'
+                  maxLength={13}
                 />
               </div>
               <div className='space-y-2'>
@@ -611,13 +849,18 @@ export default function AdvertisersPage() {
                   id='displayPhoneNumber'
                   value={form.displayPhoneNumber}
                   onChange={(e) =>
-                    setForm((prev) => ({ ...prev, displayPhoneNumber: e.target.value }))
+                    setForm((prev) => ({
+                      ...prev,
+                      displayPhoneNumber: formatLandlineNumber(e.target.value),
+                    }))
                   }
-                  placeholder='앱에 표시될 연락처'
+                  placeholder='02-123-1234 / 031-123-1234'
+                  maxLength={13}
                 />
               </div>
             </div>
 
+            {/* Row 4: 이메일, 주소 */}
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='email'>이메일</Label>
@@ -646,6 +889,7 @@ export default function AdvertisersPage() {
               </div>
             </div>
 
+            {/* Row 5: 사업자등록증, 계약서 */}
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label>사업자등록증</Label>
@@ -675,6 +919,7 @@ export default function AdvertisersPage() {
               </div>
             </div>
 
+            {/* Row 6: 계약 메모 (전체 너비) */}
             <div className='space-y-2'>
               <Label htmlFor='contractMemo'>계약 메모</Label>
               <Textarea

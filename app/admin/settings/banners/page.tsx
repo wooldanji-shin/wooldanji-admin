@@ -37,8 +37,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useEffect, useState, useCallback } from 'react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/supabase';
+import { cn } from '@/lib/utils';
 import {
   Loader2,
   Save,
@@ -52,6 +66,8 @@ import {
   X,
   Calendar,
   UserPlus,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Image from 'next/image';
@@ -334,6 +350,26 @@ export default function BannersPage() {
 
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [advertiserPopoverOpen, setAdvertiserPopoverOpen] = useState(false);
+
+  // 이미 배너가 있는 광고주 제외 (1:1 매칭)
+  const availableAdvertisers = useMemo(() => {
+    const usedAdvertiserIds = new Set(
+      banners
+        .filter(b => !b.isGlobal) // 전체 배너(isGlobal)는 광고주 필요 없음
+        .map(b => b.advertiserId)
+        .filter(Boolean) as string[]
+    );
+
+    return advertisers.filter(adv => {
+      // 수정 모드에서는 현재 배너의 광고주는 선택 가능
+      if (editingBanner && editingBanner.advertiserId === adv.id) {
+        return true;
+      }
+      // 이미 배너가 있는 광고주는 제외
+      return !usedAdvertiserIds.has(adv.id);
+    });
+  }, [advertisers, banners, editingBanner]);
 
   // 클릭수 컬럼 숨김 상태 (localStorage에서 읽어옴 - ads 페이지와 공유)
   const [hideClickCounts, setHideClickCounts] = useState(false);
@@ -851,7 +887,7 @@ export default function BannersPage() {
                         <TableHead className='w-32'>타겟</TableHead>
                         <TableHead className='w-28'>광고주</TableHead>
                         <TableHead className='w-28'>게시 기간</TableHead>
-                        <TableHead className='w-20'>게시자</TableHead>
+                        <TableHead className='w-20'>등록자</TableHead>
                         <TableHead className='w-32'>소개내용</TableHead>
                         {!hideClickCounts && (
                           <>
@@ -961,28 +997,56 @@ export default function BannersPage() {
                   <UserPlus className='h-4 w-4' />
                   광고주 선택 <span className='text-destructive'>*</span>
                 </Label>
-                <Select
-                  value={form.advertiserId || ''}
-                  onValueChange={(value) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      advertiserId: value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='광고주를 선택하세요' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {advertisers.map((adv) => (
-                      <SelectItem key={adv.id} value={adv.id}>
-                        {adv.businessName} ({adv.representativeName})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={advertiserPopoverOpen} onOpenChange={setAdvertiserPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant='outline'
+                      role='combobox'
+                      aria-expanded={advertiserPopoverOpen}
+                      className='w-full justify-between font-normal'
+                    >
+                      {form.advertiserId
+                        ? availableAdvertisers.find((adv) => adv.id === form.advertiserId)
+                          ? `${availableAdvertisers.find((adv) => adv.id === form.advertiserId)?.businessName} (${availableAdvertisers.find((adv) => adv.id === form.advertiserId)?.representativeName})`
+                          : '광고주를 선택하세요'
+                        : '광고주를 선택하세요'}
+                      <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className='w-[400px] p-0' align='start'>
+                    <Command>
+                      <CommandInput placeholder='광고주 검색...' />
+                      <CommandList>
+                        <CommandEmpty>선택 가능한 광고주가 없습니다.</CommandEmpty>
+                        <CommandGroup>
+                          {availableAdvertisers.map((adv) => (
+                            <CommandItem
+                              key={adv.id}
+                              value={`${adv.businessName} ${adv.representativeName}`}
+                              onSelect={() => {
+                                setForm((prev) => ({
+                                  ...prev,
+                                  advertiserId: adv.id,
+                                }));
+                                setAdvertiserPopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  form.advertiserId === adv.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {adv.businessName} ({adv.representativeName})
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <p className='text-xs text-muted-foreground'>
-                  광고주가 없다면 먼저 광고주 관리 페이지에서 등록하세요.
+                  이미 배너가 등록된 광고주는 선택할 수 없습니다.
                 </p>
               </div>
             )}
@@ -1019,7 +1083,12 @@ export default function BannersPage() {
                   </div>
                 </div>
                 <div className='flex gap-2 pt-1'>
-                  {[30, 60, 90].map((days) => (
+                  {[
+                    { days: 14, label: '14일' },
+                    { days: 30, label: '1개월' },
+                    { days: 180, label: '6개월' },
+                    { days: 365, label: '12개월' },
+                  ].map(({ days, label }) => (
                     <Button
                       key={days}
                       type='button'
@@ -1036,7 +1105,7 @@ export default function BannersPage() {
                         });
                       }}
                     >
-                      {days}일
+                      {label}
                     </Button>
                   ))}
                 </div>

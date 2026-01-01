@@ -65,6 +65,12 @@ interface Manager {
   createdAt: string;
   confirmImageUrl?: string;
   registerMethod?: string | null;
+  openDoorCount?: number;
+  birthDay?: string;
+  address?: string;
+  regionSido?: string;
+  regionSigungu?: string;
+  regionDong?: string;
   user_roles?: { role: string }[];
   admin_scopes?: AdminScope[];
 }
@@ -121,6 +127,15 @@ export default function ManagersPage() {
   const [selectedBuilding, setSelectedBuilding] = useState<string>('');
   const [selectedLine, setSelectedLine] = useState<string>('');
   const [scopeLevel, setScopeLevel] = useState<'APARTMENT' | 'BUILDING' | 'LINE'>('APARTMENT');
+
+  // 필터용 상태
+  const [filterApartment, setFilterApartment] = useState<string>('all');
+
+  // 상세보기 다이얼로그
+  const [detailDialog, setDetailDialog] = useState(false);
+  const [detailManager, setDetailManager] = useState<Manager | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [saving, setSaving] = useState(false);
 
   // 관리자 목록 조회
   const fetchManagers = useCallback(async () => {
@@ -499,34 +514,106 @@ export default function ManagersPage() {
     }
   };
 
-  const filteredManagers = managers.filter(
-    (manager) =>
+  // 상세보기 클릭
+  const handleDetailClick = (manager: Manager) => {
+    setDetailManager(manager);
+    setEditForm({
+      name: manager.name || '',
+      email: manager.email || '',
+      phoneNumber: manager.phoneNumber || '',
+      birthDay: manager.birthDay || '',
+      openDoorCount: manager.openDoorCount || 0,
+      address: manager.address || '',
+      regionSido: manager.regionSido || '',
+      regionSigungu: manager.regionSigungu || '',
+      regionDong: manager.regionDong || '',
+      approvalStatus: manager.approvalStatus || 'pending',
+    });
+    setDetailDialog(true);
+  };
+
+  // 상세정보 저장
+  const handleDetailSave = async () => {
+    if (!detailManager) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('user')
+        .update({
+          name: editForm.name,
+          phoneNumber: editForm.phoneNumber,
+          birthDay: editForm.birthDay || null,
+          openDoorCount: parseInt(editForm.openDoorCount) || 0,
+        })
+        .eq('id', detailManager.id);
+
+      if (error) throw error;
+
+      toast.success('관리자 정보가 수정되었습니다.');
+      setDetailDialog(false);
+      fetchManagers();
+    } catch (err) {
+      console.error('Failed to update manager:', err);
+      toast.error('관리자 정보 수정에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filteredManagers = managers.filter((manager) => {
+    // 검색 필터
+    const matchesSearch =
       manager.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       manager.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      manager.phoneNumber?.includes(searchQuery)
-  );
+      manager.phoneNumber?.includes(searchQuery);
+
+    // 아파트 필터
+    const matchesApartment =
+      filterApartment === 'all' ||
+      manager.admin_scopes?.some(scope => scope.apartmentId === filterApartment);
+
+    return matchesSearch && matchesApartment;
+  });
 
   return (
     <div className='flex flex-col h-full'>
       <AdminHeader title='관리자 관리' />
 
       <div className='flex-1 p-6 space-y-6 overflow-auto'>
-        {/* Search */}
-        <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6'>
-          <div className='relative flex-1 w-full'>
+        {/* Search and Filters */}
+        <div className='space-y-4'>
+          <div className='relative w-full'>
             <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
             <Input
               placeholder='이름, 이메일, 전화번호로 검색...'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className='pl-10'
+              className='pl-10 w-full'
             />
           </div>
-          <div className='flex items-center gap-2 whitespace-nowrap'>
-            <Shield className='h-4 w-4 text-muted-foreground' />
-            <span className='text-sm text-muted-foreground'>
-              전체 {filteredManagers.length}명
-            </span>
+          <div className='flex flex-wrap gap-4 items-center justify-between'>
+            <div className='flex gap-2'>
+              <Select value={filterApartment} onValueChange={setFilterApartment}>
+                <SelectTrigger className='w-[180px]'>
+                  <SelectValue placeholder='아파트 선택' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>전체 아파트</SelectItem>
+                  {apartments.map((apt) => (
+                    <SelectItem key={apt.id} value={apt.id}>
+                      {apt.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='flex items-center gap-2 whitespace-nowrap'>
+              <Shield className='h-4 w-4 text-muted-foreground' />
+              <span className='text-sm text-muted-foreground'>
+                전체 {filteredManagers.length}명
+              </span>
+            </div>
           </div>
         </div>
 
@@ -542,6 +629,7 @@ export default function ManagersPage() {
                     <TableHead className='text-muted-foreground'>이메일</TableHead>
                     <TableHead className='text-muted-foreground'>전화번호</TableHead>
                     <TableHead className='text-muted-foreground'>관리 범위</TableHead>
+                    <TableHead className='text-muted-foreground'>문 연 횟수</TableHead>
                     <TableHead className='text-muted-foreground'>승인상태</TableHead>
                     <TableHead className='text-muted-foreground'>등록일</TableHead>
                     <TableHead className='text-muted-foreground text-right'>작업</TableHead>
@@ -550,20 +638,24 @@ export default function ManagersPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
                         로딩 중...
                       </TableCell>
                     </TableRow>
                   ) : filteredManagers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
                         {searchQuery ? '검색 결과가 없습니다.' : '관리자가 없습니다.'}
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredManagers.map((manager) => (
-                      <TableRow key={manager.id} className='border-border hover:bg-secondary/50'>
-                        <TableCell>
+                      <TableRow
+                        key={manager.id}
+                        className='border-border hover:bg-secondary/50 cursor-pointer'
+                        onClick={() => handleDetailClick(manager)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           {manager.confirmImageUrl ? (
                             <button
                               onClick={() => setImagePreview(manager.confirmImageUrl || null)}
@@ -594,11 +686,12 @@ export default function ManagersPage() {
                         </TableCell>
                         <TableCell className='text-muted-foreground'>{manager.phoneNumber || '-'}</TableCell>
                         <TableCell>{getScopeDisplay(manager.admin_scopes)}</TableCell>
+                        <TableCell className='text-muted-foreground'>{manager.openDoorCount || 0}</TableCell>
                         <TableCell>{getApprovalBadge(manager.approvalStatus)}</TableCell>
                         <TableCell className='text-muted-foreground'>
                           {new Date(manager.createdAt).toLocaleDateString('ko-KR')}
                         </TableCell>
-                        <TableCell className='text-right'>
+                        <TableCell className='text-right' onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
@@ -844,6 +937,129 @@ export default function ManagersPage() {
               }
             >
               저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
+        <DialogContent className='sm:max-w-[600px] max-h-[90vh] overflow-y-auto'>
+          <DialogHeader>
+            <DialogTitle>관리자 상세 정보</DialogTitle>
+            <DialogDescription>
+              관리자 정보를 확인하고 수정할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='grid grid-cols-2 gap-4 py-4'>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>이름</label>
+              <Input
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>이메일</label>
+              <Input
+                value={editForm.email}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>전화번호</label>
+              <Input
+                value={editForm.phoneNumber}
+                onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+              />
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>생년월일</label>
+              <Input
+                value={editForm.birthDay}
+                onChange={(e) => setEditForm({ ...editForm, birthDay: e.target.value })}
+                placeholder='YYYY-MM-DD'
+              />
+            </div>
+
+            {/* 관리 범위 */}
+            <div className='col-span-2 space-y-2'>
+              <label className='text-sm font-medium'>관리 범위</label>
+              <div className='p-3 bg-muted rounded-md'>
+                {detailManager && getScopeDisplay(detailManager.admin_scopes)}
+              </div>
+            </div>
+
+            {/* 지역 정보 */}
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>주소</label>
+              <Input
+                value={editForm.address}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>시/도</label>
+              <Input
+                value={editForm.regionSido}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>시/군/구</label>
+              <Input
+                value={editForm.regionSigungu}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>읍/면/동</label>
+              <Input
+                value={editForm.regionDong}
+                disabled
+                className='bg-muted text-gray-700 disabled:opacity-100'
+              />
+            </div>
+
+            {/* 상태 정보 */}
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>승인상태</label>
+              <Select
+                value={editForm.approvalStatus}
+                disabled
+              >
+                <SelectTrigger className='bg-muted text-gray-700 disabled:opacity-100'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='pending'>대기</SelectItem>
+                  <SelectItem value='approve'>승인</SelectItem>
+                  <SelectItem value='suspended'>보류</SelectItem>
+                  <SelectItem value='inactive'>비활성</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>문 연 횟수</label>
+              <Input
+                type='number'
+                value={editForm.openDoorCount}
+                onChange={(e) => setEditForm({ ...editForm, openDoorCount: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setDetailDialog(false)}>
+              취소
+            </Button>
+            <Button onClick={handleDetailSave} disabled={saving}>
+              {saving ? '저장 중...' : '저장'}
             </Button>
           </DialogFooter>
         </DialogContent>

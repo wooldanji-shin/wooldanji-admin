@@ -41,14 +41,52 @@ type UserReconfirmDetails = {
   };
 };
 
+// 보류 상태 사용자 (재신청 안 한 사람)
+type SuspendedUser = {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string | null;
+  confirmImageUrl: string | null;
+  buildingNumber: number | null;
+  unit: number | null;
+  apartmentId: string | null;
+  approvalStatus: string;
+  suspensionReason: string | null;
+  createdAt: string;
+  user_roles?: { role: string }[];
+  apartments: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+// 통합 타입
+type CombinedItem = {
+  type: 'reconfirm' | 'suspended';
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string | null;
+  apartmentName: string | null;
+  buildingNumber: number | null;
+  unit: number | null;
+  userRoles?: { role: string }[];
+  previousStatus: string;
+  currentStatus: string;
+  suspensionReason?: string | null;
+  createdAt: string;
+};
+
 export default function UserReconfirmPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [reconfirms, setReconfirms] = useState<UserReconfirmDetails[]>([]);
+  const [combinedItems, setCombinedItems] = useState<CombinedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchReconfirms = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
 
     try {
@@ -63,7 +101,28 @@ export default function UserReconfirmPage() {
         return;
       }
 
-      let query = supabase
+      // 매니저인 경우 아파트 ID 가져오기
+      let apartmentIds: string[] = [];
+      if (isManager) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: managerApartments } = await supabase
+            .from('manager_apartments')
+            .select('apartmentId')
+            .eq('managerId', user.id);
+
+          if (managerApartments && managerApartments.length > 0) {
+            apartmentIds = managerApartments.map(ma => ma.apartmentId);
+          } else {
+            setCombinedItems([]);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // 1. 재신청 목록 가져오기
+      let reconfirmQuery = supabase
         .from('user_reconfirm')
         .select(`
           *,
@@ -85,44 +144,116 @@ export default function UserReconfirmPage() {
         .not('user.registrationType', 'is', null)
         .eq('user.registrationType', 'APARTMENT');
 
-      // 매니저인 경우 자신이 관리하는 아파트의 재신청만 필터링
-      if (isManager) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: managerApartments } = await supabase
-            .from('manager_apartments')
-            .select('apartmentId')
-            .eq('managerId', user.id);
-
-          if (managerApartments && managerApartments.length > 0) {
-            const apartmentIds = managerApartments.map(ma => ma.apartmentId);
-            query = query.in('user.apartmentId', apartmentIds);
-          } else {
-            // 관리하는 아파트가 없으면 빈 결과
-            setReconfirms([]);
-            setLoading(false);
-            return;
-          }
-        }
+      if (isManager && apartmentIds.length > 0) {
+        reconfirmQuery = reconfirmQuery.in('user.apartmentId', apartmentIds);
       }
 
-      const { data, error: fetchError } = await query
+      const { data: reconfirmData, error: reconfirmError } = await reconfirmQuery
         .order('createdAt', { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (reconfirmError) throw reconfirmError;
 
-      setReconfirms(data || []);
+      // 2. 보류 상태 사용자 가져오기 (재신청 안 한 사람)
+      // 먼저 재신청한 사용자 ID 목록 가져오기
+      const reconfirmUserIds = (reconfirmData || [])
+        .filter((r: any) => r.user)
+        .map((r: any) => r.user.id);
+
+      let suspendedQuery = supabase
+        .from('user')
+        .select(`
+          id,
+          name,
+          email,
+          phoneNumber,
+          confirmImageUrl,
+          buildingNumber,
+          unit,
+          apartmentId,
+          approvalStatus,
+          suspensionReason,
+          createdAt,
+          registrationType,
+          user_roles!inner(role),
+          apartments:apartmentId(id, name)
+        `)
+        .eq('user_roles.role', 'APP_USER')
+        .in('approvalStatus', ['suspended', 'inactive'])
+        .eq('registrationType', 'APARTMENT');
+
+      if (isManager && apartmentIds.length > 0) {
+        suspendedQuery = suspendedQuery.in('apartmentId', apartmentIds);
+      }
+
+      const { data: suspendedData, error: suspendedError } = await suspendedQuery
+        .order('createdAt', { ascending: false });
+
+      if (suspendedError) throw suspendedError;
+
+      // 재신청한 사용자 제외
+      const suspendedUsers = (suspendedData || []).filter(
+        (u: any) => !reconfirmUserIds.includes(u.id)
+      );
+
+      // 3. 통합 데이터 생성
+      const combined: CombinedItem[] = [];
+
+      // 재신청 데이터 추가
+      (reconfirmData || []).forEach((r: any) => {
+        if (r.user) {
+          combined.push({
+            type: 'reconfirm',
+            id: r.id,
+            userId: r.user.id,
+            userName: r.user.name || '-',
+            userEmail: r.user.email,
+            userPhone: r.user.phoneNumber,
+            apartmentName: r.user.apartments?.name || null,
+            buildingNumber: r.user.buildingNumber,
+            unit: r.user.unit,
+            userRoles: r.user.user_roles,
+            previousStatus: r.previousStatus,
+            currentStatus: r.status,
+            createdAt: r.createdAt,
+          });
+        }
+      });
+
+      // 보류 사용자 데이터 추가
+      suspendedUsers.forEach((u: any) => {
+        combined.push({
+          type: 'suspended',
+          id: u.id,
+          userId: u.id,
+          userName: u.name || '-',
+          userEmail: u.email,
+          userPhone: u.phoneNumber,
+          apartmentName: u.apartments?.name || null,
+          buildingNumber: u.buildingNumber,
+          unit: u.unit,
+          userRoles: u.user_roles,
+          previousStatus: u.approvalStatus,
+          currentStatus: u.approvalStatus,
+          suspensionReason: u.suspensionReason,
+          createdAt: u.createdAt,
+        });
+      });
+
+      // 날짜순 정렬
+      combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      setCombinedItems(combined);
     } catch (err) {
-      console.error('Failed to fetch reconfirms:', err);
-      toast.error('재신청 목록을 불러오는데 실패했습니다.');
+      console.error('Failed to fetch data:', err);
+      toast.error('목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
   }, [supabase, router]);
 
   useEffect(() => {
-    fetchReconfirms();
-  }, [fetchReconfirms]);
+    fetchData();
+  }, [fetchData]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ko-KR');
@@ -139,26 +270,54 @@ export default function UserReconfirmPage() {
     return roles.map(r => roleMap[r.role] || r.role).join(', ');
   };
 
-  const handleRowClick = (reconfirmId: string) => {
-    router.push(`/admin/user-reconfirm/${reconfirmId}`);
+  const handleRowClick = (item: CombinedItem) => {
+    if (item.type === 'reconfirm') {
+      router.push(`/admin/user-reconfirm/${item.id}`);
+    } else {
+      // 보류 사용자는 회원관리 페이지로 이동
+      router.push(`/admin/users?search=${encodeURIComponent(item.userEmail)}`);
+    }
   };
+
+  const getStatusBadge = (status: string, type: 'previous' | 'current') => {
+    if (status === 'suspended') {
+      return <Badge className="bg-yellow-500 text-white">보류</Badge>;
+    } else if (status === 'inactive') {
+      return <Badge className="bg-gray-500 text-white">비활성</Badge>;
+    } else if (status === 'pending') {
+      return <Badge className="bg-blue-500 text-white">재신청 대기</Badge>;
+    } else if (status === 'rejected') {
+      return <Badge className="bg-red-500 text-white">거절</Badge>;
+    }
+    return <Badge variant="outline">{status}</Badge>;
+  };
+
+  const reconfirmCount = combinedItems.filter(i => i.type === 'reconfirm').length;
+  const suspendedCount = combinedItems.filter(i => i.type === 'suspended').length;
 
   return (
     <div className='flex flex-col h-full'>
       <AdminHeader title='승인보류/거절 관리' />
 
       <div className='flex-1 p-6 space-y-6 overflow-auto'>
-        <div className='text-sm text-muted-foreground'>
-          전체 {reconfirms.length}건의 재신청
+        <div className='text-sm text-muted-foreground flex gap-4'>
+          <span>전체 {combinedItems.length}건</span>
+          <span>•</span>
+          <span>재신청 {reconfirmCount}건</span>
+          <span>•</span>
+          <span>보류/비활성 {suspendedCount}건</span>
         </div>
 
-        {/* Reconfirms Table */}
+        {/* Combined Table */}
         <Card className='bg-card border-border'>
           <CardContent className='p-0'>
             <div className='overflow-x-auto relative min-h-[400px]'>
               <Table>
                 <TableHeader>
                   <TableRow className='border-border hover:bg-transparent'>
+                    <TableHead className='text-muted-foreground'>
+                      구분
+                    </TableHead>
                     <TableHead className='text-muted-foreground'>
                       이름
                     </TableHead>
@@ -175,79 +334,74 @@ export default function UserReconfirmPage() {
                       권한
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
-                      이전 상태
+                      상태
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
-                      현재 상태
+                      보류사유
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
-                      재신청일
+                      날짜
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
                         로딩 중...
                       </TableCell>
                     </TableRow>
-                  ) : reconfirms.length === 0 ? (
+                  ) : combinedItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
-                        재신청 내역이 없습니다.
+                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
+                        보류/거절 대상이 없습니다.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    reconfirms.map((reconfirm) => (
+                    combinedItems.map((item) => (
                       <TableRow
-                        key={reconfirm.id}
+                        key={`${item.type}-${item.id}`}
                         className='border-border hover:bg-secondary/50 cursor-pointer'
-                        onClick={() => handleRowClick(reconfirm.id)}
+                        onClick={() => handleRowClick(item)}
                       >
+                        <TableCell>
+                          {item.type === 'reconfirm' ? (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">재신청</Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">보류중</Badge>
+                          )}
+                        </TableCell>
                         <TableCell className='font-medium text-card-foreground'>
-                          {reconfirm.user.name || '-'}
+                          {item.userName}
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
-                          {reconfirm.user.email}
+                          {item.userEmail}
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
-                          {reconfirm.user.phoneNumber || '-'}
+                          {item.userPhone || '-'}
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
-                          {reconfirm.user.apartments ? (
+                          {item.apartmentName ? (
                             <span className='text-sm'>
-                              {reconfirm.user.apartments.name}<br/>
-                              {reconfirm.user.buildingNumber ? `${reconfirm.user.buildingNumber}동` : ''}
-                              {reconfirm.user.unit ? ` ${reconfirm.user.unit}호` : ''}
+                              {item.apartmentName}<br/>
+                              {item.buildingNumber ? `${item.buildingNumber}동` : ''}
+                              {item.unit ? ` ${item.unit}호` : ''}
                             </span>
                           ) : (
                             '-'
                           )}
                         </TableCell>
                         <TableCell className='text-muted-foreground text-sm'>
-                          {getUserRole(reconfirm.user.user_roles)}
+                          {getUserRole(item.userRoles)}
                         </TableCell>
                         <TableCell>
-                          {reconfirm.previousStatus === 'suspended' ? (
-                            <Badge className="bg-yellow-500 text-white">보류</Badge>
-                          ) : reconfirm.previousStatus === 'inactive' ? (
-                            <Badge className="bg-gray-500 text-white">비활성</Badge>
-                          ) : (
-                            <Badge variant="outline">{reconfirm.previousStatus}</Badge>
-                          )}
+                          {getStatusBadge(item.currentStatus, 'current')}
                         </TableCell>
-                        <TableCell>
-                          {reconfirm.status === 'pending' ? (
-                            <Badge className="bg-blue-500 text-white">대기중</Badge>
-                          ) : reconfirm.status === 'rejected' ? (
-                            <Badge className="bg-red-500 text-white">거절</Badge>
-                          ) : (
-                            <Badge variant="outline">{reconfirm.status}</Badge>
-                          )}
+                        <TableCell className='text-muted-foreground text-sm max-w-[150px] truncate'>
+                          {item.suspensionReason || '-'}
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
-                          {formatDate(reconfirm.createdAt)}
+                          {formatDate(item.createdAt)}
                         </TableCell>
                       </TableRow>
                     ))
