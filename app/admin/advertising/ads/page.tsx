@@ -78,6 +78,7 @@ import {
   Loader2,
   Package,
   Download,
+  RotateCcw,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -306,6 +307,7 @@ export default function AdsManagementPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isResetClickDialogOpen, setIsResetClickDialogOpen] = useState(false);
   const [selectedAd, setSelectedAd] = useState<Advertisement | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -1038,6 +1040,37 @@ export default function AdsManagementPage() {
     }
   };
 
+  // 클릭수 초기화
+  const handleResetClickCount = async () => {
+    if (!selectedAd) return;
+
+    try {
+      const { error } = await supabase
+        .from('advertisements')
+        .update({
+          adClickCount: 0,
+          clickCount: 0,
+        })
+        .eq('id', selectedAd.id);
+
+      if (error) throw error;
+
+      toast.success('클릭수가 초기화되었습니다.');
+      await fetchData();
+
+      // selectedAd 업데이트
+      setSelectedAd({
+        ...selectedAd,
+        adClickCount: 0,
+        clickCount: 0,
+      });
+      setIsResetClickDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error resetting click counts:', error);
+      toast.error('클릭수 초기화에 실패했습니다.');
+    }
+  };
+
   // 다음 주소 API로 지역 검색 및 추가
   const handleRegionAddressSearch = () => {
     new (window as any).daum.Postcode({
@@ -1555,7 +1588,7 @@ export default function AdsManagementPage() {
                           <SelectValue placeholder='게시자' />
                         </SelectTrigger>
                         <SelectContent align='start'>
-                          <SelectItem value='all'>전체 게시자</SelectItem>
+                          <SelectItem value='all'>전체 등록자</SelectItem>
                           {creators.map((creator) => (
                             <SelectItem
                               key={creator.id}
@@ -1976,6 +2009,24 @@ export default function AdsManagementPage() {
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p>수정</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={() => {
+                                      setSelectedAd(ad);
+                                      setIsResetClickDialogOpen(true);
+                                    }}
+                                    className='h-8 w-8 p-0'
+                                  >
+                                    <RotateCcw className='h-4 w-4' />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>클릭수 초기화</p>
                                 </TooltipContent>
                               </Tooltip>
                               <Tooltip>
@@ -2655,34 +2706,7 @@ export default function AdsManagementPage() {
                           type='button'
                           variant='outline'
                           size='sm'
-                          onClick={async () => {
-                            if (!window.confirm('클릭수를 0으로 초기화하시겠습니까?')) return;
-
-                            try {
-                              const { error } = await supabase
-                                .from('advertisements')
-                                .update({
-                                  adClickCount: 0,
-                                  clickCount: 0,
-                                })
-                                .eq('id', selectedAd.id);
-
-                              if (error) throw error;
-
-                              toast.success('클릭수가 초기화되었습니다.');
-                              await fetchData();
-
-                              // selectedAd 업데이트
-                              setSelectedAd({
-                                ...selectedAd,
-                                adClickCount: 0,
-                                clickCount: 0,
-                              });
-                            } catch (error: any) {
-                              console.error('Error resetting click counts:', error);
-                              toast.error('클릭수 초기화에 실패했습니다.');
-                            }
-                          }}
+                          onClick={() => setIsResetClickDialogOpen(true)}
                           className='text-orange-700 border-orange-300 hover:bg-orange-100'
                         >
                           <X className='mr-1 h-3 w-3' />
@@ -2750,6 +2774,43 @@ export default function AdsManagementPage() {
               >
                 <Trash2 className='mr-2 h-4 w-4' />
                 삭제
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 클릭수 초기화 확인 다이얼로그 */}
+        <Dialog
+          open={isResetClickDialogOpen}
+          onOpenChange={setIsResetClickDialogOpen}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className='flex items-center gap-2'>
+                <AlertCircle className='h-5 w-5 text-blue-500' />
+                클릭수 초기화
+              </DialogTitle>
+              <DialogDescription className='pt-2'>
+                <span className='font-semibold'>{selectedAd?.title}</span> 광고의 클릭수를 0으로 초기화하시겠습니까?
+                <br />
+                <span className='text-blue-600 mt-2 block'>
+                  현재: 광고 클릭수 {selectedAd?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {selectedAd?.clickCount?.toLocaleString() || '0'}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant='outline'
+                onClick={() => setIsResetClickDialogOpen(false)}
+              >
+                취소
+              </Button>
+              <Button
+                variant='default'
+                className='bg-blue-500 hover:bg-blue-600'
+                onClick={handleResetClickCount}
+              >
+                초기화
               </Button>
             </DialogFooter>
           </DialogContent>

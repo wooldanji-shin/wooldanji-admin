@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -68,6 +69,7 @@ import {
   UserPlus,
   Check,
   ChevronsUpDown,
+  RotateCcw,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Image from 'next/image';
@@ -147,6 +149,7 @@ function BannerRow({
   onEdit,
   onDelete,
   onToggleActive,
+  onResetClick,
   canEdit,
   canDelete,
   hideClickCounts,
@@ -155,6 +158,7 @@ function BannerRow({
   onEdit: (banner: Banner) => void;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, isActive: boolean) => void;
+  onResetClick: (banner: Banner) => void;
   canEdit: boolean;
   canDelete: boolean;
   hideClickCounts: boolean;
@@ -309,6 +313,19 @@ function BannerRow({
               <Edit className='h-4 w-4' />
             </Button>
           )}
+          {canEdit && (
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={(e) => {
+                e.stopPropagation();
+                onResetClick(banner);
+              }}
+              title='클릭수 초기화'
+            >
+              <RotateCcw className='h-4 w-4' />
+            </Button>
+          )}
           {canDelete && (
             <Button
               variant='ghost'
@@ -351,6 +368,8 @@ export default function BannersPage() {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [advertiserPopoverOpen, setAdvertiserPopoverOpen] = useState(false);
+  const [resetClickDialogOpen, setResetClickDialogOpen] = useState(false);
+  const [resetClickBanner, setResetClickBanner] = useState<Banner | null>(null);
 
   // 이미 배너가 있는 광고주 제외 (1:1 매칭)
   const availableAdvertisers = useMemo(() => {
@@ -822,6 +841,28 @@ export default function BannersPage() {
     }
   };
 
+  // 클릭수 초기화
+  const handleResetClickCount = async () => {
+    if (!resetClickBanner) return;
+
+    try {
+      const { error } = await supabase
+        .from('home_banners')
+        .update({ clickCount: 0, adClickCount: 0 })
+        .eq('id', resetClickBanner.id);
+
+      if (error) throw error;
+
+      toast.success('클릭수가 초기화되었습니다.');
+      await loadBanners();
+      setResetClickDialogOpen(false);
+      setResetClickBanner(null);
+    } catch (err) {
+      console.error('Error resetting click count:', err);
+      toast.error('클릭수 초기화에 실패했습니다.');
+    }
+  };
+
   const resetForm = () => {
     setForm({
       linkUrl: '',
@@ -907,6 +948,10 @@ export default function BannersPage() {
                           onEdit={handleEdit}
                           onDelete={handleDelete}
                           onToggleActive={handleToggleActive}
+                          onResetClick={(b) => {
+                            setResetClickBanner(b);
+                            setResetClickDialogOpen(true);
+                          }}
                           canEdit={canEditBanner(banner)}
                           canDelete={canDeleteBanner(banner)}
                           hideClickCounts={hideClickCounts}
@@ -1317,6 +1362,43 @@ export default function BannersPage() {
                   저장
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 클릭수 초기화 확인 다이얼로그 */}
+      <Dialog open={resetClickDialogOpen} onOpenChange={setResetClickDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className='flex items-center gap-2'>
+              <AlertCircle className='h-5 w-5 text-blue-500' />
+              클릭수 초기화
+            </DialogTitle>
+            <DialogDescription className='pt-2'>
+              이 배너의 클릭수를 0으로 초기화하시겠습니까?
+              <br />
+              <span className='text-blue-600 mt-2 block'>
+                현재: 광고 클릭수 {resetClickBanner?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {resetClickBanner?.clickCount?.toLocaleString() || '0'}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => {
+                setResetClickDialogOpen(false);
+                setResetClickBanner(null);
+              }}
+            >
+              취소
+            </Button>
+            <Button
+              variant='default'
+              className='bg-blue-500 hover:bg-blue-600'
+              onClick={handleResetClickCount}
+            >
+              초기화
             </Button>
           </DialogFooter>
         </DialogContent>
