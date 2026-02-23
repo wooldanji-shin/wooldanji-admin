@@ -7,40 +7,40 @@
 
 ## Table: `user`
 
-| Column            | Type        | Notes                                                                                             |
-| ----------------- | ----------- | ------------------------------------------------------------------------------------------------- |
-| id                | uuid        | **PK**, = `auth.users.id`                                                                         |
-| createdAt         | timestamptz |                                                                                                   |
-| email             | text        |                                                                                                   |
-| name              | text        |                                                                                                   |
-| address           | text        |                                                                                                   |
-| detailAddress     | text        |                                                                                                   |
-| premium           | bool        |                                                                                                   |
-| birthDay          | text        | (날짜 타입으로 변경 고려)                                                                         |
-| premiumExpiryDate | timestamptz |                                                                                                   |
-| confirmImageUrl   | text        |                                                                                                   |
-| shareUserCount    | int4        |                                                                                                   |
-| recommendCode     | text        |                                                                                                   |
-| openDoorCount     | int4        |                                                                                                   |
-| rssLevel          | int4        |                                                                                                   |
-| approvalStatus              | text        | `pending` \| `approve` \| `inactive` \| `suspended`                                               |
-| suspensionReason            | text        | 승인 보류/취소 이유 (approvalStatus가 suspended 또는 inactive일 때 관리자가 작성)                |
-| registerMethods             | text[]      | 가입 방법 배열 (예: `['google', 'kakao']`)                                                        |
-| registrationType            | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원                                            |
-| apartmentId       | uuid        | **FK** → `apartments.id` **ON DELETE SET NULL** (APARTMENT 타입인 경우 필수, GENERAL인 경우 NULL) |
-| buildingNumber    | int4        | 동 번호 (예: 101, 102)                                                                            |
-| unit              | int4        | 호수 (예: 1023, 1034) - `unit % 100`으로 라인 매칭                                                |
-| termsAgreed       | bool        |                                                                                                   |
-| privacyAgreed     | bool        |                                                                                                   |
-| marketingAgreed   | bool        |                                                                                                   |
-| phoneNumber       | text        |                                                                                                   |
-| lastAccessedAt    | timestamptz | 마지막 출입 시간 (문 열림 성공 시 업데이트)                                                       |
-| regionSido                  | text        | ✓ 추가: 시/도 (예: 서울, 경기) - 다음 주소 검색 API 결과 저장                                     |
-| regionSigungu               | text        | ✓ 추가: 시/군/구 (예: 관악구, 수원시) - 다음 주소 검색 API 결과 저장                              |
-| regionDong                  | text        | ✓ 추가: 읍/면/동 (예: 신림동, 봉천동) - 다음 주소 검색 API 결과 저장                              |
-| overlayPermissionGranted    | bool        | 오버레이 권한 허용 여부 (기본값: false)                                                           |
-| platform                    | text        | 플랫폼 정보 (예: 'android', 'ios')                                                                |
-| fcmToken                    | text[]      | FCM 토큰 배열 - 사용자가 여러 기기에서 로그인 시 모든 기기의 토큰 저장                            |
+| Column                   | Type        | Notes                                                                                             |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------------------- |
+| id                       | uuid        | **PK**, = `auth.users.id`                                                                         |
+| createdAt                | timestamptz |                                                                                                   |
+| email                    | text        |                                                                                                   |
+| name                     | text        |                                                                                                   |
+| address                  | text        |                                                                                                   |
+| detailAddress            | text        |                                                                                                   |
+| premium                  | bool        |                                                                                                   |
+| birthDay                 | text        | (날짜 타입으로 변경 고려)                                                                         |
+| premiumExpiryDate        | timestamptz |                                                                                                   |
+| confirmImageUrl          | text        |                                                                                                   |
+| shareUserCount           | int4        |                                                                                                   |
+| recommendCode            | text        |                                                                                                   |
+| openDoorCount            | int4        |                                                                                                   |
+| rssLevel                 | int4        |                                                                                                   |
+| approvalStatus           | text        | `pending` \| `approve` \| `inactive` \| `suspended`                                               |
+| suspensionReason         | text        | 승인 보류/취소 이유 (approvalStatus가 suspended 또는 inactive일 때 관리자가 작성)                 |
+| registerMethods          | text[]      | 가입 방법 배열 (예: `['google', 'kakao']`)                                                        |
+| registrationType         | text        | `GENERAL` \| `APARTMENT` - 일반회원 vs 아파트 등록회원                                            |
+| apartmentId              | uuid        | **FK** → `apartments.id` **ON DELETE SET NULL** (APARTMENT 타입인 경우 필수, GENERAL인 경우 NULL) |
+| buildingNumber           | int4        | 동 번호 (예: 101, 102)                                                                            |
+| unit                     | int4        | 호수 (예: 1023, 1034) - `unit % 100`으로 라인 매칭                                                |
+| termsAgreed              | bool        |                                                                                                   |
+| privacyAgreed            | bool        |                                                                                                   |
+| marketingAgreed          | bool        |                                                                                                   |
+| phoneNumber              | text        |                                                                                                   |
+| lastAccessedAt           | timestamptz | 마지막 출입 시간 (문 열림 성공 시 업데이트)                                                       |
+| regionSido               | text        | ✓ 추가: 시/도 (예: 서울, 경기) - 다음 주소 검색 API 결과 저장                                     |
+| regionSigungu            | text        | ✓ 추가: 시/군/구 (예: 관악구, 수원시) - 다음 주소 검색 API 결과 저장                              |
+| regionDong               | text        | ✓ 추가: 읍/면/동 (예: 신림동, 봉천동) - 다음 주소 검색 API 결과 저장                              |
+| overlayPermissionGranted | bool        | 오버레이 권한 허용 여부 (기본값: false)                                                           |
+| platform                 | text        | 플랫폼 정보 (예: 'android', 'ios')                                                                |
+| fcmToken                 | text[]      | FCM 토큰 배열 - 사용자가 여러 기기에서 로그인 시 모든 기기의 토큰 저장                            |
 
 > **✓ 추가: 지역 정보 저장**:
 >
@@ -68,17 +68,17 @@
 
 ## Table: `user_reconfirm` (재신청)
 
-| Column             | Type        | Notes                                                                 |
-| ------------------ | ----------- | --------------------------------------------------------------------- |
-| id                 | uuid        | **PK**                                                                |
-| userId             | uuid        | **FK** → `user.id` **ON DELETE CASCADE**                              |
-| reConfirmImageUrl  | text        | 재신청 인증 이미지 URL                                                |
-| status             | text        | `pending` \| `approve` \| `reject` - 재신청 상태 (DEFAULT PENDING) |
-| previousStatus     | text        | 재신청 당시 유저 상태 (`pending`, `approve`, `inactive`, `suspended`) |
-| reviewedBy         | uuid        | **FK** → `user.id` **ON DELETE SET NULL** - 검토한 관리자 (NULL 가능) |
-| reviewedAt         | timestamptz | 검토 완료 시간 (NULL 가능)                                            |
-| rejectionReason    | text        | 거절 사유 (status가 'reject'일 때 작성, NULL 가능)                   |
-| createdAt          | timestamptz | DEFAULT now() - 재신청 생성 시간                                      |
+| Column            | Type        | Notes                                                                 |
+| ----------------- | ----------- | --------------------------------------------------------------------- |
+| id                | uuid        | **PK**                                                                |
+| userId            | uuid        | **FK** → `user.id` **ON DELETE CASCADE**                              |
+| reConfirmImageUrl | text        | 재신청 인증 이미지 URL                                                |
+| status            | text        | `pending` \| `approve` \| `reject` - 재신청 상태 (DEFAULT PENDING)    |
+| previousStatus    | text        | 재신청 당시 유저 상태 (`pending`, `approve`, `inactive`, `suspended`) |
+| reviewedBy        | uuid        | **FK** → `user.id` **ON DELETE SET NULL** - 검토한 관리자 (NULL 가능) |
+| reviewedAt        | timestamptz | 검토 완료 시간 (NULL 가능)                                            |
+| rejectionReason   | text        | 거절 사유 (status가 'reject'일 때 작성, NULL 가능)                    |
+| createdAt         | timestamptz | DEFAULT now() - 재신청 생성 시간                                      |
 
 > **설명**:
 >
@@ -154,12 +154,12 @@
 
 ## Table: `user_roles`
 
-| Column    | Type        | Notes                                                         |
-| --------- | ----------- | ------------------------------------------------------------- |
-| id        | uuid        | **PK**                                                        |
-| userId    | uuid        | **FK** → `user.id` **ON DELETE CASCADE**                      |
+| Column    | Type        | Notes                                                    |
+| --------- | ----------- | -------------------------------------------------------- |
+| id        | uuid        | **PK**                                                   |
+| userId    | uuid        | **FK** → `user.id` **ON DELETE CASCADE**                 |
 | role      | text        | 예: `APP_USER` / `APT_ADMIN` / `MANAGER` / `SUPER_ADMIN` |
-| createdAt | timestamptz |                                                               |
+| createdAt | timestamptz |                                                          |
 
 > **제약조건**:
 >
@@ -191,12 +191,12 @@
 
 ## Table: `apartments`
 
-| Column    | Type        | Notes                                           |
-| --------- | ----------- | ----------------------------------------------- |
-| id        | uuid        | **PK**                                          |
-| name      | text        |                                                 |
-| address   | text        |                                                 |
-| createdAt | timestamptz |                                                 |
+| Column    | Type        | Notes                                                                               |
+| --------- | ----------- | ----------------------------------------------------------------------------------- |
+| id        | uuid        | **PK**                                                                              |
+| name      | text        |                                                                                     |
+| address   | text        |                                                                                     |
+| createdAt | timestamptz |                                                                                     |
 | createdBy | uuid        | **FK** → `user.id` **ON DELETE SET NULL** - 아파트를 등록한 매니저 또는 슈퍼 어드민 |
 
 ---
@@ -285,6 +285,54 @@
 
 ---
 
+## Table: `apartment_common_devices`
+
+| Column         | Type        | Notes                                                     |
+| -------------- | ----------- | --------------------------------------------------------- |
+| id             | uuid        | **PK**, DEFAULT `gen_random_uuid()`                       |
+| apartmentId    | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE** (NOT NULL) |
+| macAddress     | text        | **BLE 기기 MAC 주소** (예: `74:F0:7D:B2:70:32`) UNIQUE    |
+| devicePassword | text        | 기기 비밀번호 (NOT NULL)                                  |
+| lastOpenedAt   | timestamptz | 마지막으로 문이 성공적으로 열린 시간                      |
+| isWorking      | bool        | 기기 작동 여부 (기본값: true, false = 점검 중)            |
+| createdAt      | timestamptz | DEFAULT now()                                             |
+
+> **설명**:
+>
+> - 아파트 **공용 기기** 테이블 - 라인과 무관하게 해당 아파트 주민이면 누구나 접근 가능
+> - 예: 정문, 후문, 지하주차장 입구 등 공동 현관문
+> - 기존 `devices` 테이블은 라인(세대) 단위, 이 테이블은 아파트 단위
+>
+> **제약조건**:
+>
+> - `UNIQUE (macAddress)`
+> - **ON DELETE CASCADE**: 아파트 삭제 시 해당 공용 기기도 함께 삭제
+>
+> **RLS 정책**:
+>
+> - **일반 사용자(SELECT)**: 자신의 아파트(`user.apartmentId` 일치) + 승인된 사용자(`approvalStatus = 'approve'`)만 조회 가능
+> - **관리자(ALL)**: `MANAGER`, `SUPER_ADMIN` 역할만 생성/수정/삭제 가능
+>
+> **사용 예시**:
+>
+> ```dart
+> // 1. 공용 기기 조회 (RLS가 자동 필터링)
+> final commonDevices = await supabase
+>   .from('apartment_common_devices')
+>   .select()
+>   .eq('apartmentId', apartmentId)
+>   .eq('isWorking', true);
+>
+> // 2. 관리자가 공용 기기 등록
+> await supabase.from('apartment_common_devices').insert({
+>   'apartmentId': apartmentId,
+>   'macAddress': '74:F0:7D:B2:70:32',
+>   'devicePassword': encryptedPassword,
+> });
+> ```
+
+---
+
 ## Table: `user_line_access`
 
 | Column     | Type        | Notes                                                                                |
@@ -334,10 +382,11 @@ user.id (PK)
   └─> apartments.id (apartmentId FK)
 
 apartments.id
+  ├─< apartment_common_devices.apartmentId  (공용 기기)
   └─< apartment_buildings.apartmentId
        └─< apartment_lines.buildingId
             ├─< apartment_line_places.lineId
-            │    └─< devices.linePlaceId
+            │    └─< devices.linePlaceId    (라인 기기)
             └─< user_line_access.lineId
 ```
 
@@ -529,22 +578,21 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `home_banners`
 
-| Column       | Type        | Notes                                                                      |
-| ------------ | ----------- | -------------------------------------------------------------------------- |
-| id           | uuid        | **PK**                                                                     |
-| createdAt    | timestamptz | DEFAULT now()                                                              |
-| imageUrl     | text        | 배너 이미지 URL (Supabase Storage)                                         |
-| linkUrl      | text        | 클릭 시 이동할 URL (NULL 가능)                                             |
-| orderIndex   | int4        | 표시 순서 (작을수록 먼저 표시)                                             |
-| isActive     | bool        | DEFAULT true - 활성화 여부                                                 |
-| isGlobal     | bool        | DEFAULT false - true면 전체 회원에게 표시                                  |
-| createdBy    | uuid        | **FK** → `auth.users.id` - 배너 생성자 (NULL 가능)                         |
+| Column       | Type        | Notes                                                                       |
+| ------------ | ----------- | --------------------------------------------------------------------------- |
+| id           | uuid        | **PK**                                                                      |
+| createdAt    | timestamptz | DEFAULT now()                                                               |
+| imageUrl     | text        | 배너 이미지 URL (Supabase Storage)                                          |
+| linkUrl      | text        | 클릭 시 이동할 URL (NULL 가능)                                              |
+| isActive     | bool        | DEFAULT true - 활성화 여부                                                  |
+| isGlobal     | bool        | DEFAULT false - true면 전체 회원에게 표시                                   |
+| createdBy    | uuid        | **FK** → `auth.users.id` - 배너 생성자 (NULL 가능)                          |
 | advertiserId | uuid        | **FK** → `advertisers.id` **ON DELETE CASCADE** - 연결된 광고주 (NULL 가능) |
-| startDate    | timestamptz | 게시 시작일 (NULL 가능, isGlobal=false인 경우 사용)                        |
-| endDate      | timestamptz | 게시 종료일 (NULL 가능, isGlobal=false인 경우 사용)                        |
-| clickCount   | int4        | DEFAULT 0 - 클릭 수                                                        |
-| adClickCount | int4        | DEFAULT 0 - 광고 카드 클릭 횟수 (광고 상세 다이얼로그 열기)                |
-| description  | text        | 배너 설명 (NULL 가능)                                                      |
+| startDate    | timestamptz | 게시 시작일 (NULL 가능, isGlobal=false인 경우 사용)                         |
+| endDate      | timestamptz | 게시 종료일 (NULL 가능, isGlobal=false인 경우 사용)                         |
+| clickCount   | int4        | DEFAULT 0 - 클릭 수                                                         |
+| adClickCount | int4        | DEFAULT 0 - 광고 카드 클릭 횟수 (광고 상세 다이얼로그 열기)                 |
+| description  | text        | 배너 설명 (NULL 가능)                                                       |
 
 > **설명**:
 >
@@ -556,21 +604,18 @@ await bleService.sendOpenCommand(passwordBytes);
 > - **광고주 연결**: 타겟 아파트 배너(`isGlobal = false`)에 광고주(`advertiserId`)를 연결하여 광고로 관리 가능
 > - **게시 기간 관리**: `startDate`, `endDate`로 배너의 게시 기간을 설정하고, 해당 기간 동안에만 배너 노출
 > - **매니저 권한**: MANAGER는 자신이 생성한 배너(`createdBy`)만 수정/삭제 가능, `isGlobal = true` 사용 불가
->
-> **제약조건**:
->
-> - `UNIQUE (orderIndex)`: 순서 중복 불가
+> - **랜덤 정렬**: 배너 조회 시 `RANDOM()` 정렬로 노출 순서가 매번 달라짐
 >
 > **사용 예시**:
 >
 > ```sql
 > -- 전체 대상 배너 등록
-> INSERT INTO home_banners (imageUrl, linkUrl, orderIndex, isGlobal) VALUES
->   ('banners/banner-1.jpg', 'https://example.com/promotion', 1, true);
+> INSERT INTO home_banners (imageUrl, linkUrl, isGlobal) VALUES
+>   ('banners/banner-1.jpg', 'https://example.com/promotion', true);
 >
 > -- 특정 아파트 대상 배너 등록
-> INSERT INTO home_banners (imageUrl, linkUrl, orderIndex, isGlobal) VALUES
->   ('banners/apt-banner.jpg', 'https://example.com/apt-event', 2, false);
+> INSERT INTO home_banners (imageUrl, linkUrl, isGlobal) VALUES
+>   ('banners/apt-banner.jpg', 'https://example.com/apt-event', false);
 > -- 아파트 연결은 home_banner_apartments 테이블에서 설정
 > ```
 
@@ -578,12 +623,12 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `home_banner_apartments`
 
-| Column      | Type        | Notes                                                    |
-| ----------- | ----------- | -------------------------------------------------------- |
-| id          | uuid        | **PK**                                                   |
-| createdAt   | timestamptz | DEFAULT now()                                            |
-| bannerId    | uuid        | **FK** → `home_banners.id` **ON DELETE CASCADE**         |
-| apartmentId | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE**           |
+| Column      | Type        | Notes                                            |
+| ----------- | ----------- | ------------------------------------------------ |
+| id          | uuid        | **PK**                                           |
+| createdAt   | timestamptz | DEFAULT now()                                    |
+| bannerId    | uuid        | **FK** → `home_banners.id` **ON DELETE CASCADE** |
+| apartmentId | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE**   |
 
 > **설명**:
 >
@@ -671,20 +716,20 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `home_sections`
 
-| Column               | Type        | Notes                                                                                           |
-| -------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
-| id                   | uuid        | **PK**                                                                                          |
-| createdAt            | timestamptz | DEFAULT now()                                                                                   |
-| sectionType          | text        | 섹션 타입: `AD_CATEGORY` \| `NOTIFICATION` \| `ANNOUNCEMENT` \| `EVENT`                         |
-| orderIndex           | int4        | **UNIQUE** - 섹션 표시 순서 (작을수록 상단)                                                    |
-| adCategoryId         | uuid        | **FK** → `ad_categories.id` **ON DELETE CASCADE** (NULL 가능, AD_CATEGORY 타입일 때만 필수)    |
-| iconUrl              | text        | **고정 섹션 전용** - 알림/공지사항/이벤트 섹션의 아이콘 URL (NULL 가능)                         |
-| displayName          | text        | 커스텀 표시 이름 (NULL인 경우 기본값 "알림", "공지사항", "이벤트" 사용) (NULL 가능)             |
-| isActive             | bool        | DEFAULT true - 활성화 여부                                                                      |
-| autoSelectStartTime  | time        | 자동 선택 시작 시간 (HH:MM:SS, NULL이면 스케줄 없음)                                           |
-| autoSelectEndTime    | time        | 자동 선택 종료 시간 (HH:MM:SS, NULL이면 스케줄 없음)                                           |
-| autoSelectStartDate  | date        | 자동 선택 시작 날짜 (YYYY-MM-DD, NULL이면 제한 없음)                                           |
-| autoSelectEndDate    | date        | 자동 선택 종료 날짜 (YYYY-MM-DD, NULL이면 제한 없음)                                           |
+| Column              | Type        | Notes                                                                                       |
+| ------------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| id                  | uuid        | **PK**                                                                                      |
+| createdAt           | timestamptz | DEFAULT now()                                                                               |
+| sectionType         | text        | 섹션 타입: `AD_CATEGORY` \| `NOTIFICATION` \| `ANNOUNCEMENT` \| `EVENT`                     |
+| orderIndex          | int4        | **UNIQUE** - 섹션 표시 순서 (작을수록 상단)                                                 |
+| adCategoryId        | uuid        | **FK** → `ad_categories.id` **ON DELETE CASCADE** (NULL 가능, AD_CATEGORY 타입일 때만 필수) |
+| iconUrl             | text        | **고정 섹션 전용** - 알림/공지사항/이벤트 섹션의 아이콘 URL (NULL 가능)                     |
+| displayName         | text        | 커스텀 표시 이름 (NULL인 경우 기본값 "알림", "공지사항", "이벤트" 사용) (NULL 가능)         |
+| isActive            | bool        | DEFAULT true - 활성화 여부                                                                  |
+| autoSelectStartTime | time        | 자동 선택 시작 시간 (HH:MM:SS, NULL이면 스케줄 없음)                                        |
+| autoSelectEndTime   | time        | 자동 선택 종료 시간 (HH:MM:SS, NULL이면 스케줄 없음)                                        |
+| autoSelectStartDate | date        | 자동 선택 시작 날짜 (YYYY-MM-DD, NULL이면 제한 없음)                                        |
+| autoSelectEndDate   | date        | 자동 선택 종료 날짜 (YYYY-MM-DD, NULL이면 제한 없음)                                        |
 
 > **설명**:
 >
@@ -693,17 +738,20 @@ await bleService.sendOpenCommand(passwordBytes);
 > - `orderIndex`로 섹션 순서 제어 (드래그&드롭)
 >
 > **섹션 타입**:
+>
 > - `AD_CATEGORY`: 광고 카테고리 섹션 (adCategoryId 필수, ad_categories.iconUrl 사용)
 > - `NOTIFICATION`: 알림 섹션 (home_notifications 표시, iconUrl 변경 가능)
 > - `ANNOUNCEMENT`: 공지사항 섹션 (announcements 표시, iconUrl 변경 가능)
 > - `EVENT`: 이벤트 섹션 (isEvent = true인 광고 표시, iconUrl 변경 가능)
 >
 > **아이콘 사용 방식**:
+>
 > - **AD_CATEGORY**: `ad_categories.iconUrl` 사용 (home_sections.iconUrl은 NULL)
 > - **고정 섹션** (NOTIFICATION, ANNOUNCEMENT, EVENT): `home_sections.iconUrl` 사용
 > - 저장 경로: `advertisements/sections/icons/{section-id}.png`
 >
 > **제약조건**:
+>
 > - `CHECK (sectionType IN ('AD_CATEGORY', 'NOTIFICATION', 'ANNOUNCEMENT', 'EVENT'))`
 > - `UNIQUE (orderIndex)`: 순서 중복 불가
 > - **데이터 일관성 체크**:
@@ -716,6 +764,7 @@ await bleService.sendOpenCommand(passwordBytes);
 >   - **중요**: 시간대가 겹치는 스케줄이 여러 섹션에 설정되면 안 됨 (앱 레벨에서 검증 필요)
 >
 > **자동 선택 기능**:
+>
 > - 관리자가 특정 시간대/날짜 범위에 특정 섹션을 자동 선택되도록 설정 가능
 > - 앱 진입 시 현재 시간/날짜가 스케줄 범위에 해당하면 해당 섹션 자동 선택
 > - 해당하는 스케줄이 없으면 랜덤으로 섹션 선택
@@ -723,6 +772,7 @@ await bleService.sendOpenCommand(passwordBytes);
 > - 시간대가 NULL이면 스케줄 기능 비활성화 (랜덤 선택)
 >
 > **사용 예시**:
+>
 > ```sql
 > -- 홈 화면 섹션 순서 설정
 > INSERT INTO home_sections (sectionType, orderIndex, adCategoryId) VALUES
@@ -776,28 +826,29 @@ await bleService.sendOpenCommand(passwordBytes);
 > - home_sections에서 ANNOUNCEMENT 타입으로 표시
 > - 여러 개 등록 가능하지만 보통 소수만 사용
 
-
 ---
 
 ## ✓ 광고 시스템 테이블
 
 ### Table: `advertisers` (광고 업체 정보)
 
-| Column                | Type        | Notes                                                   |
-| --------------------- | ----------- | ------------------------------------------------------- |
-| id                    | uuid        | **PK**                                                  |
-| createdAt             | timestamptz | DEFAULT now()                                           |
-| businessName          | text        | 상호명                                                  |
-| representativeName    | text        | 대표자명                                                |
-| email                 | text        | 이메일 (NULL 가능)                                      |
-| contactPhoneNumber    | text        | 광고주 연락처 (관리용, 비공개)                          |
-| displayPhoneNumber    | text        | 광고 표시용 전화번호 (앱에서 보여질 공개 번호) (NULL 가능) |
-| address               | text        | 영업점 주소 (실제 위치)                                 |
-| businessRegistration  | text        | 사업자등록증 이미지 URL (NULL 가능)                     |
-| contractDocument      | text        | 계약서 이미지 URL (NULL 가능)                           |
-| contractMemo          | text        | 계약 메모 (NULL 가능)                                   |
-| searchTags            | text[]      | 검색용 태그 배열 - 지역, 아파트, 상호명 조합 (NULL 가능) |
-| createdBy             | uuid        | **FK** → `user.id` - 등록한 매니저                      |
+| Column                     | Type        | Notes                                                          |
+| -------------------------- | ----------- | -------------------------------------------------------------- |
+| id                         | uuid        | **PK**                                                         |
+| createdAt                  | timestamptz | DEFAULT now()                                                  |
+| businessName               | text        | 상호명                                                         |
+| representativeName         | text        | 대표자명                                                       |
+| email                      | text        | 이메일 (NULL 가능)                                             |
+| contactPhoneNumber         | text        | 광고주 연락처 (관리용, 비공개)                                 |
+| displayPhoneNumber         | text        | 광고 표시용 전화번호 (앱에서 보여질 공개 번호) (NULL 가능)     |
+| address                    | text        | 영업점 주소 (실제 위치)                                        |
+| businessRegistration       | text        | 사업자등록증 이미지 URL (NULL 가능)                            |
+| businessRegistrationNumber | text        | 사업자등록번호 (NULL 가능)                                     |
+| contractDocument           | text        | 계약서 이미지 URL (NULL 가능)                                  |
+| contractMemo               | text        | 계약 메모 (NULL 가능)                                          |
+| searchTags                 | text[]      | 검색용 태그 배열 - 지역, 아파트, 상호명 조합 (NULL 가능)       |
+| categoryId                 | uuid        | **FK** → `ad_categories.id` - 광고주의 주 카테고리 (NULL 가능) |
+| createdBy                  | uuid        | **FK** → `user.id` - 등록한 매니저                             |
 
 > **설명**:
 >
@@ -809,81 +860,50 @@ await bleService.sendOpenCommand(passwordBytes);
 > **제약조건**:
 >
 > - `createdBy` **FK** → `user.id` **ON DELETE SET NULL**
+> - `categoryId` **FK** → `ad_categories.id` **ON DELETE SET NULL**
 
 ---
 
 ### Table: `ad_categories` (광고 카테고리)
 
-| Column             | Type        | Notes                                   |
-| ------------------ | ----------- | --------------------------------------- |
-| id                 | uuid        | **PK**                                  |
-| createdAt          | timestamptz | DEFAULT now()                           |
-| categoryName       | text        | 카테고리 이름 (예: 필라테스, 영어학원) |
-| iconUrl            | text        | 카테고리 아이콘 URL (NULL 가능)         |
-| weekdayEnabled     | bool        | 평일 노출 여부 (DEFAULT true)           |
-| weekdayStartTime   | time        | 평일 시작 시간 (NULL = 제한 없음)       |
-| weekdayEndTime     | time        | 평일 종료 시간 (NULL = 제한 없음)       |
-| weekendEnabled     | bool        | 주말 노출 여부 (DEFAULT true)           |
-| weekendStartTime   | time        | 주말 시작 시간 (NULL = 제한 없음)       |
-| weekendEndTime     | time        | 주말 종료 시간 (NULL = 제한 없음)       |
-| isActive           | bool        | DEFAULT true - 활성화 여부              |
+| Column       | Type        | Notes                                  |
+| ------------ | ----------- | -------------------------------------- |
+| id           | uuid        | **PK**                                 |
+| createdAt    | timestamptz | DEFAULT now()                          |
+| categoryName | text        | 카테고리 이름 (예: 필라테스, 영어학원) |
+| iconUrl      | text        | 카테고리 아이콘 URL (NULL 가능)        |
+| isActive     | bool        | DEFAULT true - 활성화 여부             |
 
 > **설명**:
 >
-> - 광고 카테고리별 노출 시간 제어
-> - 평일/주말 각각 다른 시간 설정 가능
-> - 카테고리 전체가 시간대별로 노출/숨김
->
-> **시간 제어 예시**:
->
-> ```sql
-> -- 평일 9시~18시, 주말 10시~17시 노출
-> INSERT INTO ad_categories (
->   categoryName,
->   weekdayEnabled, weekdayStartTime, weekdayEndTime,
->   weekendEnabled, weekendStartTime, weekendEndTime
-> ) VALUES (
->   '필라테스',
->   true, '09:00', '18:00',
->   true, '10:00', '17:00'
-> );
->
-> -- 평일만 노출, 주말 숨김
-> INSERT INTO ad_categories (
->   categoryName,
->   weekdayEnabled, weekdayStartTime, weekdayEndTime,
->   weekendEnabled
-> ) VALUES (
->   '학원',
->   true, '09:00', '18:00',
->   false
-> );
-> ```
+> - 광고 카테고리 기본 정보 관리
+> - 홈 섹션에서 사용되는 광고 카테고리 정의
+> - ~~시간 제어 기능은 제거됨~~ (weekday/weekend 컬럼 삭제됨)
 
 ---
 
 ### Table: `advertisements` (광고)
 
-| Column         | Type        | Notes                                                                   |
-| -------------- | ----------- | ----------------------------------------------------------------------- |
-| id             | uuid        | **PK**                                                                  |
-| createdAt      | timestamptz | DEFAULT now()                                                           |
-| advertiserId   | uuid        | **FK** → `advertisers.id` **ON DELETE CASCADE**                         |
-| categoryId     | uuid        | **FK** → `ad_categories.id` **ON DELETE SET NULL**                      |
-| adType         | text        | `NEIGHBORHOOD` \| `REGION` - 동네 광고 or 지역 광고                     |
-| title          | text        | 광고 제목                                                               |
-| imageUrl       | text        | 광고 이미지 URL                                                         |
-| description    | text        | 소개내용 (광고별 세부 설명) (NULL 가능)                                 |
-| linkUrl        | text        | 클릭 시 이동할 URL (NULL 가능)                                          |
-| startDate      | timestamptz | 광고 게시 시작일                                                        |
-| endDate        | timestamptz | 광고 게시 종료일                                                        |
-| createdBy      | uuid        | **FK** → `user.id` - 등록한 매니저                                      |
-| isActive       | bool        | DEFAULT true - 활성화 여부                                              |
-| isEvent        | bool        | DEFAULT false - 이벤트 광고 여부 (true: 이벤트 섹션에 표시)             |
-| eventStartDate | timestamptz | 이벤트 시작일 (이벤트인 경우 필수) (NULL 가능)                          |
-| eventEndDate   | timestamptz | 이벤트 종료일 (이벤트인 경우 필수) (NULL 가능)                          |
-| eventDescription | text      | 이벤트 전용 소개글 (이벤트인 경우 사용) (NULL 가능)                      |
-| clickCount     | integer     | DEFAULT 0 - 광고 클릭 횟수 (사용자가 광고를 클릭할 때마다 증가)         |
+| Column           | Type        | Notes                                                           |
+| ---------------- | ----------- | --------------------------------------------------------------- |
+| id               | uuid        | **PK**                                                          |
+| createdAt        | timestamptz | DEFAULT now()                                                   |
+| advertiserId     | uuid        | **FK** → `advertisers.id` **ON DELETE CASCADE**                 |
+| categoryId       | uuid        | **FK** → `ad_categories.id` **ON DELETE SET NULL**              |
+| adType           | text        | `NEIGHBORHOOD` \| `REGION` - 동네 광고 or 지역 광고             |
+| title            | text        | 광고 제목                                                       |
+| imageUrl         | text        | 광고 이미지 URL                                                 |
+| description      | text        | 소개내용 (광고별 세부 설명) (NULL 가능)                         |
+| linkUrl          | text        | 클릭 시 이동할 URL (NULL 가능)                                  |
+| startDate        | timestamptz | 광고 게시 시작일                                                |
+| endDate          | timestamptz | 광고 게시 종료일                                                |
+| createdBy        | uuid        | **FK** → `user.id` - 등록한 매니저                              |
+| isActive         | bool        | DEFAULT true - 활성화 여부                                      |
+| isEvent          | bool        | DEFAULT false - 이벤트 광고 여부 (true: 이벤트 섹션에 표시)     |
+| eventStartDate   | timestamptz | 이벤트 시작일 (이벤트인 경우 필수) (NULL 가능)                  |
+| eventEndDate     | timestamptz | 이벤트 종료일 (이벤트인 경우 필수) (NULL 가능)                  |
+| eventDescription | text        | 이벤트 전용 소개글 (이벤트인 경우 사용) (NULL 가능)             |
+| clickCount       | integer     | DEFAULT 0 - 광고 클릭 횟수 (사용자가 광고를 클릭할 때마다 증가) |
 
 > **설명**:
 >
@@ -951,12 +971,12 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `advertisement_apartments` (광고-아파트 연결)
 
-| Column          | Type        | Notes                                            |
-| --------------- | ----------- | ------------------------------------------------ |
-| id              | uuid        | **PK**                                           |
+| Column          | Type        | Notes                                              |
+| --------------- | ----------- | -------------------------------------------------- |
+| id              | uuid        | **PK**                                             |
 | advertisementId | uuid        | **FK** → `advertisements.id` **ON DELETE CASCADE** |
 | apartmentId     | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE**     |
-| createdAt       | timestamptz | DEFAULT now()                                    |
+| createdAt       | timestamptz | DEFAULT now()                                      |
 
 > **설명**:
 >
@@ -1013,14 +1033,14 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `manager_profiles` (매니저 추가 정보)
 
-| Column               | Type        | Notes                                       |
-| -------------------- | ----------- | ------------------------------------------- |
-| id                   | uuid        | **PK**                                      |
-| userId               | uuid        | **FK** → `user.id` **ON DELETE CASCADE**    |
-| businessRegistration | text        | 사업자등록증 URL (선택)                     |
-| address              | text        | 주소 (NULL 가능)                            |
-| memo                 | text        | 메모 (NULL 가능)                            |
-| createdAt            | timestamptz | DEFAULT now()                               |
+| Column               | Type        | Notes                                    |
+| -------------------- | ----------- | ---------------------------------------- |
+| id                   | uuid        | **PK**                                   |
+| userId               | uuid        | **FK** → `user.id` **ON DELETE CASCADE** |
+| businessRegistration | text        | 사업자등록증 URL (선택)                  |
+| address              | text        | 주소 (NULL 가능)                         |
+| memo                 | text        | 메모 (NULL 가능)                         |
+| createdAt            | timestamptz | DEFAULT now()                            |
 
 > **설명**:
 >
@@ -1036,12 +1056,12 @@ await bleService.sendOpenCommand(passwordBytes);
 
 ### Table: `manager_apartments` (매니저-아파트 연결)
 
-| Column      | Type        | Notes                                        |
-| ----------- | ----------- | -------------------------------------------- |
-| id          | uuid        | **PK**                                       |
-| managerId   | uuid        | **FK** → `user.id` **ON DELETE CASCADE**     |
+| Column      | Type        | Notes                                          |
+| ----------- | ----------- | ---------------------------------------------- |
+| id          | uuid        | **PK**                                         |
+| managerId   | uuid        | **FK** → `user.id` **ON DELETE CASCADE**       |
 | apartmentId | uuid        | **FK** → `apartments.id` **ON DELETE CASCADE** |
-| createdAt   | timestamptz | DEFAULT now() - 아파트 등록일                |
+| createdAt   | timestamptz | DEFAULT now() - 아파트 등록일                  |
 
 > **설명**:
 >
@@ -1159,7 +1179,6 @@ USING (
 | description | text        | 메시지 설명 (NULL 가능)                                |
 | createdAt   | timestamptz | DEFAULT now()                                          |
 
-
 > **설명**:
 >
 > - 앱 전역에서 사용되는 다이얼로그 메시지를 동적으로 관리
@@ -1204,15 +1223,15 @@ USING (
 
 ### Table: `phone_verifications`
 
-| Column            | Type        | Notes                                       |
-| ----------------- | ----------- | ------------------------------------------- |
-| id                | uuid        | **PK**                                      |
-| phone_number      | text        | 인증할 전화번호                             |
-| verification_code | text        | 인증 코드                                   |
-| created_at        | timestamptz | 생성 시간 (DEFAULT now())                   |
-| expires_at        | timestamptz | 만료 시간 (DEFAULT now() + 3분)             |
-| verified          | boolean     | 인증 완료 여부 (DEFAULT false)              |
-| attempts          | integer     | 인증 시도 횟수 (DEFAULT 0)                  |
+| Column            | Type        | Notes                           |
+| ----------------- | ----------- | ------------------------------- |
+| id                | uuid        | **PK**                          |
+| phone_number      | text        | 인증할 전화번호                 |
+| verification_code | text        | 인증 코드                       |
+| created_at        | timestamptz | 생성 시간 (DEFAULT now())       |
+| expires_at        | timestamptz | 만료 시간 (DEFAULT now() + 3분) |
+| verified          | boolean     | 인증 완료 여부 (DEFAULT false)  |
+| attempts          | integer     | 인증 시도 횟수 (DEFAULT 0)      |
 
 > **설명**:
 >
@@ -1250,73 +1269,140 @@ USING (
 
 ---
 
+## ✓ 앱 버전 관리
+
+### Table: `app_versions`
+
+| Column             | Type        | Notes                             |
+| ------------------ | ----------- | --------------------------------- |
+| id                 | uuid        | **PK**                            |
+| platform           | text        | 플랫폼 (android/ios) - **UNIQUE** |
+| latestversion      | text        | 최신 버전 (예: "1.0.5")           |
+| minrequiredversion | text        | 최소 요구 버전 (예: "1.0.0")      |
+| updateurl          | text        | 업데이트 URL (스토어 링크)        |
+| releasenotes       | text        | 릴리스 노트 (NULL 가능)           |
+| createdat          | timestamptz | 생성 시간 (DEFAULT now())         |
+| updatedat          | timestamptz | 수정 시간 (DEFAULT now())         |
+
+> **설명**:
+>
+> - 앱 버전 관리 및 강제 업데이트 제어
+> - 플랫폼별(android/ios) 버전 정보 관리
+> - `latestversion`: 최신 버전 (앱 시작 시 비교하여 업데이트 알림 표시)
+> - `minrequiredversion`: 최소 요구 버전 (이보다 낮으면 강제 업데이트)
+>
+> **제약조건**:
+>
+> - `UNIQUE (platform)`: 플랫폼당 하나의 레코드만 존재
+>
+> **사용 예시**:
+>
+> ```dart
+> // 현재 앱 버전 확인
+> final currentVersion = '1.0.3';
+> final platform = Platform.isAndroid ? 'android' : 'ios';
+>
+> // DB에서 버전 정보 조회
+> final versionInfo = await supabase
+>   .from('app_versions')
+>   .select()
+>   .eq('platform', platform)
+>   .single();
+>
+> final latestVersion = versionInfo['latestversion'];
+> final minRequiredVersion = versionInfo['minrequiredversion'];
+>
+> // 버전 비교 (패키지: package_info_plus, version 사용)
+> if (Version.parse(currentVersion) < Version.parse(minRequiredVersion)) {
+>   // 강제 업데이트 다이얼로그 표시
+>   showForceUpdateDialog();
+> } else if (Version.parse(currentVersion) < Version.parse(latestVersion)) {
+>   // 선택적 업데이트 다이얼로그 표시
+>   showOptionalUpdateDialog();
+> }
+> ```
+>
+> **관리자 업데이트 예시**:
+>
+> ```sql
+> -- Android 버전 업데이트
+> UPDATE app_versions
+> SET latestversion = '1.0.6',
+>     minrequiredversion = '1.0.2',
+>     releasenotes = '버그 수정 및 성능 개선',
+>     updatedat = now()
+> WHERE platform = 'android';
+> ```
+
+---
+
 ## ✓ 성능 최적화 인덱스
 
 ### 광고 시스템 인덱스
 
-| 인덱스명                                  | 테이블                    | 컬럼                                       | 설명                                 |
-| ----------------------------------------- | ------------------------- | ------------------------------------------ | ------------------------------------ |
-| idx_advertisements_active_dates_partial   | advertisements            | startDate, endDate (WHERE isActive = true) | **활성 광고 날짜 범위 조회 (핵심, Partial)** |
-| idx_advertisements_category_active        | advertisements            | categoryId, isActive                       | **카테고리별 광고 조회 (핵심)**      |
-| idx_advertisements_category_id            | advertisements            | categoryId                                 | 카테고리별 광고 조회                 |
-| idx_advertisements_ad_type                | advertisements            | adType                                     | 광고 타입별 조회                     |
-| idx_advertisements_dates                  | advertisements            | startDate, endDate                         | 광고 날짜 범위 조회                  |
-| idx_advertisements_created_by             | advertisements            | createdBy                                  | 매니저별 광고 조회                   |
-| idx_advertisers_created_by                | advertisers               | createdBy                                  | 매니저별 광고 업체 조회              |
-| idx_ad_apts_ad_id                         | advertisement_apartments  | advertisementId                            | 광고-아파트 연결 조회                |
-| idx_ad_regions_ad_id                      | advertisement_regions     | advertisementId                            | **광고-지역 연결 조회 (핵심)**       |
-| idx_ad_regions_region                     | advertisement_regions     | regionSido, regionSigungu, regionDong      | **지역별 광고 필터링 (핵심)**        |
-| idx_ad_categories_order_active            | ad_categories             | orderIndex, isActive (WHERE isActive)      | 카테고리 정렬 조회 (Partial)         |
+| 인덱스명                                | 테이블                   | 컬럼                                       | 설명                                         |
+| --------------------------------------- | ------------------------ | ------------------------------------------ | -------------------------------------------- |
+| idx_advertisements_active_dates_partial | advertisements           | startDate, endDate (WHERE isActive = true) | **활성 광고 날짜 범위 조회 (핵심, Partial)** |
+| idx_advertisements_category_active      | advertisements           | categoryId, isActive                       | **카테고리별 광고 조회 (핵심)**              |
+| idx_advertisements_category_id          | advertisements           | categoryId                                 | 카테고리별 광고 조회                         |
+| idx_advertisements_ad_type              | advertisements           | adType                                     | 광고 타입별 조회                             |
+| idx_advertisements_dates                | advertisements           | startDate, endDate                         | 광고 날짜 범위 조회                          |
+| idx_advertisements_created_by           | advertisements           | createdBy                                  | 매니저별 광고 조회                           |
+| idx_advertisers_created_by              | advertisers              | createdBy                                  | 매니저별 광고 업체 조회                      |
+| idx_ad_apts_ad_id                       | advertisement_apartments | advertisementId                            | 광고-아파트 연결 조회                        |
+| idx_ad_regions_ad_id                    | advertisement_regions    | advertisementId                            | **광고-지역 연결 조회 (핵심)**               |
+| idx_ad_regions_region                   | advertisement_regions    | regionSido, regionSigungu, regionDong      | **지역별 광고 필터링 (핵심)**                |
+| idx_ad_categories_order_active          | ad_categories            | orderIndex, isActive (WHERE isActive)      | 카테고리 정렬 조회 (Partial)                 |
 
 ### 사용자 관련 인덱스
 
-| 인덱스명                 | 테이블     | 컬럼                                | 설명                                   |
-| ------------------------ | ---------- | ----------------------------------- | -------------------------------------- |
-| idx_user_region          | user       | regionSido, regionSigungu, regionDong | **사용자 지역 기반 광고 필터링 (핵심)** |
-| idx_user_apartment_id    | user       | apartmentId                         | 아파트별 사용자 조회                   |
-| idx_user_phone_number    | user       | phoneNumber                         | 전화번호 중복 체크                     |
+| 인덱스명              | 테이블 | 컬럼                                  | 설명                                    |
+| --------------------- | ------ | ------------------------------------- | --------------------------------------- |
+| idx_user_region       | user   | regionSido, regionSigungu, regionDong | **사용자 지역 기반 광고 필터링 (핵심)** |
+| idx_user_apartment_id | user   | apartmentId                           | 아파트별 사용자 조회                    |
+| idx_user_phone_number | user   | phoneNumber                           | 전화번호 중복 체크                      |
 
 ### 접근 권한 인덱스 (문 열기)
 
-| 인덱스명                           | 테이블            | 컬럼                             | 설명                                     |
-| ---------------------------------- | ----------------- | -------------------------------- | ---------------------------------------- |
-| idx_user_line_access_user_active   | user_line_access  | userId, isActive (WHERE isActive) | **사용자별 활성 접근 권한 (핵심)**       |
-| idx_user_line_access_line_id       | user_line_access  | lineId                           | 라인별 접근 권한 조회                    |
-| idx_user_roles_user_id             | user_roles        | userId                           | 사용자별 역할 조회                       |
-| idx_user_roles_role                | user_roles        | role                             | 역할별 사용자 조회                       |
+| 인덱스명                         | 테이블           | 컬럼                              | 설명                               |
+| -------------------------------- | ---------------- | --------------------------------- | ---------------------------------- |
+| idx_user_line_access_user_active | user_line_access | userId, isActive (WHERE isActive) | **사용자별 활성 접근 권한 (핵심)** |
+| idx_user_line_access_line_id     | user_line_access | lineId                            | 라인별 접근 권한 조회              |
+| idx_user_roles_user_id           | user_roles       | userId                            | 사용자별 역할 조회                 |
+| idx_user_roles_role              | user_roles       | role                              | 역할별 사용자 조회                 |
 
 ### 아파트 구조 인덱스
 
-| 인덱스명                              | 테이블                  | 컬럼         | 설명                 |
-| ------------------------------------- | ----------------------- | ------------ | -------------------- |
-| idx_apartments_name                   | apartments              | name         | 아파트명 검색        |
-| idx_apartment_buildings_apartment_id  | apartment_buildings     | apartmentId  | 아파트별 동 조회     |
-| idx_apartment_buildings_number        | apartment_buildings     | buildingNumber | 동 번호 검색         |
-| idx_apartment_lines_building_id       | apartment_lines         | buildingId   | 동별 라인 조회       |
-| idx_apartment_line_places_line_id     | apartment_line_places   | lineId       | 라인별 장소 조회     |
+| 인덱스명                             | 테이블                | 컬럼           | 설명             |
+| ------------------------------------ | --------------------- | -------------- | ---------------- |
+| idx_apartments_name                  | apartments            | name           | 아파트명 검색    |
+| idx_apartment_buildings_apartment_id | apartment_buildings   | apartmentId    | 아파트별 동 조회 |
+| idx_apartment_buildings_number       | apartment_buildings   | buildingNumber | 동 번호 검색     |
+| idx_apartment_lines_building_id      | apartment_lines       | buildingId     | 동별 라인 조회   |
+| idx_apartment_line_places_line_id    | apartment_line_places | lineId         | 라인별 장소 조회 |
 
 ### 기기 관련 인덱스
 
-| 인덱스명                   | 테이블   | 컬럼                          | 설명                         |
-| -------------------------- | -------- | ----------------------------- | ---------------------------- |
-| idx_devices_line_place_id  | devices  | linePlaceId                   | 장소별 기기 조회             |
-| idx_devices_active         | devices  | isWorking (WHERE isWorking)   | 활성 기기 조회 (Partial)     |
-| idx_devices_mac_address    | devices  | macAddress                    | **BLE MAC 주소 조회 (핵심)** |
+| 인덱스명                  | 테이블  | 컬럼                        | 설명                         |
+| ------------------------- | ------- | --------------------------- | ---------------------------- |
+| idx_devices_line_place_id | devices | linePlaceId                 | 장소별 기기 조회             |
+| idx_devices_active        | devices | isWorking (WHERE isWorking) | 활성 기기 조회 (Partial)     |
+| idx_devices_mac_address   | devices | macAddress                  | **BLE MAC 주소 조회 (핵심)** |
 
 ### 매니저 관련 인덱스
 
-| 인덱스명                          | 테이블              | 컬럼        | 설명                   |
-| --------------------------------- | ------------------- | ----------- | ---------------------- |
-| idx_manager_profiles_user_id      | manager_profiles    | userId      | 매니저 프로필 조회     |
-| idx_manager_apts_manager_id       | manager_apartments  | managerId   | 매니저별 관리 아파트   |
-| idx_manager_apts_apartment_id     | manager_apartments  | apartmentId | 아파트별 매니저 조회   |
+| 인덱스명                      | 테이블             | 컬럼        | 설명                 |
+| ----------------------------- | ------------------ | ----------- | -------------------- |
+| idx_manager_profiles_user_id  | manager_profiles   | userId      | 매니저 프로필 조회   |
+| idx_manager_apts_manager_id   | manager_apartments | managerId   | 매니저별 관리 아파트 |
+| idx_manager_apts_apartment_id | manager_apartments | apartmentId | 아파트별 매니저 조회 |
 
 ### 관리자 권한 인덱스
 
-| 인덱스명                        | 테이블        | 컬럼        | 설명                 |
-| ------------------------------- | ------------- | ----------- | -------------------- |
-| idx_admin_scopes_user_id        | admin_scopes  | userId      | 사용자별 관리 범위   |
-| idx_admin_scopes_apartment_id   | admin_scopes  | apartmentId | 아파트별 관리자 조회 |
+| 인덱스명                      | 테이블       | 컬럼        | 설명                 |
+| ----------------------------- | ------------ | ----------- | -------------------- |
+| idx_admin_scopes_user_id      | admin_scopes | userId      | 사용자별 관리 범위   |
+| idx_admin_scopes_apartment_id | admin_scopes | apartmentId | 아파트별 관리자 조회 |
 
 > **인덱스 타입**:
 >
@@ -1395,31 +1481,34 @@ managers/
 
 ## 업로드 규칙 요약
 
-| 항목                   | 버킷              | 경로                                              |
-| ---------------------- | ----------------- | ------------------------------------------------- |
-| **홈 배너 이미지**     | home-content      | `banners/{banner-id}.jpg`                         |
-| 홈 알림 이미지         | home-content      | `notifications/{notification-id}.jpg`             |
-| 카테고리 아이콘        | advertisements    | `categories/icons/{category-id}.png`              |
-| **고정 섹션 아이콘**   | advertisements    | `sections/icons/{section-id}.png`                 |
-| 광고주 사업자등록증    | advertisements    | `advertisers/business-registrations/{advertiser-id}.jpg` |
-| 광고주 계약서          | advertisements    | `advertisers/contracts/{advertiser-id}.pdf`       |
-| 광고 이미지            | advertisements    | `ads/{category-name}/{ad-id}.jpg`                 |
-| 매니저 사업자등록증    | managers          | `business-registrations/{manager-id}.jpg`         |
+| 항목                 | 버킷           | 경로                                                     |
+| -------------------- | -------------- | -------------------------------------------------------- |
+| **홈 배너 이미지**   | home-content   | `banners/{banner-id}.jpg`                                |
+| 홈 알림 이미지       | home-content   | `notifications/{notification-id}.jpg`                    |
+| 카테고리 아이콘      | advertisements | `categories/icons/{category-id}.png`                     |
+| **고정 섹션 아이콘** | advertisements | `sections/icons/{section-id}.png`                        |
+| 광고주 사업자등록증  | advertisements | `advertisers/business-registrations/{advertiser-id}.jpg` |
+| 광고주 계약서        | advertisements | `advertisers/contracts/{advertiser-id}.pdf`              |
+| 광고 이미지          | advertisements | `ads/{category-name}/{ad-id}.jpg`                        |
+| 매니저 사업자등록증  | managers       | `business-registrations/{manager-id}.jpg`                |
 
 ---
 
 ## 버킷 권한 설정 (RLS)
 
 ### home-content
+
 - **Public**: 모든 사용자 읽기 가능
 - **Upload**: SUPER_ADMIN만 업로드 가능
 
 ### advertisements
+
 - **Public**: 모든 사용자 읽기 가능
 - **Upload**: SUPER_ADMIN, MANAGER 업로드 가능
 - **Delete**: 본인이 생성한 파일만 삭제 가능
 
 ### managers
+
 - **Public**: 인증된 사용자만 읽기 가능
 - **Upload**: SUPER_ADMIN만 업로드 가능
 - **Delete**: SUPER_ADMIN만 삭제 가능
@@ -1434,6 +1523,7 @@ managers/
 **실행 주기**: `0 1 * * *` (매일 오전 1시)
 
 **수행 작업**:
+
 - 종료일이 지난 광고 자동 비활성화
 
 ```sql
@@ -1502,16 +1592,19 @@ SELECT cron.schedule(
 ## ✓ Cron Job 관리
 
 ### Job 조회
+
 ```sql
 SELECT * FROM cron.job ORDER BY jobid;
 ```
 
 ### Job 삭제
+
 ```sql
 SELECT cron.unschedule('job-name');
 ```
 
 ### Job 비활성화/활성화
+
 ```sql
 -- 비활성화
 UPDATE cron.job SET active = false WHERE jobname = 'job-name';
@@ -1526,15 +1619,15 @@ UPDATE cron.job SET active = true WHERE jobname = 'job-name';
 
 ### Table: `inquiries` (문의사항)
 
-| Column      | Type        | Notes                                        |
-| ----------- | ----------- | -------------------------------------------- |
-| id          | uuid        | **PK**                                       |
-| createdAt   | timestamptz | DEFAULT now()                                |
-| userId      | uuid        | **FK** → `user.id` **ON DELETE CASCADE**     |
-| content     | text        | 문의 내용                                    |
-| imageUrls   | text[]      | 첨부 이미지 URL 배열 (NULL 가능)             |
-| status      | text        | `PENDING` \| `ANSWERED` - 답변 상태          |
-| lastReplyAt | timestamptz | 마지막 답변 시간 (DEFAULT now())             |
+| Column      | Type        | Notes                                    |
+| ----------- | ----------- | ---------------------------------------- |
+| id          | uuid        | **PK**                                   |
+| createdAt   | timestamptz | DEFAULT now()                            |
+| userId      | uuid        | **FK** → `user.id` **ON DELETE CASCADE** |
+| content     | text        | 문의 내용                                |
+| imageUrls   | text[]      | 첨부 이미지 URL 배열 (NULL 가능)         |
+| status      | text        | `PENDING` \| `ANSWERED` - 답변 상태      |
+| lastReplyAt | timestamptz | 마지막 답변 시간 (DEFAULT now())         |
 
 > **설명**:
 >
@@ -1572,14 +1665,14 @@ UPDATE cron.job SET active = true WHERE jobname = 'job-name';
 
 ### Table: `inquiry_replies` (문의 답변)
 
-| Column     | Type        | Notes                                        |
-| ---------- | ----------- | -------------------------------------------- |
-| id         | uuid        | **PK**                                       |
-| inquiryId  | uuid        | **FK** → `inquiries.id` **ON DELETE CASCADE** |
-| createdAt  | timestamptz | DEFAULT now()                                |
-| userId     | uuid        | **FK** → `user.id` **ON DELETE SET NULL** (NULL 가능) |
-| content    | text        | 답변 내용 (텍스트만, 이미지 없음)            |
-| isAdmin    | bool        | DEFAULT false - 관리자 답변 여부             |
+| Column    | Type        | Notes                                                 |
+| --------- | ----------- | ----------------------------------------------------- |
+| id        | uuid        | **PK**                                                |
+| inquiryId | uuid        | **FK** → `inquiries.id` **ON DELETE CASCADE**         |
+| createdAt | timestamptz | DEFAULT now()                                         |
+| userId    | uuid        | **FK** → `user.id` **ON DELETE SET NULL** (NULL 가능) |
+| content   | text        | 답변 내용 (텍스트만, 이미지 없음)                     |
+| isAdmin   | bool        | DEFAULT false - 관리자 답변 여부                      |
 
 > **설명**:
 >
@@ -1629,6 +1722,7 @@ UPDATE cron.job SET active = true WHERE jobname = 'job-name';
 ### 문의하기 사용 예시
 
 #### 1. 문의 작성
+
 ```dart
 // 문의 생성
 await supabase.from('inquiries').insert({
@@ -1641,6 +1735,7 @@ await supabase.from('inquiries').insert({
 ```
 
 #### 2. 내 문의 목록 조회
+
 ```dart
 final inquiries = await supabase
   .from('inquiries')
@@ -1650,6 +1745,7 @@ final inquiries = await supabase
 ```
 
 #### 3. 문의 상세 조회 (답변 포함)
+
 ```dart
 // 문의 정보
 final inquiry = await supabase
@@ -1667,6 +1763,7 @@ final replies = await supabase
 ```
 
 #### 4. 사용자 추가 문의 (답변)
+
 ```dart
 await supabase.from('inquiry_replies').insert({
   'inquiryId': inquiryId,
@@ -1677,6 +1774,7 @@ await supabase.from('inquiry_replies').insert({
 ```
 
 #### 5. 관리자 답변
+
 ```dart
 // 답변 작성
 await supabase.from('inquiry_replies').insert({
@@ -1712,10 +1810,12 @@ user.id
 **경로**: `supabase/functions/send-approval-notification/index.ts`
 
 **트리거**: `trigger_user_approval` (user 테이블)
+
 - **조건**: `approvalStatus`가 'approve'로 변경될 때
 - **호출 함수**: `notify_user_approval()`
 
 **파라미터**:
+
 ```json
 {
   "userId": "uuid",
@@ -1724,12 +1824,14 @@ user.id
 ```
 
 **기능**:
+
 - 사용자 승인 완료 시 FCM 푸시 알림 전송
 - 알림 내용: "{userName}님, 회원 승인이 완료되었습니다."
 - 사용자의 모든 FCM 토큰으로 전송 (다중 기기 지원)
 - UNREGISTERED 토큰 자동 정리
 
 **호출 방식**:
+
 - Database Trigger에서 자동 호출 (pg_net.http_post)
 - user 테이블의 approvalStatus가 'approve'로 변경되면 자동 실행
 
@@ -1742,6 +1844,7 @@ user.id
 **트리거**: 수동 호출 (관리자가 문의에 답변할 때 애플리케이션에서 호출)
 
 **파라미터**:
+
 ```json
 {
   "userId": "uuid",
@@ -1751,12 +1854,14 @@ user.id
 ```
 
 **기능**:
+
 - 문의 답변 도착 시 FCM 푸시 알림 전송
 - 알림 내용: "문의하신 내용에 답변이 도착했습니다"
 - 사용자의 모든 FCM 토큰으로 전송 (다중 기기 지원)
 - UNREGISTERED 토큰 자동 정리
 
 **호출 방식**:
+
 - 관리자 앱에서 답변 작성 후 직접 호출
 - HTTP POST 요청
 
@@ -1767,10 +1872,12 @@ user.id
 **경로**: `supabase/functions/send-status-change-notification/index.ts`
 
 **트리거**: `trigger_user_status_change` (user 테이블)
+
 - **조건**: `approvalStatus`가 'suspended' 또는 'inactive'로 변경될 때
 - **호출 함수**: `notify_user_status_change()`
 
 **파라미터**:
+
 ```json
 {
   "userId": "uuid",
@@ -1779,6 +1886,7 @@ user.id
 ```
 
 **기능**:
+
 - 사용자 상태 변경 시 FCM 푸시 알림 전송
 - **suspended 알림**:
   - 제목: "승인 보류"
@@ -1790,6 +1898,7 @@ user.id
 - UNREGISTERED 토큰 자동 정리
 
 **호출 방식**:
+
 - Database Trigger에서 자동 호출 (pg_net.http_post)
 - user 테이블의 approvalStatus가 'suspended' 또는 'inactive'로 변경되면 자동 실행
 
@@ -1800,10 +1909,12 @@ user.id
 **경로**: `supabase/functions/send-reconfirm-rejection-notification/index.ts`
 
 **트리거**: `trigger_reconfirm_rejection` (user_reconfirm 테이블)
+
 - **조건**: `status`가 'pending'에서 'reject'로 변경될 때
 - **호출 함수**: `notify_reconfirm_rejection()`
 
 **파라미터**:
+
 ```json
 {
   "userId": "uuid",
@@ -1813,16 +1924,19 @@ user.id
 ```
 
 **기능**:
+
 - 재신청 거절 시 FCM 푸시 알림 전송
 - 알림 내용: "재신청이 거절되었습니다. 사유: {rejectionReason}"
 - 사용자의 모든 FCM 토큰으로 전송 (다중 기기 지원)
 - UNREGISTERED 토큰 자동 정리
 
 **호출 방식**:
+
 - Database Trigger에서 자동 호출 (pg_net.http_post)
 - user_reconfirm 테이블의 status가 'pending'에서 'reject'로 변경되면 자동 실행
 
 **재신청 승인 알림은?**
+
 - 재신청 승인 시 user.approvalStatus도 'approve'로 변경됨
 - 따라서 `send-approval-notification`이 자동으로 실행됨
 - 별도 알림 불필요 (중복 방지)
@@ -1839,12 +1953,14 @@ user.id
 **조건**: `NEW.approvalStatus = 'approve'`
 
 **동작**:
+
 1. user 테이블의 approvalStatus가 'approve'로 변경됨
 2. Trigger가 발동하여 `notify_user_approval()` 함수 실행
 3. 함수 내부에서 `pg_net.http_post`로 Edge Function 호출
 4. `send-approval-notification` Edge Function이 FCM 알림 전송
 
 **함수 정의**:
+
 ```sql
 CREATE OR REPLACE FUNCTION public.notify_user_approval()
 RETURNS trigger
@@ -1885,18 +2001,21 @@ $function$;
 **조건**: `NEW.approvalStatus IN ('suspended', 'inactive')`
 
 **동작**:
+
 1. user 테이블의 approvalStatus가 'suspended' 또는 'inactive'로 변경됨
 2. Trigger가 발동하여 `notify_user_status_change()` 함수 실행
 3. 함수 내부에서 `pg_net.http_post`로 Edge Function 호출
 4. `send-status-change-notification` Edge Function이 FCM 알림 전송
 
 **중복 알림 방지**:
+
 - `pending` → `suspended`: ✅ 알림 발송
 - `approve` → `inactive`: ✅ 알림 발송
 - `suspended` → `inactive`: ❌ 알림 없음 (이전 상태도 suspended/inactive)
 - `inactive` → `suspended`: ❌ 알림 없음 (이전 상태도 suspended/inactive)
 
 **함수 정의**:
+
 ```sql
 CREATE OR REPLACE FUNCTION public.notify_user_status_change()
 RETURNS trigger
@@ -1938,12 +2057,14 @@ $function$;
 **조건**: `OLD.status = 'pending' AND NEW.status = 'reject'`
 
 **동작**:
+
 1. user_reconfirm 테이블의 status가 'pending'에서 'reject'로 변경됨
 2. Trigger가 발동하여 `notify_reconfirm_rejection()` 함수 실행
 3. 함수 내부에서 `pg_net.http_post`로 Edge Function 호출
 4. `send-reconfirm-rejection-notification` Edge Function이 FCM 알림 전송
 
 **함수 정의**:
+
 ```sql
 CREATE OR REPLACE FUNCTION public.notify_reconfirm_rejection()
 RETURNS trigger
@@ -1974,6 +2095,7 @@ $function$;
 ```
 
 **트리거 정의**:
+
 ```sql
 CREATE TRIGGER trigger_reconfirm_rejection
 AFTER UPDATE ON user_reconfirm
@@ -2014,6 +2136,7 @@ $$ LANGUAGE plpgsql;
 ```
 
 **사용 예시**:
+
 ```dart
 await supabase.rpc('add_fcm_token', params: {
   'user_id': currentUserId,
@@ -2042,6 +2165,7 @@ $$ LANGUAGE plpgsql;
 ```
 
 **자동 호출**:
+
 - Edge Function에서 FCM 전송 실패 시 (UNREGISTERED 에러)
 - 무효한 토큰을 자동으로 DB에서 제거
 
@@ -2050,6 +2174,7 @@ $$ LANGUAGE plpgsql;
 ## ✓ Edge Functions 배포
 
 ### Dev 환경 배포
+
 ```bash
 # 개별 배포
 supabase functions deploy send-approval-notification --project-ref rlpcgnoebbclgoojylpv
@@ -2062,6 +2187,7 @@ supabase functions deploy send-approval-notification send-inquiry-reply-notifica
 ```
 
 ### Prod 환경 배포
+
 ```bash
 # 개별 배포
 supabase functions deploy send-approval-notification --project-ref szszfmjrfyqmgdklybts
