@@ -274,8 +274,7 @@ export default function UserReconfirmPage() {
     if (item.type === 'reconfirm') {
       router.push(`/admin/user-reconfirm/${item.id}`);
     } else {
-      // 보류 사용자는 회원관리 페이지로 이동
-      router.push(`/admin/users?search=${encodeURIComponent(item.userEmail)}`);
+      router.push(`/admin/user-reconfirm/user/${item.userId}`);
     }
   };
 

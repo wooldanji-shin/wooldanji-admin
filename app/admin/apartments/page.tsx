@@ -136,10 +136,21 @@ export default function ApartmentsPage() {
           )
         `);
 
-      // 아파트별 회원 정보도 가져오기 (openDoorCount 합계 계산용)
+      // 아파트별 문 열기 횟수 합계 (RPC로 DB 집계 → 행 제한 없음)
+      const { data: openDoorCounts } = await supabase
+        .rpc('get_apartment_open_door_counts');
+
+      const openDoorCountMap = new Map<string, number>(
+        (openDoorCounts || []).map((r: { apartment_id: string; total_open_door_count: number }) => [
+          r.apartment_id,
+          r.total_open_door_count,
+        ])
+      );
+
+      // 아파트별 회원 정보도 가져오기 (회원수 계산용)
       const { data: allUsers } = await supabase
         .from('user')
-        .select('apartmentId, openDoorCount')
+        .select('apartmentId')
         .eq('registrationType', 'APARTMENT');
 
       // 매니저인 경우 자신이 관리하는 아파트만 필터링
@@ -197,8 +208,8 @@ export default function ApartmentsPage() {
         const apartmentUsers = (allUsers || []).filter((u: any) => u.apartmentId === apt.id);
         const memberCount = apartmentUsers.length;
 
-        // 총 문 열기 횟수 계산
-        const totalOpenDoorCount = apartmentUsers.reduce((sum: number, u: any) => sum + (u.openDoorCount || 0), 0);
+        // 총 문 열기 횟수 (RPC 집계 결과에서 조회)
+        const totalOpenDoorCount = openDoorCountMap.get(apt.id) ?? 0;
 
         return {
           id: apt.id,

@@ -51,6 +51,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatLineRange } from '@/lib/utils/line';
 import { useDevicesPage, formatMacAddress } from './useDevicesPage';
+
+function formatLastOpenedAt(dateStr: string | null): string {
+  if (!dateStr) return '-';
+  const d = new Date(new Date(dateStr).toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 import type {
   Device,
   CommonDevice,
@@ -687,6 +694,7 @@ function DeviceCard({
             <span>MAC: {device.macAddress}</span>
           </div>
           <p>Password: {device.devicePassword}</p>
+          <p>마지막 문연 시간: {formatLastOpenedAt(device.lastOpenedAt)}</p>
         </div>
       </div>
       <div className='flex gap-2'>
@@ -767,6 +775,7 @@ function TableView({
               <TableHead>설치 장소</TableHead>
               <TableHead>MAC Address</TableHead>
               <TableHead>비밀번호</TableHead>
+              <TableHead>마지막 문연 시간</TableHead>
               <TableHead>등록일</TableHead>
               <TableHead className='text-right'>관리</TableHead>
             </TableRow>
@@ -774,7 +783,7 @@ function TableView({
           <TableBody>
             {isEmpty ? (
               <TableRow>
-                <TableCell colSpan={7} className='text-center py-8'>
+                <TableCell colSpan={8} className='text-center py-8'>
                   {searchTerm ? '검색 결과가 없습니다' : '등록된 기기가 없습니다'}
                 </TableCell>
               </TableRow>
@@ -801,6 +810,9 @@ function TableView({
                     </TableCell>
                     <TableCell className='font-mono text-sm'>{device.macAddress}</TableCell>
                     <TableCell>{device.devicePassword}</TableCell>
+                    <TableCell className='text-sm text-muted-foreground'>
+                      {formatLastOpenedAt(device.lastOpenedAt)}
+                    </TableCell>
                     <TableCell>
                       {new Date(device.createdAt).toLocaleDateString('ko-KR')}
                     </TableCell>
@@ -870,6 +882,9 @@ function TableView({
                       </TableCell>
                       <TableCell className='font-mono text-sm'>{device.macAddress}</TableCell>
                       <TableCell>{device.devicePassword}</TableCell>
+                      <TableCell className='text-sm text-muted-foreground'>
+                        {formatLastOpenedAt(device.lastOpenedAt)}
+                      </TableCell>
                       <TableCell>
                         {new Date(device.createdAt).toLocaleDateString('ko-KR')}
                       </TableCell>
@@ -1376,6 +1391,7 @@ function CommonDeviceCard({
             <span>MAC: {device.macAddress}</span>
           </div>
           <p>Password: {device.devicePassword}</p>
+          <p>마지막 문연 시간: {formatLastOpenedAt(device.lastOpenedAt)}</p>
         </div>
       </div>
       <div className='flex gap-2'>

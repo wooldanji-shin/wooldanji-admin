@@ -20,8 +20,6 @@ import {
   AlertCircle,
   Edit,
   Trash2,
-  Home,
-  Building2,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
@@ -44,10 +42,20 @@ interface Inquiry {
     name: string | null;
     email: string | null;
     phoneNumber: string | null;
+    birthDay: string | null;
     apartmentId: string | null;
     registrationType: 'APARTMENT' | 'GENERAL' | null;
     buildingNumber: number | null;
     unit: number | null;
+    address: string | null;
+    regionSido: string | null;
+    regionSigungu: string | null;
+    regionDong: string | null;
+    approvalStatus: string | null;
+    openDoorCount: number | null;
+    rssLevel: number | null;
+    platform: string | null;
+    createdAt: string | null;
     apartments?: {
       name: string;
     } | null;
@@ -114,10 +122,20 @@ export default function InquiryDetailPage() {
             name,
             email,
             phoneNumber,
+            birthDay,
             apartmentId,
             registrationType,
             buildingNumber,
             unit,
+            address,
+            regionSido,
+            regionSigungu,
+            regionDong,
+            approvalStatus,
+            openDoorCount,
+            rssLevel,
+            platform,
+            createdAt,
             apartments:apartmentId(name)
           )
         `)
@@ -418,54 +436,10 @@ export default function InquiryDetailPage() {
               </div>
             </CardHeader>
             <CardContent className='space-y-6'>
-              {/* User Info Card - Background style */}
-              <div className='bg-muted/50 rounded-lg p-4 space-y-3'>
-                <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-muted-foreground'>
-                  {inquiry.user?.name && (
-                    <div className='flex items-center gap-2'>
-                      <User className='h-4 w-4' />
-                      <span>{inquiry.user.name}</span>
-                    </div>
-                  )}
-                  {inquiry.user?.email && (
-                    <div className='flex items-center gap-2'>
-                      <Mail className='h-4 w-4' />
-                      <span className='truncate'>{inquiry.user.email}</span>
-                    </div>
-                  )}
-                  {inquiry.user?.phoneNumber && (
-                    <div className='flex items-center gap-2'>
-                      <Phone className='h-4 w-4' />
-                      <span>{inquiry.user.phoneNumber}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* User Type Information */}
-                <div className='pt-2 border-t border-border/50'>
-                  {inquiry.user?.registrationType === 'APARTMENT' ? (
-                    <div className='flex items-center gap-2 text-sm'>
-                      <Home className='h-4 w-4 text-primary' />
-                      <span className='font-medium'>아파트 회원:</span>
-                      <span className='text-muted-foreground'>
-                        {inquiry.user.apartments?.name || '정보 없음'}
-                        {inquiry.user.buildingNumber && inquiry.user.unit && (
-                          <>
-                            {' '}
-                            <Building2 className='h-3 w-3 inline mx-1' />
-                            {inquiry.user.buildingNumber}동 {inquiry.user.unit}호
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  ) : inquiry.user?.registrationType === 'GENERAL' ? (
-                    <div className='flex items-center gap-2 text-sm'>
-                      <User className='h-4 w-4 text-muted-foreground' />
-                      <span className='text-muted-foreground'>일반회원</span>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+              {/* User Info */}
+              {inquiry.user && (
+                <UserInfoGrid user={inquiry.user} />
+              )}
 
               <Separator />
 
@@ -664,6 +638,82 @@ export default function InquiryDetailPage() {
             );
           })()}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// UserInfoGrid
+// ============================================================
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div className='text-xs text-muted-foreground mb-0.5'>{label}</div>
+      <div className='text-sm'>{value ?? '-'}</div>
+    </div>
+  );
+}
+
+function UserInfoGrid({ user }: {
+  user: {
+    name: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+    birthDay: string | null;
+    apartmentId: string | null;
+    registrationType: 'APARTMENT' | 'GENERAL' | null;
+    buildingNumber: number | null;
+    unit: number | null;
+    address: string | null;
+    regionSido: string | null;
+    regionSigungu: string | null;
+    regionDong: string | null;
+    approvalStatus: string | null;
+    openDoorCount: number | null;
+    rssLevel: number | null;
+    platform: string | null;
+    createdAt: string | null;
+    apartments?: { name: string } | null;
+  };
+}) {
+  const registrationTypeLabel =
+    user.registrationType === 'APARTMENT' ? '아파트' :
+    user.registrationType === 'GENERAL' ? '일반' : '-';
+
+  const approvalStatusLabel =
+    user.approvalStatus === 'approve' ? '승인' :
+    user.approvalStatus === 'pending' ? '대기' :
+    user.approvalStatus === 'suspended' ? '보류' :
+    user.approvalStatus === 'inactive' ? '비활성' :
+    user.approvalStatus ?? '-';
+
+  return (
+    <div className='space-y-3'>
+      <div className='grid grid-cols-2 gap-3'>
+        <Field label='이름' value={user.name} />
+        <Field label='이메일' value={user.email} />
+        <Field label='전화번호' value={user.phoneNumber} />
+        <Field label='생년월일' value={user.birthDay} />
+      </div>
+      <Field label='아파트' value={user.apartments?.name} />
+      <div className='grid grid-cols-2 gap-3'>
+        <Field label='동' value={user.buildingNumber} />
+        <Field label='호' value={user.unit} />
+      </div>
+      <div className='grid grid-cols-2 gap-3'>
+        <Field label='주소' value={user.address} />
+        <Field
+          label='지역'
+          value={[user.regionSido, user.regionSigungu, user.regionDong].filter(Boolean).join(' ') || undefined}
+        />
+        <Field label='회원유형' value={registrationTypeLabel} />
+        <Field label='승인상태' value={approvalStatusLabel} />
+        <Field label='문 연 횟수' value={user.openDoorCount} />
+        <Field label='RSS 레벨' value={user.rssLevel} />
+        <Field label='가입일' value={user.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : undefined} />
+        <Field label='플랫폼' value={user.platform} />
       </div>
     </div>
   );
