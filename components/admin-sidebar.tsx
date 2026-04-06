@@ -33,6 +33,7 @@ const BADGE_KEYS: Record<string, string> = {
   '/admin/user-reconfirm': 'user_reconfirm',
   '/admin/inquiries': 'inquiries',
   '/admin/managers': 'managers',
+  '/admin/advertising-v2/applications': 'ad_applications',
 };
 
 // 로컬스토리지 키 접두사
@@ -84,6 +85,12 @@ const navigationItems = [
 ];
 
 const advertisingItems = [
+  {
+    name: '광고 신청 관리',
+    href: '/admin/advertising-v2/applications',
+    icon: ShieldAlert,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
   {
     name: '홈 섹션 관리',
     href: '/admin/advertising/categories',
@@ -143,6 +150,7 @@ interface NewCounts {
   users: number;
   user_reconfirm: number;
   managers: number;
+  ad_applications: number;
 }
 
 export function AdminSidebar() {
@@ -156,6 +164,7 @@ export function AdminSidebar() {
     users: 0,
     user_reconfirm: 0,
     managers: 0,
+    ad_applications: 0,
   });
 
   const supabase = createClient();
@@ -177,20 +186,29 @@ export function AdminSidebar() {
     try {
       const lastReadTimes = getLastReadTimes();
 
-      const { data, error } = await (supabase.rpc as any)('get_menu_new_counts', {
-        p_last_read_inquiries: lastReadTimes.inquiries || null,
-        p_last_read_users: lastReadTimes.users || null,
-        p_last_read_user_reconfirm: lastReadTimes.user_reconfirm || null,
-        p_last_read_managers: lastReadTimes.managers || null,
-      });
+      const [menuCountsResult, adApplicationsResult] = await Promise.all([
+        (supabase.rpc as any)('get_menu_new_counts', {
+          p_last_read_inquiries: lastReadTimes.inquiries || null,
+          p_last_read_users: lastReadTimes.users || null,
+          p_last_read_user_reconfirm: lastReadTimes.user_reconfirm || null,
+          p_last_read_managers: lastReadTimes.managers || null,
+        }),
+        supabase
+          .from('advertisements_v2')
+          .select('id', { count: 'exact', head: true })
+          .eq('adStatus', 'pending'),
+      ]);
 
-      if (error) {
-        console.error('Failed to fetch new counts:', error);
+      if (menuCountsResult.error) {
+        console.error('Failed to fetch new counts:', menuCountsResult.error);
         return;
       }
 
-      if (data) {
-        setNewCounts(data as NewCounts);
+      if (menuCountsResult.data) {
+        setNewCounts({
+          ...(menuCountsResult.data as NewCounts),
+          ad_applications: adApplicationsResult.count ?? 0,
+        });
       }
     } catch (err) {
       console.error('Failed to fetch new counts:', err);
@@ -310,6 +328,7 @@ export function AdminSidebar() {
                 {advertisingMenu.map((subItem) => {
                   const isActive = pathname === subItem.href;
                   const SubIcon = subItem.icon;
+                  const badgeCount = getBadgeCount(subItem.href);
 
                   return (
                     <Button
@@ -321,10 +340,18 @@ export function AdminSidebar() {
                         isActive &&
                           'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90'
                       )}
-                      onClick={() => router.push(subItem.href)}
+                      onClick={() => handleMenuClick(subItem.href)}
                     >
                       <SubIcon className='h-4 w-4' />
-                      {subItem.name}
+                      <span className='flex-1 text-left'>{subItem.name}</span>
+                      {badgeCount > 0 && (
+                        <Badge
+                          variant='destructive'
+                          className='h-5 min-w-5 px-1.5 text-xs font-medium'
+                        >
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </Badge>
+                      )}
                     </Button>
                   );
                 })}
