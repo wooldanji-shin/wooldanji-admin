@@ -47,11 +47,14 @@ export async function POST(
 
     const changes = ad.pendingChanges as Record<string, unknown>;
 
+    // subCategoryIds는 junction table로 처리 (advertisements_v2 컬럼에 없음)
+    const { subCategoryIds, ...adChanges } = changes;
+
     // pendingChanges를 실제 컬럼에 적용 + modificationStatus/pendingChanges 초기화
     const { error: updateError } = await supabase
       .from('advertisements_v2')
       .update({
-        ...changes,
+        ...adChanges,
         modificationStatus: null,
         modificationRejectedReason: null,
         pendingChanges: null,
@@ -62,6 +65,34 @@ export async function POST(
     if (updateError) {
       console.error('Failed to approve modification:', updateError);
       return NextResponse.json({ error: 'Failed to approve modification' }, { status: 500 });
+    }
+
+    // 서브카테고리 junction table 업데이트
+    if (Array.isArray(subCategoryIds)) {
+      const { error: deleteError } = await supabase
+        .from('advertisement_sub_categories_v2')
+        .delete()
+        .eq('advertisementId', id);
+
+      if (deleteError) {
+        console.error('Failed to delete sub categories:', deleteError);
+        return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+      }
+
+      if (subCategoryIds.length > 0) {
+        const rows = subCategoryIds.map((subId: string) => ({
+          advertisementId: id,
+          subCategoryId: subId,
+        }));
+        const { error: insertError } = await supabase
+          .from('advertisement_sub_categories_v2')
+          .insert(rows);
+
+        if (insertError) {
+          console.error('Failed to insert sub categories:', insertError);
+          return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+        }
+      }
     }
 
     return NextResponse.json({ success: true });

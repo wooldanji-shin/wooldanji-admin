@@ -242,10 +242,10 @@ export default function AdApplicationsPage() {
                         </TableCell>
                         <TableCell className='whitespace-nowrap text-muted-foreground'>
                           {app.ad_categories_v2?.categoryName ?? '-'}
-                          {app.ad_sub_categories_v2 && (
+                          {app.subCategoryNames.length > 0 && (
                             <>
                               <span className='mx-1'>›</span>
-                              {app.ad_sub_categories_v2.subCategoryName}
+                              {app.subCategoryNames.join(', ')}
                             </>
                           )}
                         </TableCell>

@@ -37,9 +37,7 @@ export interface AdApplication {
   ad_categories_v2: {
     categoryName: string;
   } | null;
-  ad_sub_categories_v2: {
-    subCategoryName: string;
-  } | null;
+  subCategoryNames: string[];
   apartments: ApartmentSummary[];
 }
 
@@ -106,7 +104,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           adminExtraMonths,
           partner_users:partnerId(businessName, displayPhoneNumber),
           ad_categories_v2:categoryId(categoryName),
-          ad_sub_categories_v2:subCategoryId(subCategoryName),
+          advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
           advertisement_apartments_v2(
             apartmentId,
             totalHouseholds,
@@ -143,7 +141,9 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         adminExtraMonths: row.adminExtraMonths,
         partner_users: row.partner_users,
         ad_categories_v2: row.ad_categories_v2,
-        ad_sub_categories_v2: row.ad_sub_categories_v2,
+        subCategoryNames: (row.advertisement_sub_categories_v2 ?? []).map(
+          (sc: any) => sc.ad_sub_categories_v2?.subCategoryName ?? ''
+        ).filter(Boolean),
         apartments: (row.advertisement_apartments_v2 ?? []).map((apt: any) => ({
           apartmentId: apt.apartmentId,
           apartmentName: apt.apartments?.name ?? '-',

@@ -140,6 +140,7 @@ export default function AdApplicationDetailPage({
     { label: '블로그', url: detail.blogUrl },
     { label: '유튜브', url: detail.youtubeUrl },
     { label: '인스타그램', url: detail.instagramUrl },
+    { label: '카카오톡 오픈채팅', url: detail.kakaoOpenChatUrl },
   ].filter((s) => s.url);
 
   return (
@@ -221,16 +222,16 @@ export default function AdApplicationDetailPage({
                     proposed={detail.pendingChanges.resolvedCategoryName}
                   />
                 )}
-                {detail.pendingChanges.resolvedSubCategoryName && (
+                {detail.pendingChanges.resolvedSubCategoryNames && detail.pendingChanges.resolvedSubCategoryNames.length > 0 && (
                   <CompareRow
                     label='서브카테고리'
-                    current={detail.subCategory?.subCategoryName ?? '-'}
-                    proposed={detail.pendingChanges.resolvedSubCategoryName}
+                    current={detail.subCategoryNames.join(', ') || '-'}
+                    proposed={detail.pendingChanges.resolvedSubCategoryNames.join(', ')}
                   />
                 )}
                 {/* SNS 링크 비교 */}
-                {(['naverMapUrl', 'blogUrl', 'youtubeUrl', 'instagramUrl'] as const).map((key) => {
-                  const labelMap = { naverMapUrl: '네이버 지도', blogUrl: '블로그', youtubeUrl: '유튜브', instagramUrl: '인스타그램' };
+                {(['naverMapUrl', 'blogUrl', 'youtubeUrl', 'instagramUrl', 'kakaoOpenChatUrl'] as const).map((key) => {
+                  const labelMap = { naverMapUrl: '네이버 지도', blogUrl: '블로그', youtubeUrl: '유튜브', instagramUrl: '인스타그램', kakaoOpenChatUrl: '카카오톡 오픈채팅' };
                   const proposed = detail.pendingChanges![key];
                   const current = detail[key];
                   if (proposed === undefined || proposed === current) return null;
@@ -433,10 +434,10 @@ export default function AdApplicationDetailPage({
                   <InfoRow label='카테고리'>
                     <span className='flex items-center gap-1 flex-wrap'>
                       <span>{detail.category?.categoryName ?? '-'}</span>
-                      {detail.subCategory && (
+                      {detail.subCategoryNames.length > 0 && (
                         <>
                           <span className='text-muted-foreground'>{'>'}</span>
-                          <span className='text-muted-foreground'>{detail.subCategory.subCategoryName}</span>
+                          <span className='text-muted-foreground'>{detail.subCategoryNames.join(', ')}</span>
                         </>
                       )}
                     </span>

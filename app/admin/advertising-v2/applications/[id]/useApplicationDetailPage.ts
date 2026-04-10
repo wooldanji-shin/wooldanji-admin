@@ -17,14 +17,15 @@ export interface PendingChanges {
   content?: string | null;
   imageUrls?: string[];
   categoryId?: string;
-  subCategoryId?: string | null;
+  subCategoryIds?: string[];
   naverMapUrl?: string | null;
   blogUrl?: string | null;
   youtubeUrl?: string | null;
   instagramUrl?: string | null;
+  kakaoOpenChatUrl?: string | null;
   // 비교용: 카테고리 이름 (훅에서 resolve)
   resolvedCategoryName?: string | null;
-  resolvedSubCategoryName?: string | null;
+  resolvedSubCategoryNames?: string[];
 }
 
 export interface AdApplicationDetail {
@@ -41,6 +42,7 @@ export interface AdApplicationDetail {
   blogUrl: string | null;
   youtubeUrl: string | null;
   instagramUrl: string | null;
+  kakaoOpenChatUrl: string | null;
   rejectReason: string | null;
   modificationStatus: string | null;
   modificationRejectedReason: string | null;
@@ -53,9 +55,7 @@ export interface AdApplicationDetail {
   category: {
     categoryName: string;
   } | null;
-  subCategory: {
-    subCategoryName: string;
-  } | null;
+  subCategoryNames: string[];
   apartments: ApartmentInfo[];
   pricePerHousehold: number;
   defaultDiscountRate: number;
@@ -127,7 +127,6 @@ export function useApplicationDetailPage(
             id,
             partnerId,
             categoryId,
-            subCategoryId,
             adStatus,
             paymentStatus,
             freeMonths,
@@ -142,13 +141,14 @@ export function useApplicationDetailPage(
             blogUrl,
             youtubeUrl,
             instagramUrl,
+            kakaoOpenChatUrl,
             rejectReason,
             modificationStatus,
             modificationRejectedReason,
             pendingChanges,
             partner_users:partnerId(businessName, displayPhoneNumber, representativeName),
             ad_categories_v2:categoryId(categoryName),
-            ad_sub_categories_v2:subCategoryId(subCategoryName),
+            advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
             advertisement_apartments_v2(
               apartmentId,
               totalHouseholds,
@@ -196,7 +196,7 @@ export function useApplicationDetailPage(
       if (row.pendingChanges) {
         const pc = row.pendingChanges as PendingChanges;
         let resolvedCategoryName: string | null = null;
-        let resolvedSubCategoryName: string | null = null;
+        let resolvedSubCategoryNames: string[] = [];
 
         if (pc.categoryId && pc.categoryId !== row.categoryId) {
           const { data: catData } = await supabase
@@ -207,16 +207,17 @@ export function useApplicationDetailPage(
           resolvedCategoryName = (catData as any)?.categoryName ?? null;
         }
 
-        if (pc.subCategoryId && pc.subCategoryId !== row.subCategoryId) {
+        if (pc.subCategoryIds && pc.subCategoryIds.length > 0) {
           const { data: subCatData } = await supabase
             .from('ad_sub_categories_v2')
             .select('subCategoryName')
-            .eq('id', pc.subCategoryId)
-            .single();
-          resolvedSubCategoryName = (subCatData as any)?.subCategoryName ?? null;
+            .in('id', pc.subCategoryIds);
+          resolvedSubCategoryNames = ((subCatData as any[]) ?? [])
+            .map((r) => r.subCategoryName as string)
+            .filter(Boolean);
         }
 
-        pendingChanges = { ...pc, resolvedCategoryName, resolvedSubCategoryName };
+        pendingChanges = { ...pc, resolvedCategoryName, resolvedSubCategoryNames };
       }
 
       const apartments: ApartmentInfo[] = (row.advertisement_apartments_v2 ?? []).map(
@@ -242,13 +243,16 @@ export function useApplicationDetailPage(
         blogUrl: row.blogUrl,
         youtubeUrl: row.youtubeUrl,
         instagramUrl: row.instagramUrl,
+        kakaoOpenChatUrl: row.kakaoOpenChatUrl,
         rejectReason: row.rejectReason,
         modificationStatus: row.modificationStatus ?? null,
         modificationRejectedReason: row.modificationRejectedReason ?? null,
         pendingChanges,
         partner: row.partner_users,
         category: row.ad_categories_v2,
-        subCategory: row.ad_sub_categories_v2,
+        subCategoryNames: (row.advertisement_sub_categories_v2 ?? []).map(
+          (sc: any) => sc.ad_sub_categories_v2?.subCategoryName ?? ''
+        ).filter(Boolean),
         apartments,
         pricePerHousehold: pricing?.pricePerHousehold ?? 70,
         defaultDiscountRate: effectiveDiscountRate,
