@@ -163,6 +163,14 @@ export default function AdApplicationDetailPage({
             <div className='flex items-center gap-2'>
               <StatusBadge status={detail.adStatus} />
               <ModificationBadge status={detail.modificationStatus} />
+              {detail.adStatus === 'pending' && detail.isFirstAd && (
+                <Badge
+                  variant='outline'
+                  className='text-sm font-medium px-2.5 py-0.5 bg-blue-100 text-blue-800 border-blue-200'
+                >
+                  첫광고
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -244,6 +252,72 @@ export default function AdApplicationDetailPage({
                     />
                   );
                 })}
+                {/* 아파트 비교 */}
+                {detail.pendingChanges.resolvedApartments && detail.pendingChanges.resolvedApartments.length > 0 && (() => {
+                  const discountRate = detail.approvedDiscountRate ?? detail.defaultDiscountRate;
+                  const calcFee = (apts: typeof detail.apartments) => {
+                    const total = apts.reduce((s, a) => s + a.totalHouseholds, 0);
+                    const original = Math.round(total * detail.pricePerHousehold / 10) * 10;
+                    return Math.round(original * (100 - discountRate) / 100 / 10) * 10;
+                  };
+                  const currentFee = detail.approvedMonthlyAmount ?? calcFee(detail.apartments);
+                  const newFee = calcFee(detail.pendingChanges!.resolvedApartments!);
+                  const diff = newFee - currentFee;
+                  return (
+                    <div className='space-y-2'>
+                      <p className='text-sm font-medium text-muted-foreground'>신청 아파트</p>
+                      <div className='grid grid-cols-2 gap-4'>
+                        <div>
+                          <p className='text-xs text-muted-foreground mb-1.5'>현재 ({detail.apartments.length}개)</p>
+                          <div className='space-y-1.5'>
+                            {detail.apartments.map((apt) => (
+                              <div key={apt.apartmentId} className='flex items-start gap-1.5 p-2 rounded border border-border/50 bg-white text-sm'>
+                                <Building2 className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
+                                <div>
+                                  <p className='font-medium text-foreground'>{apt.apartmentName}</p>
+                                  <p className='text-xs text-muted-foreground'>{apt.totalHouseholds.toLocaleString()}세대</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className='text-xs text-purple-600 mb-1.5 font-medium'>수정 요청 ({detail.pendingChanges!.resolvedApartments!.length}개)</p>
+                          <div className='space-y-1.5'>
+                            {detail.pendingChanges!.resolvedApartments!.map((apt) => (
+                              <div key={apt.apartmentId} className='flex items-start gap-1.5 p-2 rounded border-2 border-purple-300 bg-purple-50/50 text-sm'>
+                                <Building2 className='h-3.5 w-3.5 text-purple-500 mt-0.5 shrink-0' />
+                                <div>
+                                  <p className='font-medium text-foreground'>{apt.apartmentName}</p>
+                                  <p className='text-xs text-muted-foreground'>{apt.totalHouseholds.toLocaleString()}세대</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {/* 월 금액 변경 */}
+                      <div className='flex items-center justify-between p-3 rounded-lg bg-white border border-border/50 text-sm mt-1'>
+                        <span className='text-muted-foreground font-medium'>월 금액 변경</span>
+                        <div className='flex items-center gap-2 font-semibold'>
+                          <span className='text-foreground'>{currentFee.toLocaleString()}원</span>
+                          <span className='text-muted-foreground'>→</span>
+                          <span className='text-purple-700'>{newFee.toLocaleString()}원</span>
+                          {diff !== 0 && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${diff > 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString()}원
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {diff > 0 && (
+                        <p className='text-xs text-muted-foreground mt-1'>
+                          * 승인 시 남은 구독 기간 일할 계산하여 차액이 확정됩니다.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
                 {/* 이미지 비교 */}
                 {detail.pendingChanges.imageUrls && (
                   <div className='space-y-2'>
@@ -282,6 +356,28 @@ export default function AdApplicationDetailPage({
                     </div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 아파트 변경 차액 결제 대기 카드 */}
+          {detail.apartmentChangeStatus === 'pending_payment' && (
+            <Card className='border-orange-200 bg-orange-50/40'>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-base text-orange-800'>차액 결제 대기 중</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className='text-sm text-orange-700 mb-3'>
+                  아파트 변경 승인이 완료되었습니다. 파트너가 아래 금액을 결제해야 변경이 적용됩니다.
+                </p>
+                <div className='flex items-center justify-between p-3 rounded-lg bg-white border border-orange-200 text-sm'>
+                  <span className='text-muted-foreground font-medium'>파트너 청구 차액 (일할 계산)</span>
+                  <span className='font-bold text-orange-700 text-base'>
+                    {detail.pendingDiffAmount != null
+                      ? `${detail.pendingDiffAmount.toLocaleString()}원`
+                      : '-'}
+                  </span>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -596,22 +692,44 @@ export default function AdApplicationDetailPage({
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-5 py-2'>
+            {/* 비첫광고 안내 배너 + 예외 적용 체크박스 */}
+            {!detail.isFirstAd && (
+              <div className='flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md'>
+                <AlertCircle className='h-4 w-4 text-amber-600 mt-0.5 shrink-0' />
+                <div className='flex-1'>
+                  <p className='text-sm text-amber-800'>
+                    이 파트너는 이미 광고를 운영한 이력이 있습니다.
+                  </p>
+                  <label className='flex items-center gap-2 mt-2 cursor-pointer'>
+                    <input
+                      type='checkbox'
+                      checked={page.overrideEnabled}
+                      onChange={(e) => page.setOverrideEnabled(e.target.checked)}
+                    />
+                    <span className='text-sm text-amber-900 font-medium'>예외 적용 (파트너 협의 완료)</span>
+                  </label>
+                </div>
+              </div>
+            )}
             <div className='space-y-1.5'>
-              <label className='text-base font-medium'>추가 무료 개월 수</label>
+              <label className='text-base font-medium'>무료 개월 수</label>
               <Input
                 type='number'
                 min={0}
                 max={24}
                 placeholder='0'
-                value={page.adminExtraMonths || ''}
+                disabled={!detail.isFirstAd && !page.overrideEnabled}
+                value={page.freeMonths || ''}
                 onChange={(e) => {
                   const val = e.target.value;
-                  page.setAdminExtraMonths(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                  page.setFreeMonths(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
                 }}
               />
-              <p className='text-sm text-muted-foreground'>
-                총 무료 기간: <strong>{detail.freeMonths + page.adminExtraMonths}개월</strong>
-              </p>
+              {(detail.isFirstAd || page.overrideEnabled) && (
+                <p className='text-sm text-muted-foreground'>
+                  무료 기간: <strong>{page.freeMonths}개월</strong>
+                </p>
+              )}
             </div>
             <div className='space-y-1.5'>
               <label className='text-base font-medium'>첫 결제 할인율 (%)</label>
@@ -620,18 +738,21 @@ export default function AdApplicationDetailPage({
                 min={0}
                 max={100}
                 placeholder='0'
+                disabled={!detail.isFirstAd && !page.overrideEnabled}
                 value={page.discountRate || ''}
                 onChange={(e) => {
                   const val = e.target.value;
                   page.setDiscountRate(val === '' ? 0 : Math.min(100, Math.max(0, parseInt(val) || 0)));
                 }}
               />
-              <p className='text-sm text-muted-foreground'>
-                기본값: {detail.defaultDiscountRate}% &middot; 적용 후 월 결제금액:{' '}
-                <strong>
-                  {(Math.round((page.monthlyAmount * (1 - page.discountRate / 100)) / 10) * 10).toLocaleString()}원
-                </strong>
-              </p>
+              {(detail.isFirstAd || page.overrideEnabled) && (
+                <p className='text-sm text-muted-foreground'>
+                  적용 후 월 결제금액:{' '}
+                  <strong>
+                    {(Math.round((page.monthlyAmount * (1 - page.discountRate / 100)) / 10) * 10).toLocaleString()}원
+                  </strong>
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>

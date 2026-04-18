@@ -229,7 +229,18 @@ export default function AdApplicationsPage() {
                         onClick={() => handleRowClick(app.id)}
                       >
                         <TableCell className='font-medium whitespace-nowrap'>
-                          {app.partner_users?.businessName ?? '-'}
+                          <div className='flex items-center gap-1.5'>
+                            {app.partner_users?.businessName ?? '-'}
+                            {/* 첫광고 뱃지: hasHadRunningAd=false이면 표시 */}
+                            {app.partner_users?.hasHadRunningAd === false && (
+                              <span
+                                className='inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border'
+                                style={{ color: '#2563EB', backgroundColor: '#DBEAFE', borderColor: '#BFDBFE' }}
+                              >
+                                첫광고
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className='text-sm text-muted-foreground whitespace-nowrap'>
                           {app.partner_users?.displayPhoneNumber ?? '-'}

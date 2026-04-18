@@ -45,7 +45,7 @@ export async function POST(
 
     const { data: ad, error: fetchError } = await supabase
       .from('advertisements_v2')
-      .select('adStatus')
+      .select('adStatus, partnerId')
       .eq('id', id)
       .single();
 
@@ -69,6 +69,8 @@ export async function POST(
         adStatus: 'rejected',
         rejectReason: rejectReason.trim(),
         rejectedAt: new Date().toISOString(),
+        // 거절 시 isFirstAdApplication 초기화: 파트너가 재신청 시 다시 조건 평가 가능
+        isFirstAdApplication: false,
       })
       .eq('id', id);
 
@@ -78,6 +80,32 @@ export async function POST(
         { error: 'Failed to reject advertisement' },
         { status: 500 }
       );
+    }
+
+    // 광고 거절 FCM 알림 전송 (non-critical: 실패해도 거절 처리는 유지)
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/send-partner-fcm-notification`;
+
+      await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          partnerUserId: ad.partnerId,
+          title: '광고 심사 결과',
+          body: '신청하신 광고가 반려되었습니다. 앱에서 사유를 확인해주세요.',
+          type: 'ad_rejected',
+          navigationData: {
+            type: 'ad_detail',
+            params: { advertisementId: id },
+          },
+        }),
+      });
+    } catch (notificationError) {
+      console.error('광고 거절 알림 전송 실패 (non-critical):', notificationError);
     }
 
     return NextResponse.json({

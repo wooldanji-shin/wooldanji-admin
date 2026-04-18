@@ -22,6 +22,7 @@ import {
   HelpCircle,
   Image,
   ShieldAlert,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { logout, getUserRoles } from '@/lib/auth';
 import { useState, useEffect, useCallback } from 'react';
@@ -34,6 +35,7 @@ const BADGE_KEYS: Record<string, string> = {
   '/admin/inquiries': 'inquiries',
   '/admin/managers': 'managers',
   '/admin/advertising-v2/applications': 'ad_applications',
+  '/admin/membership-conversion': 'membership_conversion',
 };
 
 // 로컬스토리지 키 접두사
@@ -74,6 +76,12 @@ const navigationItems = [
     name: '승인보류/거절 관리',
     href: '/admin/user-reconfirm',
     icon: ShieldAlert,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '멤버십 전환 신청',
+    href: '/admin/membership-conversion',
+    icon: ArrowLeftRight,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
@@ -151,6 +159,7 @@ interface NewCounts {
   user_reconfirm: number;
   managers: number;
   ad_applications: number;
+  membership_conversion: number;
 }
 
 export function AdminSidebar() {
@@ -165,6 +174,7 @@ export function AdminSidebar() {
     user_reconfirm: 0,
     managers: 0,
     ad_applications: 0,
+    membership_conversion: 0,
   });
 
   const supabase = createClient();
@@ -186,7 +196,7 @@ export function AdminSidebar() {
     try {
       const lastReadTimes = getLastReadTimes();
 
-      const [menuCountsResult, adApplicationsResult] = await Promise.all([
+      const [menuCountsResult, adApplicationsResult, membershipConversionResult] = await Promise.all([
         (supabase.rpc as any)('get_menu_new_counts', {
           p_last_read_inquiries: lastReadTimes.inquiries || null,
           p_last_read_users: lastReadTimes.users || null,
@@ -197,6 +207,10 @@ export function AdminSidebar() {
           .from('advertisements_v2')
           .select('id', { count: 'exact', head: true })
           .eq('adStatus', 'pending'),
+        supabase
+          .from('partner_to_apartment_applications')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
       ]);
 
       if (menuCountsResult.error) {
@@ -208,6 +222,7 @@ export function AdminSidebar() {
         setNewCounts({
           ...(menuCountsResult.data as NewCounts),
           ad_applications: adApplicationsResult.count ?? 0,
+          membership_conversion: membershipConversionResult.count ?? 0,
         });
       }
     } catch (err) {

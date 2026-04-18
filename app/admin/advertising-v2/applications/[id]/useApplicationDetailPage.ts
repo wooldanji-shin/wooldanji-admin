@@ -23,9 +23,12 @@ export interface PendingChanges {
   youtubeUrl?: string | null;
   instagramUrl?: string | null;
   kakaoOpenChatUrl?: string | null;
+  apartments?: { apartmentId: string; totalHouseholds: number }[];
   // 비교용: 카테고리 이름 (훅에서 resolve)
   resolvedCategoryName?: string | null;
   resolvedSubCategoryNames?: string[];
+  // 비교용: 아파트 상세 (훅에서 resolve)
+  resolvedApartments?: ApartmentInfo[];
 }
 
 export interface AdApplicationDetail {
@@ -33,7 +36,6 @@ export interface AdApplicationDetail {
   adStatus: string;
   paymentStatus: string;
   freeMonths: number;
-  adminExtraMonths: number;
   submittedAt: string | null;
   title: string;
   content: string | null;
@@ -64,6 +66,11 @@ export interface AdApplicationDetail {
   nextBillingDate: string | null;
   approvedDiscountRate: number | null;
   approvedMonthlyAmount: number | null;
+  isFirstAd: boolean;
+  // 아파트 변경 상태 (pending_payment | pending_next_cycle | null)
+  apartmentChangeStatus: string | null;
+  // 승인 시점에 고정된 차액 결제 금액 (일할 계산 완료, pending_payment 상태에서만 유효)
+  pendingDiffAmount: number | null;
 }
 
 export interface UseApplicationDetailPageReturn {
@@ -73,8 +80,10 @@ export interface UseApplicationDetailPageReturn {
   setApproveDialog: (open: boolean) => void;
   rejectDialog: boolean;
   setRejectDialog: (open: boolean) => void;
-  adminExtraMonths: number;
-  setAdminExtraMonths: (v: number) => void;
+  freeMonths: number;
+  setFreeMonths: (v: number) => void;
+  overrideEnabled: boolean;
+  setOverrideEnabled: (v: boolean) => void;
   discountRate: number;
   setDiscountRate: (v: number) => void;
   rejectReason: string;
@@ -104,7 +113,8 @@ export function useApplicationDetailPage(
   const [loading, setLoading] = useState(true);
   const [approveDialog, setApproveDialog] = useState(false);
   const [rejectDialog, setRejectDialog] = useState(false);
-  const [adminExtraMonths, setAdminExtraMonths] = useState(0);
+  const [freeMonths, setFreeMonths] = useState(0);
+  const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [discountRate, setDiscountRate] = useState(28);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -130,10 +140,10 @@ export function useApplicationDetailPage(
             adStatus,
             paymentStatus,
             freeMonths,
-            adminExtraMonths,
             approvedDiscountRate,
             approvedMonthlyAmount,
             submittedAt,
+            isFirstAdApplication,
             title,
             content,
             imageUrls,
@@ -145,6 +155,8 @@ export function useApplicationDetailPage(
             rejectReason,
             modificationStatus,
             modificationRejectedReason,
+            apartmentChangeStatus,
+            pendingDiffAmount,
             pendingChanges,
             partner_users:partnerId(businessName, displayPhoneNumber, representativeName),
             ad_categories_v2:categoryId(categoryName),
@@ -170,16 +182,20 @@ export function useApplicationDetailPage(
       const row = adResult.data as any;
       const pricing = pricingResult.data as any;
 
-      const { count: pastAdCount } = await supabase
-        .from('advertisements_v2')
-        .select('id', { count: 'exact', head: true })
-        .eq('partnerId', row.partnerId)
-        .neq('id', adId)
-        .eq('adStatus', 'ended')
-        .eq('paymentStatus', 'paid');
+      // Design Ref: §5.1 — isFirstAdApplication(광고 레벨) + hasHadRunningAd(파트너 레벨) 이중 체크
+      // isFirstAdApplication: 제출 시점에 결정 (파트너당 1개만 true), 관리자 UX 가시성 기준
+      // hasHadRunningAd: running 전환 시 설정, 어뷰징 방어용 fallback
+      const { data: partnerData } = await supabase
+        .from('partner_users')
+        .select('hasHadRunningAd')
+        .eq('id', row.partnerId)
+        .single();
 
-      const hasPaymentHistory = (pastAdCount ?? 0) > 0;
-      const effectiveDiscountRate = hasPaymentHistory ? 0 : (pricing?.defaultDiscountRate ?? 28);
+      // isFirstAdApplication이 null이면(DB 컬럼 추가 전) hasHadRunningAd로 fallback
+      const isFirstAd = (row.isFirstAdApplication !== null && row.isFirstAdApplication !== undefined)
+        ? (row.isFirstAdApplication === true && !partnerData?.hasHadRunningAd)
+        : !partnerData?.hasHadRunningAd;
+      const effectiveDiscountRate = isFirstAd ? (pricing?.defaultDiscountRate ?? 28) : 0;
 
       // 활성 구독 정보 조회 (running 상태일 때 무료종료일, 다음결제일 표시용)
       const { data: subscription } = await supabase
@@ -217,7 +233,26 @@ export function useApplicationDetailPage(
             .filter(Boolean);
         }
 
-        pendingChanges = { ...pc, resolvedCategoryName, resolvedSubCategoryNames };
+        // pendingChanges 아파트 이름/주소 resolve
+        let resolvedApartments: ApartmentInfo[] = [];
+        if (pc.apartments && pc.apartments.length > 0) {
+          const aptIds = pc.apartments.map((a) => a.apartmentId);
+          const { data: aptRows } = await supabase
+            .from('apartments')
+            .select('id, name, address')
+            .in('id', aptIds);
+          resolvedApartments = pc.apartments.map((a) => {
+            const aptRow = (aptRows as any[])?.find((r) => r.id === a.apartmentId);
+            return {
+              apartmentId: a.apartmentId,
+              apartmentName: aptRow?.name ?? '-',
+              address: aptRow?.address ?? '-',
+              totalHouseholds: a.totalHouseholds,
+            };
+          });
+        }
+
+        pendingChanges = { ...pc, resolvedCategoryName, resolvedSubCategoryNames, resolvedApartments };
       }
 
       const apartments: ApartmentInfo[] = (row.advertisement_apartments_v2 ?? []).map(
@@ -234,7 +269,6 @@ export function useApplicationDetailPage(
         adStatus: row.adStatus,
         paymentStatus: row.paymentStatus,
         freeMonths: row.freeMonths,
-        adminExtraMonths: row.adminExtraMonths,
         submittedAt: row.submittedAt,
         title: row.title,
         content: row.content,
@@ -260,11 +294,17 @@ export function useApplicationDetailPage(
         approvedMonthlyAmount: row.approvedMonthlyAmount ?? null,
         freeEndDate: (subscription as any)?.freeEndDate ?? null,
         nextBillingDate: (subscription as any)?.nextBillingDate ?? null,
+        isFirstAd,
+        apartmentChangeStatus: row.apartmentChangeStatus ?? null,
+        pendingDiffAmount: row.pendingDiffAmount ?? null,
       };
 
       setDetail(mapped);
-      setAdminExtraMonths(mapped.adminExtraMonths ?? 0);
-      setDiscountRate(mapped.defaultDiscountRate);
+      // 다이얼로그 열릴 때 매번 초기화
+      // 첫광고이면 무료기간 기본 1개월, 아니면 0
+      setFreeMonths(isFirstAd ? 1 : 0);
+      setOverrideEnabled(false);
+      setDiscountRate(isFirstAd ? mapped.defaultDiscountRate : 0);
     } catch (err) {
       console.error('Failed to fetch detail:', err);
       toast.error('광고 신청 정보를 불러오는데 실패했습니다.');
@@ -287,7 +327,7 @@ export function useApplicationDetailPage(
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminExtraMonths, discountRate }),
+          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled }),
         }
       );
       if (!response.ok) {
@@ -404,8 +444,10 @@ export function useApplicationDetailPage(
     setApproveDialog,
     rejectDialog,
     setRejectDialog,
-    adminExtraMonths,
-    setAdminExtraMonths,
+    freeMonths,
+    setFreeMonths,
+    overrideEnabled,
+    setOverrideEnabled,
     discountRate,
     setDiscountRate,
     rejectReason,

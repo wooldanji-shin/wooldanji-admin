@@ -35,7 +35,7 @@ export async function POST(
 
     const { data: ad, error: fetchError } = await supabase
       .from('advertisements_v2')
-      .select('modificationStatus')
+      .select('modificationStatus, partnerId')
       .eq('id', id)
       .single();
 
@@ -60,6 +60,32 @@ export async function POST(
     if (updateError) {
       console.error('Failed to reject modification:', updateError);
       return NextResponse.json({ error: 'Failed to reject modification' }, { status: 500 });
+    }
+
+    // 수정 거절 FCM 알림 전송 (non-critical: 실패해도 거절 처리는 유지)
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/send-partner-fcm-notification`;
+
+      await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          partnerUserId: ad.partnerId,
+          title: '광고 수정 심사 결과',
+          body: '광고 수정 요청이 반려되었습니다. 앱에서 사유를 확인해주세요.',
+          type: 'ad_rejected',
+          navigationData: {
+            type: 'ad_detail',
+            params: { advertisementId: id },
+          },
+        }),
+      });
+    } catch (notificationError) {
+      console.error('수정 거절 알림 전송 실패 (non-critical):', notificationError);
     }
 
     return NextResponse.json({ success: true });
