@@ -373,9 +373,7 @@ export default function AdApplicationDetailPage({
                 <div className='flex items-center justify-between p-3 rounded-lg bg-white border border-orange-200 text-sm'>
                   <span className='text-muted-foreground font-medium'>파트너 청구 차액 (일할 계산)</span>
                   <span className='font-bold text-orange-700 text-base'>
-                    {detail.pendingDiffAmount != null
-                      ? `${detail.pendingDiffAmount.toLocaleString()}원`
-                      : '-'}
+                    결제 시점에 자동 산출
                   </span>
                 </div>
               </CardContent>

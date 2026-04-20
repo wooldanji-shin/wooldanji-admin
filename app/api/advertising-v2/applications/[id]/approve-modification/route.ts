@@ -82,10 +82,10 @@ export async function POST(
       // 아파트 변경 포함 — 4가지 케이스 분기
       const aptList = pendingApartments as { apartmentId: string; totalHouseholds: number }[];
 
-      // 현재 아파트 총 세대수 조회
+      // 현재 아파트 조회 (ID + 세대수)
       const { data: currentApts } = await supabase
         .from('advertisement_apartments_v2')
-        .select('"totalHouseholds"')
+        .select('"apartmentId", "totalHouseholds"')
         .eq('advertisementId', id);
 
       // 단가 조회
@@ -110,10 +110,60 @@ export async function POST(
         calcFee((currentApts ?? []) as { totalHouseholds: number }[]);
       const newFee = calcFee(aptList);
 
-      // 무료기간 여부 확인 + 일할 계산용 nextBillingDate, billingAnchorDay 함께 조회
+      // 실제 아파트 변경 여부 확인 (동일 아파트면 일반 텍스트 수정으로 처리)
+      const currentAptIds = new Set(
+        (currentApts ?? []).map((a: any) => a.apartmentId as string),
+      );
+      const newAptIds = new Set(aptList.map((a) => a.apartmentId));
+      const apartmentsActuallyChanged =
+        currentAptIds.size !== newAptIds.size ||
+        [...newAptIds].some((aptId) => !currentAptIds.has(aptId));
+
+      if (!apartmentsActuallyChanged) {
+        // 동일 아파트로 수정 신청이 들어온 경우 → 아파트 변경 없는 일반 수정으로 처리
+        const { error: updateError } = await supabase
+          .from('advertisements_v2')
+          .update({
+            ...adChanges,
+            apartmentChangeStatus: null,
+            modificationStatus: null,
+            modificationRejectedReason: null,
+            pendingChanges: null,
+            updatedAt: now,
+          })
+          .eq('id', id);
+
+        if (updateError) {
+          console.error('Failed to approve modification (same apartments):', updateError);
+          return NextResponse.json({ error: 'Failed to approve modification' }, { status: 500 });
+        }
+
+        // 서브카테고리 업데이트 후 바로 리턴
+        if (Array.isArray(subCategoryIds)) {
+          await supabase
+            .from('advertisement_sub_categories_v2')
+            .delete()
+            .eq('advertisementId', id);
+
+          if (subCategoryIds.length > 0) {
+            await supabase
+              .from('advertisement_sub_categories_v2')
+              .insert(
+                subCategoryIds.map((subId: string) => ({
+                  advertisementId: id,
+                  subCategoryId: subId,
+                })),
+              );
+          }
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      // 무료기간 여부 확인
       const { data: subscription } = await supabase
         .from('ad_subscriptions_v2')
-        .select('id, "freeEndDate", "nextBillingDate", "billingAnchorDay"')
+        .select('id, "freeEndDate"')
         .eq('advertisementId', id)
         .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
         .order('createdAt', { ascending: false })
@@ -152,47 +202,10 @@ export async function POST(
           // 케이스 2: 금액 증가 + 결제 이력 → 차액 결제 대기
           // 텍스트/아파트/서브카테고리 모두 결제 후 charge-apartment-difference EF에서 일괄 적용
           // pendingChanges 전체를 그대로 보존 (텍스트 + apartments 포함)
-
-          // 승인 시점에 일할 계산하여 pendingDiffAmount 고정
-          // (결제 시점과 관계없이 파트너에게 일관된 금액 표시)
-          const fullDiffAmount = newFee - currentFee;
-          let pendingDiffAmount = fullDiffAmount;
-
-          const sub = subscription as any;
-          if (sub?.nextBillingDate) {
-            const nextBilling = new Date(sub.nextBillingDate);
-            const anchorDay: number = sub.billingAnchorDay ?? nextBilling.getDate();
-            const approvalNow = new Date();
-
-            // 현재 사이클 시작일: setDate(1) 먼저 → setMonth → anchorDay 적용 (월말 오버플로우 방지)
-            const periodStart = new Date(nextBilling);
-            periodStart.setDate(1);
-            periodStart.setMonth(periodStart.getMonth() - 1);
-            const daysInStartMonth = new Date(
-              periodStart.getFullYear(),
-              periodStart.getMonth() + 1,
-              0,
-            ).getDate();
-            periodStart.setDate(Math.min(anchorDay, daysInStartMonth));
-
-            const MS_PER_DAY = 1000 * 60 * 60 * 24;
-            const totalCycleDays = Math.round(
-              (nextBilling.getTime() - periodStart.getTime()) / MS_PER_DAY
-            );
-            const remainingDays = Math.max(
-              1,
-              Math.round((nextBilling.getTime() - approvalNow.getTime()) / MS_PER_DAY)
-            );
-
-            if (totalCycleDays > 0 && remainingDays < totalCycleDays) {
-              pendingDiffAmount = Math.round((fullDiffAmount * remainingDays / totalCycleDays) / 10) * 10;
-              if (pendingDiffAmount <= 0) pendingDiffAmount = 10;
-            }
-          }
+          // 차액 금액은 DB에 저장하지 않음 — charge-apartment-difference EF가 호출 시점 now() 기준으로 동적 계산
 
           await supabase.from('advertisements_v2').update({
             apartmentChangeStatus: 'pending_payment',
-            pendingDiffAmount,
             modificationStatus: null,
             modificationRejectedReason: null,
             updatedAt: now,

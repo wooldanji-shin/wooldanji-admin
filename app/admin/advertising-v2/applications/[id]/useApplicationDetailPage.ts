@@ -69,8 +69,6 @@ export interface AdApplicationDetail {
   isFirstAd: boolean;
   // 아파트 변경 상태 (pending_payment | pending_next_cycle | null)
   apartmentChangeStatus: string | null;
-  // 승인 시점에 고정된 차액 결제 금액 (일할 계산 완료, pending_payment 상태에서만 유효)
-  pendingDiffAmount: number | null;
 }
 
 export interface UseApplicationDetailPageReturn {
@@ -156,7 +154,6 @@ export function useApplicationDetailPage(
             modificationStatus,
             modificationRejectedReason,
             apartmentChangeStatus,
-            pendingDiffAmount,
             pendingChanges,
             partner_users:partnerId(businessName, displayPhoneNumber, representativeName),
             ad_categories_v2:categoryId(categoryName),
@@ -296,7 +293,6 @@ export function useApplicationDetailPage(
         nextBillingDate: (subscription as any)?.nextBillingDate ?? null,
         isFirstAd,
         apartmentChangeStatus: row.apartmentChangeStatus ?? null,
-        pendingDiffAmount: row.pendingDiffAmount ?? null,
       };
 
       setDetail(mapped);
