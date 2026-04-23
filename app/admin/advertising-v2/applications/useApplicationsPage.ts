@@ -29,6 +29,7 @@ export interface AdApplication {
   modificationStatus: ModificationStatus;
   submittedAt: string | null;
   freeMonths: number;
+  isFirstAdApplication: boolean;
   partner_users: {
     businessName: string;
     displayPhoneNumber: string | null;
@@ -101,6 +102,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           modificationStatus,
           submittedAt,
           freeMonths,
+          isFirstAdApplication,
           partner_users:partnerId(businessName, displayPhoneNumber, hasHadRunningAd),
           ad_categories_v2:categoryId(categoryName),
           advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
@@ -137,6 +139,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         modificationStatus: row.modificationStatus ?? null,
         submittedAt: row.submittedAt,
         freeMonths: row.freeMonths,
+        isFirstAdApplication: row.isFirstAdApplication ?? false,
         partner_users: row.partner_users,
         ad_categories_v2: row.ad_categories_v2,
         subCategoryNames: (row.advertisement_sub_categories_v2 ?? []).map(

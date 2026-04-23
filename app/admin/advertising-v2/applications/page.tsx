@@ -231,8 +231,8 @@ export default function AdApplicationsPage() {
                         <TableCell className='font-medium whitespace-nowrap'>
                           <div className='flex items-center gap-1.5'>
                             {app.partner_users?.businessName ?? '-'}
-                            {/* 첫광고 뱃지: hasHadRunningAd=false이면 표시 */}
-                            {app.partner_users?.hasHadRunningAd === false && (
+                            {/* 첫광고 뱃지: isFirstAdApplication=true인 경우만 표시 */}
+                            {app.isFirstAdApplication && (
                               <span
                                 className='inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border'
                                 style={{ color: '#2563EB', backgroundColor: '#DBEAFE', borderColor: '#BFDBFE' }}
