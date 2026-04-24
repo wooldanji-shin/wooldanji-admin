@@ -51,7 +51,7 @@ export async function POST(
         .select('pricePerHousehold')
         .order('effectiveFrom', { ascending: false })
         .limit(1)
-        .single(),
+        .maybeSingle(),
     ]);
 
     const { data: ad, error: fetchError } = adResult;

@@ -79,7 +79,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       .select('pricePerHousehold')
       .order('effectiveFrom', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
     if (data) setPricePerHousehold((data as any).pricePerHousehold ?? 70);
   }, [supabase]);
 

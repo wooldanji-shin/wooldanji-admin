@@ -35,6 +35,7 @@ const BADGE_KEYS: Record<string, string> = {
   '/admin/inquiries': 'inquiries',
   '/admin/managers': 'managers',
   '/admin/advertising-v2/applications': 'ad_applications',
+  '/admin/advertising-v2/premium': 'premium_applications',
   '/admin/membership-conversion': 'membership_conversion',
 };
 
@@ -100,6 +101,12 @@ const advertisingItems = [
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
+    name: '프리미엄 광고 관리',
+    href: '/admin/advertising-v2/premium',
+    icon: Megaphone,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
     name: '홈 섹션 관리',
     href: '/admin/advertising/categories',
     icon: LayoutList,
@@ -159,6 +166,7 @@ interface NewCounts {
   user_reconfirm: number;
   managers: number;
   ad_applications: number;
+  premium_applications: number;
   membership_conversion: number;
 }
 
@@ -174,6 +182,7 @@ export function AdminSidebar() {
     user_reconfirm: 0,
     managers: 0,
     ad_applications: 0,
+    premium_applications: 0,
     membership_conversion: 0,
   });
 
@@ -196,7 +205,7 @@ export function AdminSidebar() {
     try {
       const lastReadTimes = getLastReadTimes();
 
-      const [menuCountsResult, adApplicationsResult, membershipConversionResult] = await Promise.all([
+      const [menuCountsResult, adApplicationsResult, premiumApplicationsResult, membershipConversionResult] = await Promise.all([
         (supabase.rpc as any)('get_menu_new_counts', {
           p_last_read_inquiries: lastReadTimes.inquiries || null,
           p_last_read_users: lastReadTimes.users || null,
@@ -207,6 +216,10 @@ export function AdminSidebar() {
           .from('advertisements_v2')
           .select('id', { count: 'exact', head: true })
           .eq('adStatus', 'pending'),
+        supabase
+          .from('premium_advertisements_v2')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
         supabase
           .from('partner_to_apartment_applications')
           .select('id', { count: 'exact', head: true })
@@ -222,6 +235,7 @@ export function AdminSidebar() {
         setNewCounts({
           ...(menuCountsResult.data as NewCounts),
           ad_applications: adApplicationsResult.count ?? 0,
+          premium_applications: premiumApplicationsResult.count ?? 0,
           membership_conversion: membershipConversionResult.count ?? 0,
         });
       }

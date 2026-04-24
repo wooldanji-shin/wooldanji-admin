@@ -171,7 +171,7 @@ export function useApplicationDetailPage(
           .select('pricePerHousehold, defaultDiscountRate')
           .order('effectiveFrom', { ascending: false })
           .limit(1)
-          .single(),
+          .maybeSingle(),
       ]);
 
       if (adResult.error) throw adResult.error;

@@ -94,7 +94,7 @@ export async function POST(
         .select('"pricePerHousehold"')
         .order('effectiveFrom', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       const pricePerHousehold: number = (pricing as any)?.pricePerHousehold ?? 70;
 
