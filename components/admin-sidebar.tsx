@@ -91,6 +91,24 @@ const navigationItems = [
     icon: HelpCircle,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
+  {
+    name: '파트너 문의 관리',
+    href: '/admin/partner-inquiries',
+    icon: HelpCircle,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '파트너 안내 배너',
+    href: '/admin/partner-banners',
+    icon: Megaphone,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '파트너 공지 발송',
+    href: '/admin/partner-announcements',
+    icon: Bell,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
 ];
 
 const advertisingItems = [
