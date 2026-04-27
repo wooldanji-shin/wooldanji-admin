@@ -13,9 +13,9 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { createClient } from '@/lib/supabase/client';
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { use, useEffect, useState } from 'react';
+import { ReactNode, use, useEffect, useState } from 'react';
 
 type PremiumStatus = 'pending' | 'approved' | 'running' | 'ended' | 'rejected' | 'modification_pending';
 
@@ -23,6 +23,18 @@ interface SnapshotApartment {
   apartmentName: string;
   address: string;
   totalHouseholds: number;
+}
+
+// Design Ref: §2.7 — 연장 이력 행 (paymentType='extension')
+interface ExtensionRow {
+  id: string;
+  paidAt: Date;
+  weeks: number;
+  amount: number;
+  periodStart: Date;
+  periodEnd: Date;
+  paymentKey: string | null;
+  receiptUrl: string | null;
 }
 
 interface PremiumAdDetail {
@@ -90,6 +102,10 @@ export default function PremiumAdDetailPage({ params }: { params: Promise<{ id: 
   const [ad, setAd] = useState<PremiumAdDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Design Ref: §2.7 — 누적 결제 합계 + 연장 이력
+  const [cumulativeAmount, setCumulativeAmount] = useState<number | null>(null);
+  const [extensions, setExtensions] = useState<ExtensionRow[]>([]);
+
   // 거절 다이얼로그
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -134,6 +150,48 @@ export default function PremiumAdDetailPage({ params }: { params: Promise<{ id: 
         snapshotApartments: (data.snapshotApartments as SnapshotApartment[]) ?? [],
         partnerBusinessName: partnerData?.businessName,
       } as PremiumAdDetail);
+
+      // Design Ref: §2.7 — 누적 결제 합계 + 연장 이력 동시 조회
+      // Plan SC: 누적 totalAmount = 모든 결제 amount 의 합 (신규 + 모든 연장)
+      const [{ data: paidRows }, { data: extRows }] = await Promise.all([
+        supabase
+          .from('ad_payment_history_v2')
+          .select('amount')
+          .eq('premiumAdId', id)
+          .eq('status', 'paid'),
+        supabase
+          .from('ad_payment_history_v2')
+          .select('id, amount, "paymentDate", "billingPeriodStart", "billingPeriodEnd", "paymentKey", "receiptUrl"')
+          .eq('premiumAdId', id)
+          .eq('paymentType', 'extension')
+          .eq('status', 'paid')
+          .order('paymentDate', { ascending: true }),
+      ]);
+
+      const sum = (paidRows ?? []).reduce(
+        (s: number, r: { amount: number | null }) => s + (r.amount ?? 0),
+        0,
+      );
+      setCumulativeAmount(sum > 0 ? sum : null);
+
+      const parsedExtensions: ExtensionRow[] = (extRows ?? []).map((row) => {
+        const periodStart = new Date(row.billingPeriodStart as string);
+        const periodEnd = new Date(row.billingPeriodEnd as string);
+        const weeks = Math.floor(
+          (periodEnd.getTime() - periodStart.getTime()) / (7 * 24 * 60 * 60 * 1000),
+        );
+        return {
+          id: row.id as string,
+          paidAt: new Date(row.paymentDate as string),
+          weeks,
+          amount: row.amount as number,
+          periodStart,
+          periodEnd,
+          paymentKey: (row.paymentKey as string | null) ?? null,
+          receiptUrl: (row.receiptUrl as string | null) ?? null,
+        };
+      });
+      setExtensions(parsedExtensions);
     } catch (err) {
       console.error('프리미엄 광고 상세 로드 실패:', err);
     } finally {
@@ -229,6 +287,21 @@ export default function PremiumAdDetailPage({ params }: { params: Promise<{ id: 
 
   const totalHouseholds = ad.snapshotApartments.reduce((s, a) => s + a.totalHouseholds, 0);
 
+  // Design Ref: §2.7 — 누적 주차 = (endedAt - startedAt) / 7일
+  const cumulativeWeeks =
+    ad.startedAt && ad.endedAt
+      ? Math.floor(
+          (new Date(ad.endedAt).getTime() - new Date(ad.startedAt).getTime()) /
+            (7 * 24 * 60 * 60 * 1000),
+        )
+      : ad.weeks;
+  const extensionWeeks = cumulativeWeeks - ad.weeks;
+  const displayAmount = cumulativeAmount ?? ad.totalAmount;
+  const extensionAmount =
+    displayAmount != null && ad.totalAmount != null
+      ? displayAmount - ad.totalAmount
+      : null;
+
   return (
     <div className='min-h-screen bg-gray-50'>
       <AdminHeader title='프리미엄 광고 상세' />
@@ -259,10 +332,37 @@ export default function PremiumAdDetailPage({ params }: { params: Promise<{ id: 
           <CardContent className='space-y-3 text-sm'>
             <InfoRow label='업체명' value={ad.partnerBusinessName ?? '-'} />
             <InfoRow label='광고 제목' value={ad.title ?? '(제목 없음)'} />
-            <InfoRow label='광고 기간' value={`${ad.weeks}주`} />
+            {/* Design Ref: §2.7 — 광고 기간 분해 표기 (원 + 연장) */}
+            <InfoRow
+              label='광고 기간'
+              value={
+                <span>
+                  {cumulativeWeeks}주
+                  {extensionWeeks > 0 && (
+                    <span className='text-xs text-gray-500 ml-1'>
+                      (원 {ad.weeks}주 + 연장 {extensionWeeks}주)
+                    </span>
+                  )}
+                </span>
+              }
+            />
+            {/* Design Ref: §2.7 — 결제 금액 분해 표기 */}
             <InfoRow
               label='결제 금액'
-              value={ad.totalAmount != null ? `${ad.totalAmount.toLocaleString()}원` : '-'}
+              value={
+                displayAmount != null ? (
+                  <span>
+                    {displayAmount.toLocaleString()}원
+                    {extensionAmount != null && extensionAmount > 0 && ad.totalAmount != null && (
+                      <span className='text-xs text-gray-500 ml-1'>
+                        (원 {ad.totalAmount.toLocaleString()}원 + 연장 {extensionAmount.toLocaleString()}원)
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  '-'
+                )
+              }
             />
             <InfoRow
               label='결제 상태'
@@ -307,6 +407,63 @@ export default function PremiumAdDetailPage({ params }: { params: Promise<{ id: 
                   합계 {totalHouseholds.toLocaleString()}세대
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Design Ref: §2.7 — 연장 이력 테이블 (paymentType='extension') */}
+        {extensions.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>연장 이력 (총 {extensions.length}건)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='overflow-x-auto'>
+                <table className='w-full text-sm'>
+                  <thead>
+                    <tr className='border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide'>
+                      <th className='py-2 pr-3'>차수</th>
+                      <th className='py-2 pr-3'>결제일</th>
+                      <th className='py-2 pr-3'>주수</th>
+                      <th className='py-2 pr-3 text-right'>결제 금액</th>
+                      <th className='py-2 pr-3'>광고 기간</th>
+                      <th className='py-2'>영수증</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {extensions.map((ext, idx) => (
+                      <tr key={ext.id} className='border-b border-gray-100 last:border-b-0'>
+                        <td className='py-2.5 pr-3 text-gray-700 font-medium'>{idx + 1}차</td>
+                        <td className='py-2.5 pr-3 text-gray-700'>
+                          {ext.paidAt.toLocaleDateString('ko-KR')}
+                        </td>
+                        <td className='py-2.5 pr-3 text-gray-700'>{ext.weeks}주</td>
+                        <td className='py-2.5 pr-3 text-right text-gray-800 font-semibold'>
+                          {ext.amount.toLocaleString()}원
+                        </td>
+                        <td className='py-2.5 pr-3 text-gray-600 text-xs'>
+                          {ext.periodStart.toLocaleDateString('ko-KR')} ~{' '}
+                          {ext.periodEnd.toLocaleDateString('ko-KR')}
+                        </td>
+                        <td className='py-2.5'>
+                          {ext.receiptUrl ? (
+                            <a
+                              href={ext.receiptUrl}
+                              target='_blank'
+                              rel='noopener noreferrer'
+                              className='inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs'
+                            >
+                              <ExternalLink size={12} /> 보기
+                            </a>
+                          ) : (
+                            <span className='text-gray-400 text-xs'>-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -491,7 +648,7 @@ export default function PremiumAdDetailPage({ params }: { params: Promise<{ id: 
   );
 }
 
-function InfoRow({ label, value, isRed = false }: { label: string; value: string; isRed?: boolean }) {
+function InfoRow({ label, value, isRed = false }: { label: string; value: ReactNode; isRed?: boolean }) {
   return (
     <div className='flex gap-3'>
       <span className='text-gray-500 w-28 shrink-0'>{label}</span>

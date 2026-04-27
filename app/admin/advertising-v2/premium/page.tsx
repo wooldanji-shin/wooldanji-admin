@@ -26,7 +26,10 @@ interface PremiumAd {
   status: PremiumStatus;
   paymentStatus: 'unpaid' | 'paid';
   totalAmount: number | null;
+  cumulativeAmount: number | null;
   modificationStatus: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
   createdAt: string;
   partnerBusinessName?: string;
 }
@@ -80,7 +83,7 @@ export default function PremiumAdListPage() {
       // 1단계: 프리미엄 광고 목록 조회 (draft 제외)
       const { data: adsData, error: adsError } = await supabase
         .from('premium_advertisements_v2')
-        .select('id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "modificationStatus", "createdAt"')
+        .select('id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "modificationStatus", "startedAt", "endedAt", "createdAt"')
         .neq('status', 'draft')
         .order('createdAt', { ascending: false });
 
@@ -89,18 +92,38 @@ export default function PremiumAdListPage() {
 
       // 2단계: partnerId (= auth.users.id) 기준으로 partner_users.businessName 조회
       const partnerUserIds = [...new Set(adsData.map((a: any) => a.partnerId))];
-      const { data: partnerData } = await supabase
-        .from('partner_users')
-        .select('"userId", "businessName"')
-        .in('userId', partnerUserIds);
+      const adIds = adsData.map((a: any) => a.id);
+
+      // 누적 결제 합계 (신규 + 연장) — 진실의 원천: ad_payment_history_v2 SUM(paid)
+      const [{ data: partnerData }, { data: paymentRows }] = await Promise.all([
+        supabase
+          .from('partner_users')
+          .select('"userId", "businessName"')
+          .in('userId', partnerUserIds),
+        supabase
+          .from('ad_payment_history_v2')
+          .select('"premiumAdId", amount')
+          .in('premiumAdId', adIds)
+          .eq('status', 'paid'),
+      ]);
 
       const partnerMap = Object.fromEntries(
         (partnerData ?? []).map((p: any) => [p.userId, p.businessName])
       );
 
+      const cumulativeAmountMap = (paymentRows ?? []).reduce<Record<string, number>>(
+        (acc, r: any) => {
+          const k = r.premiumAdId as string;
+          acc[k] = (acc[k] ?? 0) + ((r.amount as number | null) ?? 0);
+          return acc;
+        },
+        {},
+      );
+
       const mapped: PremiumAd[] = adsData.map((row: any) => ({
         ...row,
         partnerBusinessName: partnerMap[row.partnerId] ?? '-',
+        cumulativeAmount: cumulativeAmountMap[row.id] ?? null,
       }));
       setAds(mapped);
     } catch (err) {
@@ -175,14 +198,48 @@ export default function PremiumAdListPage() {
                       {ad.partnerBusinessName ?? '-'}
                     </TableCell>
                     <TableCell>{ad.title ?? '(제목 없음)'}</TableCell>
-                    <TableCell>{ad.weeks}주</TableCell>
                     <TableCell>
-                      {ad.totalAmount != null
-                        ? `${ad.totalAmount.toLocaleString()}원`
-                        : '-'}
+                      {(() => {
+                        // 누적 기간 = (endedAt - startedAt) / 7일, 시작 전이면 ad.weeks
+                        const cumulativeWeeks =
+                          ad.startedAt && ad.endedAt
+                            ? Math.floor(
+                                (new Date(ad.endedAt).getTime() -
+                                  new Date(ad.startedAt).getTime()) /
+                                  (7 * 24 * 60 * 60 * 1000),
+                              )
+                            : ad.weeks;
+                        const extWeeks = cumulativeWeeks - ad.weeks;
+                        return (
+                          <span>
+                            {cumulativeWeeks}주
+                            {extWeeks > 0 && (
+                              <span className='text-xs text-gray-500 ml-1'>
+                                (원 {ad.weeks} + 연장 {extWeeks})
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={ad.status} />
+                      {(() => {
+                        const amount = ad.cumulativeAmount ?? ad.totalAmount;
+                        return amount != null ? `${amount.toLocaleString()}원` : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      <div className='flex items-center gap-1.5 flex-wrap'>
+                        <StatusBadge status={ad.status} />
+                        {ad.status === 'running' && ad.modificationStatus === 'pending' && (
+                          <span
+                            className='inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium border'
+                            style={{ color: '#7C3AED', backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }}
+                          >
+                            수정 심사
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className='text-sm text-gray-500'>
                       {new Date(ad.createdAt).toLocaleDateString('ko-KR')}

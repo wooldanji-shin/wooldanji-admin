@@ -39,6 +39,7 @@ interface PartnerInquiry {
     displayPhoneNumber: string | null;
     businessAddress: string | null;
     businessDetailAddress: string | null;
+    parkingInfo: string | null;
     businessRegistrationNumber: string | null;
     categoryId: string | null;
     createdAt: string | null;
@@ -101,6 +102,7 @@ export default function PartnerInquiryDetailPage() {
             displayPhoneNumber,
             businessAddress,
             businessDetailAddress,
+            parkingInfo,
             businessRegistrationNumber,
             categoryId,
             createdAt,
@@ -546,6 +548,7 @@ function PartnerInfoGrid({
     displayPhoneNumber: string | null;
     businessAddress: string | null;
     businessDetailAddress: string | null;
+    parkingInfo: string | null;
     businessRegistrationNumber: string | null;
     categoryId: string | null;
     createdAt: string | null;
@@ -565,6 +568,7 @@ function PartnerInfoGrid({
         <Field label='카테고리' value={partner.category?.categoryName} />
       </div>
       <Field label='사업장 주소' value={fullAddress || undefined} />
+      <Field label='주차 안내' value={partner.parkingInfo || undefined} />
       <div className='grid grid-cols-2 gap-3'>
         <Field label='사업자등록번호' value={partner.businessRegistrationNumber} />
         <Field
