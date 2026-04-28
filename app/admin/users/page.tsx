@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -714,10 +720,15 @@ export default function UsersPage() {
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='회원관리' />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="회원 관리"
+          description="등록된 회원 정보를 검색하고 관리합니다."
+        />
+      </PageHeader>
 
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
+      <PageContent>
         {/* Search and Filters */}
         <div className='flex flex-col lg:flex-row gap-4 items-start lg:items-center mb-6'>
           <div className='relative w-full lg:w-[300px]'>
@@ -768,9 +779,9 @@ export default function UsersPage() {
             </span>
             <Button
               variant='outline'
-              size='sm'
               onClick={handleExportCSV}
               disabled={exporting || totalCount === 0}
+              className='h-11 px-5'
             >
               <Download className='h-4 w-4 mr-2' />
               {exporting ? '내보내는 중...' : 'CSV 내보내기'}
@@ -824,7 +835,7 @@ export default function UsersPage() {
                   {initialLoading && loading ? (
                     <TableRow>
                       <TableCell colSpan={11} className='text-center py-12 text-muted-foreground'>
-                        로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                       </TableCell>
                     </TableRow>
                   ) : users.length === 0 ? (
@@ -909,8 +920,8 @@ export default function UsersPage() {
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant='ghost'
-                                size='sm'
-                                className='h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary'
+                                size='icon-sm'
+                                className='text-muted-foreground hover:text-foreground hover:bg-secondary'
                               >
                                 <MoreVertical className='h-4 w-4' />
                               </Button>
@@ -1029,7 +1040,7 @@ export default function UsersPage() {
             </div>
           </div>
         )}
-      </div>
+      </PageContent>
 
       {/* Image Preview Modal */}
       {imagePreview && (
@@ -1325,6 +1336,6 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

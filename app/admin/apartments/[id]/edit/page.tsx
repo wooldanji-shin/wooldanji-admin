@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -429,20 +430,15 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground">데이터를 불러오는 중...</p>
-        </div>
-      </div>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8"><div className="space-y-3"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-72" /></div><div className="flex flex-col gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div></div>
     );
   }
 
   if (!apartment) {
     return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="text-center py-8">
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+        <Card className="border-border/70 shadow-card">
+          <CardContent className="text-center py-12 text-muted-foreground">
             아파트 정보를 찾을 수 없습니다.
           </CardContent>
         </Card>
@@ -451,9 +447,9 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="p-8 pb-24">
+    <div className="flex w-full flex-col gap-6 px-6 pb-24 pt-6 md:pt-8">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 -mt-8 pt-8 mb-8 border-b">
+      <div className="sticky top-14 z-10 -mx-4 border-b border-border bg-background/85 px-4 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:-mx-6 md:px-6">
         <Button
           variant="ghost"
           size="sm"
@@ -464,22 +460,22 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
               router.push('/admin/apartments');
             }
           }}
-          className="mb-4"
+          className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
           뒤로
         </Button>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">아파트 설정</h1>
+              <h1 className="text-2xl font-semibold tracking-tight md:text-[1.625rem]">아파트 설정</h1>
               {hasChanges && (
-                <Badge variant="outline" className="text-orange-600 border-orange-600">
+                <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning-foreground">
                   저장 안됨
                 </Badge>
               )}
             </div>
-            <p className="text-muted-foreground mt-1">
+            <p className="mt-1.5 text-sm text-muted-foreground">
               아파트 정보와 구조를 관리합니다
             </p>
           </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { ChevronLeft, Check, X } from 'lucide-react';
+import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { createClient } from '@/lib/supabase/client';
 import { getUserRoles } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -48,6 +50,11 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
   const supabase = createClient();
 
   const [reconfirm, setReconfirm] = useState<UserReconfirmDetails | null>(null);
+  const imgLb = useImageLightbox(
+    reconfirm
+      ? [reconfirm.user.confirmImageUrl, reconfirm.reConfirmImageUrl].filter((u): u is string => !!u)
+      : []
+  );
   const [loading, setLoading] = useState(true);
   const [rejectDialog, setRejectDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -195,10 +202,10 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
 
   if (loading) {
     return (
-      <div className='flex flex-col h-full'>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader title='재신청 상세' />
-        <div className='flex-1 flex items-center justify-center'>
-          <div className='text-muted-foreground'>로딩 중...</div>
+        <div className="flex w-full items-center justify-center py-20">
+          <div className="flex w-full max-w-sm flex-col gap-3 mx-auto"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div>
         </div>
       </div>
     );
@@ -206,9 +213,9 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
 
   if (!reconfirm) {
     return (
-      <div className='flex flex-col h-full'>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader title='재신청 상세' />
-        <div className='flex-1 flex items-center justify-center'>
+        <div className="flex w-full items-center justify-center py-20">
           <div className='text-muted-foreground'>재신청 정보를 찾을 수 없습니다.</div>
         </div>
       </div>
@@ -216,19 +223,20 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='재신청 상세' />
-
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
-        {/* Back Button */}
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+      <div className='flex items-center gap-2'>
         <Button
           variant='ghost'
+          size='icon-sm'
           onClick={() => router.push('/admin/user-reconfirm')}
-          className='gap-2'
+          aria-label='뒤로가기'
         >
-          <ArrowLeft className='h-4 w-4' />
-          목록으로
+          <ChevronLeft className='h-5 w-5' />
         </Button>
+        <AdminHeader title='재신청 상세' className='flex-1' />
+      </div>
+
+      <div className="flex flex-col gap-6">
 
         {/* User Info */}
         <Card>
@@ -307,39 +315,26 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
             <CardTitle>인증 사진 비교</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-              {/* Original Image */}
-              <div>
-                <div className='text-sm font-medium mb-2 text-muted-foreground'>
-                  원래 사진
-                </div>
+            <div className='flex flex-wrap gap-6'>
+              <div className='flex flex-col gap-2'>
+                <span className='text-sm font-medium text-muted-foreground'>원래 사진</span>
                 {reconfirm.user.confirmImageUrl ? (
-                  <div className='relative aspect-square bg-secondary rounded-lg overflow-hidden flex items-center justify-center'>
-                    <img
-                      src={reconfirm.user.confirmImageUrl}
-                      alt='원래 인증 사진'
-                      className='w-full h-full object-contain'
-                    />
-                  </div>
+                  <ImageThumbnail
+                    src={reconfirm.user.confirmImageUrl}
+                    alt='원래 인증 사진'
+                    onClick={() => imgLb.open(0)}
+                  />
                 ) : (
-                  <div className='aspect-square bg-secondary rounded-lg flex items-center justify-center'>
-                    <span className='text-muted-foreground'>사진 없음</span>
-                  </div>
+                  <p className='text-sm text-muted-foreground'>사진 없음</p>
                 )}
               </div>
-
-              {/* Reconfirm Image */}
-              <div>
-                <div className='text-sm font-medium mb-2 text-muted-foreground'>
-                  재신청 사진
-                </div>
-                <div className='relative aspect-square bg-secondary rounded-lg overflow-hidden flex items-center justify-center'>
-                  <img
-                    src={reconfirm.reConfirmImageUrl}
-                    alt='재신청 사진'
-                    className='w-full h-full object-contain'
-                  />
-                </div>
+              <div className='flex flex-col gap-2'>
+                <span className='text-sm font-medium text-muted-foreground'>재신청 사진</span>
+                <ImageThumbnail
+                  src={reconfirm.reConfirmImageUrl}
+                  alt='재신청 사진'
+                  onClick={() => imgLb.open(reconfirm.user.confirmImageUrl ? 1 : 0)}
+                />
               </div>
             </div>
           </CardContent>
@@ -401,6 +396,7 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ImageLightbox {...imgLb.props} />
     </div>
   );
 }

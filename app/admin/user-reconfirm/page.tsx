@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -295,10 +301,15 @@ export default function UserReconfirmPage() {
   const suspendedCount = combinedItems.filter(i => i.type === 'suspended').length;
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='승인보류/거절 관리' />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="승인보류/거절 관리"
+          description="재신청·보류·거절 회원을 한곳에서 검토합니다."
+        />
+      </PageHeader>
 
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
+      <PageContent>
         <div className='text-sm text-muted-foreground flex gap-4'>
           <span>전체 {combinedItems.length}건</span>
           <span>•</span>
@@ -347,7 +358,7 @@ export default function UserReconfirmPage() {
                   {loading ? (
                     <TableRow>
                       <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
-                        로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                       </TableCell>
                     </TableRow>
                   ) : combinedItems.length === 0 ? (
@@ -410,7 +421,7 @@ export default function UserReconfirmPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }

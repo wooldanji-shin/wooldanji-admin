@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
@@ -514,20 +515,20 @@ export default function AdvertisersPage() {
 
   if (loading) {
     return (
-      <div className='flex flex-col h-full'>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader title='광고주 관리' />
-        <div className='flex-1 flex items-center justify-center'>
-          <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+        <div className="flex w-full items-center justify-center py-20">
+          <div className="flex w-full max-w-sm flex-col gap-3 mx-auto"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className='flex flex-col h-full'>
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       <AdminHeader title='광고주 관리' />
 
-      <div className='flex-1 p-6 overflow-auto'>
+      <div className="flex flex-col gap-6">
         <div className='space-y-4'>
           {/* 헤더 카드 */}
           <Card>

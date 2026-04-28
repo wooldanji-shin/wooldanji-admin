@@ -3,21 +3,16 @@
 import { useState, useEffect } from 'react';
 import {
   Plus,
-  Search,
   Trash2,
   Building2,
-  Home,
   Cpu,
   Users,
-  ChevronLeft,
-  ChevronRight,
   MoreVertical,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
@@ -27,9 +22,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderActions,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { DataTableShell } from '@/components/data-table-shell';
+import { DataToolbar, DataToolbarSearch, DataToolbarActions } from '@/components/data-toolbar';
+import { DataPagination } from '@/components/data-pagination';
+import { EmptyState } from '@/components/empty-state';
+import { TableSkeleton } from '@/components/skeletons';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -321,45 +327,55 @@ export default function ApartmentsPage() {
 
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">아파트 관리</h1>
-          <p className="text-muted-foreground mt-2">
-            등록된 아파트 정보를 관리합니다
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="아파트 관리"
+          description="등록된 아파트 정보를 관리합니다."
+        />
+        <PageHeaderActions>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <Checkbox
               id="hide-open-door-column"
               checked={hideOpenDoorColumn}
               onCheckedChange={(checked) => handleHideOpenDoorColumnChange(checked === true)}
             />
-          </div>
+            문 연 횟수 숨기기
+          </label>
           <Button onClick={() => router.push('/admin/apartments/new')}>
             <Plus className="mr-2 h-4 w-4" />
             새 아파트 등록
           </Button>
-        </div>
-      </div>
+        </PageHeaderActions>
+      </PageHeader>
 
-      {/* Search */}
-      <div className="relative mb-8">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="아파트명 또는 주소로 검색..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
-
-      {/* Apartments Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      <PageContent>
+      <DataTableShell
+        toolbar={
+          <DataToolbar>
+            <DataToolbarSearch
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="아파트명 또는 주소로 검색..."
+            />
+            <DataToolbarActions>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                총 {filteredApartments.length.toLocaleString()}개
+              </span>
+            </DataToolbarActions>
+          </DataToolbar>
+        }
+        pagination={
+          !loading && filteredApartments.length > 0 ? (
+            <DataPagination
+              page={currentPage}
+              pageSize={ITEMS_PER_PAGE}
+              totalCount={filteredApartments.length}
+              onPageChange={setCurrentPage}
+            />
+          ) : undefined
+        }
+      >
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
@@ -432,17 +448,23 @@ export default function ApartmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="text-center py-12 text-muted-foreground">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
-                        데이터를 불러오는 중...
-                      </div>
+                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="p-0">
+                      <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 9 : 10} showHeader={false} />
                     </TableCell>
                   </TableRow>
                 ) : filteredApartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="text-center py-12 text-muted-foreground">
-                      {searchTerm ? '검색 결과가 없습니다.' : '등록된 아파트가 없습니다.'}
+                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="p-0">
+                      <EmptyState
+                        icon={Building2}
+                        title={searchTerm ? '검색 결과가 없습니다' : '등록된 아파트가 없습니다'}
+                        description={
+                          searchTerm
+                            ? '다른 검색어로 다시 시도해보세요.'
+                            : '새 아파트를 등록하여 관리할 수 있습니다.'
+                        }
+                        size="sm"
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -528,8 +550,8 @@ export default function ApartmentsPage() {
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                size="icon-sm"
+                                className="text-muted-foreground hover:text-foreground"
                               >
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
@@ -558,64 +580,7 @@ export default function ApartmentsPage() {
                 )}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      {!loading && filteredApartments.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <div className="text-sm text-muted-foreground">
-            {currentPage} / {totalPages} 페이지
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              이전
-            </Button>
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className="w-10"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              다음
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      </DataTableShell>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
@@ -638,6 +603,7 @@ export default function ApartmentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }

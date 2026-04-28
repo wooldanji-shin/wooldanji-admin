@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -84,7 +85,7 @@ export default function DevicesManagementPage({
   const page = useDevicesPage(params);
 
   return (
-    <div className='p-8'>
+    <div className='flex w-full flex-col gap-6 px-6 py-6 md:py-8'>
       {/* Header */}
       <Header
         apartmentName={page.fetch.apartment?.name}
@@ -123,7 +124,7 @@ export default function DevicesManagementPage({
       {page.fetch.loading ? (
         <Card>
           <CardContent className='p-12 text-center text-muted-foreground'>
-            로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
           </CardContent>
         </Card>
       ) : page.viewMode === 'tree' ? (
@@ -202,21 +203,26 @@ function Header({
   onBack: () => void;
 }): React.ReactElement {
   return (
-    <div className='mb-8'>
-      <Button variant='ghost' size='sm' onClick={onBack} className='mb-4'>
-        <ArrowLeft className='h-4 w-4 mr-2' />
+    <div>
+      <Button
+        variant='ghost'
+        size='sm'
+        onClick={onBack}
+        className='-ml-2 mb-3 text-muted-foreground hover:text-foreground'
+      >
+        <ArrowLeft className='h-4 w-4 mr-1.5' />
         뒤로
       </Button>
-      <div className='flex items-center gap-3'>
-        <h1 className='text-3xl font-bold tracking-tight'>장치 관리</h1>
+      <div className='flex flex-wrap items-center gap-3'>
+        <h1 className='text-2xl font-semibold tracking-tight md:text-[1.625rem]'>장치 관리</h1>
         {brokenDeviceCount > 0 && (
-          <Badge variant='destructive' className='text-sm px-3 py-1'>
+          <Badge variant='destructive' className='text-xs'>
             <AlertCircle className='h-3 w-3 mr-1' />
             고장 {brokenDeviceCount}개
           </Badge>
         )}
       </div>
-      <p className='text-muted-foreground mt-1'>
+      <p className='mt-1.5 text-sm text-muted-foreground'>
         {apartmentName || '아파트'}의 모든 장치를 관리합니다
       </p>
     </div>

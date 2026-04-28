@@ -53,6 +53,12 @@ export interface AdApplicationDetail {
     businessName: string;
     displayPhoneNumber: string | null;
     representativeName: string | null;
+    phoneNumber: string | null;
+    businessAddress: string | null;
+    businessDetailAddress: string | null;
+    parkingInfo: string | null;
+    businessRegistrationNumber: string | null;
+    createdAt: string | null;
   } | null;
   category: {
     categoryName: string;
@@ -155,7 +161,7 @@ export function useApplicationDetailPage(
             modificationRejectedReason,
             apartmentChangeStatus,
             pendingChanges,
-            partner_users:partnerId(businessName, displayPhoneNumber, representativeName),
+            partner_users:partnerId(businessName, displayPhoneNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, businessRegistrationNumber, createdAt),
             ad_categories_v2:categoryId(categoryName),
             advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
             advertisement_apartments_v2(

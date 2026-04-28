@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -272,12 +273,7 @@ export default function ApartmentDetailPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground">데이터를 불러오는 중...</p>
-        </div>
-      </div>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8"><div className="space-y-3"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-72" /></div><div className="flex flex-col gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div></div>
     );
   }
 
@@ -286,26 +282,25 @@ export default function ApartmentDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="p-8">
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/admin/apartments')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            뒤로가기
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{apartment.name}</h1>
-            <p className="text-muted-foreground mt-1">{apartment.address}</p>
-          </div>
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/admin/apartments')}
+          className="-ml-2 mb-3 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          뒤로가기
+        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight md:text-[1.625rem]">{apartment.name}</h1>
           <Badge variant={apartment.status === 'active' ? 'default' : 'secondary'}>
             {apartment.status === 'active' ? '활성' : '비활성'}
           </Badge>
         </div>
+        <p className="mt-1.5 text-sm text-muted-foreground">{apartment.address}</p>
       </div>
 
       {/* Tabs */}

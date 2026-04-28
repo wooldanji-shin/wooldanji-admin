@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -757,10 +758,10 @@ export default function AdvertisementsPage() {
   };
 
   return (
-    <div className='flex flex-col h-full'>
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       <AdminHeader title='광고 관리' />
 
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
+      <div className="flex flex-col gap-6">
         {/* Statistics Dashboard */}
         <div className='grid grid-cols-5 gap-3'>
           <Card
@@ -1029,7 +1030,7 @@ export default function AdvertisementsPage() {
                   {loading ? (
                     <TableRow>
                       <TableCell colSpan={selectedCategory !== 'all' ? 10 : 9} className='text-center py-12 text-muted-foreground'>
-                        로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                       </TableCell>
                     </TableRow>
                   ) : filteredAds.length === 0 ? (
@@ -1169,7 +1170,7 @@ export default function AdvertisementsPage() {
                                 {ad.isActive ? (
                                   <span className='text-green-600'>✓</span>
                                 ) : (
-                                  <span className='text-gray-400'>○</span>
+                                  <span className='text-muted-foreground'>○</span>
                                 )}
                               </Button>
                               <Button

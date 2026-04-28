@@ -4,7 +4,13 @@
 // Plan SC: SC-1(SLA) / SC-2(결과 토스트) / SC-3(인앱 알림 노출)
 // Decision: 광고 케이스(A/B/C)는 RPC get_partner_ad_cases로 SQL CASE 부여
 
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { InlineLoadingSkeleton } from '@/components/skeletons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -260,28 +266,34 @@ export default function PartnerAnnouncementsPage() {
 
   if (loading && partners.length === 0) {
     return (
-      <div className='flex h-64 items-center justify-center'>
-        <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
-      </div>
+      <PageShell>
+        <InlineLoadingSkeleton />
+      </PageShell>
     );
   }
   if (error) {
     return (
-      <Alert variant='destructive'>
-        <AlertCircle className='h-4 w-4' />
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <PageShell>
+        <Alert variant='destructive'>
+          <AlertCircle className='h-4 w-4' />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </PageShell>
     );
   }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
-    <div className='space-y-6'>
-      <AdminHeader
-        title='파트너 공지 발송'
-        description='광고 상태(A/B/C) 필터 + 다중 선택 후 자유 문구 푸시 발송'
-      />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="파트너 공지 발송"
+          description="광고 상태(A/B/C) 필터 + 다중 선택 후 자유 문구 푸시 발송"
+        />
+      </PageHeader>
+
+      <PageContent>
 
       <div className='grid grid-cols-1 gap-6 lg:grid-cols-5'>
         {/* ─── 좌측 60% ─────────────────────────────────────────── */}
@@ -609,7 +621,8 @@ export default function PartnerAnnouncementsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }
 

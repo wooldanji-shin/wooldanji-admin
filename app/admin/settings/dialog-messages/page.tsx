@@ -1,6 +1,13 @@
 'use client';
 
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { InlineLoadingSkeleton } from '@/components/skeletons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -222,21 +229,23 @@ export default function DialogMessagesPage() {
 
   if (loading) {
     return (
-      <div className='flex flex-col h-full'>
-        <AdminHeader title='다이얼로그 메시지 관리' />
-        <div className='flex-1 flex items-center justify-center'>
-          <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader>
+          <PageHeaderTitle title="다이얼로그 메시지 관리" />
+        </PageHeader>
+        <InlineLoadingSkeleton />
+      </PageShell>
     );
   }
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='다이얼로그 메시지 관리' />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle title="다이얼로그 메시지 관리" />
+      </PageHeader>
 
-      <div className='flex-1 p-6 overflow-auto'>
-        <div className='max-w-6xl mx-auto space-y-6'>
+      <PageContent>
+        <div className='space-y-6'>
           {/* List View */}
           {mode === 'list' && (
             <>
@@ -296,7 +305,7 @@ export default function DialogMessagesPage() {
                                 {message.content}
                               </p>
                             )}
-                            <p className='text-xs text-muted-foreground/50 font-mono'>
+                            <p className='text-xs text-muted-foreground font-mono'>
                               Key: {message.messageKey}
                             </p>
                           </div>
@@ -435,7 +444,7 @@ export default function DialogMessagesPage() {
             </Card>
           )}
         </div>
-      </div>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }

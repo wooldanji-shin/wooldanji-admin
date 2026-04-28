@@ -11,7 +11,7 @@ export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>) {
+}>): React.ReactElement {
   return (
     <html lang="ko">
       <head>
@@ -19,7 +19,20 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         {children}
-        <Toaster position="top-right" richColors />
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          theme="light"
+          toastOptions={{
+            classNames: {
+              toast:
+                "border border-border/70 shadow-popover bg-card text-card-foreground rounded-xl",
+              title: "font-medium",
+              description: "text-sm text-muted-foreground",
+            },
+          }}
+        />
       </body>
     </html>
   );

@@ -1,6 +1,13 @@
 'use client';
 
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { InlineLoadingSkeleton } from '@/components/skeletons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,21 +116,23 @@ export default function HeaderSettingsPage() {
 
   if (loading) {
     return (
-      <div className='flex flex-col h-full'>
-        <AdminHeader title='헤더 설정' />
-        <div className='flex-1 flex items-center justify-center'>
-          <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader>
+          <PageHeaderTitle title="헤더 설정" />
+        </PageHeader>
+        <InlineLoadingSkeleton />
+      </PageShell>
     );
   }
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='헤더 설정' />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle title="헤더 설정" />
+      </PageHeader>
 
-      <div className='flex-1 p-6'>
-        <div className='max-w-2xl mx-auto space-y-6'>
+      <PageContent>
+        <div className='space-y-6'>
           {/* Header Settings Card */}
           <Card className='bg-card border-border'>
             <CardHeader>
@@ -189,7 +198,7 @@ export default function HeaderSettingsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }

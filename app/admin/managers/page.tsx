@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { TableSkeleton } from '@/components/skeletons';
+import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -577,10 +584,15 @@ export default function ManagersPage() {
   });
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='관리자 관리' />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="관리자 관리"
+          description="관리자 권한 범위와 승인 상태를 관리합니다."
+        />
+      </PageHeader>
 
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
+      <PageContent>
         {/* Search and Filters */}
         <div className='space-y-4'>
           <div className='relative w-full'>
@@ -638,14 +650,19 @@ export default function ManagersPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
-                        로딩 중...
+                      <TableCell colSpan={9} className='p-0'>
+                        <TableSkeleton rows={6} columns={9} showHeader={false} />
                       </TableCell>
                     </TableRow>
                   ) : filteredManagers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
-                        {searchQuery ? '검색 결과가 없습니다.' : '관리자가 없습니다.'}
+                      <TableCell colSpan={9} className='p-0'>
+                        <EmptyState
+                          icon={Shield}
+                          title={searchQuery ? '검색 결과가 없습니다' : '관리자가 없습니다'}
+                          description={searchQuery ? '다른 검색어로 다시 시도해 보세요.' : undefined}
+                          size="sm"
+                        />
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -694,7 +711,7 @@ export default function ManagersPage() {
                         <TableCell className='text-right' onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
+                              <Button variant='ghost' size='icon-sm' className='p-0'>
                                 <MoreVertical className='h-4 w-4' />
                               </Button>
                             </DropdownMenuTrigger>
@@ -753,7 +770,7 @@ export default function ManagersPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </PageContent>
 
       {/* Image Preview Modal */}
       {imagePreview && (
@@ -1064,6 +1081,6 @@ export default function ManagersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

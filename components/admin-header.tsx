@@ -1,32 +1,42 @@
 'use client';
 
-import { getCurrentUser } from '@/lib/auth';
-import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
-export function AdminHeader({ title }: { title: string }) {
-  const [userName, setUserName] = useState('');
+interface AdminHeaderProps {
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+  className?: string;
+}
 
-  useEffect(() => {
-    async function loadUser() {
-      const user = await getCurrentUser();
-      if (user) {
-        setUserName(user.name);
-      }
-    }
-    loadUser();
-  }, []);
-
+/**
+ * @deprecated Use `PageHeader` + `PageHeaderTitle` from `@/components/page-shell`
+ * instead. This shim is kept only for legacy pages and renders the same row that
+ * PageShell/PageHeaderTitle would render so legacy pages get the new typography.
+ */
+export function AdminHeader({
+  title,
+  description,
+  actions,
+  className,
+}: AdminHeaderProps): React.ReactElement {
   return (
-    <div className='flex h-16 items-center justify-between border-b border-border bg-card px-6'>
-      <h2 className='text-2xl font-semibold text-card-foreground'>{title}</h2>
-      <div className='flex items-center gap-3'>
-        <div className='text-sm text-muted-foreground'>{userName}</div>
-        <div className='h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center'>
-          <span className='text-sm font-medium text-primary'>
-            {userName.charAt(0)}
-          </span>
-        </div>
+    <div
+      className={cn(
+        'flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-6',
+        className
+      )}
+    >
+      <div className="min-w-0">
+        <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground md:text-[1.625rem]">
+          {title}
+        </h1>
+        {description && (
+          <p className="mt-2 text-base font-medium text-muted-foreground">{description}</p>
+        )}
       </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

@@ -136,21 +136,21 @@ export default function NewApartmentPage() {
   );
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       {/* Header */}
-      <div className="mb-8">
+      <div>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.push('/admin/apartments')}
-          className="mb-4"
+          className="-ml-2 mb-3 text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
           뒤로
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">새 아파트 등록</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl font-semibold tracking-tight md:text-[1.625rem]">새 아파트 등록</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             아파트 정보를 입력하여 새로운 아파트를 등록합니다
           </p>
         </div>

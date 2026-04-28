@@ -1,6 +1,17 @@
 'use client';
 
-import { AdminHeader } from '@/components/admin-header';
+import { Inbox } from 'lucide-react';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { DataTableShell } from '@/components/data-table-shell';
+import { DataToolbar, DataToolbarFilters } from '@/components/data-toolbar';
+import { StatusBadge } from '@/components/status-badge';
+import { EmptyState } from '@/components/empty-state';
+import { TableSkeleton } from '@/components/skeletons';
 import {
   Table,
   TableBody,
@@ -16,70 +27,23 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useApplicationsPage, type AdStatus, type ModificationStatus, type ApartmentSummary, type PaymentStatus, type StatusFilter } from './useApplicationsPage';
+import {
+  useApplicationsPage,
+  type ApartmentSummary,
+  type StatusFilter,
+} from './useApplicationsPage';
 
-const AD_STATUS_CONFIG: Record<AdStatus, { label: string; color: string; bg: string; border: string }> = {
-  pending:  { label: '승인대기', color: '#CD6D00', bg: '#FFF4E5', border: '#FDDCAA' },
-  approved: { label: '승인됨',   color: '#16A34A', bg: '#F0FDF4', border: '#86EFAC' },
-  rejected: { label: '거절됨',   color: '#DC2626', bg: '#FEE2E2', border: '#FECACA' },
-  running:  { label: '진행중',   color: '#2563EB', bg: '#DBEAFE', border: '#BFDBFE' },
-  ended:    { label: '종료',     color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' },
-  draft:    { label: '임시저장', color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' },
-};
-
-function AdStatusBadge({ status }: { status: AdStatus }) {
-  const { label, color, bg, border } = AD_STATUS_CONFIG[status] ?? { label: status, color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' };
-  return (
-    <span
-      className='inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium border'
-      style={{ color, backgroundColor: bg, borderColor: border }}
-    >
-      {label}
-    </span>
-  );
-}
-
-function ModificationStatusBadge({ status }: { status: ModificationStatus }) {
-  if (!status) return null;
-  const config = {
-    pending:  { label: '수정신청', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-    approved: { label: '수정승인', color: '#16A34A', bg: '#F0FDF4', border: '#86EFAC' },
-    rejected: { label: '수정거절', color: '#DC2626', bg: '#FEE2E2', border: '#FECACA' },
-  } as const;
-  const { label, color, bg, border } = config[status];
-  return (
-    <span
-      className='inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium border'
-      style={{ color, backgroundColor: bg, borderColor: border }}
-    >
-      {label}
-    </span>
-  );
-}
-
-function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const { label, color, bg, border } = status === 'paid'
-    ? { label: '결제완료', color: '#16A34A', bg: '#F0FDF4', border: '#86EFAC' }
-    : { label: '미결제',   color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' };
-  return (
-    <span
-      className='inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium border'
-      style={{ color, backgroundColor: bg, borderColor: border }}
-    >
-      {label}
-    </span>
-  );
+interface ApartmentTooltipProps {
+  apartments: ApartmentSummary[];
+  pricePerHousehold: number;
+  children: React.ReactNode;
 }
 
 function ApartmentTooltip({
   apartments,
   pricePerHousehold,
   children,
-}: {
-  apartments: ApartmentSummary[];
-  pricePerHousehold: number;
-  children: React.ReactNode;
-}) {
+}: ApartmentTooltipProps): React.ReactElement {
   if (apartments.length === 0) return <>{children}</>;
 
   const totalHouseholds = apartments.reduce((sum, a) => sum + a.totalHouseholds, 0);
@@ -89,26 +53,29 @@ function ApartmentTooltip({
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent
-        side='bottom'
-        className='bg-popover text-popover-foreground border border-border shadow-lg p-0 max-w-xs'
+        side="bottom"
+        className="max-w-xs border border-border bg-popover p-0 text-popover-foreground shadow-popover"
       >
-        <div className='p-3 space-y-1.5'>
+        <div className="space-y-1.5 p-3">
           {apartments.map((apt) => (
-            <div key={apt.apartmentId} className='flex items-center justify-between gap-6 text-xs'>
-              <span className='font-medium'>{apt.apartmentName}</span>
-              <span className='text-muted-foreground shrink-0'>
-                {apt.totalHouseholds.toLocaleString()}세대
-                · {(apt.totalHouseholds * pricePerHousehold).toLocaleString()}원
+            <div
+              key={apt.apartmentId}
+              className="flex items-center justify-between gap-6 text-xs"
+            >
+              <span className="font-medium">{apt.apartmentName}</span>
+              <span className="shrink-0 text-muted-foreground">
+                {apt.totalHouseholds.toLocaleString()}세대 ·{' '}
+                {(apt.totalHouseholds * pricePerHousehold).toLocaleString()}원
               </span>
             </div>
           ))}
           {apartments.length > 1 && (
-            <>
-              <div className='border-t border-border pt-1.5 flex items-center justify-between text-xs font-semibold'>
-                <span>합계</span>
-                <span>{totalHouseholds.toLocaleString()}세대 · {totalAmount.toLocaleString()}원</span>
-              </div>
-            </>
+            <div className="flex items-center justify-between border-t border-border pt-1.5 text-xs font-semibold">
+              <span>합계</span>
+              <span>
+                {totalHouseholds.toLocaleString()}세대 · {totalAmount.toLocaleString()}원
+              </span>
+            </div>
           )}
         </div>
       </TooltipContent>
@@ -116,7 +83,14 @@ function ApartmentTooltip({
   );
 }
 
-export default function AdApplicationsPage() {
+const STATUS_TABS: { label: string; value: StatusFilter }[] = [
+  { label: '전체', value: 'all' },
+  { label: '승인대기', value: 'pending' },
+  { label: '승인됨', value: 'approved' },
+  { label: '수정심사', value: 'modification' },
+];
+
+export default function AdApplicationsPage(): React.ReactElement {
   const {
     applications,
     loading,
@@ -129,172 +103,171 @@ export default function AdApplicationsPage() {
     handleRowClick,
   } = useApplicationsPage();
 
-  const statusTabs: { label: string; value: StatusFilter }[] = [
-    { label: '전체',     value: 'all' },
-    { label: '승인대기', value: 'pending' },
-    { label: '승인됨',   value: 'approved' },
-    { label: '수정심사', value: 'modification' },
-  ];
-
   return (
     <TooltipProvider delayDuration={300}>
-      <div className='flex flex-col h-full'>
-        <AdminHeader title='광고 신청 관리' />
+      <PageShell>
+        <PageHeader>
+          <PageHeaderTitle
+            title="광고 신청 관리"
+            description="광고 신청을 검토하고 승인 상태를 관리합니다."
+          />
+        </PageHeader>
 
-        <div className='flex-1 overflow-auto'>
-          <div className='p-6 space-y-4'>
-            {/* 상태 필터 탭 */}
-            <div className='flex items-center gap-0 border-b border-border'>
-              {statusTabs.map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => setStatusFilter(tab.value)}
-                  className={cn(
-                    'px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-                    statusFilter === tab.value
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* 카테고리 필터 */}
-            {categories.length > 0 && (
-              <div className='flex flex-wrap items-center gap-1.5'>
-                <span className='text-xs text-muted-foreground'>카테고리</span>
-                <div className='w-px h-3.5 bg-border mx-0.5' />
-                <button
-                  onClick={() => setCategoryFilter(null)}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
-                    categoryFilter === null
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground'
-                  )}
-                >
-                  전체
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setCategoryFilter(categoryFilter === cat.id ? null : cat.id)}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
-                      categoryFilter === cat.id
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground'
-                    )}
-                  >
-                    {cat.categoryName}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* 테이블 */}
-            {loading ? (
-              <div className='flex items-center justify-center py-24'>
-                <div className='flex flex-col items-center gap-3 text-muted-foreground'>
-                  <div className='h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin' />
-                  <span className='text-sm'>불러오는 중...</span>
-                </div>
-              </div>
-            ) : applications.length === 0 ? (
-              <div className='flex items-center justify-center py-24 text-muted-foreground'>
-                <span className='text-sm'>신청 내역이 없습니다.</span>
-              </div>
-            ) : (
-              <div className='rounded-lg border border-border overflow-hidden'>
-                <Table>
-                  <TableHeader>
-                    <TableRow className='bg-muted/40 hover:bg-muted/40'>
-                      <TableHead className='font-semibold text-foreground'>상호명</TableHead>
-                      <TableHead className='font-semibold text-foreground'>광고표시용번호</TableHead>
-                      <TableHead className='font-semibold text-foreground'>광고 내용</TableHead>
-                      <TableHead className='font-semibold text-foreground'>카테고리</TableHead>
-                      <TableHead className='text-center font-semibold text-foreground'>신청 아파트</TableHead>
-                      <TableHead className='text-center font-semibold text-foreground'>광고 상태</TableHead>
-                      <TableHead className='text-center font-semibold text-foreground'>결제 상태</TableHead>
-                      <TableHead className='font-semibold text-foreground'>신청일시</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {applications.map((app) => (
-                      <TableRow
-                        key={app.id}
-                        className='cursor-pointer hover:bg-muted/40 transition-colors'
-                        onClick={() => handleRowClick(app.id)}
-                      >
-                        <TableCell className='font-medium whitespace-nowrap'>
-                          <div className='flex items-center gap-1.5'>
-                            {app.partner_users?.businessName ?? '-'}
-                            {/* 첫광고 뱃지: isFirstAdApplication=true인 경우만 표시 */}
-                            {app.isFirstAdApplication && (
-                              <span
-                                className='inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border'
-                                style={{ color: '#2563EB', backgroundColor: '#DBEAFE', borderColor: '#BFDBFE' }}
-                              >
-                                첫광고
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className='text-sm text-muted-foreground whitespace-nowrap'>
-                          {app.partner_users?.displayPhoneNumber ?? '-'}
-                        </TableCell>
-                        <TableCell className='max-w-[240px]'>
-                          <div className='font-medium text-sm truncate'>{app.title}</div>
-                          {app.content && (
-                            <div className='text-xs text-muted-foreground truncate mt-0.5'>{app.content}</div>
-                          )}
-                        </TableCell>
-                        <TableCell className='whitespace-nowrap text-muted-foreground'>
-                          {app.ad_categories_v2?.categoryName ?? '-'}
-                          {app.subCategoryNames.length > 0 && (
-                            <>
-                              <span className='mx-1'>›</span>
-                              {app.subCategoryNames.join(', ')}
-                            </>
-                          )}
-                        </TableCell>
-                        <TableCell className='text-center'>
-                          <ApartmentTooltip apartments={app.apartments} pricePerHousehold={pricePerHousehold}>
-                            <span
-                              className='text-muted-foreground underline decoration-dashed underline-offset-2 cursor-default'
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {app.apartments.length}개
-                            </span>
-                          </ApartmentTooltip>
-                        </TableCell>
-                        <TableCell className='text-center'>
-                          <div className='flex flex-col items-center gap-1'>
-                            <AdStatusBadge status={app.adStatus} />
-                            {app.modificationStatus && (
-                              <ModificationStatusBadge status={app.modificationStatus} />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className='text-center'>
-                          <PaymentStatusBadge status={app.paymentStatus} />
-                        </TableCell>
-                        <TableCell className='text-sm text-muted-foreground whitespace-nowrap'>
-                          {app.submittedAt
-                            ? new Date(app.submittedAt).toLocaleString('ko-KR')
-                            : '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+        <PageContent>
+          {/* 상태 탭 — 모던 segmented control */}
+          <div className="inline-flex w-full max-w-md items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setStatusFilter(tab.value)}
+                className={cn(
+                  'h-9 flex-1 rounded-md px-4 text-sm font-medium transition-all',
+                  statusFilter === tab.value
+                    ? 'bg-primary text-primary-foreground shadow-card'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-        </div>
-      </div>
+
+          <DataTableShell
+            toolbar={
+              categories.length > 0 ? (
+                <DataToolbar>
+                  <DataToolbarFilters>
+                    <button
+                      type="button"
+                      onClick={() => setCategoryFilter(null)}
+                      className={cn(
+                        'inline-flex h-11 items-center rounded-md border px-5 text-sm font-medium transition-colors',
+                        categoryFilter === null
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
+                      )}
+                    >
+                      전체 카테고리
+                    </button>
+                    {categories.map((cat) => {
+                      const isActive = categoryFilter === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setCategoryFilter(isActive ? null : cat.id)}
+                          className={cn(
+                            'inline-flex h-11 items-center rounded-md border px-5 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
+                          )}
+                        >
+                          {cat.categoryName}
+                        </button>
+                      );
+                    })}
+                  </DataToolbarFilters>
+                </DataToolbar>
+              ) : undefined
+            }
+          >
+            {loading ? (
+              <TableSkeleton rows={6} columns={8} />
+            ) : applications.length === 0 ? (
+              <EmptyState
+                icon={Inbox}
+                title="신청 내역이 없습니다"
+                description="아직 등록된 광고 신청이 없습니다."
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>상호명</TableHead>
+                    <TableHead>광고표시용번호</TableHead>
+                    <TableHead>광고 내용</TableHead>
+                    <TableHead>카테고리</TableHead>
+                    <TableHead className="text-center">신청 아파트</TableHead>
+                    <TableHead className="text-center">광고 상태</TableHead>
+                    <TableHead className="text-center">결제 상태</TableHead>
+                    <TableHead>신청일시</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {applications.map((app) => (
+                    <TableRow
+                      key={app.id}
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(app.id)}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-1.5">
+                          {app.partner_users?.businessName ?? '-'}
+                          {app.isFirstAdApplication && (
+                            <StatusBadge variant="info" size="sm" withDot={false}>
+                              첫광고
+                            </StatusBadge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {app.partner_users?.displayPhoneNumber ?? '-'}
+                      </TableCell>
+                      <TableCell className="max-w-[240px]">
+                        <div className="truncate font-medium">{app.title}</div>
+                        {app.content && (
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {app.content}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {app.ad_categories_v2?.categoryName ?? '-'}
+                        {app.subCategoryNames.length > 0 && (
+                          <>
+                            <span className="mx-1">›</span>
+                            {app.subCategoryNames.join(', ')}
+                          </>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <ApartmentTooltip
+                          apartments={app.apartments}
+                          pricePerHousehold={pricePerHousehold}
+                        >
+                          <span
+                            className="cursor-default text-muted-foreground underline decoration-dashed underline-offset-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {app.apartments.length}개
+                          </span>
+                        </ApartmentTooltip>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <StatusBadge.Ad status={app.adStatus} />
+                          {app.modificationStatus && (
+                            <StatusBadge.Modification status={app.modificationStatus} />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <StatusBadge.Payment status={app.paymentStatus} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {app.submittedAt
+                          ? new Date(app.submittedAt).toLocaleString('ko-KR')
+                          : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </DataTableShell>
+        </PageContent>
+      </PageShell>
     </TooltipProvider>
   );
 }

@@ -1,11 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader } from '@/components/admin-header';
 import { AddDeviceDialog } from '@/components/add-device-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -14,8 +11,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Eye } from 'lucide-react';
+import { Eye, HardDrive } from 'lucide-react';
 import Link from 'next/link';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderActions,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { DataTableShell } from '@/components/data-table-shell';
+import { DataToolbar, DataToolbarSearch, DataToolbarActions } from '@/components/data-toolbar';
+import { EmptyState } from '@/components/empty-state';
 
 const initialDevices = [
   {
@@ -80,108 +87,86 @@ export default function DevicesPage() {
   );
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='기기등록' />
-
-      <div className='flex-1 p-6 space-y-6'>
-        {/* Search and Actions */}
-        <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6'>
-          <div className='relative flex-1 w-full'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-            <Input
-              placeholder='주소, 아파트명, 동으로 검색...'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className='pl-10'
-            />
-          </div>
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="기기 등록"
+          description="등록된 기기 정보를 검색하고 상세를 확인합니다."
+        />
+        <PageHeaderActions>
           <AddDeviceDialog />
-        </div>
+        </PageHeaderActions>
+      </PageHeader>
 
-        {/* Devices Table */}
-        <Card className='bg-card border-border'>
-          <CardContent className='p-0'>
-            <div className='overflow-x-auto'>
-              <Table>
-                <TableHeader>
-                  <TableRow className='border-border hover:bg-transparent'>
-                    <TableHead className='text-muted-foreground'>
-                      주소
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      아파트명
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>동</TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      세대수
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      등록일시
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      MAC 주소
-                    </TableHead>
-                    <TableHead className='text-muted-foreground text-right'>
-                      작업
-                    </TableHead>
+      <PageContent>
+        <DataTableShell
+          toolbar={
+            <DataToolbar>
+              <DataToolbarSearch
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="주소, 아파트명, 동으로 검색..."
+              />
+              <DataToolbarActions>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  총 {filteredDevices.length.toLocaleString()}개
+                  {searchQuery && ` / ${devices.length.toLocaleString()}`}
+                </span>
+              </DataToolbarActions>
+            </DataToolbar>
+          }
+        >
+          {filteredDevices.length === 0 ? (
+            <EmptyState
+              icon={HardDrive}
+              title="검색 결과가 없습니다"
+              description="다른 검색어로 다시 시도해 보세요."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>주소</TableHead>
+                  <TableHead>아파트명</TableHead>
+                  <TableHead>동</TableHead>
+                  <TableHead>세대수</TableHead>
+                  <TableHead>등록일시</TableHead>
+                  <TableHead>MAC 주소</TableHead>
+                  <TableHead className="text-right">작업</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredDevices.map((device) => (
+                  <TableRow key={device.id}>
+                    <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                      {device.address}
+                    </TableCell>
+                    <TableCell className="font-medium">{device.apartmentName}</TableCell>
+                    <TableCell className="text-muted-foreground">{device.dong}동</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {device.households}세대
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {device.registeredDate}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {device.macAddress}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Link href={`/admin/devices/${device.id}`}>
+                        <Button variant="ghost" size="sm" className="gap-2">
+                          <Eye className="h-4 w-4" />
+                          상세보기
+                        </Button>
+                      </Link>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDevices.map((device) => (
-                    <TableRow
-                      key={device.id}
-                      className='border-border hover:bg-secondary/50'
-                    >
-                      <TableCell className='text-card-foreground max-w-[200px] truncate'>
-                        {device.address}
-                      </TableCell>
-                      <TableCell className='font-medium text-card-foreground'>
-                        {device.apartmentName}
-                      </TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {device.dong}동
-                      </TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {device.households}세대
-                      </TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {device.registeredDate}
-                      </TableCell>
-                      <TableCell className='font-mono text-sm text-muted-foreground'>
-                        {device.macAddress}
-                      </TableCell>
-                      <TableCell className='text-right'>
-                        <Link href={`/admin/devices/${device.id}`}>
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            className='h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary gap-2'
-                          >
-                            <Eye className='h-4 w-4' />
-                            상세보기
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {filteredDevices.length === 0 && (
-              <div className='text-center py-12 text-muted-foreground'>
-                검색 결과가 없습니다.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Summary */}
-        <div className='text-sm text-muted-foreground'>
-          총 {filteredDevices.length}개의 기기{' '}
-          {searchQuery && `(전체 ${devices.length}개 중)`}
-        </div>
-      </div>
-    </div>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DataTableShell>
+      </PageContent>
+    </PageShell>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { ChevronLeft, Check, X } from 'lucide-react';
+import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { toast } from 'sonner';
 
 type ApplicationDetail = {
@@ -46,6 +48,7 @@ type ApplicationDetail = {
 export default function MembershipConversionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [application, setApplication] = useState<ApplicationDetail | null>(null);
+  const imgLb = useImageLightbox(application?.confirmImageUrl ? [application.confirmImageUrl] : []);
   const [loading, setLoading] = useState(true);
   const [applicationId, setApplicationId] = useState('');
 
@@ -152,10 +155,10 @@ export default function MembershipConversionDetailPage({ params }: { params: Pro
 
   if (loading) {
     return (
-      <div className='flex flex-col h-full'>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader title='멤버십 전환 신청 상세' />
-        <div className='flex-1 flex items-center justify-center'>
-          <div className='text-muted-foreground'>로딩 중...</div>
+        <div className="flex w-full items-center justify-center py-20">
+          <div className="flex w-full max-w-sm flex-col gap-3 mx-auto"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div>
         </div>
       </div>
     );
@@ -163,9 +166,9 @@ export default function MembershipConversionDetailPage({ params }: { params: Pro
 
   if (!application) {
     return (
-      <div className='flex flex-col h-full'>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader title='멤버십 전환 신청 상세' />
-        <div className='flex-1 flex items-center justify-center'>
+        <div className="flex w-full items-center justify-center py-20">
           <div className='text-muted-foreground'>신청 정보를 찾을 수 없습니다.</div>
         </div>
       </div>
@@ -173,20 +176,20 @@ export default function MembershipConversionDetailPage({ params }: { params: Pro
   }
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='멤버십 전환 신청 상세' />
-
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
-        {/* 뒤로가기 */}
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+      <div className='flex items-center gap-2'>
         <Button
           variant='ghost'
+          size='icon-sm'
           onClick={() => router.push('/admin/membership-conversion')}
-          className='gap-2'
+          aria-label='뒤로가기'
         >
-          <ArrowLeft className='h-4 w-4' />
-          목록으로
+          <ChevronLeft className='h-5 w-5' />
         </Button>
+        <AdminHeader title='멤버십 전환 신청 상세' className='flex-1' />
+      </div>
 
+      <div className="flex flex-col gap-6">
         {/* 신청자 정보 */}
         <Card>
           <CardHeader>
@@ -266,17 +269,13 @@ export default function MembershipConversionDetailPage({ params }: { params: Pro
           </CardHeader>
           <CardContent>
             {application.confirmImageUrl ? (
-              <div className='relative max-w-sm aspect-square bg-secondary rounded-lg overflow-hidden flex items-center justify-center'>
-                <img
-                  src={application.confirmImageUrl}
-                  alt='신청 인증 사진'
-                  className='w-full h-full object-contain'
-                />
-              </div>
+              <ImageThumbnail
+                src={application.confirmImageUrl}
+                alt='신청 인증 사진'
+                onClick={() => imgLb.open(0)}
+              />
             ) : (
-              <div className='max-w-sm aspect-square bg-secondary rounded-lg flex items-center justify-center'>
-                <span className='text-muted-foreground'>사진 없음</span>
-              </div>
+              <p className='text-sm text-muted-foreground'>사진 없음</p>
             )}
           </CardContent>
         </Card>
@@ -368,6 +367,7 @@ export default function MembershipConversionDetailPage({ params }: { params: Pro
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ImageLightbox {...imgLb.props} />
     </div>
   );
 }

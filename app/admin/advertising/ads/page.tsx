@@ -1363,12 +1363,12 @@ export default function AdsManagementPage() {
 
   return (
     <TooltipProvider>
-      <div className='flex h-full flex-col'>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader
           title='광고 등록/수정'
         />
 
-        <div className='flex-1 space-y-4 p-4 md:p-6'>
+        <div className="flex flex-col gap-4">
           {/* 상태 탭 */}
           <Card>
             <CardContent className='pt-6'>
@@ -2000,9 +2000,8 @@ export default function AdsManagementPage() {
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant='ghost'
-                                    size='sm'
+                                    size='icon-sm'
                                     onClick={() => handleOpenDialog(ad)}
-                                    className='h-8 w-8 p-0'
                                   >
                                     <Edit className='h-4 w-4' />
                                   </Button>
@@ -2015,12 +2014,11 @@ export default function AdsManagementPage() {
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant='ghost'
-                                    size='sm'
+                                    size='icon-sm'
                                     onClick={() => {
                                       setSelectedAd(ad);
                                       setIsResetClickDialogOpen(true);
                                     }}
-                                    className='h-8 w-8 p-0'
                                   >
                                     <RotateCcw className='h-4 w-4' />
                                   </Button>
@@ -2033,12 +2031,12 @@ export default function AdsManagementPage() {
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant='ghost'
-                                    size='sm'
+                                    size='icon-sm'
                                     onClick={() => {
                                       setSelectedAd(ad);
                                       setIsDeleteDialogOpen(true);
                                     }}
-                                    className='h-8 w-8 p-0 text-destructive hover:text-destructive'
+                                    className='text-destructive hover:text-destructive'
                                   >
                                     <Trash2 className='h-4 w-4' />
                                   </Button>
@@ -2476,12 +2474,12 @@ export default function AdsManagementPage() {
                       <div className='border rounded-md'>
                         <div className='p-2 border-b'>
                           <div className='relative'>
-                            <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
                             <Input
                               placeholder='아파트명 또는 주소 검색...'
                               value={apartmentSearch}
                               onChange={(e) => setApartmentSearch(e.target.value)}
-                              className='pl-8 h-8'
+                              className='pl-9'
                             />
                           </div>
                         </div>

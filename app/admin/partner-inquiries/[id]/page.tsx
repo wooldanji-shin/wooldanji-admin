@@ -1,6 +1,7 @@
 'use client';
 
 import { AdminHeader } from '@/components/admin-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
 import {
   Loader2,
-  ArrowLeft,
+  ChevronLeft,
   Send,
   User,
   Calendar,
@@ -23,7 +24,7 @@ import { toast } from 'sonner';
 import { useRouter, useParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import Image from 'next/image';
+import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 
 interface PartnerInquiry {
   id: string;
@@ -63,6 +64,7 @@ export default function PartnerInquiryDetailPage() {
   const inquiryId = params.id as string;
 
   const [inquiry, setInquiry] = useState<PartnerInquiry | null>(null);
+  const imgLb = useImageLightbox(inquiry?.imageUrls ?? []);
   const [replies, setReplies] = useState<PartnerInquiryReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -293,26 +295,28 @@ export default function PartnerInquiryDetailPage() {
 
   if (loading) {
     return (
-      <div className='flex flex-col h-full'>
-        <AdminHeader title='파트너 문의 상세' />
-        <div className='flex-1 flex items-center justify-center'>
-          <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+        <div className='flex items-center gap-2'>
+          <Button variant='ghost' size='icon-sm' onClick={() => router.back()} aria-label='뒤로가기'>
+            <ChevronLeft className='h-5 w-5' />
+          </Button>
+          <AdminHeader title='파트너 문의 상세' className='flex-1' />
         </div>
+        <Skeleton className='h-32 w-full' />
       </div>
     );
   }
 
   if (!inquiry) {
     return (
-      <div className='flex flex-col h-full'>
-        <AdminHeader title='파트너 문의 상세' />
-        <div className='flex-1 flex flex-col items-center justify-center gap-4'>
-          <p className='text-muted-foreground'>문의를 찾을 수 없습니다.</p>
-          <Button onClick={() => router.back()}>
-            <ArrowLeft className='h-4 w-4 mr-2' />
-            돌아가기
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+        <div className='flex items-center gap-2'>
+          <Button variant='ghost' size='icon-sm' onClick={() => router.back()} aria-label='뒤로가기'>
+            <ChevronLeft className='h-5 w-5' />
           </Button>
+          <AdminHeader title='파트너 문의 상세' className='flex-1' />
         </div>
+        <p className='py-12 text-center text-muted-foreground'>문의를 찾을 수 없습니다.</p>
       </div>
     );
   }
@@ -320,15 +324,16 @@ export default function PartnerInquiryDetailPage() {
   const hasAdminReply = replies.some((r) => r.isAdmin);
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='파트너 문의 상세' />
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+      <div className='flex items-center gap-2'>
+        <Button variant='ghost' size='icon-sm' onClick={() => router.back()} aria-label='뒤로가기'>
+          <ChevronLeft className='h-5 w-5' />
+        </Button>
+        <AdminHeader title='파트너 문의 상세' className='flex-1' />
+      </div>
 
-      <div className='flex-1 p-6 overflow-auto'>
-        <div className='max-w-5xl mx-auto space-y-6'>
-          <Button variant='ghost' onClick={() => router.back()} className='mb-2'>
-            <ArrowLeft className='h-4 w-4 mr-2' />
-            목록으로
-          </Button>
+      <div className="flex flex-col gap-6">
+        <div className='space-y-6'>
 
           <Card className='bg-card border-border'>
             <CardHeader>
@@ -384,30 +389,14 @@ export default function PartnerInquiryDetailPage() {
                     <ImageIcon className='h-4 w-4' />
                     첨부 이미지 ({inquiry.imageUrls.length}개)
                   </h3>
-                  <div className='grid grid-cols-2 md:grid-cols-3 gap-4'>
+                  <div className='flex flex-wrap gap-2'>
                     {inquiry.imageUrls.map((url, index) => (
-                      <div
+                      <ImageThumbnail
                         key={index}
-                        className='relative aspect-square rounded-lg overflow-hidden bg-muted border border-border group'
-                      >
-                        <Image
-                          src={url}
-                          alt={`첨부 이미지 ${index + 1}`}
-                          fill
-                          sizes='(max-width: 768px) 50vw, 33vw'
-                          className='object-cover group-hover:scale-105 transition-transform'
-                        />
-                        <a
-                          href={url}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/50 transition-colors'
-                        >
-                          <span className='text-white opacity-0 group-hover:opacity-100 transition-opacity text-sm font-medium'>
-                            크게 보기
-                          </span>
-                        </a>
-                      </div>
+                        src={url}
+                        alt={`첨부 이미지 ${index + 1}`}
+                        onClick={() => imgLb.open(index)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -522,6 +511,7 @@ export default function PartnerInquiryDetailPage() {
           )}
         </div>
       </div>
+      <ImageLightbox {...imgLb.props} />
     </div>
   );
 }

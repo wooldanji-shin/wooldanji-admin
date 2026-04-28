@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -147,10 +153,15 @@ export default function MembershipConversionPage() {
   };
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='멤버십 전환 신청' />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="멤버십 전환 신청"
+          description="파트너 멤버십 전환 신청을 검토하고 승인합니다."
+        />
+      </PageHeader>
 
-      <div className='flex-1 p-6 overflow-auto'>
+      <PageContent>
         {/* 탭 */}
         <div className='flex gap-2 mb-6'>
           <Button
@@ -185,7 +196,7 @@ export default function MembershipConversionPage() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={activeTab === 'pending' ? 6 : 6} className='text-center py-10 text-muted-foreground'>
-                      로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                     </TableCell>
                   </TableRow>
                 ) : applications.length === 0 ? (
@@ -221,17 +232,17 @@ export default function MembershipConversionPage() {
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className='flex gap-1 justify-center'>
                             <Button
-                              size='icon'
+                              size='icon-sm'
                               variant='ghost'
-                              className='h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50'
+                              className='text-green-600 hover:text-green-700 hover:bg-green-50'
                               onClick={() => setApproveTarget(app)}
                             >
                               <Check className='h-4 w-4' />
                             </Button>
                             <Button
-                              size='icon'
+                              size='icon-sm'
                               variant='ghost'
-                              className='h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50'
+                              className='text-red-600 hover:text-red-700 hover:bg-red-50'
                               onClick={() => {
                                 setRejectTarget(app);
                                 setRejectionReason('');
@@ -249,7 +260,7 @@ export default function MembershipConversionPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
+      </PageContent>
 
       {/* 승인 확인 모달 */}
       <Dialog open={!!approveTarget} onOpenChange={(open) => !open && setApproveTarget(null)}>
@@ -319,6 +330,6 @@ export default function MembershipConversionPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

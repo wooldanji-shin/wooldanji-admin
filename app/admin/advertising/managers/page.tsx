@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -429,10 +430,10 @@ export default function AdvertisingManagersPage() {
   );
 
   return (
-    <div className='flex flex-col h-full'>
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       <AdminHeader title='매니저 관리' />
 
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
+      <div className="flex flex-col gap-6">
         {/* Search & Actions */}
         <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between'>
           <div className='relative flex-1 w-full'>
@@ -472,7 +473,7 @@ export default function AdvertisingManagersPage() {
                   {loading ? (
                     <TableRow>
                       <TableCell colSpan={6} className='text-center py-12 text-muted-foreground'>
-                        로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                       </TableCell>
                     </TableRow>
                   ) : filteredManagers.length === 0 ? (

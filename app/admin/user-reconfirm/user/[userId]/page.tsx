@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
+import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { createClient } from '@/lib/supabase/client';
 import { getUserRoles } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -54,6 +56,13 @@ export default function SuspendedUserDetailPage({
   const supabase = createClient();
 
   const [user, setUser] = useState<SuspendedUserDetails | null>(null);
+  const allImages: string[] = user
+    ? [
+        ...(user.confirmImageUrl ? [user.confirmImageUrl] : []),
+        ...user.reconfirmHistory.map((h) => h.reConfirmImageUrl).filter((u): u is string => !!u),
+      ]
+    : [];
+  const imgLb = useImageLightbox(allImages);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string>('');
 
@@ -164,10 +173,10 @@ export default function SuspendedUserDetailPage({
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader title="보류 회원 상세" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-muted-foreground">로딩 중...</div>
+        <div className="flex w-full items-center justify-center py-20">
+          <div className="flex w-full max-w-sm flex-col gap-3 mx-auto"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div>
         </div>
       </div>
     );
@@ -175,9 +184,9 @@ export default function SuspendedUserDetailPage({
 
   if (!user) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
         <AdminHeader title="보류 회원 상세" />
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex w-full items-center justify-center py-20">
           <div className="text-muted-foreground">회원 정보를 찾을 수 없습니다.</div>
         </div>
       </div>
@@ -185,18 +194,20 @@ export default function SuspendedUserDetailPage({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <AdminHeader title="보류 회원 상세" />
-
-      <div className="flex-1 p-6 space-y-6 overflow-auto">
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+      <div className='flex items-center gap-2'>
         <Button
-          variant="ghost"
+          variant='ghost'
+          size='icon-sm'
           onClick={() => router.push('/admin/user-reconfirm')}
-          className="gap-2"
+          aria-label='뒤로가기'
         >
-          <ArrowLeft className="h-4 w-4" />
-          목록으로
+          <ChevronLeft className='h-5 w-5' />
         </Button>
+        <AdminHeader title='보류 회원 상세' className='flex-1' />
+      </div>
+
+      <div className="flex flex-col gap-6">
 
         {/* 회원 정보 */}
         <Card>
@@ -254,18 +265,16 @@ export default function SuspendedUserDetailPage({
           </CardHeader>
           <CardContent>
             {user.confirmImageUrl ? (
-              <div className="max-w-sm">
-                <div className="text-sm text-muted-foreground mb-2">최초 승인 시 제출 사진</div>
-                <div className="relative aspect-square bg-secondary rounded-lg overflow-hidden flex items-center justify-center">
-                  <img
-                    src={user.confirmImageUrl}
-                    alt="승인 사진"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
+              <div className='flex flex-col gap-2'>
+                <span className='text-sm text-muted-foreground'>최초 승인 시 제출 사진</span>
+                <ImageThumbnail
+                  src={user.confirmImageUrl}
+                  alt='승인 사진'
+                  onClick={() => imgLb.open(0)}
+                />
               </div>
             ) : (
-              <div className="text-muted-foreground">등록된 사진이 없습니다.</div>
+              <p className='text-sm text-muted-foreground'>등록된 사진이 없습니다.</p>
             )}
           </CardContent>
         </Card>
@@ -286,17 +295,16 @@ export default function SuspendedUserDetailPage({
                   </div>
 
                   {/* 재신청 사진 */}
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-2">재신청 사진</div>
-                    <div className="max-w-xs">
-                      <div className="relative aspect-square bg-secondary rounded-lg overflow-hidden flex items-center justify-center">
-                        <img
-                          src={history.reConfirmImageUrl}
-                          alt="재신청 사진"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    </div>
+                  <div className='flex flex-col gap-2'>
+                    <span className='text-sm text-muted-foreground'>재신청 사진</span>
+                    <ImageThumbnail
+                      src={history.reConfirmImageUrl}
+                      alt='재신청 사진'
+                      onClick={() => {
+                        const idx = allImages.indexOf(history.reConfirmImageUrl);
+                        imgLb.open(idx >= 0 ? idx : 0);
+                      }}
+                    />
                   </div>
 
                   {/* 거절 사유 */}
@@ -314,6 +322,7 @@ export default function SuspendedUserDetailPage({
           </Card>
         )}
       </div>
+      <ImageLightbox {...imgLb.props} />
     </div>
   );
 }

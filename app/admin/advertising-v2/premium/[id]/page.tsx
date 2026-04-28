@@ -1,6 +1,7 @@
 'use client';
 
 import { AdminHeader } from '@/components/admin-header';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -11,67 +12,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { createClient } from '@/lib/supabase/client';
-import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Building2,
+  Check,
+  ChevronLeft,
+  ExternalLink,
+  GitCompare,
+  ImageIcon,
+  MapPin,
+  Tag,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { ReactNode, use, useEffect, useState } from 'react';
-
-type PremiumStatus = 'pending' | 'approved' | 'running' | 'ended' | 'rejected' | 'modification_pending';
-
-interface SnapshotApartment {
-  apartmentName: string;
-  address: string;
-  totalHouseholds: number;
-}
-
-// Design Ref: §2.7 — 연장 이력 행 (paymentType='extension')
-interface ExtensionRow {
-  id: string;
-  paidAt: Date;
-  weeks: number;
-  amount: number;
-  periodStart: Date;
-  periodEnd: Date;
-  paymentKey: string | null;
-  receiptUrl: string | null;
-}
-
-interface PremiumAdDetail {
-  id: string;
-  partnerId: string;
-  baseAdId: string;
-  title: string | null;
-  content: string | null;
-  imageUrls: string[];
-  naverMapUrl: string | null;
-  blogUrl: string | null;
-  youtubeUrl: string | null;
-  instagramUrl: string | null;
-  kakaoOpenChatUrl: string | null;
-  weeks: number;
-  status: PremiumStatus;
-  paymentStatus: 'unpaid' | 'paid';
-  totalAmount: number | null;
-  rejectedReason: string | null;
-  modificationStatus: string | null;
-  modificationRejectedReason: string | null;
-  pendingChanges: Record<string, unknown> | null;
-  startedAt: string | null;
-  endedAt: string | null;
-  createdAt: string;
-  snapshotApartments: SnapshotApartment[];
-  partnerBusinessName?: string;
-}
-
-const STATUS_CONFIG: Record<PremiumStatus, { label: string; color: string; bg: string; border: string }> = {
-  pending:              { label: '승인 대기', color: '#CD6D00', bg: '#FFF4E5', border: '#FDDCAA' },
-  approved:             { label: '승인됨',   color: '#16A34A', bg: '#F0FDF4', border: '#86EFAC' },
-  running:              { label: '진행중',   color: '#2563EB', bg: '#DBEAFE', border: '#BFDBFE' },
-  ended:                { label: '종료',     color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' },
-  rejected:             { label: '거절됨',   color: '#DC2626', bg: '#FEE2E2', border: '#FECACA' },
-  modification_pending: { label: '수정 심사', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-};
+import {
+  StatusBadge as DomainStatusBadge,
+  type PremiumStatus,
+} from '@/components/status-badge';
+import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
+import { usePremiumDetailPage } from './usePremiumDetailPage';
 
 const FIELD_LABELS: Record<string, string> = {
   title: '제목',
@@ -84,656 +45,689 @@ const FIELD_LABELS: Record<string, string> = {
   kakaoOpenChatUrl: '카카오 오픈채팅',
 };
 
-function StatusBadge({ status }: { status: PremiumStatus }) {
-  const c = STATUS_CONFIG[status] ?? { label: status, color: '#475569', bg: '#F1F5F9', border: '#CBD5E1' };
+function StatusBadge({ status }: { status: PremiumStatus }): React.ReactElement {
+  return <DomainStatusBadge.Premium status={status} size="md" />;
+}
+
+function InfoRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
   return (
-    <span
-      className='inline-flex items-center px-2.5 py-0.5 rounded text-sm font-medium border'
-      style={{ color: c.color, backgroundColor: c.bg, borderColor: c.border }}
-    >
-      {c.label}
-    </span>
+    <div className='grid grid-cols-[140px_1fr] gap-3 items-start py-2.5 border-b last:border-0 border-border/50'>
+      <span className='text-sm font-medium text-muted-foreground pt-0.5'>{label}</span>
+      <span className='text-base font-medium text-foreground'>{children}</span>
+    </div>
   );
 }
 
-export default function PremiumAdDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function PremiumAdDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): React.ReactElement {
   const router = useRouter();
-  const [ad, setAd] = useState<PremiumAdDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const page = usePremiumDetailPage(params);
+  const adImgLb = useImageLightbox(page.detail?.imageUrls ?? []);
+  const pendingImgLb = useImageLightbox(
+    Array.isArray((page.detail?.pendingChanges as { imageUrls?: string[] } | null)?.imageUrls)
+      ? ((page.detail!.pendingChanges as { imageUrls?: string[] }).imageUrls ?? [])
+      : []
+  );
 
-  // Design Ref: §2.7 — 누적 결제 합계 + 연장 이력
-  const [cumulativeAmount, setCumulativeAmount] = useState<number | null>(null);
-  const [extensions, setExtensions] = useState<ExtensionRow[]>([]);
-
-  // 거절 다이얼로그
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-
-  // 수정 거절 다이얼로그
-  const [rejectModOpen, setRejectModOpen] = useState(false);
-  const [rejectModReason, setRejectModReason] = useState('');
-
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  useEffect(() => {
-    loadAd();
-  }, [id]);
-
-  async function loadAd() {
-    setIsLoading(true);
-    try {
-      const supabase = createClient();
-
-      const { data, error } = await supabase
-        .from('premium_advertisements_v2')
-        .select(
-          'id, "partnerId", "baseAdId", title, content, "imageUrls", ' +
-          '"naverMapUrl", "blogUrl", "youtubeUrl", "instagramUrl", "kakaoOpenChatUrl", ' +
-          'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", ' +
-          '"modificationStatus", "modificationRejectedReason", "pendingChanges", ' +
-          '"startedAt", "endedAt", "createdAt", "snapshotApartments"'
-        )
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-
-      const { data: partnerData } = await supabase
-        .from('partner_users')
-        .select('"businessName"')
-        .eq('userId', data.partnerId)
-        .maybeSingle();
-
-      setAd({
-        ...data,
-        snapshotApartments: (data.snapshotApartments as SnapshotApartment[]) ?? [],
-        partnerBusinessName: partnerData?.businessName,
-      } as PremiumAdDetail);
-
-      // Design Ref: §2.7 — 누적 결제 합계 + 연장 이력 동시 조회
-      // Plan SC: 누적 totalAmount = 모든 결제 amount 의 합 (신규 + 모든 연장)
-      const [{ data: paidRows }, { data: extRows }] = await Promise.all([
-        supabase
-          .from('ad_payment_history_v2')
-          .select('amount')
-          .eq('premiumAdId', id)
-          .eq('status', 'paid'),
-        supabase
-          .from('ad_payment_history_v2')
-          .select('id, amount, "paymentDate", "billingPeriodStart", "billingPeriodEnd", "paymentKey", "receiptUrl"')
-          .eq('premiumAdId', id)
-          .eq('paymentType', 'extension')
-          .eq('status', 'paid')
-          .order('paymentDate', { ascending: true }),
-      ]);
-
-      const sum = (paidRows ?? []).reduce(
-        (s: number, r: { amount: number | null }) => s + (r.amount ?? 0),
-        0,
-      );
-      setCumulativeAmount(sum > 0 ? sum : null);
-
-      const parsedExtensions: ExtensionRow[] = (extRows ?? []).map((row) => {
-        const periodStart = new Date(row.billingPeriodStart as string);
-        const periodEnd = new Date(row.billingPeriodEnd as string);
-        const weeks = Math.floor(
-          (periodEnd.getTime() - periodStart.getTime()) / (7 * 24 * 60 * 60 * 1000),
-        );
-        return {
-          id: row.id as string,
-          paidAt: new Date(row.paymentDate as string),
-          weeks,
-          amount: row.amount as number,
-          periodStart,
-          periodEnd,
-          paymentKey: (row.paymentKey as string | null) ?? null,
-          receiptUrl: (row.receiptUrl as string | null) ?? null,
-        };
-      });
-      setExtensions(parsedExtensions);
-    } catch (err) {
-      console.error('프리미엄 광고 상세 로드 실패:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleApprove() {
-    if (!confirm('승인하시겠습니까?')) return;
-    setIsProcessing(true);
-    try {
-      const res = await fetch(`/api/advertising-v2/premium/${id}/approve`, { method: 'POST' });
-      const result = await res.json();
-      if (!res.ok) { alert(`승인 실패: ${result.error}`); return; }
-      alert('승인되었습니다.');
-      loadAd();
-    } catch { alert('승인 중 오류가 발생했습니다.'); }
-    finally { setIsProcessing(false); }
-  }
-
-  async function handleReject() {
-    if (!rejectReason.trim()) { alert('거절 사유를 입력해주세요.'); return; }
-    setIsProcessing(true);
-    try {
-      const res = await fetch(`/api/advertising-v2/premium/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: rejectReason }),
-      });
-      const result = await res.json();
-      if (!res.ok) { alert(`거절 실패: ${result.error}`); return; }
-      alert('거절 처리되었습니다.');
-      setRejectOpen(false);
-      setRejectReason('');
-      loadAd();
-    } catch { alert('거절 처리 중 오류가 발생했습니다.'); }
-    finally { setIsProcessing(false); }
-  }
-
-  async function handleApproveModification() {
-    if (!confirm('수정 내용을 승인하시겠습니까?')) return;
-    setIsProcessing(true);
-    try {
-      const res = await fetch(`/api/advertising-v2/premium/${id}/approve-modification`, { method: 'POST' });
-      const result = await res.json();
-      if (!res.ok) { alert(`수정 승인 실패: ${result.error}`); return; }
-      alert('수정이 승인되었습니다.');
-      loadAd();
-    } catch { alert('수정 승인 중 오류가 발생했습니다.'); }
-    finally { setIsProcessing(false); }
-  }
-
-  async function handleRejectModification() {
-    if (!rejectModReason.trim()) { alert('거절 사유를 입력해주세요.'); return; }
-    setIsProcessing(true);
-    try {
-      const res = await fetch(`/api/advertising-v2/premium/${id}/reject-modification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: rejectModReason }),
-      });
-      const result = await res.json();
-      if (!res.ok) { alert(`수정 거절 실패: ${result.error}`); return; }
-      alert('수정이 거절되었습니다.');
-      setRejectModOpen(false);
-      setRejectModReason('');
-      loadAd();
-    } catch { alert('수정 거절 중 오류가 발생했습니다.'); }
-    finally { setIsProcessing(false); }
-  }
-
-  if (isLoading) {
+  if (page.loading) {
     return (
-      <div className='min-h-screen bg-gray-50'>
+      <div className='flex w-full flex-col gap-6 px-6 py-6 md:py-8'>
         <AdminHeader title='프리미엄 광고 상세' />
-        <main className='max-w-4xl mx-auto px-6 py-8'>
-          <p className='text-gray-400 text-center py-20'>로딩 중...</p>
-        </main>
+        <div className='flex w-full items-center justify-center py-20'>
+          <div className='flex flex-col items-center gap-3 text-muted-foreground'>
+            <div className='h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin' />
+            <span className='text-base'>불러오는 중...</span>
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (!ad) {
+  if (!page.detail) {
     return (
-      <div className='min-h-screen bg-gray-50'>
+      <div className='flex w-full flex-col gap-6 px-6 py-6 md:py-8'>
         <AdminHeader title='프리미엄 광고 상세' />
-        <main className='max-w-4xl mx-auto px-6 py-8'>
-          <p className='text-gray-400 text-center py-20'>광고를 찾을 수 없습니다.</p>
-        </main>
+        <div className='flex w-full items-center justify-center py-20'>
+          <div className='flex flex-col items-center gap-2 text-muted-foreground'>
+            <AlertCircle className='h-8 w-8' />
+            <span className='text-base'>프리미엄 광고 정보를 찾을 수 없습니다.</span>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const totalHouseholds = ad.snapshotApartments.reduce((s, a) => s + a.totalHouseholds, 0);
+  const { detail } = page;
 
-  // Design Ref: §2.7 — 누적 주차 = (endedAt - startedAt) / 7일
-  const cumulativeWeeks =
-    ad.startedAt && ad.endedAt
-      ? Math.floor(
-          (new Date(ad.endedAt).getTime() - new Date(ad.startedAt).getTime()) /
-            (7 * 24 * 60 * 60 * 1000),
-        )
-      : ad.weeks;
-  const extensionWeeks = cumulativeWeeks - ad.weeks;
-  const displayAmount = cumulativeAmount ?? ad.totalAmount;
-  const extensionAmount =
-    displayAmount != null && ad.totalAmount != null
-      ? displayAmount - ad.totalAmount
-      : null;
+  const socialLinks = [
+    { label: '네이버 지도', url: detail.naverMapUrl },
+    { label: '블로그', url: detail.blogUrl },
+    { label: '유튜브', url: detail.youtubeUrl },
+    { label: '인스타그램', url: detail.instagramUrl },
+    { label: '카카오톡 오픈채팅', url: detail.kakaoOpenChatUrl },
+  ].filter((s) => s.url);
 
   return (
-    <div className='min-h-screen bg-gray-50'>
-      <AdminHeader title='프리미엄 광고 상세' />
-      <main className='max-w-4xl mx-auto px-6 py-8 space-y-6'>
-        {/* 뒤로가기 */}
-        <Button variant='ghost' size='sm' onClick={() => router.back()} className='gap-1'>
-          <ArrowLeft size={16} /> 목록으로
+    <div className='flex w-full flex-col gap-6 px-6 py-6 md:py-8'>
+      <div className='flex items-center gap-2'>
+        <Button
+          variant='ghost'
+          size='icon'
+          onClick={() => router.push('/admin/advertising-v2/premium')}
+          aria-label='뒤로가기'
+        >
+          <ChevronLeft className='size-7' />
         </Button>
+        <AdminHeader title='프리미엄 광고 상세' className='flex-1' />
+      </div>
 
-        {/* 기본 정보 */}
-        <Card>
-          <CardHeader>
-            <div className='flex items-center justify-between'>
-              <CardTitle>기본 정보</CardTitle>
-              <div className='flex items-center gap-2'>
-                <StatusBadge status={ad.status} />
-                {ad.status === 'running' && ad.modificationStatus === 'pending' && (
-                  <span
-                    className='inline-flex items-center px-2.5 py-0.5 rounded text-sm font-medium border'
-                    style={{ color: '#7C3AED', backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }}
-                  >
-                    수정 심사
-                  </span>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className='space-y-3 text-sm'>
-            <InfoRow label='업체명' value={ad.partnerBusinessName ?? '-'} />
-            <InfoRow label='광고 제목' value={ad.title ?? '(제목 없음)'} />
-            {/* Design Ref: §2.7 — 광고 기간 분해 표기 (원 + 연장) */}
-            <InfoRow
-              label='광고 기간'
-              value={
-                <span>
-                  {cumulativeWeeks}주
-                  {extensionWeeks > 0 && (
-                    <span className='text-xs text-gray-500 ml-1'>
-                      (원 {ad.weeks}주 + 연장 {extensionWeeks}주)
-                    </span>
-                  )}
-                </span>
-              }
-            />
-            {/* Design Ref: §2.7 — 결제 금액 분해 표기 */}
-            <InfoRow
-              label='결제 금액'
-              value={
-                displayAmount != null ? (
-                  <span>
-                    {displayAmount.toLocaleString()}원
-                    {extensionAmount != null && extensionAmount > 0 && ad.totalAmount != null && (
-                      <span className='text-xs text-gray-500 ml-1'>
-                        (원 {ad.totalAmount.toLocaleString()}원 + 연장 {extensionAmount.toLocaleString()}원)
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  '-'
-                )
-              }
-            />
-            <InfoRow
-              label='결제 상태'
-              value={ad.paymentStatus === 'paid' ? '결제 완료' : '결제 대기'}
-            />
-            {ad.startedAt && (
-              <InfoRow label='광고 시작일' value={new Date(ad.startedAt).toLocaleDateString('ko-KR')} />
-            )}
-            {ad.endedAt && (
-              <InfoRow label='광고 종료일' value={new Date(ad.endedAt).toLocaleDateString('ko-KR')} />
-            )}
-            <InfoRow label='신청일' value={new Date(ad.createdAt).toLocaleDateString('ko-KR')} />
-            {ad.rejectedReason && (
-              <InfoRow label='거절 사유' value={ad.rejectedReason} isRed />
-            )}
-            {ad.modificationRejectedReason && (
-              <InfoRow label='수정 거절 사유' value={ad.modificationRejectedReason} isRed />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 광고 아파트 (snapshotApartments) */}
-        {ad.snapshotApartments.length > 0 && (
+      <div className='grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]'>
+        {/* ───────────────────── 좌측 메인 ───────────────────── */}
+        <div className='min-w-0 space-y-5'>
+          {/* 1. 광고 본문 카드 */}
           <Card>
-            <CardHeader>
-              <CardTitle>광고 아파트</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-3'>
-              {ad.snapshotApartments.map((apt, i) => (
-                <div key={i} className='flex items-start justify-between p-3 bg-gray-50 rounded-lg border border-gray-200'>
-                  <div>
-                    <p className='text-sm font-semibold text-gray-800'>{apt.apartmentName}</p>
-                    <p className='text-xs text-gray-500 mt-0.5'>{apt.address}</p>
+            <CardContent className='space-y-4 px-6 py-5'>
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                <div className='min-w-0 flex-1'>
+                  <h1 className='text-xl font-bold text-foreground'>
+                    {detail.title ?? '(제목 없음)'}
+                  </h1>
+                  <p className='mt-1.5 text-sm text-muted-foreground'>
+                    신청일시: {new Date(detail.createdAt).toLocaleString('ko-KR')}
+                  </p>
+                  <div className='mt-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground'>
+                    <span>카테고리:</span>
+                    <span className='inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary'>
+                      <Tag className='h-3.5 w-3.5' />
+                      {detail.category?.categoryName ?? '-'}
+                      {detail.subCategoryNames.length > 0 && (
+                        <>
+                          <span className='text-primary/60'>›</span>
+                          {detail.subCategoryNames.join(', ')}
+                        </>
+                      )}
+                    </span>
                   </div>
-                  <span className='text-sm font-medium text-gray-700 whitespace-nowrap ml-4'>
-                    {apt.totalHouseholds.toLocaleString()}세대
-                  </span>
                 </div>
-              ))}
-              {ad.snapshotApartments.length > 1 && (
-                <div className='text-right text-sm font-semibold text-gray-700 pr-1'>
-                  합계 {totalHouseholds.toLocaleString()}세대
+                <div className='flex flex-wrap items-center gap-2'>
+                  <StatusBadge status={detail.status} />
+                  {detail.modificationStatus === 'pending' && (
+                    <Badge
+                      variant='outline'
+                      className='border-purple-200 bg-purple-50 px-2.5 py-0.5 text-sm font-medium text-purple-700'
+                    >
+                      수정 심사
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              {detail.content && (
+                <div className='border-t border-border/60 pt-4'>
+                  <p className='whitespace-pre-wrap text-base leading-relaxed text-foreground'>
+                    {detail.content}
+                  </p>
+                </div>
+              )}
+              {socialLinks.length > 0 && (
+                <div className='border-t border-border/60 pt-4'>
+                  <p className='mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground'>
+                    <ExternalLink className='h-3.5 w-3.5' />
+                    소셜 링크
+                  </p>
+                  <div className='flex flex-wrap gap-x-6 gap-y-1.5'>
+                    {socialLinks.map((s) => (
+                      <a
+                        key={s.label}
+                        href={s.url!}
+                        target='_blank'
+                        rel='noreferrer'
+                        className='inline-flex items-center gap-1.5 text-base text-primary hover:underline'
+                      >
+                        <ExternalLink className='h-3.5 w-3.5' />
+                        {s.label}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
-        )}
 
-        {/* Design Ref: §2.7 — 연장 이력 테이블 (paymentType='extension') */}
-        {extensions.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>연장 이력 (총 {extensions.length}건)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className='overflow-x-auto'>
-                <table className='w-full text-sm'>
-                  <thead>
-                    <tr className='border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide'>
-                      <th className='py-2 pr-3'>차수</th>
-                      <th className='py-2 pr-3'>결제일</th>
-                      <th className='py-2 pr-3'>주수</th>
-                      <th className='py-2 pr-3 text-right'>결제 금액</th>
-                      <th className='py-2 pr-3'>광고 기간</th>
-                      <th className='py-2'>영수증</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {extensions.map((ext, idx) => (
-                      <tr key={ext.id} className='border-b border-gray-100 last:border-b-0'>
-                        <td className='py-2.5 pr-3 text-gray-700 font-medium'>{idx + 1}차</td>
-                        <td className='py-2.5 pr-3 text-gray-700'>
-                          {ext.paidAt.toLocaleDateString('ko-KR')}
-                        </td>
-                        <td className='py-2.5 pr-3 text-gray-700'>{ext.weeks}주</td>
-                        <td className='py-2.5 pr-3 text-right text-gray-800 font-semibold'>
-                          {ext.amount.toLocaleString()}원
-                        </td>
-                        <td className='py-2.5 pr-3 text-gray-600 text-xs'>
-                          {ext.periodStart.toLocaleDateString('ko-KR')} ~{' '}
-                          {ext.periodEnd.toLocaleDateString('ko-KR')}
-                        </td>
-                        <td className='py-2.5'>
-                          {ext.receiptUrl ? (
-                            <a
-                              href={ext.receiptUrl}
-                              target='_blank'
-                              rel='noopener noreferrer'
-                              className='inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs'
-                            >
-                              <ExternalLink size={12} /> 보기
-                            </a>
-                          ) : (
-                            <span className='text-gray-400 text-xs'>-</span>
-                          )}
-                        </td>
+          {/* 2. 광고 이미지 카드 */}
+          {detail.imageUrls.length > 0 && (
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='flex items-center gap-2 text-base font-semibold'>
+                  <ImageIcon className='h-4 w-4 text-muted-foreground' />
+                  광고 이미지
+                  <span className='ml-auto text-sm font-normal text-muted-foreground'>
+                    {detail.imageUrls.length}장
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className='px-6 pb-5'>
+                <div className='flex flex-wrap gap-2.5'>
+                  {detail.imageUrls.map((url, i) => (
+                    <ImageThumbnail
+                      key={i}
+                      src={url}
+                      alt={`광고 이미지 ${i + 1}`}
+                      onClick={() => adImgLb.open(i)}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 거절 사유 배너 */}
+          {detail.rejectedReason && (
+            <div className='flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg'>
+              <AlertCircle className='h-4 w-4 text-red-600 mt-0.5 shrink-0' />
+              <div>
+                <p className='text-base font-medium text-red-800 mb-0.5'>거절 사유</p>
+                <p className='text-base text-red-700 whitespace-pre-wrap'>
+                  {detail.rejectedReason}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 수정 거절 사유 배너 */}
+          {detail.modificationRejectedReason && (
+            <div className='flex gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg'>
+              <AlertCircle className='h-4 w-4 text-orange-600 mt-0.5 shrink-0' />
+              <div>
+                <p className='text-base font-medium text-orange-800 mb-0.5'>수정 거절 사유</p>
+                <p className='text-base text-orange-700 whitespace-pre-wrap'>
+                  {detail.modificationRejectedReason}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 수정 심사 비교 */}
+          {detail.modificationStatus === 'pending' && detail.pendingChanges && (
+            <Card className='border-purple-200 bg-purple-50/40'>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-base font-semibold flex items-center gap-2 text-purple-800'>
+                  <GitCompare className='h-4 w-4' />
+                  수정 내용 비교 (현재 → 수정 요청)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                {Object.entries(detail.pendingChanges).map(([key, pendingValue]) => {
+                  const label = FIELD_LABELS[key] ?? key;
+                  const currentValue = (detail as unknown as Record<string, unknown>)[key];
+                  const isChanged =
+                    JSON.stringify(currentValue) !== JSON.stringify(pendingValue);
+                  if (!isChanged) return null;
+
+                  if (key === 'imageUrls') {
+                    return (
+                      <div key={key} className='space-y-2'>
+                        <p className='text-sm font-medium text-muted-foreground'>{label}</p>
+                        <div className='grid grid-cols-2 gap-4'>
+                          <div>
+                            <p className='mb-1.5 text-xs text-muted-foreground'>
+                              현재 ({((currentValue as string[]) ?? []).length}장)
+                            </p>
+                            <div className='flex flex-wrap gap-1.5'>
+                              {((currentValue as string[]) ?? []).map((url, i) => (
+                                <ImageThumbnail
+                                  key={i}
+                                  src={url}
+                                  alt=''
+                                  className='h-24 w-24'
+                                  onClick={() => adImgLb.open(i)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className='mb-1.5 text-xs font-medium text-purple-600'>
+                              수정 요청 ({((pendingValue as string[]) ?? []).length}장)
+                            </p>
+                            <div className='flex flex-wrap gap-1.5'>
+                              {((pendingValue as string[]) ?? []).map((url, i) => (
+                                <ImageThumbnail
+                                  key={i}
+                                  src={url}
+                                  alt=''
+                                  className='h-24 w-24 border-2 border-purple-300'
+                                  onClick={() => pendingImgLb.open(i)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <CompareRow
+                      key={key}
+                      label={label}
+                      current={(currentValue as string | null) ?? '(없음)'}
+                      proposed={(pendingValue as string | null) ?? '(없음)'}
+                      multiline={key === 'content'}
+                    />
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 연장 이력 */}
+          {page.extensions.length > 0 && (
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-base font-semibold'>
+                  연장 이력 (총 {page.extensions.length}건)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className='px-6 pb-5'>
+                <div className='overflow-x-auto'>
+                  <table className='w-full text-sm'>
+                    <thead>
+                      <tr className='border-b border-border/60 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
+                        <th className='py-2 pr-3'>차수</th>
+                        <th className='py-2 pr-3'>결제일</th>
+                        <th className='py-2 pr-3'>주수</th>
+                        <th className='py-2 pr-3 text-right'>결제 금액</th>
+                        <th className='py-2 pr-3'>광고 기간</th>
+                        <th className='py-2'>영수증</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                    </thead>
+                    <tbody>
+                      {page.extensions.map((ext, idx) => (
+                        <tr
+                          key={ext.id}
+                          className='border-b border-border/40 last:border-b-0'
+                        >
+                          <td className='py-2.5 pr-3 font-medium text-foreground'>
+                            {idx + 1}차
+                          </td>
+                          <td className='py-2.5 pr-3 text-foreground'>
+                            {ext.paidAt.toLocaleDateString('ko-KR')}
+                          </td>
+                          <td className='py-2.5 pr-3 text-foreground'>{ext.weeks}주</td>
+                          <td className='py-2.5 pr-3 text-right font-semibold text-foreground tabular-nums'>
+                            {ext.amount.toLocaleString()}원
+                          </td>
+                          <td className='py-2.5 pr-3 text-xs text-muted-foreground'>
+                            {ext.periodStart.toLocaleDateString('ko-KR')} ~{' '}
+                            {ext.periodEnd.toLocaleDateString('ko-KR')}
+                          </td>
+                          <td className='py-2.5'>
+                            {ext.receiptUrl ? (
+                              <a
+                                href={ext.receiptUrl}
+                                target='_blank'
+                                rel='noopener noreferrer'
+                                className='inline-flex items-center gap-1 text-xs text-primary hover:underline'
+                              >
+                                <ExternalLink className='h-3 w-3' /> 보기
+                              </a>
+                            ) : (
+                              <span className='text-xs text-muted-foreground'>-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* 광고 내용 */}
-        {ad.content && (
+          {/* 파트너 정보 */}
           <Card>
-            <CardHeader><CardTitle>광고 내용</CardTitle></CardHeader>
-            <CardContent>
-              <p className='text-sm text-gray-700 whitespace-pre-wrap'>{ad.content}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 이미지 */}
-        {ad.imageUrls.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle>이미지</CardTitle></CardHeader>
-            <CardContent>
-              <div className='grid grid-cols-3 gap-3'>
-                {ad.imageUrls.map((url, i) => (
-                  <img
-                    key={i}
-                    src={url}
-                    alt={`이미지 ${i + 1}`}
-                    className='w-full aspect-video object-cover rounded-lg border'
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 수정 심사 중: 현재 vs 변경 예정 비교 */}
-        {ad.modificationStatus === 'pending' && ad.pendingChanges && (
-          <Card className='border-purple-200'>
-            <CardHeader>
-              <CardTitle className='text-purple-700'>수정 신청 내용 (현재 → 변경 예정)</CardTitle>
+            <CardHeader className='pb-3'>
+              <CardTitle className='flex items-center gap-2 text-base font-semibold'>
+                <Building2 className='h-4 w-4 text-muted-foreground' />
+                파트너 정보
+              </CardTitle>
             </CardHeader>
-            <CardContent className='space-y-4'>
-              {Object.entries(ad.pendingChanges).map(([key, pendingValue]) => {
-                const label = FIELD_LABELS[key] ?? key;
-                const currentValue = (ad as Record<string, unknown>)[key];
-                const isChanged = JSON.stringify(currentValue) !== JSON.stringify(pendingValue);
-
-                return (
-                  <div key={key} className='space-y-1.5'>
-                    <p className='text-xs font-semibold text-gray-500 uppercase tracking-wide'>{label}</p>
-                    {key === 'imageUrls' ? (
-                      <div className='grid grid-cols-2 gap-3'>
-                        <ImageDiffBox
-                          label='현재'
-                          urls={(currentValue as string[]) ?? []}
-                          isChanged={isChanged}
-                          variant='current'
-                        />
-                        <ImageDiffBox
-                          label='변경'
-                          urls={(pendingValue as string[]) ?? []}
-                          isChanged={isChanged}
-                          variant='pending'
-                        />
-                      </div>
-                    ) : (
-                      <div className='grid grid-cols-2 gap-3'>
-                        <DiffBox
-                          label='현재'
-                          value={currentValue as string | null}
-                          isChanged={isChanged}
-                          variant='current'
-                        />
-                        <DiffBox
-                          label='변경'
-                          value={pendingValue as string | null}
-                          isChanged={isChanged}
-                          variant='pending'
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* 수정 승인 / 거절 버튼 */}
-              <div className='flex gap-2 pt-2 border-t border-purple-100'>
-                <Button
-                  size='sm'
-                  onClick={handleApproveModification}
-                  disabled={isProcessing}
-                  className='bg-purple-600 hover:bg-purple-700'
-                >
-                  <Check size={14} className='mr-1' /> 수정 승인
-                </Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => setRejectModOpen(true)}
-                  disabled={isProcessing}
-                  className='border-red-300 text-red-600 hover:bg-red-50'
-                >
-                  <X size={14} className='mr-1' /> 수정 거절
-                </Button>
+            <CardContent className='px-6 py-0 pb-4'>
+              <div className='grid gap-x-6 sm:grid-cols-2'>
+                <InfoRow label='상호명'>{detail.partner?.businessName ?? '-'}</InfoRow>
+                <InfoRow label='기본 광고 ID'>
+                  <span className='font-mono text-sm'>{detail.baseAdId.slice(0, 8)}…</span>
+                </InfoRow>
               </div>
             </CardContent>
           </Card>
-        )}
+        </div>
 
-        {/* 액션 버튼 (pending 상태일 때만) */}
-        {ad.status === 'pending' && (
-          <div className='flex gap-3'>
-            <Button
-              onClick={handleApprove}
-              disabled={isProcessing}
-              className='bg-green-600 hover:bg-green-700 gap-1'
-            >
-              <Check size={16} /> 승인
-            </Button>
-            <Button
-              variant='destructive'
-              onClick={() => setRejectOpen(true)}
-              disabled={isProcessing}
-              className='gap-1'
-            >
-              <X size={16} /> 거절
-            </Button>
+        {/* ───────────────────── 우측 Sticky 사이드바 ───────────────────── */}
+        <aside className='lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto'>
+          <div className='space-y-4'>
+            {/* 상태 요약 */}
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-base font-semibold'>상태</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-2.5 px-6 pb-4 text-sm'>
+                <div className='flex items-center justify-between'>
+                  <span className='text-muted-foreground'>광고 상태</span>
+                  <StatusBadge status={detail.status} />
+                </div>
+                {detail.modificationStatus && (
+                  <div className='flex items-center justify-between'>
+                    <span className='text-muted-foreground'>수정 심사</span>
+                    <Badge
+                      variant='outline'
+                      className='border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700'
+                    >
+                      {detail.modificationStatus === 'pending'
+                        ? '심사 대기'
+                        : detail.modificationStatus === 'approved'
+                        ? '승인'
+                        : '거절'}
+                    </Badge>
+                  </div>
+                )}
+                <div className='flex items-center justify-between'>
+                  <span className='text-muted-foreground'>결제 상태</span>
+                  <span className='font-medium'>
+                    {detail.paymentStatus === 'paid' ? '결제 완료' : '결제 대기'}
+                  </span>
+                </div>
+                <div className='flex items-center justify-between'>
+                  <span className='text-muted-foreground'>신청일</span>
+                  <span className='font-medium'>
+                    {new Date(detail.createdAt).toLocaleDateString('ko-KR')}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 결제/기간 요약 */}
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-base font-semibold'>결제 정보</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-2.5 px-6 pb-4'>
+                {/* 광고 아파트 */}
+                <div className='space-y-1.5'>
+                  <div className='flex items-center justify-between'>
+                    <span className='inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground'>
+                      <Building2 className='h-3.5 w-3.5' />
+                      광고 아파트
+                    </span>
+                    <span className='text-sm font-medium tabular-nums text-muted-foreground'>
+                      {detail.snapshotApartments.length}개 ·{' '}
+                      {page.totalHouseholds.toLocaleString()}세대
+                    </span>
+                  </div>
+                  {detail.snapshotApartments.length === 0 ? (
+                    <p className='text-sm text-muted-foreground'>아파트 정보 없음</p>
+                  ) : (
+                    <ul className='divide-y divide-border/50'>
+                      {detail.snapshotApartments.map((apt, i) => (
+                        <li
+                          key={i}
+                          className='flex items-start justify-between gap-3 py-2 text-sm'
+                        >
+                          <div className='min-w-0 flex-1'>
+                            <p className='truncate font-medium'>{apt.apartmentName}</p>
+                            <p className='mt-0.5 flex items-center gap-1 text-xs text-muted-foreground'>
+                              <MapPin className='h-3 w-3 shrink-0' />
+                              <span className='truncate'>{apt.address}</span>
+                            </p>
+                          </div>
+                          <span className='shrink-0 text-sm font-semibold tabular-nums text-foreground'>
+                            {apt.totalHouseholds.toLocaleString()}
+                            <span className='ml-0.5 text-xs font-normal text-muted-foreground'>
+                              세대
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className='space-y-1.5 text-sm'>
+                  <div className='flex items-center justify-between'>
+                    <span className='text-muted-foreground'>광고 기간</span>
+                    <span className='font-medium tabular-nums'>
+                      {page.cumulativeWeeks}주
+                      {page.extensionWeeks > 0 && (
+                        <span className='ml-1 text-xs text-muted-foreground'>
+                          (원 {detail.weeks}주 + 연장 {page.extensionWeeks}주)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {detail.startedAt && (
+                    <div className='flex items-center justify-between'>
+                      <span className='text-muted-foreground'>광고 시작일</span>
+                      <span className='font-medium'>
+                        {new Date(detail.startedAt).toLocaleDateString('ko-KR')}
+                      </span>
+                    </div>
+                  )}
+                  {detail.endedAt && (
+                    <div className='flex items-center justify-between'>
+                      <span className='text-muted-foreground'>광고 종료일</span>
+                      <span className='font-medium'>
+                        {new Date(detail.endedAt).toLocaleDateString('ko-KR')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className='flex items-center justify-between text-base font-semibold'>
+                  <span>결제 금액</span>
+                  <span className='text-primary tabular-nums'>
+                    {page.displayAmount != null
+                      ? `${page.displayAmount.toLocaleString()}원`
+                      : '-'}
+                  </span>
+                </div>
+                {page.extensionAmount != null &&
+                  page.extensionAmount > 0 &&
+                  detail.totalAmount != null && (
+                    <p className='text-xs text-muted-foreground text-right'>
+                      원 {detail.totalAmount.toLocaleString()}원 + 연장{' '}
+                      {page.extensionAmount.toLocaleString()}원
+                    </p>
+                  )}
+              </CardContent>
+            </Card>
+
+            {/* 액션 버튼 (pending 상태일 때만) */}
+            {detail.status === 'pending' && (
+              <Card>
+                <CardContent className='space-y-2 px-6 py-4'>
+                  <Button
+                    size='lg'
+                    onClick={page.handleApprove}
+                    disabled={page.processing}
+                    className='w-full gap-2 bg-blue-600 text-white hover:bg-blue-700'
+                  >
+                    <Check className='h-4 w-4' />
+                    승인하기
+                  </Button>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() => page.setRejectDialog(true)}
+                    disabled={page.processing}
+                    className='w-full gap-2'
+                  >
+                    <X className='h-4 w-4' />
+                    거절하기
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 수정 심사 액션 */}
+            {detail.modificationStatus === 'pending' && (
+              <Card>
+                <CardContent className='space-y-2 px-6 py-4'>
+                  <p className='mb-1 text-sm text-muted-foreground'>수정 내용을 검토해주세요.</p>
+                  <Button
+                    size='lg'
+                    onClick={page.handleApproveModification}
+                    disabled={page.processing}
+                    className='w-full gap-2 bg-blue-600 text-white hover:bg-blue-700'
+                  >
+                    <Check className='h-4 w-4' />
+                    수정 승인
+                  </Button>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() => page.setModificationRejectDialog(true)}
+                    disabled={page.processing}
+                    className='w-full gap-2'
+                  >
+                    <X className='h-4 w-4' />
+                    수정 거절
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        )}
-      </main>
+        </aside>
+      </div>
 
       {/* 거절 다이얼로그 */}
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent>
+      <Dialog open={page.rejectDialog} onOpenChange={page.setRejectDialog}>
+        <DialogContent className='sm:max-w-md'>
           <DialogHeader>
             <DialogTitle>프리미엄 광고 거절</DialogTitle>
-            <DialogDescription>파트너에게 전달될 거절 사유를 입력해주세요.</DialogDescription>
+            <DialogDescription>
+              거절 사유를 입력해주세요. 파트너가 이 사유를 확인할 수 있습니다.
+            </DialogDescription>
           </DialogHeader>
-          <Textarea
-            placeholder='거절 사유를 입력하세요'
-            value={rejectReason}
-            onChange={e => setRejectReason(e.target.value)}
-            rows={4}
-          />
+          <div className='py-2'>
+            <Textarea
+              className='min-h-[120px] resize-none'
+              placeholder='거절 사유를 입력해주세요...'
+              value={page.rejectReason}
+              onChange={(e) => page.setRejectReason(e.target.value)}
+            />
+          </div>
           <DialogFooter>
-            <Button variant='outline' onClick={() => setRejectOpen(false)}>취소</Button>
+            <Button
+              variant='outline'
+              onClick={() => page.setRejectDialog(false)}
+              disabled={page.processing}
+            >
+              취소
+            </Button>
             <Button
               variant='destructive'
-              onClick={handleReject}
-              disabled={isProcessing || !rejectReason.trim()}
+              onClick={page.handleReject}
+              disabled={page.processing}
             >
-              거절 처리
+              {page.processing ? '처리 중...' : '거절'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 수정 거절 다이얼로그 */}
-      <Dialog open={rejectModOpen} onOpenChange={setRejectModOpen}>
-        <DialogContent>
+      <Dialog
+        open={page.modificationRejectDialog}
+        onOpenChange={page.setModificationRejectDialog}
+      >
+        <DialogContent className='sm:max-w-md'>
           <DialogHeader>
-            <DialogTitle>수정 심사 거절</DialogTitle>
-            <DialogDescription>수정 요청을 거절하는 사유를 입력해주세요.</DialogDescription>
+            <DialogTitle>수정 내용 거절</DialogTitle>
+            <DialogDescription>
+              거절 사유를 입력해주세요. 파트너가 앱에서 이 사유를 확인할 수 있습니다.
+            </DialogDescription>
           </DialogHeader>
-          <Textarea
-            placeholder='거절 사유를 입력하세요'
-            value={rejectModReason}
-            onChange={e => setRejectModReason(e.target.value)}
-            rows={4}
-          />
+          <div className='py-2'>
+            <Textarea
+              className='min-h-[120px] resize-none'
+              placeholder='거절 사유를 입력해주세요...'
+              value={page.modificationRejectReason}
+              onChange={(e) => page.setModificationRejectReason(e.target.value)}
+            />
+          </div>
           <DialogFooter>
-            <Button variant='outline' onClick={() => setRejectModOpen(false)}>취소</Button>
+            <Button
+              variant='outline'
+              onClick={() => page.setModificationRejectDialog(false)}
+              disabled={page.processing}
+            >
+              취소
+            </Button>
             <Button
               variant='destructive'
-              onClick={handleRejectModification}
-              disabled={isProcessing || !rejectModReason.trim()}
+              onClick={page.handleRejectModification}
+              disabled={page.processing}
             >
-              거절 처리
+              {page.processing ? '처리 중...' : '거절'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImageLightbox {...adImgLb.props} />
+      <ImageLightbox {...pendingImgLb.props} />
     </div>
   );
 }
 
-function InfoRow({ label, value, isRed = false }: { label: string; value: ReactNode; isRed?: boolean }) {
-  return (
-    <div className='flex gap-3'>
-      <span className='text-gray-500 w-28 shrink-0'>{label}</span>
-      <span className={isRed ? 'text-red-600' : 'text-gray-800'}>{value}</span>
-    </div>
-  );
-}
-
-function DiffBox({
+// ── 비교 행 컴포넌트 ───────────────────────────────────────────
+function CompareRow({
   label,
-  value,
-  isChanged,
-  variant,
+  current,
+  proposed,
+  multiline = false,
 }: {
   label: string;
-  value: string | null;
-  isChanged: boolean;
-  variant: 'current' | 'pending';
-}) {
-  const colors = isChanged
-    ? variant === 'current'
-      ? 'bg-red-50 border-red-200'
-      : 'bg-green-50 border-green-200'
-    : 'bg-gray-50 border-gray-200';
-
-  const labelColors = isChanged
-    ? variant === 'current'
-      ? 'bg-red-100 text-red-700'
-      : 'bg-green-100 text-green-700'
-    : 'bg-gray-200 text-gray-600';
-
+  current: string;
+  proposed: string;
+  multiline?: boolean;
+}): React.ReactElement {
   return (
-    <div className={`rounded-lg border p-3 ${colors}`}>
-      <span className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded mb-2 ${labelColors}`}>
-        {label}
-      </span>
-      <p className='text-sm text-gray-800 whitespace-pre-wrap break-all'>
-        {value ?? <span className='text-gray-400 italic'>(없음)</span>}
-      </p>
-    </div>
-  );
-}
-
-function ImageDiffBox({
-  label,
-  urls,
-  isChanged,
-  variant,
-}: {
-  label: string;
-  urls: string[];
-  isChanged: boolean;
-  variant: 'current' | 'pending';
-}) {
-  const colors = isChanged
-    ? variant === 'current'
-      ? 'bg-red-50 border-red-200'
-      : 'bg-green-50 border-green-200'
-    : 'bg-gray-50 border-gray-200';
-
-  const labelColors = isChanged
-    ? variant === 'current'
-      ? 'bg-red-100 text-red-700'
-      : 'bg-green-100 text-green-700'
-    : 'bg-gray-200 text-gray-600';
-
-  return (
-    <div className={`rounded-lg border p-3 ${colors}`}>
-      <span className={`inline-block text-xs font-bold px-1.5 py-0.5 rounded mb-2 ${labelColors}`}>
-        {label}
-      </span>
-      {urls.length === 0 ? (
-        <p className='text-sm text-gray-400 italic'>(없음)</p>
-      ) : (
-        <div className='grid grid-cols-2 gap-1.5'>
-          {urls.map((url, i) => (
-            <img
-              key={i}
-              src={url}
-              alt={`이미지 ${i + 1}`}
-              className='w-full aspect-square object-cover rounded'
-            />
-          ))}
+    <div className='space-y-1.5'>
+      <p className='text-sm font-medium text-muted-foreground'>{label}</p>
+      <div className='grid grid-cols-2 gap-3'>
+        <div className='rounded-md bg-muted/50 p-2.5'>
+          <p className='text-xs text-muted-foreground mb-1'>현재</p>
+          <p
+            className={`text-sm text-foreground ${multiline ? 'whitespace-pre-wrap' : ''}`}
+          >
+            {current}
+          </p>
         </div>
-      )}
+        <div className='rounded-md bg-purple-50 border border-purple-200 p-2.5'>
+          <p className='text-xs text-purple-600 mb-1 font-medium'>수정 요청</p>
+          <p
+            className={`text-sm text-foreground font-medium ${
+              multiline ? 'whitespace-pre-wrap' : ''
+            }`}
+          >
+            {proposed}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
+

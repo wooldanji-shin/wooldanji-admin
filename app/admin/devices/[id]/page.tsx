@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Users } from 'lucide-react';
+import { ChevronLeft, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -137,20 +137,17 @@ export default function DeviceDetailPage() {
   );
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='기기 상세보기' />
-
-      <div className='flex-1 p-6 space-y-6'>
-        {/* Back Button */}
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+      <div className='flex items-center gap-2'>
         <Link href='/admin/devices'>
-          <Button
-            variant='ghost'
-            className='gap-2 text-muted-foreground hover:text-foreground'
-          >
-            <ArrowLeft className='h-4 w-4' />
-            목록으로 돌아가기
+          <Button variant='ghost' size='icon-sm' aria-label='뒤로가기'>
+            <ChevronLeft className='h-5 w-5' />
           </Button>
         </Link>
+        <AdminHeader title='기기 상세보기' className='flex-1' />
+      </div>
+
+      <div className="flex flex-col gap-6">
 
         {/* Device Information */}
         <Card className='bg-card border-border'>

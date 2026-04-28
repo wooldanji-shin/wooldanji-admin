@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
 import { Button } from '@/components/ui/button';
@@ -620,10 +621,10 @@ export default function AdCategoriesPage() {
   };
 
   return (
-    <div className='flex flex-col h-full'>
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       <AdminHeader title='홈 섹션 관리' />
 
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
+      <div className="flex flex-col gap-6">
         <div className='flex justify-between items-center'>
           <p className='text-sm text-muted-foreground'>
             드래그하여 섹션 순서를 변경할 수 있습니다.
@@ -659,7 +660,7 @@ export default function AdCategoriesPage() {
                     {loading ? (
                       <TableRow>
                         <TableCell colSpan={5} className='text-center py-12 text-muted-foreground'>
-                          로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                         </TableCell>
                       </TableRow>
                     ) : sections.length === 0 ? (

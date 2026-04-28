@@ -1,6 +1,13 @@
 'use client';
 
-import { AdminHeader } from '@/components/admin-header';
+import {
+  PageContent,
+  PageHeader,
+  PageHeaderTitle,
+  PageShell,
+} from '@/components/page-shell';
+import { InlineLoadingSkeleton } from '@/components/skeletons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -881,20 +888,25 @@ export default function BannersPage() {
 
   if (loading) {
     return (
-      <div className='flex flex-col h-full'>
-        <AdminHeader title='배너 광고 등록/수정' />
-        <div className='flex-1 flex items-center justify-center'>
-          <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader>
+          <PageHeaderTitle title="배너 광고 등록/수정" />
+        </PageHeader>
+        <InlineLoadingSkeleton />
+      </PageShell>
     );
   }
 
   return (
-    <div className='flex flex-col h-full'>
-      <AdminHeader title='배너 광고 등록/수정' />
+    <PageShell>
+      <PageHeader>
+        <PageHeaderTitle
+          title="배너 광고 등록/수정"
+          description="홈 화면 상단 배너 광고를 관리합니다."
+        />
+      </PageHeader>
 
-      <div className='flex-1 p-6 overflow-auto'>
+      <PageContent>
         <div className='space-y-6'>
           {/* Info Alert */}
           <Alert className='bg-muted/50 border-muted'>
@@ -964,7 +976,6 @@ export default function BannersPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -1207,12 +1218,12 @@ export default function BannersPage() {
                   {/* 검색 입력 */}
                   <div className='p-2 border-b'>
                     <div className='relative'>
-                      <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                      <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
                       <Input
                         placeholder='아파트명 또는 주소 검색...'
                         value={apartmentSearch}
                         onChange={(e) => setApartmentSearch(e.target.value)}
-                        className='pl-8 h-8'
+                        className='pl-9'
                       />
                     </div>
                   </div>
@@ -1403,6 +1414,7 @@ export default function BannersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }

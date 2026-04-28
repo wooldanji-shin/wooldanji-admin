@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use, useCallback, useRef } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -436,20 +437,15 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
 
   if (loading && initialLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground">데이터를 불러오는 중...</p>
-        </div>
-      </div>
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8"><div className="space-y-3"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-72" /></div><div className="flex flex-col gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div></div>
     );
   }
 
   if (!apartment) {
     return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="text-center py-8">
+      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+        <Card className="border-border/70 shadow-card">
+          <CardContent className="text-center py-12 text-muted-foreground">
             아파트 정보를 찾을 수 없습니다.
           </CardContent>
         </Card>
@@ -458,19 +454,18 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <div className="p-8">
+    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/admin/apartments')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            목록으로
-          </Button>
-        </div>
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/admin/apartments')}
+          className="-ml-2 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          목록으로
+        </Button>
       </div>
 
       {/* Apartment Info Card */}
@@ -616,7 +611,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
                 {initialLoading && loading ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
-                      로딩 중...
+  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                     </TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
@@ -689,8 +684,8 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant='ghost'
-                              size='sm'
-                              className='h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary'
+                              size='icon-sm'
+                              className='text-muted-foreground hover:text-foreground hover:bg-secondary'
                             >
                               <MoreVertical className='h-4 w-4' />
                             </Button>
