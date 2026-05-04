@@ -77,9 +77,24 @@ export interface AdApplicationDetail {
   apartmentChangeStatus: string | null;
 }
 
+export interface AdAnalyticsSummary {
+  impressionCount: number;
+  clickCount: number;
+  phoneClickCount: number;
+  messageClickCount: number;
+  naverMapClickCount: number;
+  blogClickCount: number;
+  youtubeClickCount: number;
+  instagramClickCount: number;
+  kakaoChatClickCount: number;
+  homeImpressionCount: number;
+  dialogImpressionCount: number;
+}
+
 export interface UseApplicationDetailPageReturn {
   detail: AdApplicationDetail | null;
   loading: boolean;
+  analytics: AdAnalyticsSummary | null;
   approveDialog: boolean;
   setApproveDialog: (open: boolean) => void;
   rejectDialog: boolean;
@@ -114,6 +129,7 @@ export function useApplicationDetailPage(
 
   const [adId, setAdId] = useState<string>('');
   const [detail, setDetail] = useState<AdApplicationDetail | null>(null);
+  const [analytics, setAnalytics] = useState<AdAnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [approveDialog, setApproveDialog] = useState(false);
   const [rejectDialog, setRejectDialog] = useState(false);
@@ -134,7 +150,7 @@ export function useApplicationDetailPage(
     setLoading(true);
 
     try {
-      const [adResult, pricingResult] = await Promise.all([
+      const [adResult, pricingResult, analyticsResult] = await Promise.all([
         supabase
           .from('advertisements_v2')
           .select(`
@@ -178,6 +194,10 @@ export function useApplicationDetailPage(
           .order('effectiveFrom', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from('ad_analytics_v2')
+          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount')
+          .eq('targetId', adId),
       ]);
 
       if (adResult.error) throw adResult.error;
@@ -300,6 +320,32 @@ export function useApplicationDetailPage(
         isFirstAd,
         apartmentChangeStatus: row.apartmentChangeStatus ?? null,
       };
+
+      const analyticsRows = (analyticsResult.data ?? []) as any[];
+      if (analyticsRows.length > 0) {
+        const sum: AdAnalyticsSummary = {
+          impressionCount: 0, clickCount: 0, phoneClickCount: 0,
+          messageClickCount: 0, naverMapClickCount: 0, blogClickCount: 0,
+          youtubeClickCount: 0, instagramClickCount: 0, kakaoChatClickCount: 0,
+          homeImpressionCount: 0, dialogImpressionCount: 0,
+        };
+        for (const r of analyticsRows) {
+          sum.impressionCount += r.impressionCount ?? 0;
+          sum.clickCount += r.clickCount ?? 0;
+          sum.phoneClickCount += r.phoneClickCount ?? 0;
+          sum.messageClickCount += r.messageClickCount ?? 0;
+          sum.naverMapClickCount += r.naverMapClickCount ?? 0;
+          sum.blogClickCount += r.blogClickCount ?? 0;
+          sum.youtubeClickCount += r.youtubeClickCount ?? 0;
+          sum.instagramClickCount += r.instagramClickCount ?? 0;
+          sum.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
+          sum.homeImpressionCount += r.homeImpressionCount ?? 0;
+          sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+        }
+        setAnalytics(sum);
+      } else {
+        setAnalytics(null);
+      }
 
       setDetail(mapped);
       // 다이얼로그 열릴 때 매번 초기화
@@ -442,6 +488,7 @@ export function useApplicationDetailPage(
   return {
     detail,
     loading,
+    analytics,
     approveDialog,
     setApproveDialog,
     rejectDialog,

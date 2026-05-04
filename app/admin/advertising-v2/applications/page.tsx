@@ -173,7 +173,7 @@ export default function AdApplicationsPage(): React.ReactElement {
             }
           >
             {loading ? (
-              <TableSkeleton rows={6} columns={8} />
+              <TableSkeleton rows={6} columns={9} />
             ) : applications.length === 0 ? (
               <EmptyState
                 icon={Inbox}
@@ -185,6 +185,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                 <TableHeader>
                   <TableRow>
                     <TableHead>상호명</TableHead>
+                    <TableHead className="text-center">첫광고</TableHead>
                     <TableHead>광고표시용번호</TableHead>
                     <TableHead>광고 내용</TableHead>
                     <TableHead>카테고리</TableHead>
@@ -202,24 +203,25 @@ export default function AdApplicationsPage(): React.ReactElement {
                       onClick={() => handleRowClick(app.id)}
                     >
                       <TableCell className="font-medium">
-                        <div className="flex items-center gap-1.5">
-                          {app.partner_users?.businessName ?? '-'}
-                          {app.isFirstAdApplication && (
-                            <StatusBadge variant="info" size="sm" withDot={false}>
-                              첫광고
-                            </StatusBadge>
-                          )}
-                        </div>
+                        {app.partner_users?.businessName ?? '-'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {app.isFirstAdApplication ? (
+                          <StatusBadge variant="info" size="sm" withDot={false}>
+                            첫광고
+                          </StatusBadge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {app.partner_users?.displayPhoneNumber ?? '-'}
                       </TableCell>
                       <TableCell className="max-w-[240px]">
-                        <div className="truncate font-medium">{app.title}</div>
-                        {app.content && (
-                          <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {app.content}
-                          </div>
+                        {app.content ? (
+                          <div className="truncate text-sm">{app.content}</div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">

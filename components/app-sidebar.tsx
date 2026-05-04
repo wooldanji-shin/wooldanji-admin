@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   ArrowLeftRight,
   Sparkles,
+  Tag,
   type LucideIcon,
 } from 'lucide-react';
 import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -108,6 +109,18 @@ const navigationItems: MenuItem[] = [
 
 // ─── 파트너 ────────────────────────────────────────────────
 const partnerItems: MenuItem[] = [
+  {
+    name: '파트너 회원 관리',
+    href: '/admin/partners',
+    icon: Users,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '쿠폰 관리',
+    href: '/admin/coupons',
+    icon: Tag,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
   {
     name: '파트너 문의 관리',
     href: '/admin/partner-inquiries',

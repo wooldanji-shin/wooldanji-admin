@@ -218,12 +218,21 @@ export default function PremiumAdListPage(): React.ReactElement {
                       </TableCell>
                       <TableCell>{ad.title ?? '(제목 없음)'}</TableCell>
                       <TableCell className="tabular-nums">
-                        {cumulativeWeeks}주
-                        {extWeeks > 0 && (
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            (원 {ad.weeks} + 연장 {extWeeks})
+                        <div className="flex flex-col gap-0.5">
+                          {ad.startedAt && ad.endedAt ? (
+                            <span className="text-sm">
+                              {new Date(ad.startedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
+                              {' ~ '}
+                              {new Date(ad.endedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">날짜 미정</span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {cumulativeWeeks}주
+                            {extWeeks > 0 && ` (원 ${ad.weeks} + 연장 ${extWeeks})`}
                           </span>
-                        )}
+                        </div>
                       </TableCell>
                       <TableCell className="tabular-nums">
                         {amount != null ? `${amount.toLocaleString()}원` : '-'}

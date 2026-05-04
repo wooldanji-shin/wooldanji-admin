@@ -62,9 +62,24 @@ export interface PremiumAdDetail {
   subCategoryNames: string[];
 }
 
+export interface PremiumAdAnalyticsSummary {
+  impressionCount: number;
+  homePremiumImpressionCount: number;
+  dialogImpressionCount: number;
+  clickCount: number;
+  phoneClickCount: number;
+  messageClickCount: number;
+  naverMapClickCount: number;
+  blogClickCount: number;
+  youtubeClickCount: number;
+  instagramClickCount: number;
+  kakaoChatClickCount: number;
+}
+
 export interface UsePremiumDetailPageReturn {
   detail: PremiumAdDetail | null;
   loading: boolean;
+  analytics: PremiumAdAnalyticsSummary | null;
   cumulativeAmount: number | null;
   extensions: ExtensionRow[];
   // 파생값
@@ -101,6 +116,7 @@ export function usePremiumDetailPage(
   const [adId, setAdId] = useState<string>('');
   const [detail, setDetail] = useState<PremiumAdDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [analytics, setAnalytics] = useState<PremiumAdAnalyticsSummary | null>(null);
   const [cumulativeAmount, setCumulativeAmount] = useState<number | null>(null);
   const [extensions, setExtensions] = useState<ExtensionRow[]>([]);
 
@@ -198,8 +214,8 @@ export function usePremiumDetailPage(
 
       setDetail(mapped);
 
-      // Design Ref: §2.7 — 누적 결제 합계 + 연장 이력 동시 조회
-      const [{ data: paidRows }, { data: extRows }] = await Promise.all([
+      // 누적 결제 합계 + 연장 이력 + 통계 동시 조회
+      const [{ data: paidRows }, { data: extRows }, { data: analyticsRows }] = await Promise.all([
         supabase
           .from('ad_payment_history_v2')
           .select('amount')
@@ -214,6 +230,13 @@ export function usePremiumDetailPage(
           .eq('paymentType', 'extension')
           .eq('status', 'paid')
           .order('paymentDate', { ascending: true }),
+        supabase
+          .from('ad_analytics_v2')
+          .select(
+            'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount'
+          )
+          .eq('targetType', 'premium_advertisements_v2')
+          .eq('targetId', adId),
       ]);
 
       const sum = (paidRows ?? []).reduce(
@@ -221,6 +244,32 @@ export function usePremiumDetailPage(
         0
       );
       setCumulativeAmount(sum > 0 ? sum : null);
+
+      const rows = (analyticsRows ?? []) as Record<string, number>[];
+      if (rows.length > 0) {
+        const s: PremiumAdAnalyticsSummary = {
+          impressionCount: 0, homePremiumImpressionCount: 0, dialogImpressionCount: 0,
+          clickCount: 0, phoneClickCount: 0, messageClickCount: 0,
+          naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
+          instagramClickCount: 0, kakaoChatClickCount: 0,
+        };
+        for (const r of rows) {
+          s.impressionCount += r.impressionCount ?? 0;
+          s.homePremiumImpressionCount += r.homePremiumImpressionCount ?? 0;
+          s.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+          s.clickCount += r.clickCount ?? 0;
+          s.phoneClickCount += r.phoneClickCount ?? 0;
+          s.messageClickCount += r.messageClickCount ?? 0;
+          s.naverMapClickCount += r.naverMapClickCount ?? 0;
+          s.blogClickCount += r.blogClickCount ?? 0;
+          s.youtubeClickCount += r.youtubeClickCount ?? 0;
+          s.instagramClickCount += r.instagramClickCount ?? 0;
+          s.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
+        }
+        setAnalytics(s);
+      } else {
+        setAnalytics(null);
+      }
 
       const parsedExtensions: ExtensionRow[] = (extRows ?? []).map((r) => {
         const periodStart = new Date(r.billingPeriodStart as string);
@@ -376,6 +425,7 @@ export function usePremiumDetailPage(
   return {
     detail,
     loading,
+    analytics,
     cumulativeAmount,
     extensions,
     totalHouseholds,

@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
   AlertCircle,
+  BarChart2,
   Building2,
   Check,
   ChevronLeft,
@@ -479,6 +480,44 @@ export default function AdApplicationDetailPage({
                   <InfoRow label='주차 정보'>{detail.partner?.parkingInfo ?? '-'}</InfoRow>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* 4. 광고 통계 */}
+          <Card>
+            <CardHeader className='pb-3'>
+              <CardTitle className='flex items-center gap-2 text-base font-semibold'>
+                <BarChart2 className='h-4 w-4 text-muted-foreground' />
+                광고 통계 (누적)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='px-6 pb-4'>
+              {(() => {
+                const a = page.analytics;
+                const fmt = (n: number) => n.toLocaleString();
+                const rows: { label: string; value: number }[] = [
+                  { label: '노출수', value: a?.impressionCount ?? 0 },
+                  { label: '홈 노출수', value: a?.homeImpressionCount ?? 0 },
+                  { label: '다이얼로그 노출수', value: a?.dialogImpressionCount ?? 0 },
+                  { label: '클릭수', value: a?.clickCount ?? 0 },
+                  { label: '전화 클릭', value: a?.phoneClickCount ?? 0 },
+                  { label: '네이버지도 클릭', value: a?.naverMapClickCount ?? 0 },
+                  { label: '블로그 클릭', value: a?.blogClickCount ?? 0 },
+                  { label: '유튜브 클릭', value: a?.youtubeClickCount ?? 0 },
+                  { label: '인스타그램 클릭', value: a?.instagramClickCount ?? 0 },
+                  { label: '카카오채팅 클릭', value: a?.kakaoChatClickCount ?? 0 },
+                ];
+                return (
+                  <div className='space-y-2 text-sm'>
+                    {rows.map(({ label, value }) => (
+                      <div key={label} className='flex items-center justify-between'>
+                        <span className='text-muted-foreground'>{label}</span>
+                        <span className='tabular-nums font-medium'>{fmt(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 

@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "lastUpdated": "2026-04-28T09:26:23.902Z",
+  "lastUpdated": "2026-05-03T13:59:03.725Z",
   "activeFeatures": [
     "wooldanji-admin",
     "admin",
@@ -28,7 +28,8 @@
     "dialog-messages",
     "header",
     "[userId]",
-    "ads"
+    "ads",
+    "partners"
   ],
   "primaryFeature": "wooldanji-admin",
   "features": {
@@ -41,9 +42,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:43:00.824Z",
-        "lastUpdated": "2026-04-28T08:52:48.616Z"
+        "lastUpdated": "2026-05-03T13:49:24.841Z"
       },
-      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/components/data-toolbar.tsx",
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/components/app-sidebar.tsx",
       "stateMachine": {
         "currentState": "do",
         "previousState": null,
@@ -123,9 +124,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:48:45.531Z",
-        "lastUpdated": "2026-04-28T09:16:20.816Z"
+        "lastUpdated": "2026-05-03T13:59:03.723Z"
       },
-      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/advertising-v2/applications/[id]/page.tsx"
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/partners/[id]/page.tsx"
     },
     "edit": {
       "phase": "do",
@@ -188,7 +189,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:10:16.522Z",
-        "lastUpdated": "2026-04-28T08:53:04.812Z"
+        "lastUpdated": "2026-05-03T13:37:21.183Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/advertising-v2/applications/page.tsx"
     },
@@ -201,7 +202,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:11:06.550Z",
-        "lastUpdated": "2026-04-28T08:49:57.157Z"
+        "lastUpdated": "2026-05-03T13:32:57.709Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/advertising-v2/premium/page.tsx"
     },
@@ -399,6 +400,19 @@
         "lastUpdated": "2026-04-28T09:00:02.910Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/advertising/ads/page.tsx"
+    },
+    "partners": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-05-03T13:48:59.271Z",
+        "lastUpdated": "2026-05-03T13:49:18.532Z"
+      },
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/partners/page.tsx"
     }
   },
   "pipeline": {
@@ -409,7 +423,7 @@
   "session": {
     "startedAt": "2026-04-28T03:43:00.823Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-28T09:26:23.902Z"
+    "lastActivity": "2026-05-03T13:59:03.725Z"
   },
   "history": [
     {
@@ -2023,6 +2037,144 @@
     {
       "timestamp": "2026-04-28T09:26:23.902Z",
       "feature": "partner-banners",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:32:57.711Z",
+      "feature": "premium",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:35:35.570Z",
+      "feature": "applications",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:35:42.971Z",
+      "feature": "applications",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:35:45.413Z",
+      "feature": "applications",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:37:15.655Z",
+      "feature": "applications",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:37:21.185Z",
+      "feature": "applications",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:39:27.340Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:39:30.440Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:39:33.473Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:39:37.889Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:39:44.296Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:39:47.159Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:39:51.603Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:40:03.979Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:42:39.148Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:42:52.141Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:44:04.068Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:45:05.371Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:48:59.272Z",
+      "feature": "partners",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:49:18.533Z",
+      "feature": "partners",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:49:24.846Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:58:29.133Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-03T13:59:03.725Z",
+      "feature": "[id]",
       "phase": "do",
       "action": "updated"
     }
