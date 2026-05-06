@@ -82,9 +82,9 @@ const recentActivity = [
     badgeLabel: '지연',
   },
   {
-    title: '멤버십 전환 신청',
-    description: '5건의 신규 신청',
-    href: '/admin/membership-conversion',
+    title: '파트너 전환 신청',
+    description: '회원 관리에서 pending 상태 확인',
+    href: '/admin/users',
     badge: 'primary',
     badgeLabel: '신규',
   },

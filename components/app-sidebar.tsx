@@ -31,7 +31,6 @@ import {
   HelpCircle,
   Image as ImageIcon,
   ShieldAlert,
-  ArrowLeftRight,
   Sparkles,
   Tag,
   type LucideIcon,
@@ -49,7 +48,6 @@ const BADGE_KEYS: Record<string, string> = {
   '/admin/managers': 'managers',
   '/admin/advertising-v2/applications': 'ad_applications',
   '/admin/advertising-v2/premium': 'premium_applications',
-  '/admin/membership-conversion': 'membership_conversion',
 };
 
 const LAST_READ_PREFIX = 'lastRead_';
@@ -91,12 +89,6 @@ const navigationItems: MenuItem[] = [
     name: '승인보류/거절 관리',
     href: '/admin/user-reconfirm',
     icon: ShieldAlert,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    name: '멤버십 전환 신청',
-    href: '/admin/membership-conversion',
-    icon: ArrowLeftRight,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
@@ -216,7 +208,6 @@ interface NewCounts {
   managers: number;
   ad_applications: number;
   premium_applications: number;
-  membership_conversion: number;
 }
 
 const INITIAL_COUNTS: NewCounts = {
@@ -226,7 +217,6 @@ const INITIAL_COUNTS: NewCounts = {
   managers: 0,
   ad_applications: 0,
   premium_applications: 0,
-  membership_conversion: 0,
 };
 
 interface SidebarUser {
@@ -262,7 +252,6 @@ export function AppSidebar(): React.ReactElement {
         menuCountsResult,
         adApplicationsResult,
         premiumApplicationsResult,
-        membershipConversionResult,
       ] = await Promise.all([
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase.rpc as any)('get_menu_new_counts', {
@@ -279,10 +268,6 @@ export function AppSidebar(): React.ReactElement {
           .from('premium_advertisements_v2')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'pending'),
-        supabase
-          .from('partner_to_apartment_applications')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending'),
       ]);
 
       if (menuCountsResult.error) {
@@ -295,7 +280,6 @@ export function AppSidebar(): React.ReactElement {
           ...(menuCountsResult.data as NewCounts),
           ad_applications: adApplicationsResult.count ?? 0,
           premium_applications: premiumApplicationsResult.count ?? 0,
-          membership_conversion: membershipConversionResult.count ?? 0,
         });
       }
     } catch (err) {

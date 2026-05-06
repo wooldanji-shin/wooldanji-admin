@@ -30,57 +30,64 @@ export async function PATCH(
 
     const adminSupabase = createAdminClient();
 
-    // 신청 상태 확인 (partnerUserId도 함께 조회 — 알림 전송에 사용)
-    const { data: app, error: appError } = await adminSupabase
-      .from('partner_to_apartment_applications')
-      .select('status, partnerUserId')
+    // user 테이블에서 해당 유저 조회 (id는 userId)
+    const { data: targetUser, error: userError } = await adminSupabase
+      .from('user')
+      .select('id, approvalStatus')
       .eq('id', id)
       .single();
 
-    if (appError || !app) {
-      return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+    if (userError || !targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (app.status !== 'pending') {
-      return NextResponse.json({ error: 'Application is not pending' }, { status: 400 });
+    if (targetUser.approvalStatus !== 'pending') {
+      return NextResponse.json({ error: 'User is not in pending status' }, { status: 400 });
     }
 
-    // 거절 처리: status = 'rejected' + rejectionReason + reviewedAt + reviewedBy
+    // 보류 처리: approvalStatus = 'suspended' + suspensionReason UPDATE
     const { error: updateError } = await adminSupabase
-      .from('partner_to_apartment_applications')
+      .from('user')
       .update({
-        status: 'rejected',
-        rejectionReason: rejectionReason || null,
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: currentUser.id,
+        approvalStatus: 'suspended',
+        suspensionReason: rejectionReason || null,
       })
       .eq('id', id);
 
     if (updateError) {
-      console.error('Failed to reject application:', updateError);
-      return NextResponse.json({ error: 'Failed to reject application' }, { status: 500 });
+      console.error('Failed to suspend user:', updateError);
+      return NextResponse.json({ error: 'Failed to reject user' }, { status: 500 });
     }
 
-    // 거절 알림 전송 (non-critical: 실패해도 200 반환)
-    try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/send-partner-fcm-notification`;
+    // FCM 알림 전송을 위해 partner_users에서 partnerUserId 역조회
+    const { data: partnerUser } = await adminSupabase
+      .from('partner_users')
+      .select('id')
+      .eq('userId', id)
+      .maybeSingle();
 
-      await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-        body: JSON.stringify({
-          partnerUserId: app.partnerUserId,
-          title: '아파트 회원 신청 결과',
-          body: '신청이 반려되었습니다. 앱에서 사유를 확인해주세요.',
-          type: 'membership_rejected',
-        }),
-      });
-    } catch (notificationError) {
-      console.error('거절 알림 전송 실패 (non-critical):', notificationError);
+    // 거절 알림 전송 (non-critical: 실패해도 200 반환)
+    if (partnerUser) {
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const edgeFunctionUrl = `${supabaseUrl}/functions/v1/send-partner-fcm-notification`;
+
+        await fetch(edgeFunctionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            partnerUserId: partnerUser.id,
+            title: '아파트 회원 신청 결과',
+            body: '신청이 반려되었습니다. 앱에서 사유를 확인해주세요.',
+            type: 'membership_rejected',
+          }),
+        });
+      } catch (notificationError) {
+        console.error('거절 알림 전송 실패 (non-critical):', notificationError);
+      }
     }
 
     return NextResponse.json({ success: true, message: '멤버십 전환 신청이 거절되었습니다.' });

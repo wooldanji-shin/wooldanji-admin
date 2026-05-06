@@ -32,7 +32,6 @@ const ROUTE_LABEL_MAP: Record<string, string> = {
   users: '회원 관리',
   managers: '관리자 관리',
   'user-reconfirm': '승인보류/거절',
-  'membership-conversion': '멤버십 전환 신청',
   inquiries: '문의 관리',
   'partner-inquiries': '파트너 문의',
   'partner-banners': '파트너 안내 배너',

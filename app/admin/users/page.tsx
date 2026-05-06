@@ -35,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Trash2, Ban, Download, Edit, Loader2 } from 'lucide-react';
+import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Ban, Download, Edit, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { createClient } from '@/lib/supabase/client';
@@ -68,6 +68,7 @@ export default function UsersPage() {
   const supabase = createClient();
 
   const [users, setUsers] = useState<UserFullDetails[]>([]);
+  const [partnerUserIds, setPartnerUserIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -90,8 +91,6 @@ export default function UsersPage() {
       return () => document.removeEventListener('keydown', handleEscape, true);
     }
   }, [imagePreview]);
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deletingUser, setDeletingUser] = useState<UserFullDetails | null>(null);
   const [suspendDialog, setSuspendDialog] = useState(false);
   const [suspendingUser, setSuspendingUser] = useState<UserFullDetails | null>(null);
   const [suspensionReason, setSuspensionReason] = useState('');
@@ -214,6 +213,12 @@ export default function UsersPage() {
       // 현재 사용자 역할 확인
       const roles = await getUserRoles();
       const isManager = roles.includes('MANAGER');
+
+      // 파트너 userId 목록 조회 (user ↔ partner_users 간 FK 없어서 별도 조회)
+      const { data: partnerData } = await supabase
+        .from('partner_users')
+        .select('userId');
+      setPartnerUserIds(new Set((partnerData || []).map((p: any) => p.userId)));
 
       let query = supabase
         .from('user')
@@ -534,34 +539,6 @@ export default function UsersPage() {
     }
   };
 
-  const handleDeleteClick = (user: UserFullDetails) => {
-    setDeletingUser(user);
-    setDeleteDialog(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!deletingUser) return;
-
-    try {
-      const response = await fetch(`/api/users/${deletingUser.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete user');
-      }
-
-      toast.success('회원이 삭제되었습니다.');
-      setDeleteDialog(false);
-      setDeletingUser(null);
-      fetchUsers();
-    } catch (err) {
-      console.error('Failed to delete user:', err);
-      toast.error('회원 삭제에 실패했습니다.');
-    }
-  };
-
   // 전체보기 다이얼로그 열기
   const handleDetailClick = (user: UserFullDetails) => {
     setDetailUser(user);
@@ -874,7 +851,9 @@ export default function UsersPage() {
                           )}
                         </TableCell>
                         <TableCell className='font-medium text-card-foreground'>
-                          {user.name || '-'}
+                          <div className='flex items-center gap-1.5'>
+                            {user.name || '-'}
+                          </div>
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
                           <div className='flex items-center gap-2'>
@@ -886,7 +865,12 @@ export default function UsersPage() {
                           {user.phoneNumber || '-'}
                         </TableCell>
                         <TableCell>
-                          {getRegistrationTypeBadge(user.registrationType)}
+                          <div className='flex items-center gap-1 flex-wrap'>
+                            {getRegistrationTypeBadge(user.registrationType)}
+                            {partnerUserIds.has(user.id) && (
+                              <Badge className='bg-purple-500 text-white'>파트너</Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
                           {user.registrationType === 'APARTMENT' && user.apartments ? (
@@ -967,13 +951,6 @@ export default function UsersPage() {
                                   )}
                                 </>
                               )}
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(user)}
-                                className='text-destructive'
-                              >
-                                <Trash2 className='mr-2 h-4 w-4' />
-                                삭제
-                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -1108,28 +1085,6 @@ export default function UsersPage() {
             </Button>
             <Button variant='default' onClick={handleSuspendConfirm} className='bg-yellow-600 hover:bg-yellow-700'>
               승인 보류
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>회원 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingUser?.name || deletingUser?.email}</strong>님을 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없으며, 해당 회원의 모든 데이터가 삭제됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDeleteDialog(false)}>
-              취소
-            </Button>
-            <Button variant='destructive' onClick={handleDeleteConfirm}>
-              삭제
             </Button>
           </DialogFooter>
         </DialogContent>
