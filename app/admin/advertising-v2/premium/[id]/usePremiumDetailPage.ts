@@ -50,6 +50,8 @@ export interface PremiumAdDetail {
   rejectedReason: string | null;
   modificationStatus: string | null;
   modificationRejectedReason: string | null;
+  approvedDiscountRate: number | null;
+  discountedTotalAmount: number | null;
   pendingChanges: Record<string, unknown> | null;
   startedAt: string | null;
   endedAt: string | null;
@@ -88,6 +90,12 @@ export interface UsePremiumDetailPageReturn {
   extensionWeeks: number;
   displayAmount: number | null;
   extensionAmount: number | null;
+  // 승인 다이얼로그
+  approveDialog: boolean;
+  setApproveDialog: (open: boolean) => void;
+  discountRate: number;
+  setDiscountRate: (v: number) => void;
+  handleApproveConfirm: () => Promise<void>;
   // 거절 다이얼로그
   rejectDialog: boolean;
   setRejectDialog: (open: boolean) => void;
@@ -101,7 +109,7 @@ export interface UsePremiumDetailPageReturn {
   // 처리 상태
   processing: boolean;
   // 액션
-  handleApprove: () => Promise<void>;
+  handleApprove: () => void;
   handleReject: () => Promise<void>;
   handleApproveModification: () => Promise<void>;
   handleRejectModification: () => Promise<void>;
@@ -120,6 +128,8 @@ export function usePremiumDetailPage(
   const [cumulativeAmount, setCumulativeAmount] = useState<number | null>(null);
   const [extensions, setExtensions] = useState<ExtensionRow[]>([]);
 
+  const [approveDialog, setApproveDialog] = useState<boolean>(false);
+  const [discountRate, setDiscountRate] = useState<number>(0);
   const [rejectDialog, setRejectDialog] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('');
   const [modificationRejectDialog, setModificationRejectDialog] = useState<boolean>(false);
@@ -142,7 +152,8 @@ export function usePremiumDetailPage(
             '"naverMapUrl", "blogUrl", "youtubeUrl", "instagramUrl", "kakaoOpenChatUrl", ' +
             'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", ' +
             '"modificationStatus", "modificationRejectedReason", "pendingChanges", ' +
-            '"startedAt", "endedAt", "createdAt", "snapshotApartments"'
+            '"startedAt", "endedAt", "createdAt", "snapshotApartments", ' +
+            '"approvedDiscountRate", "discountedTotalAmount"'
         )
         .eq('id', adId)
         .single();
@@ -205,6 +216,8 @@ export function usePremiumDetailPage(
         endedAt: (row.endedAt as string | null) ?? null,
         createdAt: row.createdAt as string,
         snapshotApartments: (row.snapshotApartments as SnapshotApartment[]) ?? [],
+        approvedDiscountRate: (row.approvedDiscountRate as number | null) ?? null,
+        discountedTotalAmount: (row.discountedTotalAmount as number | null) ?? null,
         partner: partnerData
           ? { businessName: (partnerData as { businessName: string | null }).businessName }
           : null,
@@ -302,18 +315,26 @@ export function usePremiumDetailPage(
     fetchDetail();
   }, [fetchDetail]);
 
-  const handleApprove = async (): Promise<void> => {
+  const handleApprove = (): void => {
+    setApproveDialog(true);
+  };
+
+  const handleApproveConfirm = async (): Promise<void> => {
     if (!detail) return;
     setProcessing(true);
     try {
       const res = await fetch(`/api/advertising-v2/premium/${detail.id}/approve`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discountRate }),
       });
       if (!res.ok) {
         const result = await res.json();
         throw new Error(result.error ?? 'Failed to approve');
       }
       toast.success('프리미엄 광고가 승인되었습니다.');
+      setApproveDialog(false);
+      setDiscountRate(0);
       fetchDetail();
     } catch (err) {
       console.error('프리미엄 광고 승인 실패:', err);
@@ -433,6 +454,11 @@ export function usePremiumDetailPage(
     extensionWeeks,
     displayAmount,
     extensionAmount,
+    approveDialog,
+    setApproveDialog,
+    discountRate,
+    setDiscountRate,
+    handleApproveConfirm,
     rejectDialog,
     setRejectDialog,
     rejectReason,

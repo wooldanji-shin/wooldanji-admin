@@ -24,10 +24,20 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
-    // 프리미엄 광고 조회
+    // 요청 body에서 할인율 파싱 (없으면 0)
+    let discountRate = 0;
+    try {
+      const body = await request.json();
+      discountRate = body?.discountRate ?? 0;
+    } catch {
+      // body 없거나 파싱 실패 시 0으로 처리
+    }
+    const effectiveDiscountRate = Math.min(100, Math.max(0, discountRate));
+
+    // 프리미엄 광고 조회 (할인 계산에 totalAmount 필요)
     const { data: ad, error: fetchError } = await supabase
       .from('premium_advertisements_v2')
-      .select('status, partnerId')
+      .select('status, partnerId, totalAmount')
       .eq('id', id)
       .single();
 
@@ -42,11 +52,20 @@ export async function POST(
       );
     }
 
+    // 할인된 결제 금액 계산 (10원 단위 반올림)
+    const totalAmount = ad.totalAmount as number | null;
+    const discountedTotalAmount =
+      effectiveDiscountRate > 0 && totalAmount != null
+        ? Math.round((totalAmount * (100 - effectiveDiscountRate)) / 100 / 10) * 10
+        : null;
+
     // 상태 → approved 전환
     const { error: updateError } = await supabase
       .from('premium_advertisements_v2')
       .update({
         status: 'approved',
+        approvedDiscountRate: effectiveDiscountRate > 0 ? effectiveDiscountRate : null,
+        discountedTotalAmount,
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id);
@@ -70,7 +89,9 @@ export async function POST(
         body: JSON.stringify({
           partnerUserId: ad.partnerId,
           title: '프리미엄 광고 심사 결과',
-          body: '프리미엄 광고가 승인되었습니다. 앱에서 결제 후 광고를 시작해보세요.',
+          body: effectiveDiscountRate > 0
+            ? `프리미엄 광고가 승인되었습니다. ${effectiveDiscountRate}% 할인이 적용되었습니다.`
+            : '프리미엄 광고가 승인되었습니다. 앱에서 결제 후 광고를 시작해보세요.',
           type: 'premium_ad_approved',
           navigationData: {
             type: 'premium_ad_detail',

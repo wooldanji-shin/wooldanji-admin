@@ -18,6 +18,12 @@ export interface CouponItem {
   partnerBusinessName: string;
   downloadCount: number;
   usageCount: number;
+  // 파트너 직접 만료 시각 (파트너가 쿠폰을 직접 만료시킨 경우)
+  expiredAt: string | null;
+  // 파트너가 쿠폰을 만료시킨 사유
+  expiredReason: string | null;
+  // 파트너가 쿠폰을 수정한 사유
+  updateReason: string | null;
 }
 
 export interface UseCouponsPageReturn {
@@ -39,6 +45,7 @@ export function useCouponsPage(): UseCouponsPageReturn {
         .select(`
           id, title, description, discountType, discountValue,
           minAmount, expiresAt, isActive, createdAt, partnerUserId,
+          expiredAt, expiredReason, updateReason,
           partner_users!inner(businessName),
           coupon_downloads(count)
         `)
@@ -64,6 +71,9 @@ export function useCouponsPage(): UseCouponsPageReturn {
           partnerBusinessName: row.partner_users?.businessName ?? '-',
           downloadCount,
           usageCount: 0,
+          expiredAt: row.expiredAt ?? null,
+          expiredReason: row.expiredReason ?? null,
+          updateReason: row.updateReason ?? null,
         };
       });
 

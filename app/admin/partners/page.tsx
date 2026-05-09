@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import { Search, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   PageContent,
   PageHeader,
@@ -26,6 +27,7 @@ import { usePartnersPage } from './usePartnersPage';
 
 function PartnersContent(): React.ReactElement {
   const page = usePartnersPage();
+  const { handleToggleAnalytics } = page;
 
   return (
     <PageShell>
@@ -67,10 +69,12 @@ function PartnersContent(): React.ReactElement {
                 <TableRow>
                   <TableHead>상호명</TableHead>
                   <TableHead>대표자명</TableHead>
+                  <TableHead>이메일</TableHead>
                   <TableHead>광고표시용번호</TableHead>
                   <TableHead>연락처</TableHead>
                   <TableHead>카테고리</TableHead>
                   <TableHead>광고 이력</TableHead>
+                  <TableHead>분석 권한</TableHead>
                   <TableHead>가입일</TableHead>
                 </TableRow>
               </TableHeader>
@@ -83,6 +87,9 @@ function PartnersContent(): React.ReactElement {
                   >
                     <TableCell className="font-medium">{partner.businessName}</TableCell>
                     <TableCell>{partner.representativeName}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {partner.email ?? '-'}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {partner.displayPhoneNumber ?? '-'}
                     </TableCell>
@@ -98,6 +105,16 @@ function PartnersContent(): React.ReactElement {
                       ) : (
                         <span className="text-muted-foreground text-sm">없음</span>
                       )}
+                    </TableCell>
+                    <TableCell
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={partner.analyticsEnabled}
+                        onCheckedChange={() =>
+                          handleToggleAnalytics(partner.id, partner.analyticsEnabled)
+                        }
+                      />
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(partner.createdAt).toLocaleDateString('ko-KR')}

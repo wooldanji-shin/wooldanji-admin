@@ -139,7 +139,9 @@ export async function POST(
         body: JSON.stringify({
           partnerUserId: ad.partnerId,
           title: '광고 심사 결과',
-          body: '신청하신 광고가 승인되었습니다. 앱에서 결제 후 광고를 시작해보세요.',
+          body: effectiveDiscountRate > 0
+            ? `신청하신 광고가 승인되었습니다. ${effectiveDiscountRate}% 할인이 적용되었습니다.`
+            : '신청하신 광고가 승인되었습니다. 앱에서 결제 후 광고를 시작해보세요.',
           type: 'ad_approved',
           navigationData: {
             type: 'ad_detail',

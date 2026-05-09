@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -681,6 +682,60 @@ export default function PremiumAdDetailPage({
               disabled={page.processing}
             >
               {page.processing ? '처리 중...' : '거절'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 승인 다이얼로그 */}
+      <Dialog open={page.approveDialog} onOpenChange={page.setApproveDialog}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>프리미엄 광고 승인</DialogTitle>
+            <DialogDescription>
+              할인율을 입력하면 파트너에게 할인된 금액으로 결제 요청됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-4 py-2'>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>할인율 (%)</label>
+              <Input
+                type='number'
+                min={0}
+                max={100}
+                placeholder='0 (할인 없음)'
+                value={page.discountRate || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  page.setDiscountRate(
+                    val === '' ? 0 : Math.min(100, Math.max(0, parseInt(val) || 0))
+                  );
+                }}
+              />
+            </div>
+            {page.detail?.totalAmount != null && page.discountRate > 0 && (
+              <div className='rounded-md bg-muted p-3 text-sm'>
+                <span className='text-muted-foreground'>할인 후 결제금액: </span>
+                <span className='font-semibold'>
+                  {(
+                    Math.round(
+                      (page.detail.totalAmount * (100 - page.discountRate)) / 100 / 10
+                    ) * 10
+                  ).toLocaleString()}
+                  원
+                </span>
+                <span className='text-muted-foreground ml-1'>
+                  (정상가 {page.detail.totalAmount.toLocaleString()}원)
+                </span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => page.setApproveDialog(false)}>
+              취소
+            </Button>
+            <Button onClick={page.handleApproveConfirm} disabled={page.processing}>
+              {page.processing ? '처리 중...' : '승인 확정'}
             </Button>
           </DialogFooter>
         </DialogContent>

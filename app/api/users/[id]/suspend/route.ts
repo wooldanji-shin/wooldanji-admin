@@ -63,6 +63,8 @@ export async function PUT(
       );
     }
 
+    // 알림은 trigger_user_status_change DB 트리거가 자동 처리
+
     return NextResponse.json({
       success: true,
       data

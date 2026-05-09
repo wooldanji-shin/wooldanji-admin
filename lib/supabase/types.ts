@@ -227,6 +227,62 @@ export interface Database {
           devicePassword?: string;
         };
       };
+      partner_users: {
+        Row: {
+          id: string;
+          userId: string;
+          businessName: string;
+          representativeName: string;
+          displayPhoneNumber: string | null;
+          phoneNumber: string | null;
+          businessAddress: string | null;
+          businessDetailAddress: string | null;
+          businessRegistrationNumber: string | null;
+          businessRegistrationImageUrl: string | null;
+          businessHoursNote: string | null;
+          parkingInfo: string | null;
+          hasHadRunningAd: boolean;
+          marketingAgreed: boolean;
+          analyticsEnabled: boolean;
+          createdAt: string;
+        };
+        Insert: {
+          id?: string;
+          userId: string;
+          businessName: string;
+          representativeName: string;
+          displayPhoneNumber?: string | null;
+          phoneNumber?: string | null;
+          businessAddress?: string | null;
+          businessDetailAddress?: string | null;
+          businessRegistrationNumber?: string | null;
+          businessRegistrationImageUrl?: string | null;
+          businessHoursNote?: string | null;
+          parkingInfo?: string | null;
+          hasHadRunningAd?: boolean;
+          marketingAgreed?: boolean;
+          analyticsEnabled?: boolean;
+          createdAt?: string;
+        };
+        Update: {
+          id?: string;
+          userId?: string;
+          businessName?: string;
+          representativeName?: string;
+          displayPhoneNumber?: string | null;
+          phoneNumber?: string | null;
+          businessAddress?: string | null;
+          businessDetailAddress?: string | null;
+          businessRegistrationNumber?: string | null;
+          businessRegistrationImageUrl?: string | null;
+          businessHoursNote?: string | null;
+          parkingInfo?: string | null;
+          hasHadRunningAd?: boolean;
+          marketingAgreed?: boolean;
+          analyticsEnabled?: boolean;
+          createdAt?: string;
+        };
+      };
     };
   };
 }

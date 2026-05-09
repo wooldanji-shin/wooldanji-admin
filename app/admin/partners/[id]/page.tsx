@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -74,7 +76,7 @@ export default function PartnerDetailPage({
     );
   }
 
-  const { partner, adHistory } = page;
+  const { partner, adHistory, analyticsToggling, handleToggleAnalytics } = page;
 
   return (
     <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
@@ -129,6 +131,19 @@ export default function PartnerDetailPage({
                 ) : (
                   <span className="text-muted-foreground">미동의</span>
                 )}
+              </InfoRow>
+              <InfoRow label="광고 분석 열람">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="analyticsEnabled"
+                    checked={partner.analyticsEnabled}
+                    disabled={analyticsToggling}
+                    onCheckedChange={handleToggleAnalytics}
+                  />
+                  <Label htmlFor="analyticsEnabled" className="cursor-pointer text-sm">
+                    {partner.analyticsEnabled ? '허용됨' : '비허용'}
+                  </Label>
+                </div>
               </InfoRow>
             </CardContent>
           </Card>

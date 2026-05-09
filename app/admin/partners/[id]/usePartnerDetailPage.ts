@@ -20,6 +20,7 @@ export interface PartnerDetail {
   parkingInfo: string | null;
   hasHadRunningAd: boolean;
   marketingAgreed: boolean;
+  analyticsEnabled: boolean;
   createdAt: string;
   categoryName: string | null;
 }
@@ -38,8 +39,10 @@ export interface UsePartnerDetailPageReturn {
   partner: PartnerDetail | null;
   adHistory: AdHistoryItem[];
   loading: boolean;
+  analyticsToggling: boolean;
   handleAdClick: (adId: string) => void;
   handleBack: () => void;
+  handleToggleAnalytics: () => Promise<void>;
 }
 
 export function usePartnerDetailPage(
@@ -52,6 +55,7 @@ export function usePartnerDetailPage(
   const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [adHistory, setAdHistory] = useState<AdHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analyticsToggling, setAnalyticsToggling] = useState(false);
 
   useEffect(() => {
     params.then((p) => setPartnerId(p.id));
@@ -64,7 +68,7 @@ export function usePartnerDetailPage(
       const { data: partnerData, error: partnerError } = await supabase
         .from('partner_users')
         .select(
-          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, hasHadRunningAd, marketingAgreed, createdAt, ad_categories_v2:categoryId(categoryName)'
+          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, hasHadRunningAd, marketingAgreed, analyticsEnabled, createdAt, ad_categories_v2:categoryId(categoryName)'
         )
         .eq('id', partnerId)
         .single();
@@ -87,6 +91,7 @@ export function usePartnerDetailPage(
         parkingInfo: row.parkingInfo,
         hasHadRunningAd: row.hasHadRunningAd,
         marketingAgreed: row.marketingAgreed,
+        analyticsEnabled: row.analyticsEnabled ?? false,
         createdAt: row.createdAt,
         categoryName: (row.ad_categories_v2 as any)?.categoryName ?? null,
       };
@@ -125,6 +130,27 @@ export function usePartnerDetailPage(
     fetchDetail();
   }, [fetchDetail]);
 
+  const handleToggleAnalytics = async (): Promise<void> => {
+    if (!partner || analyticsToggling) return;
+    setAnalyticsToggling(true);
+    try {
+      const next = !partner.analyticsEnabled;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('partner_users')
+        .update({ analyticsEnabled: next })
+        .eq('id', partner.id);
+      if (error) throw error;
+      setPartner((prev) => (prev ? { ...prev, analyticsEnabled: next } : prev));
+      toast.success(next ? '광고 분석 권한을 부여했습니다.' : '광고 분석 권한을 해제했습니다.');
+    } catch (err) {
+      console.error('analyticsEnabled 변경 실패:', err);
+      toast.error('권한 변경에 실패했습니다.');
+    } finally {
+      setAnalyticsToggling(false);
+    }
+  };
+
   const handleAdClick = (adId: string): void => {
     router.push(`/admin/advertising-v2/applications/${adId}`);
   };
@@ -133,5 +159,5 @@ export function usePartnerDetailPage(
     router.push('/admin/partners');
   };
 
-  return { partner, adHistory, loading, handleAdClick, handleBack };
+  return { partner, adHistory, loading, analyticsToggling, handleAdClick, handleBack, handleToggleAnalytics };
 }

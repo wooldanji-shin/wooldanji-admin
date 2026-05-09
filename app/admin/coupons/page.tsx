@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
+import { format } from 'date-fns';
 import { Tag, Trash2 } from 'lucide-react';
 import {
   PageContent,
@@ -56,6 +57,9 @@ function CouponsContent(): React.ReactElement {
                   <TableHead>유효기간</TableHead>
                   <TableHead className="text-center">다운로드</TableHead>
                   <TableHead className="text-center">사용</TableHead>
+                  <TableHead>만료 사유</TableHead>
+                  <TableHead>수정 사유</TableHead>
+                  <TableHead>파트너 만료 시각</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead className="w-16" />
                 </TableRow>
@@ -87,6 +91,16 @@ function CouponsContent(): React.ReactElement {
                       </TableCell>
                       <TableCell className="text-center">{coupon.downloadCount}</TableCell>
                       <TableCell className="text-center">{coupon.usageCount}</TableCell>
+                      {/* 파트너가 직접 입력한 만료 사유 */}
+                      <TableCell>{coupon.expiredReason ?? '-'}</TableCell>
+                      {/* 파트너가 쿠폰 수정 시 입력한 사유 */}
+                      <TableCell>{coupon.updateReason ?? '-'}</TableCell>
+                      {/* 파트너가 직접 만료시킨 시각 (YYYY.MM.DD HH:mm 형식) */}
+                      <TableCell>
+                        {coupon.expiredAt
+                          ? format(new Date(coupon.expiredAt), 'yyyy.MM.dd HH:mm')
+                          : '-'}
+                      </TableCell>
                       <TableCell>
                         {!coupon.isActive ? (
                           <Badge variant="destructive">비활성</Badge>
