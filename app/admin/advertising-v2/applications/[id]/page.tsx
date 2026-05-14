@@ -763,7 +763,9 @@ export default function AdApplicationDetailPage({
               )}
             </div>
             <div className='space-y-1.5'>
-              <label className='text-base font-medium'>첫 결제 할인율 (%)</label>
+              <label className='text-base font-medium'>
+                {page.overrideEnabled ? '예외 결제 할인율 (%)' : '첫 결제 할인율 (%)'}
+              </label>
               <Input
                 type='number'
                 min={0}
@@ -785,6 +787,24 @@ export default function AdApplicationDetailPage({
                 </p>
               )}
             </div>
+            {/* 예외 할인 적용 시에만 할인 사유 입력 표시 */}
+            {page.overrideEnabled && (
+              <div className='space-y-1.5'>
+                <label className='text-base font-medium'>
+                  할인 사유 <span className='text-sm font-normal text-muted-foreground'>(파트너에게 표시, 선택)</span>
+                </label>
+                <Textarea
+                  className='min-h-[80px] resize-none'
+                  placeholder='예: 신규 상권 지원 / 장기 계약 협의 완료 등'
+                  maxLength={100}
+                  value={page.discountNote}
+                  onChange={(e) => page.setDiscountNote(e.target.value)}
+                />
+                <p className='text-xs text-muted-foreground text-right'>
+                  {page.discountNote.length}/100
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

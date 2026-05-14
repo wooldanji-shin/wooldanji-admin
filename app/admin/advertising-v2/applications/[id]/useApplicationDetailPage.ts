@@ -105,6 +105,8 @@ export interface UseApplicationDetailPageReturn {
   setOverrideEnabled: (v: boolean) => void;
   discountRate: number;
   setDiscountRate: (v: number) => void;
+  discountNote: string;
+  setDiscountNote: (v: string) => void;
   rejectReason: string;
   setRejectReason: (v: string) => void;
   processing: boolean;
@@ -136,6 +138,7 @@ export function useApplicationDetailPage(
   const [freeMonths, setFreeMonths] = useState(0);
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [discountRate, setDiscountRate] = useState(28);
+  const [discountNote, setDiscountNote] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
   const [modificationRejectDialog, setModificationRejectDialog] = useState(false);
@@ -353,6 +356,7 @@ export function useApplicationDetailPage(
       setFreeMonths(isFirstAd ? 1 : 0);
       setOverrideEnabled(false);
       setDiscountRate(isFirstAd ? mapped.defaultDiscountRate : 0);
+      setDiscountNote('');
     } catch (err) {
       console.error('Failed to fetch detail:', err);
       toast.error('광고 신청 정보를 불러오는데 실패했습니다.');
@@ -375,7 +379,7 @@ export function useApplicationDetailPage(
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled }),
+          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, discountNote }),
         }
       );
       if (!response.ok) {
@@ -499,6 +503,8 @@ export function useApplicationDetailPage(
     setOverrideEnabled,
     discountRate,
     setDiscountRate,
+    discountNote,
+    setDiscountNote,
     rejectReason,
     setRejectReason,
     processing,

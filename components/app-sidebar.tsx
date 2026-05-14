@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   Sparkles,
   Tag,
+  DoorOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -152,6 +153,18 @@ const advertisingItems: MenuItem[] = [
     href: '/admin/advertising/categories',
     icon: LayoutList,
     roles: ['SUPER_ADMIN'],
+  },
+  {
+    name: '카테고리 관리 v2',
+    href: '/admin/advertising-v2/categories',
+    icon: Tag,
+    roles: ['SUPER_ADMIN'],
+  },
+  {
+    name: '공동현관문 배너관리 v2',
+    href: '/admin/advertising-v2/door-banner',
+    icon: DoorOpen,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
     name: '광고주 관리',

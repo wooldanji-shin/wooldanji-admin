@@ -34,10 +34,11 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { freeMonths, discountRate, overrideEnabled } = body as {
+    const { freeMonths, discountRate, overrideEnabled, discountNote } = body as {
       freeMonths: number;
       discountRate: number;
       overrideEnabled?: boolean;
+      discountNote?: string;
     };
 
     const [adResult, pricingResult] = await Promise.all([
@@ -114,6 +115,8 @@ export async function POST(
         approvedDiscountRate: effectiveDiscountRate,
         approvedMonthlyAmount,
         approvedAt: new Date().toISOString(),
+        // overrideEnabled가 아닌 경우 항상 null로 저장 (예외 할인 아닌 승인에는 사유 불필요)
+        discountNote: overrideEnabled === true ? (discountNote?.trim() || null) : null,
       })
       .eq('id', id);
 
