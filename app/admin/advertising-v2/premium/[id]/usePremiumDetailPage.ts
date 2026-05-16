@@ -76,6 +76,7 @@ export interface PremiumAdAnalyticsSummary {
   youtubeClickCount: number;
   instagramClickCount: number;
   kakaoChatClickCount: number;
+  wishCount: number;
 }
 
 export interface UsePremiumDetailPageReturn {
@@ -246,7 +247,7 @@ export function usePremiumDetailPage(
         supabase
           .from('ad_analytics_v2')
           .select(
-            'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount'
+            'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, wishCount'
           )
           .eq('targetType', 'premium_advertisements_v2')
           .eq('targetId', adId),
@@ -264,7 +265,7 @@ export function usePremiumDetailPage(
           impressionCount: 0, homePremiumImpressionCount: 0, dialogImpressionCount: 0,
           clickCount: 0, phoneClickCount: 0, messageClickCount: 0,
           naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
-          instagramClickCount: 0, kakaoChatClickCount: 0,
+          instagramClickCount: 0, kakaoChatClickCount: 0, wishCount: 0,
         };
         for (const r of rows) {
           s.impressionCount += r.impressionCount ?? 0;
@@ -278,6 +279,7 @@ export function usePremiumDetailPage(
           s.youtubeClickCount += r.youtubeClickCount ?? 0;
           s.instagramClickCount += r.instagramClickCount ?? 0;
           s.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
+          s.wishCount += r.wishCount ?? 0;
         }
         setAnalytics(s);
       } else {

@@ -89,6 +89,7 @@ export interface AdAnalyticsSummary {
   kakaoChatClickCount: number;
   homeImpressionCount: number;
   dialogImpressionCount: number;
+  wishCount: number;
 }
 
 export interface UseApplicationDetailPageReturn {
@@ -199,7 +200,7 @@ export function useApplicationDetailPage(
           .maybeSingle(),
         supabase
           .from('ad_analytics_v2')
-          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount')
+          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, wishCount')
           .eq('targetId', adId),
       ]);
 
@@ -330,7 +331,7 @@ export function useApplicationDetailPage(
           impressionCount: 0, clickCount: 0, phoneClickCount: 0,
           messageClickCount: 0, naverMapClickCount: 0, blogClickCount: 0,
           youtubeClickCount: 0, instagramClickCount: 0, kakaoChatClickCount: 0,
-          homeImpressionCount: 0, dialogImpressionCount: 0,
+          homeImpressionCount: 0, dialogImpressionCount: 0, wishCount: 0,
         };
         for (const r of analyticsRows) {
           sum.impressionCount += r.impressionCount ?? 0;
@@ -344,6 +345,7 @@ export function useApplicationDetailPage(
           sum.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
           sum.homeImpressionCount += r.homeImpressionCount ?? 0;
           sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+          sum.wishCount += r.wishCount ?? 0;
         }
         setAnalytics(sum);
       } else {

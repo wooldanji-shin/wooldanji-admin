@@ -506,6 +506,7 @@ export default function AdApplicationDetailPage({
                   { label: '유튜브 클릭', value: a?.youtubeClickCount ?? 0 },
                   { label: '인스타그램 클릭', value: a?.instagramClickCount ?? 0 },
                   { label: '카카오채팅 클릭', value: a?.kakaoChatClickCount ?? 0 },
+                  { label: '찜 수', value: a?.wishCount ?? 0 },
                 ];
                 return (
                   <div className='space-y-2 text-sm'>

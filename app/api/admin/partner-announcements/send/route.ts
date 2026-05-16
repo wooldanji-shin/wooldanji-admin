@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Design Ref: §4.2 send route — 200명 청크로 신규 EF 병렬 호출
-// Plan SC: SC-1(SLA) / SC-2-1(시스템 푸시 격리)
-// Decision: D3 2단 청킹 — EF wall time 150초 한도 보호
-//
-// 입력: { partnerUserIds: string[], title: string, body: string }
-// 응답: { total, success, failed, noToken, chunks, durationMs, failures: [...] }
+import { createClient } from '@supabase/supabase-js';
 
 const CHUNK_SIZE = 200;
 const MAX_TOTAL = 10000;
@@ -55,6 +49,23 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
+
+    // 발송 이력 1행 선생성 — EF 청크들이 공유할 announcementId
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: announcement, error: announcementErr } = await supabase
+      .from('partner_announcements')
+      .insert({ title: title.trim(), body: body.trim(), recipientCount: partnerUserIds.length })
+      .select('id')
+      .single();
+    if (announcementErr || !announcement) {
+      return NextResponse.json(
+        { error: 'announcement 생성 실패', detail: announcementErr?.message },
+        { status: 500 },
+      );
+    }
+
     const efUrl = `${supabaseUrl}/functions/v1/send-partner-bulk-fcm-notification`;
 
     // 200명 청크 분할
@@ -79,6 +90,7 @@ export async function POST(req: NextRequest) {
             title: title.trim(),
             body: body.trim(),
             type: 'admin_announcement',
+            announcementId: announcement.id,
           }),
         }).then(async (r) => {
           const json = (await r.json()) as BulkResponse | { error: string };

@@ -70,6 +70,7 @@ interface PartnerRow {
   createdAt: string;
   adCase: AdCase;
   hasFcmToken: boolean;
+  marketingAgreed: boolean;
   total_count: number;
 }
 
@@ -135,6 +136,11 @@ export default function PartnerAnnouncementsPage() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // 수신자 모달
+  const [recipientsModal, setRecipientsModal] = useState<{ key: string; title: string } | null>(null);
+  const [recipients, setRecipients] = useState<Array<{ partnerUserId: string; businessName: string | null; representativeName: string | null; displayPhoneNumber: string | null }>>([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+
   useEffect(() => {
     void initialAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,14 +201,55 @@ export default function PartnerAnnouncementsPage() {
     }
   }
 
+  // ─── 수신자 조회 ───────────────────────────────────────────────
+  async function loadRecipients(announcementId: string) {
+    setRecipientsLoading(true);
+    setRecipients([]);
+    try {
+      const { data: recData, error: recErr } = await supabase
+        .from('partner_announcement_recipients')
+        .select('partnerUserId')
+        .eq('announcementId', announcementId);
+      if (recErr) throw recErr;
+
+      const ids = (recData ?? []).map((r: any) => r.partnerUserId as string);
+      if (ids.length === 0) return;
+
+      const { data: partnerData, error: partnerErr } = await supabase
+        .from('partner_users')
+        .select('id, businessName, representativeName, displayPhoneNumber')
+        .in('id', ids);
+      if (partnerErr) throw partnerErr;
+
+      setRecipients(
+        (partnerData ?? []).map((p: any) => ({
+          partnerUserId: p.id,
+          businessName: p.businessName,
+          representativeName: p.representativeName,
+          displayPhoneNumber: p.displayPhoneNumber,
+        })),
+      );
+    } catch (e: any) {
+      toast.error(`수신자 조회 실패: ${e?.message ?? e}`);
+    } finally {
+      setRecipientsLoading(false);
+    }
+  }
+
   // ─── 선택 동작 ─────────────────────────────────────────────────
+  const eligiblePartners = useMemo(
+    () => partners.filter((p) => p.marketingAgreed),
+    [partners],
+  );
+
   const allOnPageSelected = useMemo(
-    () =>
-      partners.length > 0 && partners.every((p) => selected.has(p.id)),
-    [partners, selected],
+    () => eligiblePartners.length > 0 && eligiblePartners.every((p) => selected.has(p.id)),
+    [eligiblePartners, selected],
   );
 
   function togglePartner(id: string) {
+    const partner = partners.find((p) => p.id === id);
+    if (!partner?.marketingAgreed) return;
     const next = new Set(selected);
     next.has(id) ? next.delete(id) : next.add(id);
     setSelected(next);
@@ -211,9 +258,9 @@ export default function PartnerAnnouncementsPage() {
   function toggleAllOnPage() {
     const next = new Set(selected);
     if (allOnPageSelected) {
-      partners.forEach((p) => next.delete(p.id));
+      eligiblePartners.forEach((p) => next.delete(p.id));
     } else {
-      partners.forEach((p) => next.add(p.id));
+      eligiblePartners.forEach((p) => next.add(p.id));
     }
     setSelected(next);
   }
@@ -365,7 +412,7 @@ export default function PartnerAnnouncementsPage() {
                       <Checkbox
                         checked={allOnPageSelected}
                         onCheckedChange={toggleAllOnPage}
-                        aria-label='페이지 전체 선택 (공지 거부자 제외)'
+                        aria-label='페이지 전체 선택 (마케팅 미동의자 제외)'
                       />
                     </TableHead>
                     <TableHead>상호명</TableHead>
@@ -373,12 +420,13 @@ export default function PartnerAnnouncementsPage() {
                     <TableHead>전화</TableHead>
                     <TableHead className='w-[120px]'>케이스</TableHead>
                     <TableHead className='w-[80px]'>FCM</TableHead>
+                    <TableHead className='w-[80px]'>마케팅</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {partners.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className='py-8 text-center text-muted-foreground'>
+                      <TableCell colSpan={7} className='py-8 text-center text-muted-foreground'>
                         조회된 파트너가 없습니다
                       </TableCell>
                     </TableRow>
@@ -386,12 +434,13 @@ export default function PartnerAnnouncementsPage() {
                     partners.map((p) => (
                       <TableRow
                         key={p.id}
-                        className='cursor-pointer'
+                        className={p.marketingAgreed ? 'cursor-pointer' : 'opacity-40'}
                         onClick={() => togglePartner(p.id)}
                       >
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selected.has(p.id)}
+                            disabled={!p.marketingAgreed}
                             onCheckedChange={() => togglePartner(p.id)}
                           />
                         </TableCell>
@@ -405,6 +454,13 @@ export default function PartnerAnnouncementsPage() {
                         </TableCell>
                         <TableCell>
                           {p.hasFcmToken ? (
+                            <CheckCircle2 className='h-4 w-4 text-green-600' />
+                          ) : (
+                            <XCircle className='h-4 w-4 text-destructive' />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {p.marketingAgreed ? (
                             <CheckCircle2 className='h-4 w-4 text-green-600' />
                           ) : (
                             <XCircle className='h-4 w-4 text-destructive' />
@@ -537,7 +593,16 @@ export default function PartnerAnnouncementsPage() {
                     >
                       <div className='flex items-start justify-between'>
                         <div className='font-medium'>{h.title}</div>
-                        <Badge variant='outline'>{h.recipients}명</Badge>
+                        <Badge
+                          variant='outline'
+                          className='cursor-pointer hover:bg-accent'
+                          onClick={() => {
+                            setRecipientsModal({ key: h.key, title: h.title });
+                            void loadRecipients(h.key);
+                          }}
+                        >
+                          {h.recipients}명
+                        </Badge>
                       </div>
                       <div className='line-clamp-2 mt-1 text-sm text-muted-foreground'>
                         {h.body}
@@ -621,6 +686,53 @@ export default function PartnerAnnouncementsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* 수신자 목록 모달 */}
+      <Dialog open={!!recipientsModal} onOpenChange={(o) => !o && setRecipientsModal(null)}>
+        <DialogContent className='max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>수신자 목록</DialogTitle>
+            <DialogDescription className='line-clamp-1'>{recipientsModal?.title}</DialogDescription>
+          </DialogHeader>
+          {recipientsLoading ? (
+            <div className='flex h-32 items-center justify-center'>
+              <Loader2 className='h-5 w-5 animate-spin text-muted-foreground' />
+            </div>
+          ) : (
+            <div className='max-h-96 overflow-y-auto'>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>상호명</TableHead>
+                    <TableHead>대표자</TableHead>
+                    <TableHead>전화</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recipients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className='py-8 text-center text-muted-foreground'>
+                        수신자 정보 없음
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    recipients.map((r) => (
+                      <TableRow key={r.partnerUserId}>
+                        <TableCell>{r.businessName ?? '-'}</TableCell>
+                        <TableCell>{r.representativeName ?? '-'}</TableCell>
+                        <TableCell>{r.displayPhoneNumber ?? '-'}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setRecipientsModal(null)}>닫기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       </PageContent>
     </PageShell>
   );
