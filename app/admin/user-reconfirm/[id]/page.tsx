@@ -165,7 +165,7 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
     if (!reconfirm) return;
 
     if (!rejectionReason.trim()) {
-      toast.error('거절 사유를 입력해주세요.');
+      toast.error('보류 사유를 입력해주세요.');
       return;
     }
 
@@ -185,11 +185,11 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
         throw new Error(error.error || 'Failed to reject reconfirm');
       }
 
-      toast.success('재신청이 거절되었습니다.');
+      toast.success('재신청이 보류 처리되었습니다.');
       router.push('/admin/user-reconfirm');
     } catch (err) {
       console.error('Failed to reject reconfirm:', err);
-      toast.error('재신청 거절에 실패했습니다.');
+      toast.error('재신청 보류 처리에 실패했습니다.');
     } finally {
       setProcessing(false);
       setRejectDialog(false);
@@ -300,7 +300,7 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
             )}
             {reconfirm.rejectionReason && (
               <div>
-                <div className='text-sm text-muted-foreground'>거절 사유</div>
+                <div className='text-sm text-muted-foreground'>보류 사유</div>
                 <div className='mt-1 p-3 bg-red-50 border border-red-200 rounded-md text-red-900'>
                   {reconfirm.rejectionReason}
                 </div>
@@ -351,7 +351,7 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
               className='gap-2'
             >
               <X className='h-5 w-5' />
-              거절
+              보류
             </Button>
             <Button
               variant='default'
@@ -371,17 +371,17 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
       <Dialog open={rejectDialog} onOpenChange={setRejectDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>재신청 거절</DialogTitle>
+            <DialogTitle>재신청 보류</DialogTitle>
             <DialogDescription>
-              <strong>{reconfirm.user.name || reconfirm.user.email}</strong>님의 재신청을 거절하시겠습니까?
+              <strong>{reconfirm.user.name || reconfirm.user.email}</strong>님의 재신청을 보류 처리하시겠습니까?
               <br />
-              거절 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
+              보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
           <div className='py-4'>
             <textarea
               className='w-full min-h-[100px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary'
-              placeholder='거절 사유를 입력해주세요...'
+              placeholder='보류 사유를 입력해주세요...'
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
             />
@@ -391,7 +391,7 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
               취소
             </Button>
             <Button variant='destructive' onClick={handleReject} disabled={processing}>
-              거절
+              보류
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -166,7 +166,7 @@ export default function SuspendedUserDetailPage({
     if (status === 'suspended') return <Badge className="bg-yellow-500 text-white">보류</Badge>;
     if (status === 'inactive') return <Badge className="bg-gray-500 text-white">비활성</Badge>;
     if (status === 'pending') return <Badge className="bg-blue-500 text-white">재신청 대기</Badge>;
-    if (status === 'rejected') return <Badge className="bg-red-500 text-white">거절</Badge>;
+    if (status === 'rejected') return <Badge className="bg-yellow-500 text-white">보류</Badge>;
     if (status === 'approve') return <Badge className="bg-green-500 text-white">승인</Badge>;
     return <Badge variant="outline">{status}</Badge>;
   };
@@ -310,7 +310,7 @@ export default function SuspendedUserDetailPage({
                   {/* 거절 사유 */}
                   {history.rejectionReason && (
                     <div>
-                      <div className="text-sm text-muted-foreground mb-1">거절 사유</div>
+                      <div className="text-sm text-muted-foreground mb-1">보류 사유</div>
                       <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-900">
                         {history.rejectionReason}
                       </div>

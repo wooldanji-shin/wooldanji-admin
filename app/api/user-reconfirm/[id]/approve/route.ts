@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 export async function POST(
   request: NextRequest,
@@ -125,6 +125,35 @@ export async function POST(
         { error: 'Failed to delete reconfirm record' },
         { status: 500 }
       );
+    }
+
+    // FCM 알림 전송 (non-critical)
+    try {
+      const adminSupabase = createAdminClient();
+      const { data: partnerUser } = await adminSupabase
+        .from('partner_users')
+        .select('id')
+        .eq('userId', reconfirm.userId)
+        .maybeSingle();
+
+      if (partnerUser) {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        await fetch(`${supabaseUrl}/functions/v1/send-partner-fcm-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            partnerUserId: partnerUser.id,
+            title: '아파트 회원 재신청 승인',
+            body: '아파트 회원 재신청이 승인되었습니다. 앱에서 확인해주세요!',
+            type: 'membership_approved',
+          }),
+        });
+      }
+    } catch (notificationError) {
+      console.error('재신청 승인 알림 전송 실패 (non-critical):', notificationError);
     }
 
     return NextResponse.json({

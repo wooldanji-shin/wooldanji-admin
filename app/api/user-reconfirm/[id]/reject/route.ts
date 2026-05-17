@@ -47,7 +47,7 @@ export async function POST(
     // 재신청 정보 조회
     const { data: reconfirm, error: fetchError } = await supabase
       .from('user_reconfirm')
-      .select('status')
+      .select('status, userId')
       .eq('id', id)
       .single();
 
@@ -65,7 +65,7 @@ export async function POST(
       );
     }
 
-    // user_reconfirm 레코드 업데이트 (status를 'rejected'로 변경 및 rejectionReason 저장)
+    // 1. user_reconfirm 레코드 업데이트 (status를 'rejected'로 변경 및 rejectionReason 저장)
     const { error: updateError } = await supabase
       .from('user_reconfirm')
       .update({
@@ -83,6 +83,15 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    // 2. user 테이블도 suspended로 되돌리고 거절 사유 저장 (파트너 앱에서 상태 인식 가능하도록)
+    await supabase
+      .from('user')
+      .update({
+        approvalStatus: 'suspended',
+        suspensionReason: rejectionReason.trim(),
+      })
+      .eq('id', reconfirm.userId);
 
     return NextResponse.json({
       success: true,

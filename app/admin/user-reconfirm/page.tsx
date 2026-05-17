@@ -83,6 +83,7 @@ type CombinedItem = {
   currentStatus: string;
   suspensionReason?: string | null;
   createdAt: string;
+  isPartner?: boolean;
 };
 
 export default function UserReconfirmPage() {
@@ -127,11 +128,21 @@ export default function UserReconfirmPage() {
         }
       }
 
+      // 파트너 userId 목록 조회
+      const { data: partnerData } = await supabase
+        .from('partner_users')
+        .select('userId');
+      const partnerUserIds = new Set((partnerData || []).map((p: any) => p.userId));
+
       // 1. 재신청 목록 가져오기
       let reconfirmQuery = supabase
         .from('user_reconfirm')
         .select(`
-          *,
+          id,
+          status,
+          previousStatus,
+          rejectionReason,
+          createdAt,
           user:userId(
             id,
             name,
@@ -220,7 +231,9 @@ export default function UserReconfirmPage() {
             userRoles: r.user.user_roles,
             previousStatus: r.previousStatus,
             currentStatus: r.status,
+            suspensionReason: r.rejectionReason || null,
             createdAt: r.createdAt,
+            isPartner: partnerUserIds.has(r.user.id),
           });
         }
       });
@@ -242,6 +255,7 @@ export default function UserReconfirmPage() {
           currentStatus: u.approvalStatus,
           suspensionReason: u.suspensionReason,
           createdAt: u.createdAt,
+          isPartner: partnerUserIds.has(u.id),
         });
       });
 
@@ -292,7 +306,7 @@ export default function UserReconfirmPage() {
     } else if (status === 'pending') {
       return <Badge className="bg-blue-500 text-white">재신청 대기</Badge>;
     } else if (status === 'rejected') {
-      return <Badge className="bg-red-500 text-white">거절</Badge>;
+      return <Badge className="bg-yellow-500 text-white">보류</Badge>;
     }
     return <Badge variant="outline">{status}</Badge>;
   };
@@ -304,8 +318,8 @@ export default function UserReconfirmPage() {
     <PageShell>
       <PageHeader>
         <PageHeaderTitle
-          title="승인보류/거절 관리"
-          description="재신청·보류·거절 회원을 한곳에서 검토합니다."
+          title="승인보류 관리"
+          description="재신청·보류 회원을 한곳에서 검토합니다."
         />
       </PageHeader>
 
@@ -364,7 +378,7 @@ export default function UserReconfirmPage() {
                   ) : combinedItems.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
-                        보류/거절 대상이 없습니다.
+                        보류 대상이 없습니다.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -382,7 +396,12 @@ export default function UserReconfirmPage() {
                           )}
                         </TableCell>
                         <TableCell className='font-medium text-card-foreground'>
-                          {item.userName}
+                          <div className='flex items-center gap-2'>
+                            {item.userName}
+                            {item.isPartner && (
+                              <Badge className='bg-purple-500 text-white text-xs'>파트너</Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
                           {item.userEmail}
