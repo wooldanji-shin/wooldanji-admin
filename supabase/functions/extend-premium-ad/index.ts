@@ -6,51 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function getConfirmErrorMessage(errorCode: string): string {
-  switch (errorCode) {
-    case 'ALREADY_PROCESSED_PAYMENT': return '이미 처리된 결제입니다.';
-    case 'NOT_FOUND_PAYMENT_SESSION': return '결제 세션이 만료되었습니다. 다시 시도해주세요.';
-    case 'NOT_FOUND_PAYMENT': return '결제 정보를 찾을 수 없습니다.';
-    case 'REJECT_CARD_PAYMENT': return '카드 한도초과 또는 잔액부족으로 결제에 실패했습니다.';
-    case 'REJECT_CARD_COMPANY': return '카드사에서 결제를 거절했습니다. 카드사에 문의해주세요.';
-    case 'REJECT_ACCOUNT_PAYMENT': return '잔액 부족으로 결제에 실패했습니다.';
-    case 'INVALID_CARD_NUMBER': return '카드번호를 다시 확인해주세요.';
-    case 'INVALID_CARD_EXPIRATION': return '카드 유효기간을 다시 확인해주세요.';
-    case 'INVALID_CARD_PASSWORD': return '카드 비밀번호를 다시 확인해주세요.';
-    case 'INVALID_CARD_IDENTITY': return '주민번호 또는 사업자번호가 카드 소유주 정보와 일치하지 않습니다.';
-    case 'INVALID_CARD_INSTALLMENT_PLAN': return '할부 개월 수가 올바르지 않습니다.';
-    case 'NOT_SUPPORTED_INSTALLMENT_PLAN_CARD_OR_MERCHANT': return '해당 카드 또는 가맹점에서 할부가 지원되지 않습니다.';
-    case 'INVALID_STOPPED_CARD': return '정지된 카드입니다.';
-    case 'NOT_SUPPORTED_CARD_TYPE':
-    case 'NOT_SUPPORTED_METHOD': return '지원되지 않는 카드 종류입니다. 다른 카드를 사용해주세요.';
-    case 'NOT_REGISTERED_CARD_COMPANY': return '카드 등록이 필요합니다. 카드사에 문의해주세요.';
-    case 'EXCEED_MAX_DAILY_PAYMENT_COUNT': return '카드 일일 결제 한도를 초과했습니다.';
-    case 'EXCEED_MAX_PAYMENT_AMOUNT': return '결제 가능 금액을 초과했습니다.';
-    case 'EXCEED_MAX_AUTH_COUNT': return '최대 인증 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.';
-    case 'EXCEED_MAX_ONE_DAY_AMOUNT': return '카드 일일 결제 한도를 초과했습니다.';
-    case 'NOT_AVAILABLE_BANK': return '은행 점검 시간입니다. 잠시 후 다시 시도해주세요.';
-    case 'COMMON_ERROR': return '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
-    case 'NOT_REGISTERED_BUSINESS': return '등록되지 않은 가맹점입니다. 고객센터에 문의해주세요.';
-    case 'INVALID_REQUEST': return '결제 요청 정보가 올바르지 않습니다.';
-    case 'FORBIDDEN_REQUEST': return '결제 요청이 거부되었습니다.';
-    case 'UNAUTHORIZED_KEY': return '결제 인증에 실패했습니다.';
-    case 'PAY_PROCESS_CANCELED': return '결제가 취소되었습니다.';
-    case 'PAY_PROCESS_ABORTED': return '결제가 중단되었습니다. 다시 시도해주세요.';
-    default: return '결제 승인에 실패했습니다.';
-  }
-}
-
 /**
- * 프리미엄 광고 연장 결제 승인 Edge Function
+ * 프리미엄 광고 연장 결제 Edge Function
  *
- * 호출 주체: Flutter 파트너 앱 (결제창 successUrl 콜백 후, mode=extension)
+ * 호출 주체: Flutter 파트너 앱 (연장 화면 결제하기 버튼)
  * 역할:
- *   1. running 상태 광고 + 소유자 검증
- *   2. 서버측 금액 재계산 (할인 포함) → 위변조 검증
- *   3. 토스 결제 승인 API 호출 (POST /v1/payments/confirm)
- *   4. ad_payment_history_v2 INSERT (paymentType='extension')
- *   5. premium_advertisements_v2.endedAt 연장 (기존 endedAt + weeks × 7일)
- *   6. FCM 알림 (non-critical)
+ *   1. 기존 running 광고 조회 및 소유자 검증
+ *   2. 빌링키 복호화 → 토스페이먼츠 실결제
+ *   3. ad_payment_history_v2 INSERT (paymentType='extension')
+ *   4. 기존 광고 endedAt 연장 (기존 endedAt + weeks * 7일, 새 레코드 생성 없음)
+ *   5. FCM 알림 "N원 결제 완료, 광고 종료일: YYYY.MM.DD"
  */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -58,16 +23,16 @@ serve(async (req) => {
   }
 
   try {
-    const TOSS_BILLING_SECRET_KEY =
-      Deno.env.get('TOSS_WIDGET_SECRET_KEY') ?? Deno.env.get('TOSS_BILLING_SECRET_KEY')!;
+    const TOSS_BILLING_SECRET_KEY = Deno.env.get('TOSS_BILLING_SECRET_KEY')!;
+    const BILLING_KEY_SECRET = Deno.env.get('BILLING_KEY_SECRET')!;
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    if (!TOSS_BILLING_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
+    if (!TOSS_BILLING_SECRET_KEY || !BILLING_KEY_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('필수 환경 변수가 설정되지 않았습니다.');
     }
 
+    // 파트너 앱 JWT 검증
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -76,15 +41,22 @@ serve(async (req) => {
       );
     }
 
-    const { premiumAdId, weeks, paymentKey, orderId, amount } = await req.json();
-    if (!premiumAdId || !weeks || !paymentKey || !orderId || amount == null) {
+    const body = await req.json();
+    const { premiumAdId, weeks, billingKeyId } = body as {
+      premiumAdId: string;
+      weeks: number;
+      billingKeyId: string;
+    };
+
+    if (!premiumAdId || !weeks || !billingKeyId) {
       return new Response(
-        JSON.stringify({ error: 'premiumAdId, weeks, paymentKey, orderId, amount는 필수입니다.' }),
+        JSON.stringify({ error: 'premiumAdId, weeks, billingKeyId는 필수입니다.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    // 사용자 검증용 클라이언트
+    const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
@@ -95,8 +67,10 @@ serve(async (req) => {
       );
     }
 
+    // 서비스 롤 클라이언트
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // 1. 파트너 ID 조회
     const { data: partnerData, error: partnerError } = await supabase
       .from('partner_users')
       .select('id')
@@ -111,9 +85,10 @@ serve(async (req) => {
     }
     const partnerId = partnerData.id as string;
 
+    // 2. 기존 프리미엄 광고 조회 (소유자 + 상태 검증)
     const { data: ad, error: adError } = await supabase
       .from('premium_advertisements_v2')
-      .select('"partnerId", status, "snapshotApartments", "approvedDiscountRate", "endedAt"')
+      .select('"partnerId", status, "paymentStatus", "endedAt", "snapshotApartments"')
       .eq('id', premiumAdId)
       .single();
 
@@ -138,6 +113,7 @@ serve(async (req) => {
       );
     }
 
+    // 3. 연장 금액 계산 (ad_pricing_v2에서 단가 조회)
     const { data: pricing } = await supabase
       .from('ad_pricing_v2')
       .select('"premiumPricePerHouseholdPerWeek"')
@@ -150,59 +126,120 @@ serve(async (req) => {
     const totalHouseholds = snapshotApartments.reduce((sum, apt) => sum + apt.totalHouseholds, 0);
     const totalAmount = totalHouseholds * pricePerHouseholdPerWeek * weeks;
 
-    const discountRate = (ad.approvedDiscountRate as number | null) ?? 0;
-    const expectedAmount = discountRate > 0
-      ? Math.round(totalAmount * (100 - discountRate) / 100 / 10) * 10
-      : totalAmount;
-
-    if (expectedAmount !== amount) {
-      console.error(`[ConfirmPremiumExtendPayment] 금액 불일치: DB=${expectedAmount} 클라=${amount}`);
+    if (totalAmount <= 0) {
       return new Response(
-        JSON.stringify({ error: '결제 금액이 일치하지 않습니다.' }),
+        JSON.stringify({ error: '결제 금액이 0원입니다. 아파트 정보를 확인해주세요.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const tossRes = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Basic ' + btoa(TOSS_BILLING_SECRET_KEY + ':'),
-        'Content-Type': 'application/json',
+    // 4. 빌링키 조회 및 활성화 확인
+    const { data: billingKeyRow, error: billingKeyError } = await supabase
+      .from('ad_billing_keys_v2')
+      .select('"customerKey", "isActive"')
+      .eq('id', billingKeyId)
+      .eq('partnerId', partnerId)
+      .single();
+
+    if (billingKeyError || !billingKeyRow) {
+      return new Response(
+        JSON.stringify({ error: '빌링키를 찾을 수 없습니다.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (!billingKeyRow.isActive) {
+      return new Response(
+        JSON.stringify({ error: '비활성화된 카드입니다. 카드를 다시 등록해주세요.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // 5. 빌링키 복호화
+    const { data: decryptedKey, error: decryptError } = await supabase.rpc(
+      'decrypt_billing_key',
+      {
+        p_billing_key_id: billingKeyId,
+        p_billing_key_secret: BILLING_KEY_SECRET,
       },
-      body: JSON.stringify({ paymentKey, orderId, amount }),
-    });
+    );
+
+    if (decryptError || !decryptedKey) {
+      throw new Error(`빌링키 복호화 실패: ${decryptError?.message}`);
+    }
+
+    // 6. 토스페이먼츠 빌링 API 실결제
+    const orderId = `EXTEND-${premiumAdId}-${Date.now()}`;
+    const orderName = `울단지 프리미엄 광고 연장 (${weeks}주)`;
+
+    const tossRes = await fetch(
+      `https://api.tosspayments.com/v1/billing/${decryptedKey}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + btoa(TOSS_BILLING_SECRET_KEY + ':'),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerKey: billingKeyRow.customerKey,
+          amount: totalAmount,
+          orderId,
+          orderName,
+        }),
+      },
+    );
 
     const tossData = await tossRes.json();
 
     if (!tossRes.ok) {
-      console.error('[ConfirmPremiumExtendPayment] 토스 승인 실패:', tossData);
+      console.error('[ExtendPremiumAd] 토스 결제 실패:', tossData);
+
+      // 결제 실패 FCM (non-critical)
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/send-partner-fcm-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            partnerUserId: partnerId,
+            title: '연장 결제 실패',
+            body: '프리미엄 광고 연장 결제에 실패했습니다. 카드 정보를 확인해주세요.',
+            type: 'premium_extension_failed',
+            navigationData: {
+              type: 'premium_ad_detail',
+              params: { premiumAdId },
+            },
+          }),
+        });
+      } catch (fcmErr) {
+        console.error('[ExtendPremiumAd] 결제 실패 FCM 전송 실패 (non-critical):', fcmErr);
+      }
+
       return new Response(
-        JSON.stringify({ error: getConfirmErrorMessage(tossData.code ?? ''), code: tossData.code }),
+        JSON.stringify({ error: tossData.message ?? '결제에 실패했습니다.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    if (tossData.status !== 'DONE') {
-      console.error('[ConfirmPremiumExtendPayment] 토스 status !== DONE:', tossData.status);
-      return new Response(
-        JSON.stringify({ error: `결제 상태 이상: ${tossData.status}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
+    // 7. 결제 성공 처리
     const now = new Date();
+
+    // 연장 기간 계산: 기존 endedAt 기준 (now 기준 아님)
     const currentEndedAt = ad.endedAt ? new Date(ad.endedAt) : now;
     const newEndedAt = new Date(currentEndedAt.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
 
-    const supplyAmount = Math.round(amount / 1.1);
-    const vatAmount = amount - supplyAmount;
+    const vatAmount = totalAmount - Math.round(totalAmount / 1.1);
+    const supplyAmount = Math.round(totalAmount / 1.1);
 
+    // 7a. 결제 내역 INSERT (paymentType='extension')
     const { error: paymentError } = await supabase
       .from('ad_payment_history_v2')
       .insert({
         partnerId,
         premiumAdId,
-        amount,
+        amount: totalAmount,
         supplyAmount,
         vatAmount,
         status: 'paid',
@@ -215,30 +252,35 @@ serve(async (req) => {
       });
 
     if (paymentError) {
-      console.error('[ConfirmPremiumExtendPayment] 결제 내역 INSERT 실패:', paymentError);
+      console.error('[ExtendPremiumAd] 결제 내역 INSERT 실패:', paymentError);
       return new Response(
         JSON.stringify({ error: '결제는 완료되었으나 내역 기록에 실패했습니다. 고객센터에 문의해주세요.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
+    // 7b. 기존 광고 endedAt 연장 (새 레코드 생성 없음)
     const { error: updateError } = await supabase
       .from('premium_advertisements_v2')
-      .update({ endedAt: newEndedAt.toISOString(), updatedAt: now.toISOString() })
+      .update({
+        endedAt: newEndedAt.toISOString(),
+        updatedAt: now.toISOString(),
+      })
       .eq('id', premiumAdId);
 
     if (updateError) {
-      console.error('[ConfirmPremiumExtendPayment] 광고 endedAt 업데이트 실패:', updateError);
+      console.error('[ExtendPremiumAd] 광고 endedAt 업데이트 실패:', updateError);
       return new Response(
         JSON.stringify({ error: '결제는 완료되었으나 종료일 업데이트에 실패했습니다. 고객센터에 문의해주세요.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
+    // 8. FCM 알림 "N원 결제 완료, 광고 종료일: YYYY.MM.DD" (non-critical)
     try {
       const newEndedAtKst = new Date(newEndedAt.getTime() + 9 * 60 * 60 * 1000);
       const endDateStr = `${newEndedAtKst.getUTCFullYear()}.${String(newEndedAtKst.getUTCMonth() + 1).padStart(2, '0')}.${String(newEndedAtKst.getUTCDate()).padStart(2, '0')}`;
-      const amountStr = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      const amountStr = totalAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
       await fetch(`${SUPABASE_URL}/functions/v1/send-partner-fcm-notification`, {
         method: 'POST',
@@ -251,23 +293,26 @@ serve(async (req) => {
           title: '연장 결제 완료',
           body: `${amountStr}원 결제가 완료되었습니다. 광고 종료일: ${endDateStr}`,
           type: 'premium_ad_extended',
-          navigationData: { type: 'premium_ad_detail', params: { premiumAdId } },
+          navigationData: {
+            type: 'premium_ad_detail',
+            params: { premiumAdId },
+          },
         }),
       });
     } catch (fcmError) {
-      console.error('[ConfirmPremiumExtendPayment] FCM 전송 실패 (non-critical):', fcmError);
+      console.error('[ExtendPremiumAd] FCM 알림 전송 실패 (non-critical):', fcmError);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         newEndedAt: newEndedAt.toISOString(),
-        receiptUrl: tossData.receipt?.url ?? null,
+        totalAmount,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
-    console.error('[ConfirmPremiumExtendPayment] 서버 오류:', error);
+    console.error('[ExtendPremiumAd] 서버 오류:', error);
     return new Response(
       JSON.stringify({ error: '서버 오류가 발생했습니다.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

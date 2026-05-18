@@ -7,16 +7,17 @@ const corsHeaders = {
 };
 
 /**
- * 프리미엄 광고 연장 결제 준비 Edge Function
+ * 프리미엄 광고 무료(할인율 100%) 연장 Edge Function
  *
- * 호출 주체: Flutter 파트너 앱 (PaymentRequestScreen 진입 시, mode=extension)
+ * 호출 주체: Flutter 파트너 앱 (effectiveAmount === 0 케이스, 연장 화면)
  * 역할:
- *   1. running 상태 광고 + 소유자 검증
- *   2. snapshotApartments + ad_pricing_v2로 totalAmount 계산
- *   3. approvedDiscountRate로 할인 적용 → effectiveAmount
- *   4. orderId 발급 + amount/orderName 반환 (서버가 source of truth)
+ *   1. JWT 사용자 검증
+ *   2. running 상태 광고 + 소유자 + 할인율 100% 검증
+ *   3. ad_payment_history_v2 INSERT (amount=0, paymentType='extension')
+ *   4. premium_advertisements_v2.endedAt 연장 (기존 endedAt + weeks × 7일)
+ *   5. FCM 알림 (non-critical)
  *
- * effectiveAmount가 0이면 에러 — 100% 할인 연장은 extend-free-premium-ad EF로 처리.
+ * activate-free-premium-ad와 달리 status/paymentStatus 변경 없음 (이미 running).
  */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -77,7 +78,7 @@ serve(async (req) => {
 
     const { data: ad, error: adError } = await supabase
       .from('premium_advertisements_v2')
-      .select('"partnerId", status, "snapshotApartments", "approvedDiscountRate"')
+      .select('"partnerId", status, "approvedDiscountRate", "endedAt"')
       .eq('id', premiumAdId)
       .single();
 
@@ -102,39 +103,86 @@ serve(async (req) => {
       );
     }
 
-    const { data: pricing } = await supabase
-      .from('ad_pricing_v2')
-      .select('"premiumPricePerHouseholdPerWeek"')
-      .order('effectiveFrom', { ascending: false })
-      .limit(1)
-      .single();
-
-    const pricePerHouseholdPerWeek = (pricing?.premiumPricePerHouseholdPerWeek as number) ?? 20;
-    const snapshotApartments = (ad.snapshotApartments as Array<{ totalHouseholds: number }>) ?? [];
-    const totalHouseholds = snapshotApartments.reduce((sum, apt) => sum + apt.totalHouseholds, 0);
-    const totalAmount = totalHouseholds * pricePerHouseholdPerWeek * weeks;
-
-    const discountRate = (ad.approvedDiscountRate as number | null) ?? 0;
-    const effectiveAmount = discountRate > 0
-      ? Math.round(totalAmount * (100 - discountRate) / 100 / 10) * 10
-      : totalAmount;
-
-    if (effectiveAmount <= 0) {
+    const discountRate = ad.approvedDiscountRate as number | null;
+    if (discountRate !== 100) {
       return new Response(
-        JSON.stringify({ error: '할인율 100%는 무료 연장으로 처리해주세요.' }),
+        JSON.stringify({
+          error: `무료 연장은 할인율이 100%인 경우에만 가능합니다. (현재: ${discountRate ?? 0}%)`,
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const orderId = `EXTEND-${premiumAdId.replace(/-/g, '').slice(0, 8)}-${Date.now()}`;
-    const orderName = `울단지 프리미엄 광고 연장 (${weeks}주)`;
+    const now = new Date();
+    const currentEndedAt = ad.endedAt ? new Date(ad.endedAt) : now;
+    const newEndedAt = new Date(currentEndedAt.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
+
+    const { error: paymentError } = await supabase
+      .from('ad_payment_history_v2')
+      .insert({
+        partnerId,
+        premiumAdId,
+        amount: 0,
+        supplyAmount: 0,
+        vatAmount: 0,
+        status: 'paid',
+        paymentType: 'extension',
+        paymentDate: now.toISOString(),
+        billingPeriodStart: currentEndedAt.toISOString(),
+        billingPeriodEnd: newEndedAt.toISOString(),
+        paymentKey: null,
+        receiptUrl: null,
+      });
+
+    if (paymentError) {
+      console.error('[ExtendFreePremiumAd] 결제 내역 INSERT 실패:', paymentError);
+      return new Response(
+        JSON.stringify({ error: '결제 내역 기록에 실패했습니다. 고객센터에 문의해주세요.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const { error: updateError } = await supabase
+      .from('premium_advertisements_v2')
+      .update({ endedAt: newEndedAt.toISOString(), updatedAt: now.toISOString() })
+      .eq('id', premiumAdId);
+
+    if (updateError) {
+      console.error('[ExtendFreePremiumAd] 광고 endedAt 업데이트 실패:', updateError);
+      return new Response(
+        JSON.stringify({ error: '종료일 업데이트에 실패했습니다. 고객센터에 문의해주세요.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    try {
+      const newEndedAtKst = new Date(newEndedAt.getTime() + 9 * 60 * 60 * 1000);
+      const endDateStr = `${newEndedAtKst.getUTCFullYear()}.${String(newEndedAtKst.getUTCMonth() + 1).padStart(2, '0')}.${String(newEndedAtKst.getUTCDate()).padStart(2, '0')}`;
+
+      await fetch(`${SUPABASE_URL}/functions/v1/send-partner-fcm-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          partnerUserId: partnerId,
+          title: '연장 완료',
+          body: `프리미엄 광고가 무료로 연장되었습니다. 광고 종료일: ${endDateStr}`,
+          type: 'premium_ad_extended',
+          navigationData: { type: 'premium_ad_detail', params: { premiumAdId } },
+        }),
+      });
+    } catch (fcmError) {
+      console.error('[ExtendFreePremiumAd] FCM 전송 실패 (non-critical):', fcmError);
+    }
 
     return new Response(
-      JSON.stringify({ orderId, amount: effectiveAmount, orderName }),
+      JSON.stringify({ success: true, newEndedAt: newEndedAt.toISOString() }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
-    console.error('[PreparePremiumExtendPayment] 서버 오류:', error);
+    console.error('[ExtendFreePremiumAd] 서버 오류:', error);
     return new Response(
       JSON.stringify({ error: '서버 오류가 발생했습니다.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

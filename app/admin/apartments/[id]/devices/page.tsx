@@ -773,6 +773,7 @@ function TableView({
   return (
     <Card>
       <CardContent className='p-0'>
+        <div className='overflow-x-auto'>
         <Table>
           <TableHeader>
             <TableRow>
@@ -939,6 +940,7 @@ function TableView({
             )}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );

@@ -654,6 +654,7 @@ export default function AnnouncementsPage() {
                   등록된 공지사항이 없습니다.
                 </div>
               ) : (
+                <div className='overflow-x-auto'>
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -688,6 +689,7 @@ export default function AnnouncementsPage() {
                     </TableBody>
                   </Table>
                 </DndContext>
+                </div>
               )}
             </CardContent>
           </Card>

@@ -213,6 +213,7 @@ export default function PartnerDetailPage({
                   광고 신청 이력이 없습니다.
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -256,6 +257,7 @@ export default function PartnerDetailPage({
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

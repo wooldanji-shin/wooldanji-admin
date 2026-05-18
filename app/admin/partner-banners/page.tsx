@@ -195,6 +195,7 @@ export default function PartnerBannersPage() {
             <CardTitle>케이스 공통 배너 (A/B/C)</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className='overflow-x-auto'>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -274,6 +275,7 @@ export default function PartnerBannersPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 

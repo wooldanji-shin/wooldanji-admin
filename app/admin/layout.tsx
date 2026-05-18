@@ -20,7 +20,7 @@ export default async function AdminLayout({
         <AppSidebar />
         <SidebarInset className="bg-background">
           <AppHeader />
-          <main className="flex-1 overflow-auto">{children}</main>
+          <main className="flex-1 overflow-x-auto min-w-0">{children}</main>
         </SidebarInset>
       </SidebarProvider>
     </AuthGuard>

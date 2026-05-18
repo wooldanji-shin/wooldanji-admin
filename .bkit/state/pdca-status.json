@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "lastUpdated": "2026-05-03T13:59:03.725Z",
+  "lastUpdated": "2026-05-18T01:45:35.566Z",
   "activeFeatures": [
     "wooldanji-admin",
     "admin",
@@ -72,7 +72,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:43:52.133Z",
-        "lastUpdated": "2026-04-28T03:43:52.133Z"
+        "lastUpdated": "2026-05-18T01:43:48.836Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/layout.tsx"
     },
@@ -124,7 +124,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:48:45.531Z",
-        "lastUpdated": "2026-05-03T13:59:03.723Z"
+        "lastUpdated": "2026-05-18T01:45:35.565Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/partners/[id]/page.tsx"
     },
@@ -163,9 +163,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:49:23.361Z",
-        "lastUpdated": "2026-04-28T04:13:52.862Z"
+        "lastUpdated": "2026-05-18T01:45:22.173Z"
       },
-      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/devices/page.tsx"
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/apartments/[id]/devices/page.tsx"
     },
     "ui": {
       "phase": "do",
@@ -293,7 +293,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:17:43.907Z",
-        "lastUpdated": "2026-04-28T09:26:23.901Z"
+        "lastUpdated": "2026-05-18T01:44:23.402Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/partner-banners/page.tsx"
     },
@@ -306,7 +306,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:18:06.242Z",
-        "lastUpdated": "2026-04-28T04:18:13.333Z"
+        "lastUpdated": "2026-05-18T01:44:41.866Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/partner-announcements/page.tsx"
     },
@@ -319,7 +319,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:18:45.051Z",
-        "lastUpdated": "2026-04-28T05:17:08.286Z"
+        "lastUpdated": "2026-05-18T01:45:00.021Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/settings/announcements/page.tsx"
     },
@@ -397,7 +397,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T08:59:05.517Z",
-        "lastUpdated": "2026-04-28T09:00:02.910Z"
+        "lastUpdated": "2026-05-18T01:45:05.809Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/advertising/ads/page.tsx"
     },
@@ -423,7 +423,7 @@
   "session": {
     "startedAt": "2026-04-28T03:43:00.823Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-03T13:59:03.725Z"
+    "lastActivity": "2026-05-18T01:45:35.566Z"
   },
   "history": [
     {
@@ -2174,6 +2174,78 @@
     },
     {
       "timestamp": "2026-05-03T13:59:03.725Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:43:48.838Z",
+      "feature": "admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:44:12.004Z",
+      "feature": "partner-banners",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:44:23.404Z",
+      "feature": "partner-banners",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:44:32.652Z",
+      "feature": "partner-announcements",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:44:41.867Z",
+      "feature": "partner-announcements",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:44:51.337Z",
+      "feature": "announcements",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:45:00.022Z",
+      "feature": "announcements",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:45:05.810Z",
+      "feature": "ads",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:45:10.995Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:45:22.175Z",
+      "feature": "devices",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:45:26.615Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-18T01:45:35.566Z",
       "feature": "[id]",
       "phase": "do",
       "action": "updated"

@@ -405,6 +405,7 @@ export default function PartnerAnnouncementsPage() {
                 </Button>
               </div>
 
+              <div className='overflow-x-auto'>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -471,6 +472,7 @@ export default function PartnerAnnouncementsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
 
               {/* 페이지네이션 */}
               <div className='flex items-center justify-between'>
