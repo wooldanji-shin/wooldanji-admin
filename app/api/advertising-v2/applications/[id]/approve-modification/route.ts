@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 
 async function applyApartmentChanges(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -31,6 +31,7 @@ export async function POST(
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const adminSupabase = createAdminClient();
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
@@ -194,7 +195,7 @@ export async function POST(
 
           // 무료기간 종료 후 첫 정기결제부터 신규 금액으로 청구되도록 구독 monthlyAmount 갱신
           if ((subscription as any)?.id) {
-            await supabase.from('ad_subscriptions_v2').update({
+            await adminSupabase.from('ad_subscriptions_v2').update({
               monthlyAmount: newFee,
             }).eq('id', (subscription as any).id);
           }
@@ -215,14 +216,14 @@ export async function POST(
           // 구독 monthlyAmount를 신규 금액으로 갱신
           // (케이스 4에서 감소 금액으로 갱신된 경우를 신규 금액으로 재갱신)
           if ((subscription as any)?.id) {
-            await supabase.from('ad_subscriptions_v2').update({
+            await adminSupabase.from('ad_subscriptions_v2').update({
               monthlyAmount: newFee,
             }).eq('id', (subscription as any).id);
           }
         }
       } else {
-        if (isInFreeTrial) {
-          // 케이스 3: 금액 감소 + 무료기간 → 즉시 적용, 결제 없음
+        if (isInFreeTrial || newFee === currentFee) {
+          // 케이스 3: 금액 감소/동일 + 무료기간 or 금액 동일 → 즉시 적용, 결제 없음
           await applyApartmentChanges(supabase, id, aptList);
           await supabase.from('advertisements_v2').update({
             ...adChanges,
@@ -236,7 +237,7 @@ export async function POST(
 
           // 무료기간 종료 후 첫 정기결제부터 신규 금액으로 청구되도록 구독 monthlyAmount 갱신
           if ((subscription as any)?.id) {
-            await supabase.from('ad_subscriptions_v2').update({
+            await adminSupabase.from('ad_subscriptions_v2').update({
               monthlyAmount: newFee,
             }).eq('id', (subscription as any).id);
           }
@@ -255,7 +256,7 @@ export async function POST(
           // 다음 정기결제부터 신규 금액으로 청구되도록 구독 monthlyAmount 미리 갱신
           // (charge-billing은 sub.monthlyAmount를 그대로 결제 금액으로 사용)
           if ((subscription as any)?.id) {
-            await supabase.from('ad_subscriptions_v2').update({
+            await adminSupabase.from('ad_subscriptions_v2').update({
               monthlyAmount: newFee,
             }).eq('id', (subscription as any).id);
           }
