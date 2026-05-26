@@ -45,22 +45,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/supabase';
-import { cn } from '@/lib/utils';
 import {
   Loader2,
   Save,
@@ -73,9 +59,6 @@ import {
   Search,
   X,
   Calendar,
-  UserPlus,
-  Check,
-  ChevronsUpDown,
   RotateCcw,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -88,12 +71,12 @@ import { deleteFileFromStorage } from '@/lib/utils/storage';
 interface Banner {
   id: string;
   imageUrl: string;
+  additionalImageUrl: string | null;
   linkUrl: string | null;
   isActive: boolean;
   isGlobal: boolean;
   createdAt: string;
   createdBy: string | null;
-  advertiserId: string | null;
   startDate: string | null;
   endDate: string | null;
   clickCount: number;
@@ -102,11 +85,6 @@ interface Banner {
   user?: {
     id: string;
     name: string;
-  } | null;
-  advertiser?: {
-    id: string;
-    businessName: string;
-    representativeName: string;
   } | null;
   home_banner_apartments?: {
     apartmentId: string;
@@ -120,10 +98,10 @@ interface Banner {
 interface BannerForm {
   linkUrl: string;
   imageUrl: string;
+  additionalImageUrl: string;
   isActive: boolean;
   isGlobal: boolean;
   selectedApartments: string[];
-  advertiserId: string | null;
   startDate: string;
   endDate: string;
   description: string;
@@ -133,12 +111,6 @@ interface Apartment {
   id: string;
   name: string;
   address: string;
-}
-
-interface Advertiser {
-  id: string;
-  businessName: string;
-  representativeName: string;
 }
 
 const BUCKET_NAME = 'home-content';
@@ -228,9 +200,8 @@ function BannerRow({
                   {banner.home_banner_apartments?.map((hba, index) => (
                     <span
                       key={hba.apartmentId}
-                      className={`text-base text-black px-3 py-1.5 ${
-                        index !== (banner.home_banner_apartments?.length || 0) - 1 ? 'border-b' : ''
-                      }`}
+                      className={`text-base text-black px-3 py-1.5 ${index !== (banner.home_banner_apartments?.length || 0) - 1 ? 'border-b' : ''
+                        }`}
                     >
                       {hba.apartments?.name}
                     </span>
@@ -240,15 +211,6 @@ function BannerRow({
             </Tooltip>
           </TooltipProvider>
         )}
-      </TableCell>
-      <TableCell>
-        <span className='text-sm'>
-          {banner.advertiser ? (
-            <span className='font-medium'>{banner.advertiser.businessName}</span>
-          ) : (
-            <span className='text-muted-foreground'>-</span>
-          )}
-        </span>
       </TableCell>
       <TableCell>
         {banner.isGlobal ? (
@@ -354,7 +316,6 @@ function BannerRow({
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [apartments, setApartments] = useState<Apartment[]>([]);
-  const [advertisers, setAdvertisers] = useState<Advertiser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -363,10 +324,10 @@ export default function BannersPage() {
   const [form, setForm] = useState<BannerForm>({
     linkUrl: '',
     imageUrl: '',
+    additionalImageUrl: '',
     isActive: true,
     isGlobal: false,
     selectedApartments: [],
-    advertiserId: null,
     startDate: '',
     endDate: '',
     description: '',
@@ -374,28 +335,8 @@ export default function BannersPage() {
 
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [advertiserPopoverOpen, setAdvertiserPopoverOpen] = useState(false);
   const [resetClickDialogOpen, setResetClickDialogOpen] = useState(false);
   const [resetClickBanner, setResetClickBanner] = useState<Banner | null>(null);
-
-  // 이미 배너가 있는 광고주 제외 (1:1 매칭)
-  const availableAdvertisers = useMemo(() => {
-    const usedAdvertiserIds = new Set(
-      banners
-        .filter(b => !b.isGlobal) // 전체 배너(isGlobal)는 광고주 필요 없음
-        .map(b => b.advertiserId)
-        .filter(Boolean) as string[]
-    );
-
-    return advertisers.filter(adv => {
-      // 수정 모드에서는 현재 배너의 광고주는 선택 가능
-      if (editingBanner && editingBanner.advertiserId === adv.id) {
-        return true;
-      }
-      // 이미 배너가 있는 광고주는 제외
-      return !usedAdvertiserIds.has(adv.id);
-    });
-  }, [advertisers, banners, editingBanner]);
 
   // 클릭수 컬럼 숨김 상태 (localStorage에서 읽어옴 - ads 페이지와 공유)
   const [hideClickCounts, setHideClickCounts] = useState(false);
@@ -466,36 +407,12 @@ export default function BannersPage() {
     }
   }, [supabase, currentUserId, isSuperAdmin]);
 
-  // 광고주 목록 조회
-  const fetchAdvertisers = useCallback(async () => {
-    if (!currentUserId) return;
-
-    try {
-      let query = supabase
-        .from('advertisers')
-        .select('id, businessName, representativeName')
-        .order('businessName');
-
-      // 매니저는 자신이 등록한 광고주만 조회
-      if (isManager) {
-        query = query.eq('createdBy', currentUserId);
-      }
-
-      const { data } = await query;
-      setAdvertisers(data || []);
-    } catch (err) {
-      console.error('Failed to fetch advertisers:', err);
-      setAdvertisers([]);
-    }
-  }, [supabase, currentUserId, isManager]);
-
   useEffect(() => {
     if (currentUserId) {
       loadBanners();
       fetchApartments();
-      fetchAdvertisers();
     }
-  }, [currentUserId, fetchApartments, fetchAdvertisers, isManager]);
+  }, [currentUserId, fetchApartments, isManager]);
 
   const loadBanners = async () => {
     try {
@@ -539,29 +456,10 @@ export default function BannersPage() {
         }
       }
 
-      // 광고주 정보 가져오기
-      const advertiserIds = [...new Set((data || []).map(b => b.advertiserId).filter(Boolean))];
-      let advertisersMap: Record<string, { id: string; businessName: string; representativeName: string }> = {};
-
-      if (advertiserIds.length > 0) {
-        const { data: advertisersData } = await supabase
-          .from('advertisers')
-          .select('id, businessName, representativeName')
-          .in('id', advertiserIds);
-
-        if (advertisersData) {
-          advertisersMap = advertisersData.reduce((acc, adv) => {
-            acc[adv.id] = adv;
-            return acc;
-          }, {} as Record<string, { id: string; businessName: string; representativeName: string }>);
-        }
-      }
-
-      // 배너에 user, advertiser 정보 추가
+      // 배너에 user 정보 추가
       const bannersWithInfo = (data || []).map(banner => ({
         ...banner,
         user: banner.createdBy ? usersMap[banner.createdBy] || null : null,
-        advertiser: banner.advertiserId ? advertisersMap[banner.advertiserId] || null : null,
       }));
 
       setBanners(bannersWithInfo);
@@ -618,10 +516,10 @@ export default function BannersPage() {
     setForm({
       linkUrl: '',
       imageUrl: '',
+      additionalImageUrl: '',
       isActive: true,
       isGlobal: false,
       selectedApartments: [],
-      advertiserId: null,
       startDate: '',
       endDate: '',
       description: '',
@@ -648,10 +546,10 @@ export default function BannersPage() {
     setForm({
       linkUrl: banner.linkUrl || '',
       imageUrl: banner.imageUrl,
+      additionalImageUrl: banner.additionalImageUrl || '',
       isActive: banner.isActive,
       isGlobal: banner.isGlobal,
       selectedApartments: selectedApts,
-      advertiserId: banner.advertiserId || null,
       startDate: banner.startDate ? banner.startDate.split('T')[0] : '',
       endDate: banner.endDate ? banner.endDate.split('T')[0] : '',
       description: banner.description || '',
@@ -681,30 +579,22 @@ export default function BannersPage() {
         return;
       }
 
-      // isGlobal이 false면 광고주 필수
-      if (!form.isGlobal && !form.advertiserId) {
-        toast.error('광고주를 선택해주세요.');
-        return;
-      }
-
       // 매니저는 isGlobal 사용 불가
       if (isManager && form.isGlobal) {
         toast.error('매니저는 전체 대상 배너를 등록할 수 없습니다.');
         return;
       }
 
-      const advertiserId = form.isGlobal ? null : form.advertiserId;
-
       const bannerData = {
         imageUrl: form.imageUrl,
+        additionalImageUrl: form.additionalImageUrl.trim() || null,
         linkUrl: form.linkUrl.trim() || null,
         isActive: form.isActive,
         isGlobal: form.isGlobal,
         createdBy: editingBanner ? editingBanner.createdBy : currentUserId,
-        advertiserId: advertiserId,
         startDate: form.isGlobal ? null : (form.startDate ? new Date(form.startDate + 'T00:00:00').toISOString() : null),
         endDate: form.isGlobal ? null : (form.endDate ? new Date(form.endDate + 'T23:59:59').toISOString() : null),
-        description: form.isGlobal ? null : (form.description.trim() || null),
+        description: form.description.trim() || null,
       };
 
       if (editingBanner) {
@@ -785,46 +675,8 @@ export default function BannersPage() {
       if (banner.imageUrl) {
         await deleteFileFromStorage(banner.imageUrl);
       }
-
-      // 광고주가 연결된 경우, 다른 곳에서 사용 중인지 확인
-      if (banner.advertiserId) {
-        // 다른 배너에서 사용 중인지 확인
-        const { count: otherBannersCount } = await supabase
-          .from('home_banners')
-          .select('*', { count: 'exact', head: true })
-          .eq('advertiserId', banner.advertiserId)
-          .neq('id', id);
-
-        // 광고에서 사용 중인지 확인
-        const { count: adsCount } = await supabase
-          .from('advertisements')
-          .select('*', { count: 'exact', head: true })
-          .eq('advertiserId', banner.advertiserId);
-
-        // 다른 곳에서 사용되지 않으면 광고주도 삭제
-        if ((otherBannersCount || 0) === 0 && (adsCount || 0) === 0) {
-          // 광고주의 사업자등록증/계약서 파일 삭제
-          const { data: advertiser } = await supabase
-            .from('advertisers')
-            .select('businessRegistration, contractDocument')
-            .eq('id', banner.advertiserId)
-            .single();
-
-          if (advertiser) {
-            if (advertiser.businessRegistration) {
-              await deleteFileFromStorage(advertiser.businessRegistration);
-            }
-            if (advertiser.contractDocument) {
-              await deleteFileFromStorage(advertiser.contractDocument);
-            }
-          }
-
-          // 광고주 삭제
-          await supabase
-            .from('advertisers')
-            .delete()
-            .eq('id', banner.advertiserId);
-        }
+      if (banner.additionalImageUrl) {
+        await deleteFileFromStorage(banner.additionalImageUrl);
       }
 
       // 연결된 아파트 먼저 삭제 (CASCADE로 자동 삭제되지만 명시적으로)
@@ -874,10 +726,10 @@ export default function BannersPage() {
     setForm({
       linkUrl: '',
       imageUrl: '',
+      additionalImageUrl: '',
       isActive: true,
       isGlobal: false,
       selectedApartments: [],
-      advertiserId: null,
       startDate: '',
       endDate: '',
       description: '',
@@ -890,7 +742,7 @@ export default function BannersPage() {
     return (
       <PageShell>
         <PageHeader>
-          <PageHeaderTitle title="배너 광고 등록/수정" />
+          <PageHeaderTitle title="배너 등록/수정" />
         </PageHeader>
         <InlineLoadingSkeleton />
       </PageShell>
@@ -901,7 +753,7 @@ export default function BannersPage() {
     <PageShell>
       <PageHeader>
         <PageHeaderTitle
-          title="배너 광고 등록/수정"
+          title="배너 등록/수정"
           description="홈 화면 상단 배너 광고를 관리합니다."
         />
       </PageHeader>
@@ -938,7 +790,6 @@ export default function BannersPage() {
                         <TableHead className='w-32'>이미지</TableHead>
                         <TableHead className='w-32'>링크 URL</TableHead>
                         <TableHead className='w-32'>타겟</TableHead>
-                        <TableHead className='w-28'>광고주</TableHead>
                         <TableHead className='w-28'>게시 기간</TableHead>
                         <TableHead className='w-20'>등록자</TableHead>
                         <TableHead className='w-32'>소개내용</TableHead>
@@ -977,202 +828,157 @@ export default function BannersPage() {
           </Card>
         </div>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className='min-w-[672px] max-w-4xl max-h-[90vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>
-              {editingBanner ? '배너 수정' : '새 배너 등록'}
-            </DialogTitle>
-          </DialogHeader>
+        {/* Add/Edit Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className='min-w-[672px] max-w-4xl max-h-[90vh] overflow-y-auto'>
+            <DialogHeader>
+              <DialogTitle>
+                {editingBanner ? '배너 수정' : '새 배너 등록'}
+              </DialogTitle>
+            </DialogHeader>
 
-          <div className='space-y-6 py-4'>
-            {/* Image Upload */}
-            <div className='space-y-2'>
-              <Label className='text-sm font-medium'>
-                배너 이미지 <span className='text-destructive'>*</span>
-              </Label>
-              <ImageUpload
-                bucket={BUCKET_NAME}
-                storagePath={BANNERS_FOLDER}
-                value={form.imageUrl}
-                onChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url }))}
-                accept='image/*'
-                maxSizeMB={5}
-                description='배너 이미지를 업로드하세요 (권장: 가로형 이미지)'
-              />
-            </div>
-
-            {/* Link URL */}
-            <div className='space-y-2'>
-              <Label htmlFor='linkUrl' className='text-sm font-medium'>
-                링크 URL <span className='text-muted-foreground'>(선택사항)</span>
-              </Label>
-              <Input
-                id='linkUrl'
-                type='url'
-                value={form.linkUrl}
-                onChange={(e) => setForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
-                placeholder='https://example.com'
-              />
-              <p className='text-xs text-muted-foreground'>
-                배너 클릭 시 이동할 URL을 입력하세요.
-              </p>
-            </div>
-
-            {/* isGlobal Switch - 매니저는 사용 불가 */}
-            {isSuperAdmin && (
-              <div className='flex items-center justify-between p-4 border rounded-lg'>
-                <div className='space-y-1'>
-                  <Label htmlFor='isGlobal' className='text-sm font-medium flex items-center gap-2'>
-                    <Globe className='h-4 w-4' />
-                    전체 대상
-                  </Label>
-                  <p className='text-xs text-muted-foreground'>
-                    활성화하면 모든 회원에게 배너가 표시됩니다.
-                  </p>
-                </div>
-                <Switch
-                  id='isGlobal'
-                  checked={form.isGlobal}
-                  onCheckedChange={(checked) => {
-                    setForm((prev) => ({
-                      ...prev,
-                      isGlobal: checked,
-                      selectedApartments: checked ? [] : prev.selectedApartments,
-                    }));
-                  }}
+            <div className='space-y-6 py-4'>
+              {/* Image Upload */}
+              <div className='space-y-2'>
+                <Label className='text-sm font-medium'>
+                  배너 이미지 <span className='text-destructive'>*</span>
+                </Label>
+                <ImageUpload
+                  bucket={BUCKET_NAME}
+                  storagePath={BANNERS_FOLDER}
+                  value={form.imageUrl}
+                  onChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url }))}
+                  accept='image/*'
+                  maxSizeMB={5}
+                  description='배너 이미지를 업로드하세요 (권장: 가로형 이미지)'
                 />
               </div>
-            )}
 
-            {/* 광고주 섹션 - isGlobal이 false인 경우에만 표시 */}
-            {!form.isGlobal && (
+              {/* Additional Image Upload */}
               <div className='space-y-2'>
-                <Label className='text-sm font-medium flex items-center gap-2'>
-                  <UserPlus className='h-4 w-4' />
-                  광고주 선택 <span className='text-destructive'>*</span>
+                <Label className='text-sm font-medium'>
+                  추가 이미지 <span className='text-muted-foreground'>(선택사항)</span>
                 </Label>
-                <Popover open={advertiserPopoverOpen} onOpenChange={setAdvertiserPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant='outline'
-                      role='combobox'
-                      aria-expanded={advertiserPopoverOpen}
-                      className='w-full justify-between font-normal'
-                    >
-                      {form.advertiserId
-                        ? availableAdvertisers.find((adv) => adv.id === form.advertiserId)
-                          ? `${availableAdvertisers.find((adv) => adv.id === form.advertiserId)?.businessName} (${availableAdvertisers.find((adv) => adv.id === form.advertiserId)?.representativeName})`
-                          : '광고주를 선택하세요'
-                        : '광고주를 선택하세요'}
-                      <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className='w-[400px] p-0' align='start'>
-                    <Command>
-                      <CommandInput placeholder='광고주 검색...' />
-                      <CommandList>
-                        <CommandEmpty>선택 가능한 광고주가 없습니다.</CommandEmpty>
-                        <CommandGroup>
-                          {availableAdvertisers.map((adv) => (
-                            <CommandItem
-                              key={adv.id}
-                              value={`${adv.businessName} ${adv.representativeName}`}
-                              onSelect={() => {
-                                setForm((prev) => ({
-                                  ...prev,
-                                  advertiserId: adv.id,
-                                }));
-                                setAdvertiserPopoverOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  form.advertiserId === adv.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              {adv.businessName} ({adv.representativeName})
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <ImageUpload
+                  bucket={BUCKET_NAME}
+                  storagePath={BANNERS_FOLDER}
+                  value={form.additionalImageUrl}
+                  onChange={(url) => setForm((prev) => ({ ...prev, additionalImageUrl: url }))}
+                  accept='image/*'
+                  maxSizeMB={5}
+                  description='배너와 함께 표시할 추가 이미지를 업로드하세요'
+                />
+              </div>
+
+              {/* Link URL */}
+              <div className='space-y-2'>
+                <Label htmlFor='linkUrl' className='text-sm font-medium'>
+                  링크 URL <span className='text-muted-foreground'>(선택사항)</span>
+                </Label>
+                <Input
+                  id='linkUrl'
+                  type='url'
+                  value={form.linkUrl}
+                  onChange={(e) => setForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
+                  placeholder='https://example.com'
+                />
                 <p className='text-xs text-muted-foreground'>
-                  이미 배너가 등록된 광고주는 선택할 수 없습니다.
+                  배너 클릭 시 이동할 URL을 입력하세요.
                 </p>
               </div>
-            )}
 
-            {/* 게시 기간 - isGlobal이 false인 경우에만 표시 */}
-            {!form.isGlobal && (
-              <div className='space-y-2'>
-                <Label className='text-sm font-medium flex items-center gap-2'>
-                  <Calendar className='h-4 w-4' />
-                  게시 기간 <span className='text-destructive'>*</span>
-                </Label>
-                <div className='grid grid-cols-2 gap-3'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='startDate' className='text-xs text-muted-foreground'>시작일</Label>
-                    <Input
-                      id='startDate'
-                      type='date'
-                      value={form.startDate}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, startDate: e.target.value }))
-                      }
-                    />
+              {/* isGlobal Switch - 매니저는 사용 불가 */}
+              {isSuperAdmin && (
+                <div className='flex items-center justify-between p-4 border rounded-lg'>
+                  <div className='space-y-1'>
+                    <Label htmlFor='isGlobal' className='text-sm font-medium flex items-center gap-2'>
+                      <Globe className='h-4 w-4' />
+                      전체 대상
+                    </Label>
+                    <p className='text-xs text-muted-foreground'>
+                      활성화하면 모든 회원에게 배너가 표시됩니다.
+                    </p>
                   </div>
-                  <div className='space-y-2'>
-                    <Label htmlFor='endDate' className='text-xs text-muted-foreground'>종료일</Label>
-                    <Input
-                      id='endDate'
-                      type='date'
-                      value={form.endDate}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, endDate: e.target.value }))
-                      }
-                    />
+                  <Switch
+                    id='isGlobal'
+                    checked={form.isGlobal}
+                    onCheckedChange={(checked) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        isGlobal: checked,
+                        selectedApartments: checked ? [] : prev.selectedApartments,
+                      }));
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* 게시 기간 - isGlobal이 false인 경우에만 표시 */}
+              {!form.isGlobal && (
+                <div className='space-y-2'>
+                  <Label className='text-sm font-medium flex items-center gap-2'>
+                    <Calendar className='h-4 w-4' />
+                    게시 기간 <span className='text-destructive'>*</span>
+                  </Label>
+                  <div className='grid grid-cols-2 gap-3'>
+                    <div className='space-y-2'>
+                      <Label htmlFor='startDate' className='text-xs text-muted-foreground'>시작일</Label>
+                      <Input
+                        id='startDate'
+                        type='date'
+                        value={form.startDate}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, startDate: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <Label htmlFor='endDate' className='text-xs text-muted-foreground'>종료일</Label>
+                      <Input
+                        id='endDate'
+                        type='date'
+                        value={form.endDate}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, endDate: e.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className='flex gap-2 pt-1'>
+                    {[
+                      { days: 14, label: '14일' },
+                      { days: 30, label: '1개월' },
+                      { days: 180, label: '6개월' },
+                      { days: 365, label: '12개월' },
+                    ].map(({ days, label }) => (
+                      <Button
+                        key={days}
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={() => {
+                          const today = new Date();
+                          const endDate = new Date();
+                          endDate.setDate(today.getDate() + days);
+                          setForm({
+                            ...form,
+                            startDate: today.toISOString().split('T')[0],
+                            endDate: endDate.toISOString().split('T')[0],
+                          });
+                        }}
+                      >
+                        {label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
-                <div className='flex gap-2 pt-1'>
-                  {[
-                    { days: 14, label: '14일' },
-                    { days: 30, label: '1개월' },
-                    { days: 180, label: '6개월' },
-                    { days: 365, label: '12개월' },
-                  ].map(({ days, label }) => (
-                    <Button
-                      key={days}
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() => {
-                        const today = new Date();
-                        const endDate = new Date();
-                        endDate.setDate(today.getDate() + days);
-                        setForm({
-                          ...form,
-                          startDate: today.toISOString().split('T')[0],
-                          endDate: endDate.toISOString().split('T')[0],
-                        });
-                      }}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
 
-            {/* 소개내용 - isGlobal이 false인 경우에만 표시 */}
-            {!form.isGlobal && (
+              {/* 소개내용 */}
               <div className='space-y-2'>
                 <Label htmlFor='description' className='text-sm font-medium'>
-                  소개내용 <span className='text-destructive'>*</span>
+                  소개내용{!form.isGlobal && <span className='text-destructive'> *</span>}
+                  {form.isGlobal && <span className='text-muted-foreground'> (선택사항)</span>}
                 </Label>
                 <Textarea
                   id='description'
@@ -1184,236 +990,235 @@ export default function BannersPage() {
                   rows={3}
                 />
               </div>
-            )}
 
-            {/* 아파트 선택 - isGlobal이 false인 경우에만 표시 */}
-            {!form.isGlobal && (
-              <div className='space-y-2'>
-                <div className='flex items-center justify-between'>
-                  <Label className='text-sm font-medium'>
-                    타겟 아파트 선택 <span className='text-destructive'>*</span>
-                  </Label>
-                  <div className='flex items-center gap-2'>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => setForm({ ...form, selectedApartments: apartments.map(a => a.id) })}
-                    >
-                      전체 선택
-                    </Button>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => setForm({ ...form, selectedApartments: [] })}
-                    >
-                      전체 해제
-                    </Button>
-                  </div>
-                </div>
-
-                {/* 아파트 검색 및 체크박스 목록 */}
-                <div className='border rounded-md'>
-                  {/* 검색 입력 */}
-                  <div className='p-2 border-b'>
-                    <div className='relative'>
-                      <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                      <Input
-                        placeholder='아파트명 또는 주소 검색...'
-                        value={apartmentSearch}
-                        onChange={(e) => setApartmentSearch(e.target.value)}
-                        className='pl-9'
-                      />
+              {/* 아파트 선택 - isGlobal이 false인 경우에만 표시 */}
+              {!form.isGlobal && (
+                <div className='space-y-2'>
+                  <div className='flex items-center justify-between'>
+                    <Label className='text-sm font-medium'>
+                      타겟 아파트 선택 <span className='text-destructive'>*</span>
+                    </Label>
+                    <div className='flex items-center gap-2'>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => setForm({ ...form, selectedApartments: apartments.map(a => a.id) })}
+                      >
+                        전체 선택
+                      </Button>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => setForm({ ...form, selectedApartments: [] })}
+                      >
+                        전체 해제
+                      </Button>
                     </div>
                   </div>
-                  <div className='h-[200px] overflow-y-auto'>
-                    <div className='p-3 space-y-2'>
-                      {(() => {
-                        const filteredApartments = apartments.filter(apt =>
-                          apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
-                          apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
-                        );
 
-                        if (apartments.length === 0) {
-                          return (
-                            <p className='text-sm text-muted-foreground text-center py-4'>
-                              선택 가능한 아파트가 없습니다.
-                            </p>
+                  {/* 아파트 검색 및 체크박스 목록 */}
+                  <div className='border rounded-md'>
+                    {/* 검색 입력 */}
+                    <div className='p-2 border-b'>
+                      <div className='relative'>
+                        <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                        <Input
+                          placeholder='아파트명 또는 주소 검색...'
+                          value={apartmentSearch}
+                          onChange={(e) => setApartmentSearch(e.target.value)}
+                          className='pl-9'
+                        />
+                      </div>
+                    </div>
+                    <div className='h-[200px] overflow-y-auto'>
+                      <div className='p-3 space-y-2'>
+                        {(() => {
+                          const filteredApartments = apartments.filter(apt =>
+                            apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                            apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
                           );
-                        }
 
-                        if (filteredApartments.length === 0) {
-                          return (
-                            <p className='text-sm text-muted-foreground text-center py-4'>
-                              검색 결과가 없습니다.
-                            </p>
-                          );
-                        }
+                          if (apartments.length === 0) {
+                            return (
+                              <p className='text-sm text-muted-foreground text-center py-4'>
+                                선택 가능한 아파트가 없습니다.
+                              </p>
+                            );
+                          }
 
-                        return filteredApartments.map((apt) => (
-                          <div
-                            key={apt.id}
-                            className='flex items-center space-x-3 p-2 rounded hover:bg-muted/50 cursor-pointer'
-                            onClick={() => {
-                              const isSelected = form.selectedApartments.includes(apt.id);
-                              setForm({
-                                ...form,
-                                selectedApartments: isSelected
-                                  ? form.selectedApartments.filter(id => id !== apt.id)
-                                  : [...form.selectedApartments, apt.id]
-                              });
-                            }}
-                          >
-                            <Checkbox
-                              id={`apt-${apt.id}`}
-                              checked={form.selectedApartments.includes(apt.id)}
-                              onCheckedChange={(checked) => {
+                          if (filteredApartments.length === 0) {
+                            return (
+                              <p className='text-sm text-muted-foreground text-center py-4'>
+                                검색 결과가 없습니다.
+                              </p>
+                            );
+                          }
+
+                          return filteredApartments.map((apt) => (
+                            <div
+                              key={apt.id}
+                              className='flex items-center space-x-3 p-2 rounded hover:bg-muted/50 cursor-pointer'
+                              onClick={() => {
+                                const isSelected = form.selectedApartments.includes(apt.id);
                                 setForm({
                                   ...form,
-                                  selectedApartments: checked
-                                    ? [...form.selectedApartments, apt.id]
-                                    : form.selectedApartments.filter(id => id !== apt.id)
+                                  selectedApartments: isSelected
+                                    ? form.selectedApartments.filter(id => id !== apt.id)
+                                    : [...form.selectedApartments, apt.id]
                                 });
                               }}
-                            />
-                            <div className='flex-1 min-w-0'>
-                              <label
-                                htmlFor={`apt-${apt.id}`}
-                                className='text-sm font-medium cursor-pointer block'
-                              >
-                                {apt.name}
-                              </label>
-                              <p className='text-xs text-muted-foreground truncate'>
-                                {apt.address}
-                              </p>
+                            >
+                              <Checkbox
+                                id={`apt-${apt.id}`}
+                                checked={form.selectedApartments.includes(apt.id)}
+                                onCheckedChange={(checked) => {
+                                  setForm({
+                                    ...form,
+                                    selectedApartments: checked
+                                      ? [...form.selectedApartments, apt.id]
+                                      : form.selectedApartments.filter(id => id !== apt.id)
+                                  });
+                                }}
+                              />
+                              <div className='flex-1 min-w-0'>
+                                <label
+                                  htmlFor={`apt-${apt.id}`}
+                                  className='text-sm font-medium cursor-pointer block'
+                                >
+                                  {apt.name}
+                                </label>
+                                <p className='text-xs text-muted-foreground truncate'>
+                                  {apt.address}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        ));
-                      })()}
+                          ));
+                        })()}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <p className='text-xs text-muted-foreground'>
-                  선택된 아파트: {form.selectedApartments.length}개 / 전체 {apartments.length}개
-                </p>
+                  <p className='text-xs text-muted-foreground'>
+                    선택된 아파트: {form.selectedApartments.length}개 / 전체 {apartments.length}개
+                  </p>
 
-                {/* 선택된 아파트 뱃지 */}
-                {form.selectedApartments.length > 0 && (
-                  <div className='flex flex-wrap gap-2 pt-2'>
-                    {form.selectedApartments.map((aptId) => {
-                      const apt = apartments.find((a) => a.id === aptId);
-                      return apt ? (
-                        <Badge
-                          key={aptId}
-                          variant='secondary'
-                          className='font-normal gap-1'
-                        >
-                          {apt.name}
-                          <button
-                            type='button'
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setForm({
-                                ...form,
-                                selectedApartments: form.selectedApartments.filter(
-                                  (id) => id !== aptId
-                                ),
-                              });
-                            }}
-                            className='ml-1 rounded-full hover:bg-muted-foreground/20'
+                  {/* 선택된 아파트 뱃지 */}
+                  {form.selectedApartments.length > 0 && (
+                    <div className='flex flex-wrap gap-2 pt-2'>
+                      {form.selectedApartments.map((aptId) => {
+                        const apt = apartments.find((a) => a.id === aptId);
+                        return apt ? (
+                          <Badge
+                            key={aptId}
+                            variant='secondary'
+                            className='font-normal gap-1'
                           >
-                            <X className='h-3 w-3' />
-                          </button>
-                        </Badge>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Active Status */}
-            <div className='flex items-center justify-between'>
-              <Label htmlFor='isActive' className='text-sm font-medium'>
-                활성화
-              </Label>
-              <Switch
-                id='isActive'
-                checked={form.isActive}
-                onCheckedChange={(checked) =>
-                  setForm((prev) => ({ ...prev, isActive: checked }))
-                }
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant='outline'
-              onClick={() => {
-                setDialogOpen(false);
-                resetForm();
-              }}
-              disabled={saving}
-            >
-              취소
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !form.imageUrl || (!form.isGlobal && !form.description.trim()) || (!form.isGlobal && !form.advertiserId)}>
-              {saving ? (
-                <>
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  저장 중...
-                </>
-              ) : (
-                <>
-                  <Save className='mr-2 h-4 w-4' />
-                  저장
-                </>
+                            {apt.name}
+                            <button
+                              type='button'
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setForm({
+                                  ...form,
+                                  selectedApartments: form.selectedApartments.filter(
+                                    (id) => id !== aptId
+                                  ),
+                                });
+                              }}
+                              className='ml-1 rounded-full hover:bg-muted-foreground/20'
+                            >
+                              <X className='h-3 w-3' />
+                            </button>
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* 클릭수 초기화 확인 다이얼로그 */}
-      <Dialog open={resetClickDialogOpen} onOpenChange={setResetClickDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className='flex items-center gap-2'>
-              <AlertCircle className='h-5 w-5 text-blue-500' />
-              클릭수 초기화
-            </DialogTitle>
-            <DialogDescription className='pt-2'>
-              이 배너의 클릭수를 0으로 초기화하시겠습니까?
-              <br />
-              <span className='text-blue-600 mt-2 block'>
-                현재: 광고 클릭수 {resetClickBanner?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {resetClickBanner?.clickCount?.toLocaleString() || '0'}
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant='outline'
-              onClick={() => {
-                setResetClickDialogOpen(false);
-                setResetClickBanner(null);
-              }}
-            >
-              취소
-            </Button>
-            <Button
-              variant='default'
-              className='bg-blue-500 hover:bg-blue-600'
-              onClick={handleResetClickCount}
-            >
-              초기화
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              {/* Active Status */}
+              <div className='flex items-center justify-between'>
+                <Label htmlFor='isActive' className='text-sm font-medium'>
+                  활성화
+                </Label>
+                <Switch
+                  id='isActive'
+                  checked={form.isActive}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, isActive: checked }))
+                  }
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant='outline'
+                onClick={() => {
+                  setDialogOpen(false);
+                  resetForm();
+                }}
+                disabled={saving}
+              >
+                취소
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !form.imageUrl || (!form.isGlobal && !form.description.trim())}>
+                {saving ? (
+                  <>
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    저장 중...
+                  </>
+                ) : (
+                  <>
+                    <Save className='mr-2 h-4 w-4' />
+                    저장
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 클릭수 초기화 확인 다이얼로그 */}
+        <Dialog open={resetClickDialogOpen} onOpenChange={setResetClickDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className='flex items-center gap-2'>
+                <AlertCircle className='h-5 w-5 text-blue-500' />
+                클릭수 초기화
+              </DialogTitle>
+              <DialogDescription className='pt-2'>
+                이 배너의 클릭수를 0으로 초기화하시겠습니까?
+                <br />
+                <span className='text-blue-600 mt-2 block'>
+                  현재: 광고 클릭수 {resetClickBanner?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {resetClickBanner?.clickCount?.toLocaleString() || '0'}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant='outline'
+                onClick={() => {
+                  setResetClickDialogOpen(false);
+                  setResetClickBanner(null);
+                }}
+              >
+                취소
+              </Button>
+              <Button
+                variant='default'
+                className='bg-blue-500 hover:bg-blue-600'
+                onClick={handleResetClickCount}
+              >
+                초기화
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </PageContent>
     </PageShell>
   );

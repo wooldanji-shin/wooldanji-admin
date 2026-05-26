@@ -89,7 +89,7 @@ export default function DoorBannerPage() {
   return (
     <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
       <AdminHeader
-        title="공동현관문 배너관리 v2"
+        title="공동현관문 팝업관리 v2"
         description="공동현관문이 열릴 때 표시할 팝업 모드를 설정합니다."
       />
 

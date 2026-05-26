@@ -108,7 +108,7 @@ export default function AdApplicationsPage(): React.ReactElement {
       <PageShell>
         <PageHeader>
           <PageHeaderTitle
-            title="광고 신청 관리"
+            title="기본광고 관리"
             description="광고 신청을 검토하고 승인 상태를 관리합니다."
           />
         </PageHeader>

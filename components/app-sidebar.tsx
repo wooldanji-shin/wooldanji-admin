@@ -98,6 +98,12 @@ const navigationItems: MenuItem[] = [
     icon: HelpCircle,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
+  {
+    name: '회원 알림 발송',
+    href: '/admin/user-announcements',
+    icon: Bell,
+    roles: ['SUPER_ADMIN', 'APT_ADMIN', 'MANAGER'],
+  },
 ];
 
 // ─── 파트너 ────────────────────────────────────────────────
@@ -137,7 +143,7 @@ const partnerItems: MenuItem[] = [
 // ─── 광고 시스템 ───────────────────────────────────────────
 const advertisingItems: MenuItem[] = [
   {
-    name: '광고 신청 관리',
+    name: '기본광고 관리',
     href: '/admin/advertising-v2/applications',
     icon: ShieldAlert,
     roles: ['SUPER_ADMIN', 'MANAGER'],
@@ -148,38 +154,24 @@ const advertisingItems: MenuItem[] = [
     icon: Sparkles,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
+];
+
+// ─── 홈화면 수정 ───────────────────────────────────────────
+const homeSettingsItems: MenuItem[] = [
   {
-    name: '홈 섹션 관리',
-    href: '/admin/advertising/categories',
-    icon: LayoutList,
-    roles: ['SUPER_ADMIN'],
-  },
-  {
-    name: '카테고리 관리 v2',
+    name: '카테고리 관리',
     href: '/admin/advertising-v2/categories',
     icon: Tag,
     roles: ['SUPER_ADMIN'],
   },
   {
-    name: '공동현관문 배너관리 v2',
+    name: '공동현관문 팝업관리',
     href: '/admin/advertising-v2/door-banner',
     icon: DoorOpen,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
-    name: '광고주 관리',
-    href: '/admin/advertising/advertisers',
-    icon: Building2,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    name: '광고 등록/수정',
-    href: '/admin/advertising/ads',
-    icon: Megaphone,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    name: '배너 광고 등록/수정',
+    name: '배너 등록/수정',
     href: '/admin/settings/banners',
     icon: ImageIcon,
     roles: ['SUPER_ADMIN', 'MANAGER'],
@@ -195,6 +187,34 @@ const settingsItems: MenuItem[] = [
     roles: ['SUPER_ADMIN'],
   },
   {
+    name: '다이얼로그 설정',
+    href: '/admin/settings/dialog-messages',
+    icon: MessageSquare,
+    roles: ['SUPER_ADMIN'],
+  },
+];
+
+// ─── V1 시스템 관리 ────────────────────────────────────────
+const v1Items: MenuItem[] = [
+  {
+    name: '홈 섹션 관리',
+    href: '/admin/advertising/categories',
+    icon: LayoutList,
+    roles: ['SUPER_ADMIN'],
+  },
+  {
+    name: '광고주 관리',
+    href: '/admin/advertising/advertisers',
+    icon: Building2,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '광고 등록/수정',
+    href: '/admin/advertising/ads',
+    icon: Megaphone,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
     name: '알림 관리',
     href: '/admin/settings/notifications',
     icon: Bell,
@@ -204,12 +224,6 @@ const settingsItems: MenuItem[] = [
     name: '공지사항 관리',
     href: '/admin/settings/announcements',
     icon: FileText,
-    roles: ['SUPER_ADMIN'],
-  },
-  {
-    name: '다이얼로그 설정',
-    href: '/admin/settings/dialog-messages',
-    icon: MessageSquare,
     roles: ['SUPER_ADMIN'],
   },
 ];
@@ -414,7 +428,9 @@ export function AppSidebar(): React.ReactElement {
         {renderMenuGroup('관리', navigationItems)}
         {renderMenuGroup('파트너', partnerItems)}
         {renderMenuGroup('광고 시스템', advertisingItems)}
+        {renderMenuGroup('홈화면 수정', homeSettingsItems)}
         {renderMenuGroup('콘텐츠 관리', settingsItems)}
+        {renderMenuGroup('V1 시스템 관리', v1Items)}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">

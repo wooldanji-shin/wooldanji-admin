@@ -625,7 +625,7 @@ export default function PartnerAnnouncementsPage() {
 
       {/* 발송 결과 모달 */}
       <Dialog open={!!resultModal} onOpenChange={(o) => !o && setResultModal(null)}>
-        <DialogContent className='max-w-2xl'>
+        <DialogContent className='flex max-h-[85vh] max-w-2xl flex-col'>
           <DialogHeader>
             <DialogTitle>발송 결과</DialogTitle>
             <DialogDescription>
@@ -633,7 +633,7 @@ export default function PartnerAnnouncementsPage() {
             </DialogDescription>
           </DialogHeader>
           {resultModal && (
-            <div className='space-y-4'>
+            <div className='flex-1 space-y-4 overflow-y-auto pr-1'>
               <div className='grid grid-cols-4 gap-2'>
                 <Stat label='총 대상' value={resultModal.total} />
                 <Stat label='성공' value={resultModal.success} variant='success' />
@@ -653,7 +653,7 @@ export default function PartnerAnnouncementsPage() {
                   <div className='mb-2 text-sm font-medium'>
                     실패 사유 (최대 50건 표시)
                   </div>
-                  <div className='max-h-80 overflow-y-auto rounded border'>
+                  <div className='rounded border'>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -669,7 +669,9 @@ export default function PartnerAnnouncementsPage() {
                               {f.partnerUserId.slice(0, 8)}…
                             </TableCell>
                             <TableCell>
-                              <Badge variant='secondary'>{f.reason}</Badge>
+                              <Badge variant='secondary'>
+                                {f.reason === 'UNREGISTERED' ? '앱 삭제/재설치' : f.reason}
+                              </Badge>
                             </TableCell>
                             <TableCell className='text-xs text-muted-foreground'>
                               {f.message ?? '-'}

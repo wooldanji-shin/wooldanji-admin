@@ -51,7 +51,7 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
-type BannerCase = 'A' | 'B' | 'C';
+type BannerCase = 'A' | 'B' | 'C' | 'D';
 
 interface PartnerBanner {
   id: string;
@@ -71,9 +71,10 @@ const CASE_LABELS: Record<BannerCase, string> = {
   A: '광고전',
   B: '광고중',
   C: '광고중단',
+  D: '프리미엄 광고',
 };
 
-const CASES: BannerCase[] = ['A', 'B', 'C'];
+const CASES: BannerCase[] = ['A', 'B', 'C', 'D'];
 
 export default function PartnerBannersPage() {
   const router = useRouter();
@@ -199,12 +200,13 @@ export default function PartnerBannersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className='w-[15%]'>케이스</TableHead>
-                  <TableHead className='w-[25%]'>제목</TableHead>
-                  <TableHead className='w-[15%]'>활성</TableHead>
-                  <TableHead className='w-[15%]'>시작</TableHead>
-                  <TableHead className='w-[15%]'>종료</TableHead>
-                  <TableHead className='w-[15%] text-right'>관리</TableHead>
+                  <TableHead className='w-[12%]'>케이스</TableHead>
+                  <TableHead className='w-[20%]'>제목</TableHead>
+                  <TableHead className='w-[25%]'>내용</TableHead>
+                  <TableHead className='w-[10%]'>활성</TableHead>
+                  <TableHead className='w-[10%]'>시작</TableHead>
+                  <TableHead className='w-[10%]'>종료</TableHead>
+                  <TableHead className='w-[13%] text-right'>관리</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -221,6 +223,13 @@ export default function PartnerBannersPage() {
                         <span className='line-clamp-2'>{banner.title}</span>
                       ) : (
                         <span className='text-muted-foreground'>(없음)</span>
+                      )}
+                    </TableCell>
+                    <TableCell className='max-w-0'>
+                      {banner ? (
+                        <p className='truncate text-sm text-muted-foreground'>{banner.content}</p>
+                      ) : (
+                        <span className='text-muted-foreground'>-</span>
                       )}
                     </TableCell>
                     <TableCell>

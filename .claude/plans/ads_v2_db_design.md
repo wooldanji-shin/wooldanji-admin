@@ -525,7 +525,7 @@ ad_categories_v2 (1)
 
 ## 구현 완료 범위
 
-- **관리자 웹 대시보드 — 광고 신청 관리** (`app/admin/advertising-v2/applications/`)
+- **관리자 웹 대시보드 — 기본광고 관리** (`app/admin/advertising-v2/applications/`)
   - 목록 페이지: `adStatus='pending'` 필터, 상태 뱃지, 아파트 수 표시
   - 상세 페이지 UI: 2컬럼 레이아웃, 상태 색상 뱃지, 이미지 갤러리, sticky 액션 버튼
   - 승인 다이얼로그: 추가 무료 개월 수 + 할인율 입력 (기본값 `defaultDiscountRate` 자동 로드)
@@ -535,7 +535,7 @@ ad_categories_v2 (1)
   - 기본 할인율 28%로 변경 (코드 fallback + `ad_pricing_v2` DB)
   - 승인 API: `approvedMonthlyAmount` 계산(10원 단위 반올림) 후 저장
   - API: `POST /api/advertising-v2/applications/[id]/approve|reject`
-  - 사이드바: 광고 시스템 메뉴 내 "광고 신청 관리" 항목 + 뱃지 카운트
+  - 사이드바: 광고 시스템 메뉴 내 "기본광고 관리" 항목 + 뱃지 카운트
   - DB 마이그레이션 (dev): `advertisements_v2.approvedMonthlyAmount integer` 컬럼 추가
 
 ## 미포함 범위 (추후 구현)
