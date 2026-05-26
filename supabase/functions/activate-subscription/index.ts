@@ -6,12 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const KST_OFFSET = 9 * 60 * 60 * 1000
+
+// KST 날짜 기준으로 N개월 후 날짜를 midnight UTC로 저장
 function addMonths(date: Date, months: number, anchorDay: number): Date {
   const result = new Date(date)
-  result.setDate(1)
-  result.setMonth(result.getMonth() + months)
-  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate()
-  result.setDate(Math.min(anchorDay, lastDay))
+  result.setUTCDate(1)
+  result.setUTCMonth(result.getUTCMonth() + months)
+  const lastDay = new Date(result.getUTCFullYear(), result.getUTCMonth() + 1, 0).getDate()
+  result.setUTCDate(Math.min(anchorDay, lastDay))
+  result.setUTCHours(0, 0, 0, 0)
   return result
 }
 
@@ -125,14 +129,16 @@ serve(async (req) => {
     }
 
     const now = new Date()
+    // KST 날짜 기준으로 anchorDay 계산 (UTC+9)
+    const kstNow = new Date(now.getTime() + KST_OFFSET)
+    const anchorDay = kstNow.getUTCDate()
     const totalFreeMonths: number = ad.freeMonths ?? 0
-    const anchorDay = now.getDate()
     const noFreeTrial = totalFreeMonths === 0
 
     console.log(
       `[activate-subscription] 결제 모드 - advertisementId: ${advertisementId}, ` +
       `hasHadRunningAd: ${hasHadRunningAd}, freeMonths: ${totalFreeMonths}, ` +
-      `discountRate: ${discountRate}, noFreeTrial: ${noFreeTrial}, monthlyAmount: ${monthlyAmount}`,
+      `discountRate: ${discountRate}, noFreeTrial: ${noFreeTrial}, monthlyAmount: ${monthlyAmount}, anchorDay(KST): ${anchorDay}`,
     )
 
     if (noFreeTrial && monthlyAmount > 0) {
@@ -167,7 +173,7 @@ serve(async (req) => {
         )
       }
 
-      const nextBillingDate = addMonths(now, 1, anchorDay)
+      const nextBillingDate = addMonths(kstNow, 1, anchorDay)
 
       const { data: subData, error: subError } = await supabase.from('ad_subscriptions_v2').insert({
         advertisementId, billingKeyId, subscriptionStatus: 'active',
@@ -193,7 +199,7 @@ serve(async (req) => {
 
       try {
         const amountStr = monthlyAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-        const nextKst = new Date(nextBillingDate.getTime() + 9 * 60 * 60 * 1000)
+        const nextKst = new Date(nextBillingDate.getTime() + KST_OFFSET)
         await fetch(`${SUPABASE_URL}/functions/v1/send-partner-fcm-notification`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
@@ -207,7 +213,7 @@ serve(async (req) => {
 
     } else if (noFreeTrial && monthlyAmount === 0) {
       // ── 100% 할인 0원: 토스 스킵, success 0원으로 이력 ──
-      const nextBillingDate = addMonths(now, 1, anchorDay)
+      const nextBillingDate = addMonths(kstNow, 1, anchorDay)
 
       const { data: subData, error: subError } = await supabase.from('ad_subscriptions_v2').insert({
         advertisementId, billingKeyId, subscriptionStatus: 'active',
@@ -232,7 +238,7 @@ serve(async (req) => {
 
     } else {
       // ── 무료체험 ──
-      const freeEndDate = addMonths(now, totalFreeMonths, anchorDay)
+      const freeEndDate = addMonths(kstNow, totalFreeMonths, anchorDay)
 
       const { data: subData, error: subError } = await supabase.from('ad_subscriptions_v2').insert({
         advertisementId, billingKeyId, subscriptionStatus: 'active',
@@ -250,6 +256,20 @@ serve(async (req) => {
           billingPeriodStart: now.toISOString(), billingPeriodEnd: freeEndDate.toISOString(),
         })
       } catch (e) { console.error('[activate-subscription] freeTrial 저장 실패 (non-critical):', e) }
+
+      try {
+        const freeEndKst = new Date(freeEndDate.getTime() + KST_OFFSET)
+        const amountStr = monthlyAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        await fetch(`${SUPABASE_URL}/functions/v1/send-partner-fcm-notification`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            partnerUserId: partnerId, title: '무료체험이 시작되었습니다',
+            body: `${totalFreeMonths}개월 무료체험이 시작되었습니다. 무료체험 종료 후 ${amountStr}원이 정기 결제됩니다. (종료일: ${freeEndKst.getUTCMonth() + 1}월 ${freeEndKst.getUTCDate()}일)`,
+            type: 'free_trial_started', navigationData: { type: 'ad_detail', params: { advertisementId } },
+          }),
+        })
+      } catch (e) { console.error('[activate-subscription] 무료체험 FCM 실패 (non-critical):', e) }
     }
 
     const { error: adUpdateError } = await supabase.from('advertisements_v2')

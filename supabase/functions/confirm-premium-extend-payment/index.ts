@@ -131,9 +131,9 @@ serve(async (req) => {
       );
     }
 
-    if (ad.status !== 'running') {
+    if (ad.status !== 'running' && ad.status !== 'ended') {
       return new Response(
-        JSON.stringify({ error: `운영 중인 광고만 연장할 수 있습니다. (현재: ${ad.status})` }),
+        JSON.stringify({ error: `운영 중이거나 종료된 광고만 연장할 수 있습니다. (현재: ${ad.status})` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -222,9 +222,16 @@ serve(async (req) => {
       );
     }
 
+    // ended 상태였던 광고는 연장 결제 완료 시 running으로 복원
+    const updatePayload: Record<string, unknown> = {
+      endedAt: newEndedAt.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+    if (ad.status === 'ended') updatePayload.status = 'running';
+
     const { error: updateError } = await supabase
       .from('premium_advertisements_v2')
-      .update({ endedAt: newEndedAt.toISOString(), updatedAt: now.toISOString() })
+      .update(updatePayload)
       .eq('id', premiumAdId);
 
     if (updateError) {

@@ -900,59 +900,66 @@ export default function UsersPage() {
                           )}
                         </TableCell>
                         <TableCell className='text-right' onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant='ghost'
-                                size='icon-sm'
-                                className='text-muted-foreground hover:text-foreground hover:bg-secondary'
-                              >
-                                <MoreVertical className='h-4 w-4' />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align='end'>
-                              <DropdownMenuItem onClick={() => handleDetailClick(user)}>
-                                <Edit className='mr-2 h-4 w-4' />
-                                전체보기
-                              </DropdownMenuItem>
-                              {user.confirmImageUrl && (
-                                <DropdownMenuItem onClick={() => setImagePreview(user.confirmImageUrl)}>
-                                  <Eye className='mr-2 h-4 w-4' />
-                                  인증 사진 보기
+                          <div className='flex items-center justify-end gap-1'>
+                            {user.registrationType === 'APARTMENT' && (
+                              <>
+                                {user.approvalStatus !== 'approve' && (
+                                  <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='text-green-600 hover:text-green-700 hover:bg-green-50 h-8 px-2 text-xs'
+                                    onClick={() => handleApprovalStatusChange(user.id, 'approve')}
+                                  >
+                                    <Check className='h-3 w-3 mr-1' />
+                                    승인
+                                  </Button>
+                                )}
+                                {user.approvalStatus !== 'suspended' && (
+                                  <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 h-8 px-2 text-xs'
+                                    onClick={() => handleSuspendClick(user)}
+                                  >
+                                    <Ban className='h-3 w-3 mr-1' />
+                                    보류
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant='ghost'
+                                  size='icon-sm'
+                                  className='text-muted-foreground hover:text-foreground hover:bg-secondary'
+                                >
+                                  <MoreVertical className='h-4 w-4' />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align='end'>
+                                <DropdownMenuItem onClick={() => handleDetailClick(user)}>
+                                  <Edit className='mr-2 h-4 w-4' />
+                                  전체보기
                                 </DropdownMenuItem>
-                              )}
-                              {user.registrationType === 'APARTMENT' && (
-                                <>
-                                  {user.approvalStatus !== 'approve' ? (
-                                    <DropdownMenuItem
-                                      onClick={() => handleApprovalStatusChange(user.id, 'approve')}
-                                      className='text-green-600'
-                                    >
-                                      <Check className='mr-2 h-4 w-4' />
-                                      승인하기
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem
-                                      onClick={() => handleApprovalStatusChange(user.id, 'pending')}
-                                      className='text-orange-600'
-                                    >
-                                      <X className='mr-2 h-4 w-4' />
-                                      승인 취소
-                                    </DropdownMenuItem>
-                                  )}
-                                  {user.approvalStatus !== 'suspended' && (
-                                    <DropdownMenuItem
-                                      onClick={() => handleSuspendClick(user)}
-                                      className='text-yellow-600'
-                                    >
-                                      <Ban className='mr-2 h-4 w-4' />
-                                      승인 보류
-                                    </DropdownMenuItem>
-                                  )}
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                {user.confirmImageUrl && (
+                                  <DropdownMenuItem onClick={() => setImagePreview(user.confirmImageUrl)}>
+                                    <Eye className='mr-2 h-4 w-4' />
+                                    인증 사진 보기
+                                  </DropdownMenuItem>
+                                )}
+                                {user.registrationType === 'APARTMENT' && user.approvalStatus === 'approve' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleApprovalStatusChange(user.id, 'pending')}
+                                    className='text-orange-600'
+                                  >
+                                    <X className='mr-2 h-4 w-4' />
+                                    승인 취소
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

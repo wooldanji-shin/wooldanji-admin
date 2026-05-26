@@ -6,12 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const KST_OFFSET = 9 * 60 * 60 * 1000
+
+// KST 날짜 기준 1개월 후 midnight UTC
 function addOneMonth(date: Date, anchorDay: number): Date {
   const result = new Date(date)
-  result.setDate(1)
-  result.setMonth(result.getMonth() + 1)
-  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate()
-  result.setDate(Math.min(anchorDay, lastDay))
+  result.setUTCDate(1)
+  result.setUTCMonth(result.getUTCMonth() + 1)
+  const lastDay = new Date(result.getUTCFullYear(), result.getUTCMonth() + 1, 0).getDate()
+  result.setUTCDate(Math.min(anchorDay, lastDay))
+  result.setUTCHours(0, 0, 0, 0)
   return result
 }
 
@@ -141,6 +145,10 @@ serve(async (req) => {
     }
 
     const now = new Date()
+    const kstNow = new Date(now.getTime() + KST_OFFSET)
+    const anchorDay: number = sub.billingAnchorDay ?? kstNow.getUTCDate()
+    const nextBillingDate = addOneMonth(kstNow, anchorDay)
+
     const orderId = `RETRY-${(sub.id as string).replace(/-/g, '').slice(0, 8)}-${Date.now()}`
     const tossRes = await fetch(
       `https://api.tosspayments.com/v1/billing/${decryptedKey}`,
@@ -169,8 +177,6 @@ serve(async (req) => {
       )
     }
 
-    const anchorDay: number = sub.billingAnchorDay ?? now.getDate()
-    const nextBillingDate = addOneMonth(now, anchorDay)
     const vatAmount = Math.round(sub.monthlyAmount / 11)
     const supplyAmount = sub.monthlyAmount - vatAmount
 
@@ -202,7 +208,7 @@ serve(async (req) => {
 
     try {
       const amountStr = (sub.monthlyAmount as number).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-      const nextKst = new Date(nextBillingDate.getTime() + 9 * 60 * 60 * 1000)
+      const nextKst = new Date(nextBillingDate.getTime() + KST_OFFSET)
       const nextDateStr = `${nextKst.getUTCMonth() + 1}월 ${nextKst.getUTCDate()}일`
       await fetch(`${SUPABASE_URL}/functions/v1/send-partner-fcm-notification`, {
         method: 'POST',

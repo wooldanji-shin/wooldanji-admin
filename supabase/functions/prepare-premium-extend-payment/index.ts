@@ -95,9 +95,9 @@ serve(async (req) => {
       );
     }
 
-    if (ad.status !== 'running') {
+    if (ad.status !== 'running' && ad.status !== 'ended') {
       return new Response(
-        JSON.stringify({ error: `운영 중인 광고만 연장할 수 있습니다. (현재: ${ad.status})` }),
+        JSON.stringify({ error: `운영 중이거나 종료된 광고만 연장할 수 있습니다. (현재: ${ad.status})` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }

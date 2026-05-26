@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
@@ -61,15 +61,29 @@ interface AdCategoryV2 {
   orderIndex: number;
 }
 
-// 드래그 가능한 테이블 행
+interface AdSubCategoryV2 {
+  id: string;
+  categoryId: string;
+  subCategoryName: string;
+  isActive: boolean;
+  orderIndex: number;
+}
+
+// 드래그 가능한 카테고리 테이블 행
 function SortableRow({
   category,
+  isSelected,
   onEdit,
   onDelete,
+  onSelect,
+  onAddSub,
 }: {
   category: AdCategoryV2;
+  isSelected: boolean;
   onEdit: (category: AdCategoryV2) => void;
   onDelete: (category: AdCategoryV2) => void;
+  onSelect: (category: AdCategoryV2) => void;
+  onAddSub: (category: AdCategoryV2) => void;
 }) {
   const {
     attributes,
@@ -98,7 +112,8 @@ function SortableRow({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className="border-border hover:bg-secondary/50"
+      className={`border-border hover:bg-secondary/50 cursor-pointer ${isSelected ? 'bg-muted' : ''}`}
+      onClick={() => onSelect(category)}
     >
       {/* 드래그 핸들 + 순서 */}
       <TableCell>
@@ -147,6 +162,17 @@ function SortableRow({
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
+              onAddSub(category);
+            }}
+            title="서브카테고리 추가"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
               onEdit(category);
             }}
           >
@@ -158,6 +184,84 @@ function SortableRow({
             onClick={(e) => {
               e.stopPropagation();
               onDelete(category);
+            }}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// 드래그 가능한 서브카테고리 테이블 행
+function SortableSubRow({
+  sub,
+  onEdit,
+  onDelete,
+}: {
+  sub: AdSubCategoryV2;
+  onEdit: (sub: AdSubCategoryV2) => void;
+  onDelete: (sub: AdSubCategoryV2) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sub.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className="border-border hover:bg-secondary/50"
+    >
+      <TableCell>
+        <div
+          className="flex items-center gap-2 cursor-grab active:cursor-grabbing"
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{sub.orderIndex}</span>
+        </div>
+      </TableCell>
+      <TableCell className="font-medium">{sub.subCategoryName}</TableCell>
+      <TableCell>
+        {sub.isActive ? (
+          <Badge className="bg-green-500">활성</Badge>
+        ) : (
+          <Badge variant="secondary">비활성</Badge>
+        )}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(sub);
+            }}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(sub);
             }}
             className="text-destructive hover:text-destructive"
           >
@@ -191,6 +295,16 @@ export default function AdCategoriesV2Page() {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<AdCategoryV2 | null>(null);
 
+  // 서브카테고리 state
+  const [selectedCategory, setSelectedCategory] = useState<AdCategoryV2 | null>(null);
+  const [subCategories, setSubCategories] = useState<AdSubCategoryV2[]>([]);
+  const [subLoading, setSubLoading] = useState(false);
+  const [isSubDialogOpen, setIsSubDialogOpen] = useState(false);
+  const [editingSubCategory, setEditingSubCategory] = useState<AdSubCategoryV2 | null>(null);
+  const [subForm, setSubForm] = useState({ subCategoryName: '', isActive: true });
+  const [deleteSubDialog, setDeleteSubDialog] = useState(false);
+  const [deletingSubCategory, setDeletingSubCategory] = useState<AdSubCategoryV2 | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -220,6 +334,162 @@ export default function AdCategoriesV2Page() {
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  // 서브카테고리 목록 조회
+  const fetchSubCategories = useCallback(async (categoryId: string) => {
+    setSubLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('ad_sub_categories_v2')
+        .select('*')
+        .eq('categoryId', categoryId)
+        .order('orderIndex', { ascending: true });
+      if (error) throw error;
+      setSubCategories(data ?? []);
+    } catch (err) {
+      console.error('서브카테고리 목록 조회 실패:', err);
+      toast.error('서브카테고리 목록을 불러오는데 실패했습니다.');
+    } finally {
+      setSubLoading(false);
+    }
+  }, [supabase]);
+
+  // 카테고리 행 클릭 → 같은 카테고리면 닫기, 다른 카테고리면 펼치기
+  const handleCategorySelect = useCallback((category: AdCategoryV2) => {
+    if (selectedCategory?.id === category.id) {
+      setSelectedCategory(null);
+      setSubCategories([]);
+    } else {
+      setSelectedCategory(category);
+      fetchSubCategories(category.id);
+    }
+  }, [fetchSubCategories, selectedCategory]);
+
+  // 서브카테고리 추가 버튼 클릭
+  const handleAddSubClick = (category: AdCategoryV2) => {
+    if (selectedCategory?.id !== category.id) {
+      setSelectedCategory(category);
+      fetchSubCategories(category.id);
+    }
+    setEditingSubCategory(null);
+    setSubForm({ subCategoryName: '', isActive: true });
+    setIsSubDialogOpen(true);
+  };
+
+  // 서브카테고리 수정 시작
+  const handleSubEditClick = (sub: AdSubCategoryV2) => {
+    setEditingSubCategory(sub);
+    setSubForm({ subCategoryName: sub.subCategoryName, isActive: sub.isActive });
+    setIsSubDialogOpen(true);
+  };
+
+  // 서브카테고리 저장 (생성/수정)
+  const handleSubSave = async () => {
+    if (!subForm.subCategoryName.trim()) {
+      toast.error('서브카테고리 이름을 입력해주세요.');
+      return;
+    }
+    try {
+      if (editingSubCategory) {
+        const { error } = await (supabase as any)
+          .from('ad_sub_categories_v2')
+          .update({
+            subCategoryName: subForm.subCategoryName.trim(),
+            isActive: subForm.isActive,
+          })
+          .eq('id', editingSubCategory.id);
+        if (error) throw error;
+        toast.success('서브카테고리가 수정되었습니다.');
+      } else {
+        const nextOrderIndex = subCategories.length > 0
+          ? Math.max(...subCategories.map((s) => s.orderIndex)) + 1
+          : 1;
+        const { error } = await (supabase as any)
+          .from('ad_sub_categories_v2')
+          .insert({
+            categoryId: selectedCategory!.id,
+            subCategoryName: subForm.subCategoryName.trim(),
+            isActive: subForm.isActive,
+            orderIndex: nextOrderIndex,
+          });
+        if (error) throw error;
+        toast.success('서브카테고리가 추가되었습니다.');
+      }
+      setIsSubDialogOpen(false);
+      setEditingSubCategory(null);
+      if (selectedCategory) fetchSubCategories(selectedCategory.id);
+    } catch (err: any) {
+      console.error('서브카테고리 저장 실패:', err);
+      toast.error(err.message || '서브카테고리 저장에 실패했습니다.');
+    }
+  };
+
+  // 서브카테고리 삭제 클릭
+  const handleSubDeleteClick = (sub: AdSubCategoryV2) => {
+    setDeletingSubCategory(sub);
+    setDeleteSubDialog(true);
+  };
+
+  // 서브카테고리 삭제 실행
+  const handleSubDeleteConfirm = async () => {
+    if (!deletingSubCategory) return;
+    try {
+      const { error } = await (supabase as any)
+        .from('ad_sub_categories_v2')
+        .delete()
+        .eq('id', deletingSubCategory.id);
+      if (error) throw error;
+      toast.success('서브카테고리가 삭제되었습니다.');
+      setDeleteSubDialog(false);
+      setDeletingSubCategory(null);
+      if (selectedCategory) fetchSubCategories(selectedCategory.id);
+    } catch (err: any) {
+      console.error('서브카테고리 삭제 실패:', err);
+      const isFkViolation = err?.code === '23503' || err?.message?.includes('foreign key');
+      toast.error(
+        isFkViolation
+          ? '이 서브카테고리를 선택한 광고가 있어 삭제할 수 없습니다.'
+          : err.message || '서브카테고리 삭제에 실패했습니다.'
+      );
+    }
+  };
+
+  // 서브카테고리 드래그앤드랍 순서 변경
+  const handleSubDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = subCategories.findIndex((s) => s.id === active.id);
+    const newIndex = subCategories.findIndex((s) => s.id === over.id);
+    const reordered = arrayMove(subCategories, oldIndex, newIndex).map(
+      (s, idx) => ({ ...s, orderIndex: idx + 1 })
+    );
+
+    setSubCategories(reordered);
+
+    try {
+      await Promise.all(
+        reordered.map((s, idx) =>
+          (supabase as any)
+            .from('ad_sub_categories_v2')
+            .update({ orderIndex: -(idx + 1) })
+            .eq('id', s.id)
+        )
+      );
+      await Promise.all(
+        reordered.map((s) =>
+          (supabase as any)
+            .from('ad_sub_categories_v2')
+            .update({ orderIndex: s.orderIndex })
+            .eq('id', s.id)
+        )
+      );
+    } catch (err) {
+      console.error('서브카테고리 순서 변경 실패:', err);
+      toast.error('순서 변경에 실패했습니다.');
+      if (selectedCategory) fetchSubCategories(selectedCategory.id);
+    }
+  };
 
   // orderIndex 중복 체크 (자기 자신 제외)
   const checkOrderIndexDuplicate = (orderIndex: number, excludeId?: string) => {
@@ -415,7 +685,7 @@ export default function AdCategoriesV2Page() {
       <div className="flex flex-col gap-6">
         <div className="flex justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            드래그하여 카테고리 순서를 변경할 수 있습니다.
+            드래그하여 순서 변경, 클릭하여 서브카테고리 펼치기
           </p>
           <Button
             onClick={() => {
@@ -469,12 +739,69 @@ export default function AdCategoriesV2Page() {
                         strategy={verticalListSortingStrategy}
                       >
                         {categories.map((category) => (
-                          <SortableRow
-                            key={category.id}
-                            category={category}
-                            onEdit={handleEditClick}
-                            onDelete={handleDeleteClick}
-                          />
+                          <React.Fragment key={category.id}>
+                            <SortableRow
+                              category={category}
+                              isSelected={selectedCategory?.id === category.id}
+                              onEdit={handleEditClick}
+                              onDelete={handleDeleteClick}
+                              onSelect={handleCategorySelect}
+                              onAddSub={handleAddSubClick}
+                            />
+                            {selectedCategory?.id === category.id && (
+                              <TableRow className="hover:bg-transparent">
+                                <TableCell colSpan={5} className="p-0 border-b border-border">
+                                  <div className="bg-muted/30 px-4 py-3">
+                                    <DndContext
+                                      sensors={sensors}
+                                      collisionDetection={closestCenter}
+                                      onDragEnd={handleSubDragEnd}
+                                    >
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow className="border-border hover:bg-transparent">
+                                            <TableHead className="text-muted-foreground w-32 h-8">순서</TableHead>
+                                            <TableHead className="text-muted-foreground h-8">서브카테고리명</TableHead>
+                                            <TableHead className="text-muted-foreground h-8">상태</TableHead>
+                                            <TableHead className="text-muted-foreground text-right h-8">작업</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {subLoading ? (
+                                            <TableRow>
+                                              <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                                                <Skeleton className="h-4 w-1/2 mx-auto" />
+                                              </TableCell>
+                                            </TableRow>
+                                          ) : subCategories.length === 0 ? (
+                                            <TableRow>
+                                              <TableCell colSpan={4} className="text-center py-6 text-muted-foreground text-sm">
+                                                서브카테고리가 없습니다.
+                                              </TableCell>
+                                            </TableRow>
+                                          ) : (
+                                            <SortableContext
+                                              items={subCategories.map((s) => s.id)}
+                                              strategy={verticalListSortingStrategy}
+                                            >
+                                              {subCategories.map((sub) => (
+                                                <SortableSubRow
+                                                  key={sub.id}
+                                                  sub={sub}
+                                                  onEdit={handleSubEditClick}
+                                                  onDelete={handleSubDeleteClick}
+                                                />
+                                              ))}
+                                            </SortableContext>
+                                          )}
+                                        </TableBody>
+                                      </Table>
+                                    </DndContext>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
                         ))}
                       </SortableContext>
                     )}
@@ -574,6 +901,74 @@ export default function AdCategoriesV2Page() {
             </Button>
             <Button onClick={handleSave} disabled={!!orderIndexError}>
               {editingCategory ? '수정' : '생성'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 서브카테고리 수정 다이얼로그 */}
+      <Dialog open={isSubDialogOpen} onOpenChange={(open) => {
+        if (!open) setEditingSubCategory(null);
+        setIsSubDialogOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingSubCategory ? '서브카테고리 수정' : '서브카테고리 추가'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingSubCategory ? '서브카테고리 정보를 수정합니다.' : `${selectedCategory?.categoryName}에 서브카테고리를 추가합니다.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="subCategoryName">서브카테고리 이름 *</Label>
+              <Input
+                id="subCategoryName"
+                value={subForm.subCategoryName}
+                onChange={(e) => setSubForm((prev) => ({ ...prev, subCategoryName: e.target.value }))}
+                placeholder="서브카테고리 이름"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="subIsActive"
+                checked={subForm.isActive}
+                onCheckedChange={(checked) =>
+                  setSubForm((prev) => ({ ...prev, isActive: checked as boolean }))
+                }
+              />
+              <Label htmlFor="subIsActive">활성화</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSubDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={handleSubSave}>
+              {editingSubCategory ? '수정' : '추가'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 서브카테고리 삭제 확인 다이얼로그 */}
+      <Dialog open={deleteSubDialog} onOpenChange={setDeleteSubDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>서브카테고리 삭제</DialogTitle>
+            <DialogDescription>
+              정말로 <strong>{deletingSubCategory?.subCategoryName}</strong> 서브카테고리를
+              삭제하시겠습니까?
+              <br />이 작업은 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteSubDialog(false)}>
+              취소
+            </Button>
+            <Button variant="destructive" onClick={handleSubDeleteConfirm}>
+              삭제
             </Button>
           </DialogFooter>
         </DialogContent>
