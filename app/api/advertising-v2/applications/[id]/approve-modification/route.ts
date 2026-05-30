@@ -30,6 +30,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const adminMonthlyAmount: number | undefined =
+      typeof body.monthlyAmount === 'number' && body.monthlyAmount > 0
+        ? body.monthlyAmount
+        : undefined;
     const supabase = await createClient();
     const adminSupabase = createAdminClient();
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -110,6 +115,8 @@ export async function POST(
       const currentFee = (ad as any).approvedMonthlyAmount ??
         calcFee((currentApts ?? []) as { totalHouseholds: number }[]);
       const newFee = calcFee(aptList);
+      // 관리자 직접 입력 금액 우선, 없으면 자동계산
+      const actualNewFee = adminMonthlyAmount ?? newFee;
 
       // 실제 아파트 변경 여부 확인 (동일 아파트면 일반 텍스트 수정으로 처리)
       const currentAptIds = new Set(
@@ -126,6 +133,7 @@ export async function POST(
           .from('advertisements_v2')
           .update({
             ...adChanges,
+            ...(adminMonthlyAmount !== undefined ? { approvedMonthlyAmount: adminMonthlyAmount } : {}),
             apartmentChangeStatus: null,
             modificationStatus: null,
             modificationRejectedReason: null,
@@ -137,6 +145,22 @@ export async function POST(
         if (updateError) {
           console.error('Failed to approve modification (same apartments):', updateError);
           return NextResponse.json({ error: 'Failed to approve modification' }, { status: 500 });
+        }
+
+        if (adminMonthlyAmount !== undefined) {
+          const { data: subSameApt } = await supabase
+            .from('ad_subscriptions_v2')
+            .select('id')
+            .eq('advertisementId', id)
+            .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
+            .order('createdAt', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if ((subSameApt as any)?.id) {
+            await adminSupabase.from('ad_subscriptions_v2').update({
+              monthlyAmount: adminMonthlyAmount,
+            }).eq('id', (subSameApt as any).id);
+          }
         }
 
         // 서브카테고리 업데이트 후 바로 리턴
@@ -189,22 +213,17 @@ export async function POST(
             modificationStatus: null,
             modificationRejectedReason: null,
             pendingChanges: pendingChangesWithoutApartments,
-            approvedMonthlyAmount: newFee,
+            approvedMonthlyAmount: actualNewFee,
             updatedAt: now,
           }).eq('id', id);
 
-          // 무료기간 종료 후 첫 정기결제부터 신규 금액으로 청구되도록 구독 monthlyAmount 갱신
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
-              monthlyAmount: newFee,
+              monthlyAmount: actualNewFee,
             }).eq('id', (subscription as any).id);
           }
         } else {
           // 케이스 2: 금액 증가 + 결제 이력 → 차액 결제 대기
-          // 텍스트/아파트/서브카테고리 모두 결제 후 charge-apartment-difference EF에서 일괄 적용
-          // pendingChanges 전체를 그대로 보존 (텍스트 + apartments 포함)
-          // 차액 금액은 DB에 저장하지 않음 — charge-apartment-difference EF가 호출 시점 now() 기준으로 동적 계산
-
           await supabase.from('advertisements_v2').update({
             apartmentChangeStatus: 'pending_payment',
             modificationStatus: null,
@@ -213,11 +232,9 @@ export async function POST(
           }).eq('id', id);
           deferSubCategoryUpdate = true;
 
-          // 구독 monthlyAmount를 신규 금액으로 갱신
-          // (케이스 4에서 감소 금액으로 갱신된 경우를 신규 금액으로 재갱신)
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
-              monthlyAmount: newFee,
+              monthlyAmount: actualNewFee,
             }).eq('id', (subscription as any).id);
           }
         }
@@ -231,20 +248,17 @@ export async function POST(
             modificationStatus: null,
             modificationRejectedReason: null,
             pendingChanges: pendingChangesWithoutApartments,
-            approvedMonthlyAmount: newFee,
+            approvedMonthlyAmount: actualNewFee,
             updatedAt: now,
           }).eq('id', id);
 
-          // 무료기간 종료 후 첫 정기결제부터 신규 금액으로 청구되도록 구독 monthlyAmount 갱신
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
-              monthlyAmount: newFee,
+              monthlyAmount: actualNewFee,
             }).eq('id', (subscription as any).id);
           }
         } else {
           // 케이스 4: 금액 감소 + 결제 이력 → 다음달 정기결제일에 자동 적용 예약
-          // 텍스트/아파트/서브카테고리 모두 charge-billing에서 일괄 적용 (케이스 2와 동일 원칙)
-          // pendingChanges 전체를 그대로 보존 (텍스트 + apartments 포함)
           await supabase.from('advertisements_v2').update({
             apartmentChangeStatus: 'pending_next_cycle',
             modificationStatus: null,
@@ -253,21 +267,20 @@ export async function POST(
           }).eq('id', id);
           deferSubCategoryUpdate = true;
 
-          // 다음 정기결제부터 신규 금액으로 청구되도록 구독 monthlyAmount 미리 갱신
-          // (charge-billing은 sub.monthlyAmount를 그대로 결제 금액으로 사용)
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
-              monthlyAmount: newFee,
+              monthlyAmount: actualNewFee,
             }).eq('id', (subscription as any).id);
           }
         }
       }
     } else {
-      // 아파트 변경 없는 일반 텍스트 수정 → 기존 로직 그대로
+      // 아파트 변경 없는 일반 텍스트 수정
       const { error: updateError } = await supabase
         .from('advertisements_v2')
         .update({
           ...adChanges,
+          ...(adminMonthlyAmount !== undefined ? { approvedMonthlyAmount: adminMonthlyAmount } : {}),
           modificationStatus: null,
           modificationRejectedReason: null,
           pendingChanges: null,
@@ -278,6 +291,22 @@ export async function POST(
       if (updateError) {
         console.error('Failed to approve modification:', updateError);
         return NextResponse.json({ error: 'Failed to approve modification' }, { status: 500 });
+      }
+
+      if (adminMonthlyAmount !== undefined) {
+        const { data: subText } = await supabase
+          .from('ad_subscriptions_v2')
+          .select('id')
+          .eq('advertisementId', id)
+          .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
+          .order('createdAt', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if ((subText as any)?.id) {
+          await adminSupabase.from('ad_subscriptions_v2').update({
+            monthlyAmount: adminMonthlyAmount,
+          }).eq('id', (subText as any).id);
+        }
       }
     }
 

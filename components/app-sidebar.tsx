@@ -34,6 +34,7 @@ import {
   Sparkles,
   Tag,
   DoorOpen,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
 import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -153,6 +154,12 @@ const advertisingItems: MenuItem[] = [
     href: '/admin/advertising-v2/premium',
     icon: Sparkles,
     roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '가격 변동하기',
+    href: '/admin/advertising-v2/pricing',
+    icon: TrendingUp,
+    roles: ['SUPER_ADMIN'],
   },
 ];
 
@@ -365,7 +372,7 @@ export function AppSidebar(): React.ReactElement {
     if (visible.length === 0) return null;
     return (
       <SidebarGroup className="px-2 py-2">
-        <SidebarGroupLabel className="mb-1 px-2 font-semibold uppercase tracking-wider text-sidebar-foreground/55">
+        <SidebarGroupLabel className="mb-1 rounded-md bg-primary/10 px-2 py-6 font-semibold uppercase tracking-wider text-primary/70">
           {label}
         </SidebarGroupLabel>
         <SidebarGroupContent>

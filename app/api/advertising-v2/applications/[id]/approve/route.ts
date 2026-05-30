@@ -34,11 +34,14 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { freeMonths, discountRate, overrideEnabled, discountNote } = body as {
+    const { freeMonths, discountRate, overrideEnabled, discountNote, categoryId, subCategoryIds, adminMemo } = body as {
       freeMonths: number;
       discountRate: number;
       overrideEnabled?: boolean;
       discountNote?: string;
+      categoryId?: string;
+      subCategoryIds?: string[];
+      adminMemo?: string;
     };
 
     const [adResult, pricingResult] = await Promise.all([
@@ -117,6 +120,8 @@ export async function POST(
         approvedAt: new Date().toISOString(),
         // overrideEnabled가 아닌 경우 항상 null로 저장 (예외 할인 아닌 승인에는 사유 불필요)
         discountNote: overrideEnabled === true ? (discountNote?.trim() || null) : null,
+        adminMemo: adminMemo?.trim() || null,
+        ...(categoryId ? { categoryId } : {}),
       })
       .eq('id', id);
 
@@ -126,6 +131,30 @@ export async function POST(
         { error: 'Failed to approve advertisement' },
         { status: 500 }
       );
+    }
+
+    // 서브카테고리 override: 제공된 경우 junction table 교체
+    if (subCategoryIds !== undefined) {
+      const { error: deleteError } = await supabase
+        .from('advertisement_sub_categories_v2')
+        .delete()
+        .eq('advertisementId', id);
+
+      if (deleteError) {
+        console.error('Failed to delete sub categories:', deleteError);
+        return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+      }
+
+      if (subCategoryIds.length > 0) {
+        const { error: insertError } = await supabase
+          .from('advertisement_sub_categories_v2')
+          .insert(subCategoryIds.map((subCategoryId) => ({ advertisementId: id, subCategoryId })));
+
+        if (insertError) {
+          console.error('Failed to insert sub categories:', insertError);
+          return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+        }
+      }
     }
 
     // 광고 승인 FCM 알림 전송 (non-critical: 실패해도 승인 처리는 유지)

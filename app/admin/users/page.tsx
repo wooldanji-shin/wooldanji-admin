@@ -126,6 +126,7 @@ export default function UsersPage() {
   const currentPage = parseInt(searchParams.get('page') || '1');
   const selectedApartment = searchParams.get('apartment') || '';
   const selectedBuilding = searchParams.get('building') || '';
+  const selectedRegistrationType = searchParams.get('type') || '';
 
   // 초기 로드시 URL의 검색어를 input에 설정
   useEffect(() => {
@@ -218,7 +219,8 @@ export default function UsersPage() {
       const { data: partnerData } = await supabase
         .from('partner_users')
         .select('userId');
-      setPartnerUserIds(new Set((partnerData || []).map((p: any) => p.userId)));
+      const partnerIds = (partnerData || []).map((p: any) => p.userId);
+      setPartnerUserIds(new Set(partnerIds));
 
       let query = supabase
         .from('user')
@@ -269,6 +271,21 @@ export default function UsersPage() {
         }
       }
 
+      // 회원유형 필터링
+      if (selectedRegistrationType === 'PARTNER') {
+        if (partnerIds.length > 0) {
+          query = query.in('id', partnerIds);
+        } else {
+          setUsers([]);
+          setTotalCount(0);
+          setLoading(false);
+          setInitialLoading(false);
+          return;
+        }
+      } else if (selectedRegistrationType) {
+        query = query.eq('registrationType', selectedRegistrationType);
+      }
+
       // 페이지네이션
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -288,7 +305,7 @@ export default function UsersPage() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [searchQuery, currentPage, selectedApartment, selectedBuilding, buildings, supabase, initialLoading]);
+  }, [searchQuery, currentPage, selectedApartment, selectedBuilding, selectedRegistrationType, buildings, supabase, initialLoading]);
 
   useEffect(() => {
     fetchUsers();
@@ -474,6 +491,11 @@ export default function UsersPage() {
   const handleBuildingChange = (value: string) => {
     const buildingValue = value === 'all' ? '' : value;
     updateSearchParams({ building: buildingValue, page: '1' });
+  };
+
+  const handleRegistrationTypeChange = (value: string) => {
+    const typeValue = value === 'all' ? '' : value;
+    updateSearchParams({ type: typeValue, page: '1' });
   };
 
   const handleApprovalStatusChange = async (userId: string, status: 'approve' | 'pending') => {
@@ -747,6 +769,18 @@ export default function UsersPage() {
                   {building.buildingNumber}동
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedRegistrationType || 'all'} onValueChange={handleRegistrationTypeChange}>
+            <SelectTrigger className='w-full lg:w-[150px]'>
+              <SelectValue placeholder='회원유형' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>전체 유형</SelectItem>
+              <SelectItem value='APARTMENT'>아파트</SelectItem>
+              <SelectItem value='GENERAL'>일반</SelectItem>
+              <SelectItem value='PARTNER'>파트너</SelectItem>
             </SelectContent>
           </Select>
 

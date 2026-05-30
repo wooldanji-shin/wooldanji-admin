@@ -127,18 +127,21 @@ export interface Database {
           name: string;
           address: string | null;
           createdAt: string;
+          isAdEnabled: boolean;
         };
         Insert: {
           id?: string;
           name: string;
           address?: string | null;
           createdAt?: string;
+          isAdEnabled?: boolean;
         };
         Update: {
           id?: string;
           name?: string;
           address?: string | null;
           createdAt?: string;
+          isAdEnabled?: boolean;
         };
       };
       apartment_buildings: {

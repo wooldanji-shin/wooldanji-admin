@@ -12,6 +12,12 @@ export interface ApartmentInfo {
   totalHouseholds: number;
 }
 
+export interface AdCategoryWithSubs {
+  id: string;
+  categoryName: string;
+  subCategories: { id: string; subCategoryName: string }[];
+}
+
 export interface PendingChanges {
   title?: string;
   content?: string | null;
@@ -46,6 +52,7 @@ export interface AdApplicationDetail {
   instagramUrl: string | null;
   kakaoOpenChatUrl: string | null;
   rejectReason: string | null;
+  adminMemo: string | null;
   modificationStatus: string | null;
   modificationRejectedReason: string | null;
   pendingChanges: PendingChanges | null;
@@ -75,6 +82,8 @@ export interface AdApplicationDetail {
   isFirstAd: boolean;
   // 아파트 변경 상태 (pending_payment | pending_next_cycle | null)
   apartmentChangeStatus: string | null;
+  partnerDbId: string;
+  partnerAnalyticsEnabled: boolean;
 }
 
 export interface AdAnalyticsSummary {
@@ -108,20 +117,34 @@ export interface UseApplicationDetailPageReturn {
   setDiscountRate: (v: number) => void;
   discountNote: string;
   setDiscountNote: (v: string) => void;
+  adminMemo: string;
+  setAdminMemo: (v: string) => void;
   rejectReason: string;
   setRejectReason: (v: string) => void;
   processing: boolean;
   handleApprove: () => Promise<void>;
   handleReject: () => Promise<void>;
+  handleUpdateMemo: () => Promise<void>;
   // 수정 심사
+  modificationApproveDialog: boolean;
+  setModificationApproveDialog: (open: boolean) => void;
+  newMonthlyAmount: string;
+  setNewMonthlyAmount: (v: string) => void;
   modificationRejectDialog: boolean;
   setModificationRejectDialog: (open: boolean) => void;
   modificationRejectReason: string;
   setModificationRejectReason: (v: string) => void;
   handleApproveModification: () => Promise<void>;
   handleRejectModification: () => Promise<void>;
+  grantAnalytics: boolean;
+  setGrantAnalytics: (v: boolean) => void;
   totalHouseholds: number;
   monthlyAmount: number;
+  allCategories: AdCategoryWithSubs[];
+  approveCategory: string | null;
+  handleApproveCategoryChange: (categoryId: string) => void;
+  approveSubCategoryIds: string[];
+  setApproveSubCategoryIds: (ids: string[]) => void;
 }
 
 export function useApplicationDetailPage(
@@ -140,10 +163,17 @@ export function useApplicationDetailPage(
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [discountRate, setDiscountRate] = useState(28);
   const [discountNote, setDiscountNote] = useState('');
+  const [adminMemo, setAdminMemo] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [modificationApproveDialog, setModificationApproveDialog] = useState(false);
+  const [newMonthlyAmount, setNewMonthlyAmount] = useState('');
   const [modificationRejectDialog, setModificationRejectDialog] = useState(false);
   const [modificationRejectReason, setModificationRejectReason] = useState('');
+  const [grantAnalytics, setGrantAnalytics] = useState(false);
+  const [allCategories, setAllCategories] = useState<AdCategoryWithSubs[]>([]);
+  const [approveCategory, setApproveCategory] = useState<string | null>(null);
+  const [approveSubCategoryIds, setApproveSubCategoryIds] = useState<string[]>([]);
 
   useEffect(() => {
     params.then((p) => setAdId(p.id));
@@ -154,7 +184,7 @@ export function useApplicationDetailPage(
     setLoading(true);
 
     try {
-      const [adResult, pricingResult, analyticsResult] = await Promise.all([
+      const [adResult, pricingResult, analyticsResult, categoriesResult] = await Promise.all([
         supabase
           .from('advertisements_v2')
           .select(`
@@ -177,6 +207,7 @@ export function useApplicationDetailPage(
             instagramUrl,
             kakaoOpenChatUrl,
             rejectReason,
+            adminMemo,
             modificationStatus,
             modificationRejectedReason,
             apartmentChangeStatus,
@@ -202,6 +233,11 @@ export function useApplicationDetailPage(
           .from('ad_analytics_v2')
           .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, wishCount')
           .eq('targetId', adId),
+        supabase
+          .from('ad_categories_v2')
+          .select('id, categoryName, ad_sub_categories_v2(id, subCategoryName, isActive, orderIndex)')
+          .eq('isActive', true)
+          .order('orderIndex', { ascending: true }),
       ]);
 
       if (adResult.error) throw adResult.error;
@@ -214,7 +250,7 @@ export function useApplicationDetailPage(
       // hasHadRunningAd: running 전환 시 설정, 어뷰징 방어용 fallback
       const { data: partnerData } = await supabase
         .from('partner_users')
-        .select('hasHadRunningAd')
+        .select('hasHadRunningAd, analyticsEnabled')
         .eq('id', row.partnerId)
         .single();
 
@@ -306,6 +342,7 @@ export function useApplicationDetailPage(
         instagramUrl: row.instagramUrl,
         kakaoOpenChatUrl: row.kakaoOpenChatUrl,
         rejectReason: row.rejectReason,
+        adminMemo: row.adminMemo ?? null,
         modificationStatus: row.modificationStatus ?? null,
         modificationRejectedReason: row.modificationRejectedReason ?? null,
         pendingChanges,
@@ -323,6 +360,8 @@ export function useApplicationDetailPage(
         nextBillingDate: (subscription as any)?.nextBillingDate ?? null,
         isFirstAd,
         apartmentChangeStatus: row.apartmentChangeStatus ?? null,
+        partnerDbId: row.partnerId,
+        partnerAnalyticsEnabled: (partnerData as any)?.analyticsEnabled ?? false,
       };
 
       const analyticsRows = (analyticsResult.data ?? []) as any[];
@@ -353,12 +392,30 @@ export function useApplicationDetailPage(
       }
 
       setDetail(mapped);
+      setGrantAnalytics((partnerData as any)?.analyticsEnabled ?? false);
       // 다이얼로그 열릴 때 매번 초기화
       // 첫광고이면 무료기간 기본 1개월, 아니면 0
       setFreeMonths(isFirstAd ? 1 : 0);
       setOverrideEnabled(false);
       setDiscountRate(isFirstAd ? mapped.defaultDiscountRate : 0);
       setDiscountNote('');
+      setAdminMemo(row.adminMemo ?? '');
+      // 승인 다이얼로그 카테고리 초기값: 현재 광고의 카테고리/서브카테고리
+      const currentSubCategoryIds = (row.advertisement_sub_categories_v2 ?? [])
+        .map((sc: any) => sc.subCategoryId)
+        .filter(Boolean);
+      setApproveCategory(row.categoryId ?? null);
+      setApproveSubCategoryIds(currentSubCategoryIds);
+      setAllCategories(
+        ((categoriesResult.data ?? []) as any[]).map((cat: any) => ({
+          id: cat.id,
+          categoryName: cat.categoryName,
+          subCategories: ((cat.ad_sub_categories_v2 ?? []) as any[])
+            .filter((s: any) => s.isActive !== false)
+            .sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+            .map((s: any) => ({ id: s.id, subCategoryName: s.subCategoryName })),
+        }))
+      );
     } catch (err) {
       console.error('Failed to fetch detail:', err);
       toast.error('광고 신청 정보를 불러오는데 실패했습니다.');
@@ -372,6 +429,11 @@ export function useApplicationDetailPage(
     fetchDetail();
   }, [fetchDetail]);
 
+  const handleApproveCategoryChange = useCallback((categoryId: string) => {
+    setApproveCategory(categoryId);
+    setApproveSubCategoryIds([]);
+  }, []);
+
   const handleApprove = async () => {
     if (!detail) return;
     setProcessing(true);
@@ -381,12 +443,18 @@ export function useApplicationDetailPage(
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, discountNote }),
+          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, categoryId: approveCategory, subCategoryIds: approveSubCategoryIds }),
         }
       );
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || 'Failed to approve');
+      }
+      if (grantAnalytics && !detail.partnerAnalyticsEnabled) {
+        await (supabase as any)
+          .from('partner_users')
+          .update({ analyticsEnabled: true })
+          .eq('id', detail.partnerDbId);
       }
       toast.success('광고 신청이 승인되었습니다.');
       router.push('/admin/advertising-v2/applications');
@@ -430,19 +498,53 @@ export function useApplicationDetailPage(
     }
   };
 
-  const handleApproveModification = async () => {
+  const handleUpdateMemo = async () => {
     if (!detail) return;
     setProcessing(true);
     try {
       const response = await fetch(
+        `/api/advertising-v2/applications/${detail.id}/memo`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminMemo: adminMemo.trim() }),
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to update memo');
+      }
+      toast.success('메모가 저장되었습니다.');
+      fetchDetail();
+    } catch (err) {
+      console.error('Failed to update memo:', err);
+      toast.error('메모 저장에 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleApproveModification = async () => {
+    if (!detail) return;
+    setProcessing(true);
+    try {
+      const parsed = parseInt(newMonthlyAmount.replace(/,/g, ''), 10);
+      const monthlyAmount = !isNaN(parsed) && parsed > 0 ? parsed : undefined;
+      const response = await fetch(
         `/api/advertising-v2/applications/${detail.id}/approve-modification`,
-        { method: 'POST' }
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...(monthlyAmount !== undefined ? { monthlyAmount } : {}) }),
+        }
       );
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || 'Failed to approve modification');
       }
       toast.success('수정 내용이 승인되었습니다.');
+      setModificationApproveDialog(false);
+      setNewMonthlyAmount('');
       fetchDetail();
     } catch (err) {
       console.error('Failed to approve modification:', err);
@@ -507,18 +609,32 @@ export function useApplicationDetailPage(
     setDiscountRate,
     discountNote,
     setDiscountNote,
+    adminMemo,
+    setAdminMemo,
     rejectReason,
     setRejectReason,
     processing,
     handleApprove,
     handleReject,
+    handleUpdateMemo,
+    modificationApproveDialog,
+    setModificationApproveDialog,
+    newMonthlyAmount,
+    setNewMonthlyAmount,
     modificationRejectDialog,
     setModificationRejectDialog,
     modificationRejectReason,
     setModificationRejectReason,
     handleApproveModification,
     handleRejectModification,
+    grantAnalytics,
+    setGrantAnalytics,
     totalHouseholds,
     monthlyAmount,
+    allCategories,
+    approveCategory,
+    handleApproveCategoryChange,
+    approveSubCategoryIds,
+    setApproveSubCategoryIds,
   };
 }

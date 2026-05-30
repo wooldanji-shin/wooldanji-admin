@@ -13,7 +13,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -96,6 +104,8 @@ export default function AdApplicationDetailPage({
   const effectiveDiscountRate = detail.approvedDiscountRate ?? detail.defaultDiscountRate;
   const effectiveMonthlyAmount = detail.approvedMonthlyAmount
     ?? Math.round((page.monthlyAmount * (1 - effectiveDiscountRate / 100)) / 10) * 10;
+
+  const approveCategoryData = page.allCategories.find(c => c.id === page.approveCategory);
 
   const socialLinks = [
     { label: '네이버 지도', url: detail.naverMapUrl },
@@ -690,7 +700,7 @@ export default function AdApplicationDetailPage({
                   <p className='mb-1 text-sm text-muted-foreground'>수정 내용을 검토해주세요.</p>
                   <Button
                     size='lg'
-                    onClick={page.handleApproveModification}
+                    onClick={() => page.setModificationApproveDialog(true)}
                     disabled={page.processing}
                     className='w-full gap-2 bg-blue-600 text-white hover:bg-blue-700'
                   >
@@ -710,6 +720,34 @@ export default function AdApplicationDetailPage({
                 </CardContent>
               </Card>
             )}
+
+            {/* 관리 메모 */}
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-base font-semibold'>관리 메모</CardTitle>
+                <p className='text-xs text-muted-foreground'>내부용 · 파트너에게 공개되지 않습니다</p>
+              </CardHeader>
+              <CardContent className='space-y-2 px-6 pb-4'>
+                <Textarea
+                  className='min-h-[100px] resize-none text-sm'
+                  placeholder='이 광고에 대한 내부 메모를 남겨주세요...'
+                  maxLength={500}
+                  value={page.adminMemo}
+                  onChange={(e) => page.setAdminMemo(e.target.value)}
+                />
+                <div className='flex items-center justify-between'>
+                  <span className='text-xs text-muted-foreground'>{page.adminMemo.length}/500</span>
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    onClick={page.handleUpdateMemo}
+                    disabled={page.processing}
+                  >
+                    {page.processing ? '저장 중...' : '저장'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </aside>
       </div>
@@ -743,6 +781,46 @@ export default function AdApplicationDetailPage({
                 </div>
               </div>
             )}
+            {/* 카테고리 변경 (선택사항) */}
+            <div className='space-y-2'>
+              <div className='space-y-1.5'>
+                <label className='text-base font-medium'>
+                  카테고리 <span className='text-sm font-normal text-muted-foreground'>(변경 시에만 수정)</span>
+                </label>
+                <Select value={page.approveCategory ?? ''} onValueChange={page.handleApproveCategoryChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder='카테고리 선택' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {page.allCategories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.categoryName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {approveCategoryData && approveCategoryData.subCategories.length > 0 && (
+                <div className='space-y-1.5'>
+                  <label className='text-sm font-medium text-muted-foreground'>서브카테고리</label>
+                  <div className='flex flex-wrap gap-3'>
+                    {approveCategoryData.subCategories.map((sub) => (
+                      <label key={sub.id} className='flex items-center gap-1.5 cursor-pointer'>
+                        <Checkbox
+                          checked={page.approveSubCategoryIds.includes(sub.id)}
+                          onCheckedChange={(checked) => {
+                            page.setApproveSubCategoryIds(
+                              checked
+                                ? [...page.approveSubCategoryIds, sub.id]
+                                : page.approveSubCategoryIds.filter((id) => id !== sub.id)
+                            );
+                          }}
+                        />
+                        <span className='text-sm'>{sub.subCategoryName}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className='space-y-1.5'>
               <label className='text-base font-medium'>무료 개월 수</label>
               <Input
@@ -788,6 +866,23 @@ export default function AdApplicationDetailPage({
                 </p>
               )}
             </div>
+            {/* 광고 분석 열람 권한 부여 */}
+            <div className='rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1.5'>
+              <label className='flex items-center gap-2 cursor-pointer'>
+                <Checkbox
+                  checked={page.grantAnalytics}
+                  disabled={detail.partnerAnalyticsEnabled}
+                  onCheckedChange={(checked) => page.setGrantAnalytics(!!checked)}
+                  className='border-blue-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600'
+                />
+                <span className='text-base font-semibold text-blue-900'>광고 분석 열람 권한 부여</span>
+              </label>
+              {detail.partnerAnalyticsEnabled ? (
+                <p className='text-sm text-blue-600 pl-6'>이미 분석 열람 권한이 허용된 파트너입니다.</p>
+              ) : (
+                <p className='text-sm text-blue-700/70 pl-6'>승인 시 파트너가 앱에서 광고 통계를 열람할 수 있습니다.</p>
+              )}
+            </div>
             {/* 예외 할인 적용 시에만 할인 사유 입력 표시 */}
             {page.overrideEnabled && (
               <div className='space-y-1.5'>
@@ -806,6 +901,19 @@ export default function AdApplicationDetailPage({
                 </p>
               </div>
             )}
+            <div className='space-y-1.5'>
+              <label className='text-base font-medium'>
+                관리 메모 <span className='text-sm font-normal text-muted-foreground'>(내부용, 파트너 비공개)</span>
+              </label>
+              <Textarea
+                className='min-h-[80px] resize-none'
+                placeholder='승인 관련 내부 메모를 남겨주세요...'
+                maxLength={500}
+                value={page.adminMemo}
+                onChange={(e) => page.setAdminMemo(e.target.value)}
+              />
+              <p className='text-xs text-muted-foreground text-right'>{page.adminMemo.length}/500</p>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -864,6 +972,52 @@ export default function AdApplicationDetailPage({
 
       <ImageLightbox {...adImgLb.props} />
       <ImageLightbox {...pendingImgLb.props} />
+
+      {/* 수정 승인 다이얼로그 */}
+      <Dialog open={page.modificationApproveDialog} onOpenChange={page.setModificationApproveDialog}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>수정 내용 승인</DialogTitle>
+            <DialogDescription>
+              결제금액을 직접 설정하려면 입력하세요. 비워두면 기존 금액이 유지됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-1.5 py-2'>
+            <label className='text-sm font-medium'>월 결제금액 변경 (선택)</label>
+            <div className='flex items-center gap-2'>
+              <Input
+                type='number'
+                min={0}
+                placeholder='예: 50000'
+                value={page.newMonthlyAmount}
+                onChange={(e) => page.setNewMonthlyAmount(e.target.value)}
+              />
+              <span className='shrink-0 text-sm text-muted-foreground'>원</span>
+            </div>
+            {page.newMonthlyAmount && !isNaN(parseInt(page.newMonthlyAmount)) && parseInt(page.newMonthlyAmount) > 0 && (
+              <p className='text-sm text-blue-600'>
+                변경 금액: <strong>{parseInt(page.newMonthlyAmount).toLocaleString()}원</strong>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => { page.setModificationApproveDialog(false); page.setNewMonthlyAmount(''); }}
+              disabled={page.processing}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={page.handleApproveModification}
+              disabled={page.processing}
+              className='bg-blue-600 text-white hover:bg-blue-700'
+            >
+              {page.processing ? '처리 중...' : '승인'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 수정 거절 다이얼로그 */}
       <Dialog open={page.modificationRejectDialog} onOpenChange={page.setModificationRejectDialog}>

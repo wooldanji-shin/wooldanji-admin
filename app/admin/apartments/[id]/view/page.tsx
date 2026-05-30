@@ -111,6 +111,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
   const currentPage = parseInt(searchParams.get('page') || '1');
   const selectedBuilding = searchParams.get('building') || '';
   const selectedLine = searchParams.get('line') || '';
+  const selectedRole = searchParams.get('role') || '';
 
   useEffect(() => {
     setSearchInput(searchQuery);
@@ -224,6 +225,13 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
         }
       }
 
+      // 회원유형(역할) 필터링 (클라이언트 사이드)
+      if (selectedRole) {
+        filteredData = filteredData.filter((user: any) =>
+          user.user_roles?.some((r: any) => r.role === selectedRole)
+        );
+      }
+
       // 페이지네이션 적용
       const totalFiltered = filteredData.length;
       const paginatedData = filteredData.slice(from, to + 1);
@@ -240,7 +248,7 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [searchQuery, currentPage, selectedBuilding, selectedLine, resolvedParams.id, apartment, lines, supabase, initialLoading]);
+  }, [searchQuery, currentPage, selectedBuilding, selectedLine, selectedRole, resolvedParams.id, apartment, lines, supabase, initialLoading]);
 
   // 통계 계산
   const fetchStats = async () => {
@@ -358,6 +366,11 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
   const handleLineChange = (value: string) => {
     const lineValue = value === 'all' ? '' : value;
     updateSearchParams({ line: lineValue, page: '1' });
+  };
+
+  const handleRoleChange = (value: string) => {
+    const roleValue = value === 'all' ? '' : value;
+    updateSearchParams({ role: roleValue, page: '1' });
   };
 
   const formatDate = (dateString: string) => {
@@ -560,6 +573,18 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
                         {formatLineDisplay(line.line)}라인
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedRole || 'all'} onValueChange={handleRoleChange}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="회원유형" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 유형</SelectItem>
+                    <SelectItem value="APP_USER">앱 사용자</SelectItem>
+                    <SelectItem value="APT_ADMIN">아파트 관리자</SelectItem>
+                    <SelectItem value="MANAGER">매니저</SelectItem>
+                    <SelectItem value="SUPER_ADMIN">최고 관리자</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

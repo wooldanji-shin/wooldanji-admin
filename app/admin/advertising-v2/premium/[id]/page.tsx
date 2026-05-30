@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
@@ -648,6 +649,34 @@ export default function PremiumAdDetailPage({
                 </CardContent>
               </Card>
             )}
+
+            {/* 관리 메모 */}
+            <Card>
+              <CardHeader className='pb-3'>
+                <CardTitle className='text-base font-semibold'>관리 메모</CardTitle>
+                <p className='text-xs text-muted-foreground'>내부용 · 파트너에게 공개되지 않습니다</p>
+              </CardHeader>
+              <CardContent className='space-y-2 px-6 pb-4'>
+                <Textarea
+                  className='min-h-[100px] resize-none text-sm'
+                  placeholder='이 광고에 대한 내부 메모를 남겨주세요...'
+                  maxLength={500}
+                  value={page.adminMemo}
+                  onChange={(e) => page.setAdminMemo(e.target.value)}
+                />
+                <div className='flex items-center justify-between'>
+                  <span className='text-xs text-muted-foreground'>{page.adminMemo.length}/500</span>
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    onClick={page.handleUpdateMemo}
+                    disabled={page.processing}
+                  >
+                    {page.processing ? '저장 중...' : '저장'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </aside>
       </div>
@@ -730,6 +759,37 @@ export default function PremiumAdDetailPage({
                 </span>
               </div>
             )}
+            {/* 광고 분석 열람 권한 부여 */}
+            <div className='rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1.5'>
+              <label className='flex items-center gap-2 cursor-pointer'>
+                <Checkbox
+                  checked={page.grantAnalytics}
+                  disabled={detail.partner?.analyticsEnabled}
+                  onCheckedChange={(checked) => page.setGrantAnalytics(!!checked)}
+                  className='border-blue-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600'
+                />
+                <span className='text-sm font-semibold text-blue-900'>광고 분석 열람 권한 부여</span>
+              </label>
+              {detail.partner?.analyticsEnabled ? (
+                <p className='text-sm text-blue-600 pl-6'>이미 분석 열람 권한이 허용된 파트너입니다.</p>
+              ) : (
+                <p className='text-sm text-blue-700/70 pl-6'>승인 시 파트너가 앱에서 광고 통계를 열람할 수 있습니다.</p>
+              )}
+            </div>
+            <div className='space-y-1.5'>
+              <label className='text-sm font-medium'>
+                관리 메모{' '}
+                <span className='font-normal text-muted-foreground'>(내부용, 파트너 비공개)</span>
+              </label>
+              <Textarea
+                className='min-h-[80px] resize-none'
+                placeholder='승인 관련 내부 메모를 남겨주세요...'
+                maxLength={500}
+                value={page.adminMemo}
+                onChange={(e) => page.setAdminMemo(e.target.value)}
+              />
+              <p className='text-right text-xs text-muted-foreground'>{page.adminMemo.length}/500</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant='outline' onClick={() => page.setApproveDialog(false)}>

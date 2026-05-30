@@ -11,9 +11,13 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Home,
+  DoorOpen,
 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -70,6 +74,7 @@ interface Apartment {
   createdByName: string | null;
   createdByPhone: string | null;
   status: 'active' | 'pending' | 'inactive';
+  isAdEnabled: boolean;
 }
 
 type SortField = 'name' | 'buildingCount' | 'totalUnits' | 'totalDevices' | 'memberCount' | 'createdAt';
@@ -121,6 +126,7 @@ export default function ApartmentsPage() {
           address,
           createdAt,
           createdBy,
+          isAdEnabled,
           user:createdBy (
             name,
             phoneNumber
@@ -236,6 +242,7 @@ export default function ApartmentsPage() {
           createdByName: (apt as any).user?.name || null,
           createdByPhone: (apt as any).user?.phoneNumber || null,
           status: 'active' as const,
+          isAdEnabled: (apt as any).isAdEnabled ?? true,
         };
       }) || [];
 
@@ -325,6 +332,22 @@ export default function ApartmentsPage() {
     }
   };
 
+  const handleToggleAdEnabled = async (id: string, isAdEnabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('apartments')
+        .update({ isAdEnabled })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setApartments(prev => prev.map(a => a.id === id ? { ...a, isAdEnabled } : a));
+      toast.success(isAdEnabled ? '광고가 활성화되었습니다.' : '광고가 비활성화되었습니다.');
+    } catch (error) {
+      console.error('Failed to toggle ad enabled:', error);
+      toast.error('광고 활성화 상태 변경 중 오류가 발생했습니다.');
+    }
+  };
 
   return (
     <PageShell>
@@ -350,6 +373,62 @@ export default function ApartmentsPage() {
       </PageHeader>
 
       <PageContent>
+        {/* 전체 합계 통계 카드 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+          <Card>
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="p-2 rounded-lg bg-blue-100">
+                <Home className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">총 세대수</p>
+                <p className="text-2xl font-bold">
+                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalUnits, 0).toLocaleString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="p-2 rounded-lg bg-purple-100">
+                <Cpu className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">총 기기수</p>
+                <p className="text-2xl font-bold">
+                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalDevices, 0).toLocaleString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="p-2 rounded-lg bg-green-100">
+                <Users className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">총 회원수</p>
+                <p className="text-2xl font-bold">
+                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.memberCount, 0).toLocaleString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="p-2 rounded-lg bg-orange-100">
+                <DoorOpen className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">총 문 연 횟수</p>
+                <p className="text-2xl font-bold">
+                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalOpenDoorCount, 0).toLocaleString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
       <DataTableShell
         toolbar={
           <DataToolbar>
@@ -431,6 +510,9 @@ export default function ApartmentsPage() {
                     </TableHead>
                   )}
                   <TableHead className="text-muted-foreground text-center">
+                    광고
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-center">
                     등록자
                   </TableHead>
                   <TableHead
@@ -448,13 +530,13 @@ export default function ApartmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="p-0">
+                    <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className="p-0">
                       <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 9 : 10} showHeader={false} />
                     </TableCell>
                   </TableRow>
                 ) : filteredApartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 9 : 10} className="p-0">
+                    <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className="p-0">
                       <EmptyState
                         icon={Building2}
                         title={searchTerm ? '검색 결과가 없습니다' : '등록된 아파트가 없습니다'}
@@ -509,6 +591,12 @@ export default function ApartmentsPage() {
                           )}
                         </TableCell>
                       )}
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={apartment.isAdEnabled}
+                          onCheckedChange={(checked) => handleToggleAdEnabled(apartment.id, checked)}
+                        />
+                      </TableCell>
                       <TableCell className="text-center text-sm">
                         {apartment.createdByName ? (
                           <div>

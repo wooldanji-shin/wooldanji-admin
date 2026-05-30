@@ -24,13 +24,15 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
-    // 요청 body에서 할인율 파싱 (없으면 0)
+    // 요청 body에서 할인율 및 관리자 메모 파싱
     let discountRate = 0;
+    let adminMemo: string | undefined;
     try {
       const body = await request.json();
       discountRate = body?.discountRate ?? 0;
+      adminMemo = body?.adminMemo;
     } catch {
-      // body 없거나 파싱 실패 시 0으로 처리
+      // body 없거나 파싱 실패 시 기본값으로 처리
     }
     const effectiveDiscountRate = Math.min(100, Math.max(0, discountRate));
 
@@ -66,6 +68,7 @@ export async function POST(
         status: 'approved',
         approvedDiscountRate: effectiveDiscountRate > 0 ? effectiveDiscountRate : null,
         discountedTotalAmount,
+        adminMemo: adminMemo?.trim() || null,
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id);

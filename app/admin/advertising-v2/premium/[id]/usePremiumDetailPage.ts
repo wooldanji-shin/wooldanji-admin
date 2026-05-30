@@ -48,6 +48,7 @@ export interface PremiumAdDetail {
   paymentStatus: 'unpaid' | 'paid';
   totalAmount: number | null;
   rejectedReason: string | null;
+  adminMemo: string | null;
   modificationStatus: string | null;
   modificationRejectedReason: string | null;
   approvedDiscountRate: number | null;
@@ -59,6 +60,7 @@ export interface PremiumAdDetail {
   snapshotApartments: SnapshotApartment[];
   partner: {
     businessName: string | null;
+    analyticsEnabled: boolean;
   } | null;
   category: { categoryName: string } | null;
   subCategoryNames: string[];
@@ -91,11 +93,16 @@ export interface UsePremiumDetailPageReturn {
   extensionWeeks: number;
   displayAmount: number | null;
   extensionAmount: number | null;
+  // 분석 권한 부여
+  grantAnalytics: boolean;
+  setGrantAnalytics: (v: boolean) => void;
   // 승인 다이얼로그
   approveDialog: boolean;
   setApproveDialog: (open: boolean) => void;
   discountRate: number;
   setDiscountRate: (v: number) => void;
+  adminMemo: string;
+  setAdminMemo: (v: string) => void;
   handleApproveConfirm: () => Promise<void>;
   // 거절 다이얼로그
   rejectDialog: boolean;
@@ -114,6 +121,7 @@ export interface UsePremiumDetailPageReturn {
   handleReject: () => Promise<void>;
   handleApproveModification: () => Promise<void>;
   handleRejectModification: () => Promise<void>;
+  handleUpdateMemo: () => Promise<void>;
 }
 
 export function usePremiumDetailPage(
@@ -129,8 +137,10 @@ export function usePremiumDetailPage(
   const [cumulativeAmount, setCumulativeAmount] = useState<number | null>(null);
   const [extensions, setExtensions] = useState<ExtensionRow[]>([]);
 
+  const [grantAnalytics, setGrantAnalytics] = useState<boolean>(false);
   const [approveDialog, setApproveDialog] = useState<boolean>(false);
   const [discountRate, setDiscountRate] = useState<number>(0);
+  const [adminMemo, setAdminMemo] = useState<string>('');
   const [rejectDialog, setRejectDialog] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('');
   const [modificationRejectDialog, setModificationRejectDialog] = useState<boolean>(false);
@@ -151,7 +161,7 @@ export function usePremiumDetailPage(
         .select(
           'id, "partnerId", "baseAdId", title, content, "imageUrls", ' +
             '"naverMapUrl", "blogUrl", "youtubeUrl", "instagramUrl", "kakaoOpenChatUrl", ' +
-            'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", ' +
+            'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", "adminMemo", ' +
             '"modificationStatus", "modificationRejectedReason", "pendingChanges", ' +
             '"startedAt", "endedAt", "createdAt", "snapshotApartments", ' +
             '"approvedDiscountRate", "discountedTotalAmount"'
@@ -165,7 +175,7 @@ export function usePremiumDetailPage(
 
       const { data: partnerData } = await supabase
         .from('partner_users')
-        .select('"businessName"')
+        .select('"businessName", "analyticsEnabled"')
         .eq('userId', row.partnerId)
         .maybeSingle();
 
@@ -210,6 +220,7 @@ export function usePremiumDetailPage(
         paymentStatus: row.paymentStatus as 'unpaid' | 'paid',
         totalAmount: (row.totalAmount as number | null) ?? null,
         rejectedReason: (row.rejectedReason as string | null) ?? null,
+        adminMemo: (row.adminMemo as string | null) ?? null,
         modificationStatus: (row.modificationStatus as string | null) ?? null,
         modificationRejectedReason: (row.modificationRejectedReason as string | null) ?? null,
         pendingChanges: (row.pendingChanges as Record<string, unknown> | null) ?? null,
@@ -220,16 +231,24 @@ export function usePremiumDetailPage(
         approvedDiscountRate: (row.approvedDiscountRate as number | null) ?? null,
         discountedTotalAmount: (row.discountedTotalAmount as number | null) ?? null,
         partner: partnerData
-          ? { businessName: (partnerData as { businessName: string | null }).businessName }
+          ? {
+              businessName: (partnerData as { businessName: string | null; analyticsEnabled: boolean }).businessName,
+              analyticsEnabled: (partnerData as { businessName: string | null; analyticsEnabled: boolean }).analyticsEnabled ?? false,
+            }
           : null,
         category,
         subCategoryNames,
       };
 
       setDetail(mapped);
+      setGrantAnalytics((partnerData as any)?.analyticsEnabled ?? false);
+      setAdminMemo((row.adminMemo as string | null) ?? '');
 
       // 누적 결제 합계 + 연장 이력 + 통계 동시 조회
-      const [{ data: paidRows }, { data: extRows }, { data: analyticsRows }] = await Promise.all([
+      const analyticsSelect =
+        'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, wishCount';
+
+      const [{ data: paidRows }, { data: extRows }, { data: premiumAnalyticsRows }, { data: baseAnalyticsRows }] = await Promise.all([
         supabase
           .from('ad_payment_history_v2')
           .select('amount')
@@ -246,11 +265,14 @@ export function usePremiumDetailPage(
           .order('paymentDate', { ascending: true }),
         supabase
           .from('ad_analytics_v2')
-          .select(
-            'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, wishCount'
-          )
+          .select(analyticsSelect)
           .eq('targetType', 'premium_advertisements_v2')
           .eq('targetId', adId),
+        supabase
+          .from('ad_analytics_v2')
+          .select(analyticsSelect)
+          .eq('targetType', 'advertisement_v2')
+          .eq('targetId', baseAdId),
       ]);
 
       const sum = (paidRows ?? []).reduce(
@@ -259,15 +281,18 @@ export function usePremiumDetailPage(
       );
       setCumulativeAmount(sum > 0 ? sum : null);
 
-      const rows = (analyticsRows ?? []) as Record<string, number>[];
-      if (rows.length > 0) {
+      const allRows = [
+        ...((premiumAnalyticsRows ?? []) as Record<string, number>[]),
+        ...((baseAnalyticsRows ?? []) as Record<string, number>[]),
+      ];
+      if (allRows.length > 0) {
         const s: PremiumAdAnalyticsSummary = {
           impressionCount: 0, homePremiumImpressionCount: 0, dialogImpressionCount: 0,
           clickCount: 0, phoneClickCount: 0, messageClickCount: 0,
           naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
           instagramClickCount: 0, kakaoChatClickCount: 0, wishCount: 0,
         };
-        for (const r of rows) {
+        for (const r of allRows) {
           s.impressionCount += r.impressionCount ?? 0;
           s.homePremiumImpressionCount += r.homePremiumImpressionCount ?? 0;
           s.dialogImpressionCount += r.dialogImpressionCount ?? 0;
@@ -328,11 +353,17 @@ export function usePremiumDetailPage(
       const res = await fetch(`/api/advertising-v2/premium/${detail.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discountRate }),
+        body: JSON.stringify({ discountRate, adminMemo }),
       });
       if (!res.ok) {
         const result = await res.json();
         throw new Error(result.error ?? 'Failed to approve');
+      }
+      if (grantAnalytics && !detail.partner?.analyticsEnabled) {
+        await (supabase as any)
+          .from('partner_users')
+          .update({ analyticsEnabled: true })
+          .eq('userId', detail.partnerId);
       }
       toast.success('프리미엄 광고가 승인되었습니다.');
       setApproveDialog(false);
@@ -391,6 +422,29 @@ export function usePremiumDetailPage(
     } catch (err) {
       console.error('수정 승인 실패:', err);
       toast.error('수정 승인에 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleUpdateMemo = async (): Promise<void> => {
+    if (!detail) return;
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/advertising-v2/premium/${detail.id}/memo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminMemo: adminMemo.trim() }),
+      });
+      if (!res.ok) {
+        const result = await res.json();
+        throw new Error(result.error ?? 'Failed to update memo');
+      }
+      toast.success('메모가 저장되었습니다.');
+      fetchDetail();
+    } catch (err) {
+      console.error('메모 업데이트 실패:', err);
+      toast.error('메모 저장에 실패했습니다.');
     } finally {
       setProcessing(false);
     }
@@ -456,10 +510,14 @@ export function usePremiumDetailPage(
     extensionWeeks,
     displayAmount,
     extensionAmount,
+    grantAnalytics,
+    setGrantAnalytics,
     approveDialog,
     setApproveDialog,
     discountRate,
     setDiscountRate,
+    adminMemo,
+    setAdminMemo,
     handleApproveConfirm,
     rejectDialog,
     setRejectDialog,
@@ -474,5 +532,6 @@ export function usePremiumDetailPage(
     handleReject,
     handleApproveModification,
     handleRejectModification,
+    handleUpdateMemo,
   };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Inbox } from 'lucide-react';
+import { AlertCircle, Check, Inbox, Search, X } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
@@ -12,6 +12,26 @@ import { DataToolbar, DataToolbarFilters } from '@/components/data-toolbar';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
+import { ApartmentCombobox } from '@/components/apartment-combobox';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -26,6 +46,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   useApplicationsPage,
@@ -83,6 +104,57 @@ function ApartmentTooltip({
   );
 }
 
+interface PaginationProps {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}
+
+function Pagination({ page, totalPages, onPageChange }: PaginationProps): React.ReactElement | null {
+  if (totalPages <= 1) return null;
+
+  // 최대 5개 페이지 번호 표시
+  const getPageNumbers = (): number[] => {
+    const half = 2;
+    let start = Math.max(1, page - half);
+    const end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-1 border-t border-border px-4 py-3">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={page === 1}
+        onClick={() => onPageChange(page - 1)}
+      >
+        이전
+      </Button>
+      {getPageNumbers().map((n) => (
+        <Button
+          key={n}
+          variant={n === page ? 'default' : 'ghost'}
+          size="sm"
+          className="w-9"
+          onClick={() => onPageChange(n)}
+        >
+          {n}
+        </Button>
+      ))}
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={page === totalPages}
+        onClick={() => onPageChange(page + 1)}
+      >
+        다음
+      </Button>
+    </div>
+  );
+}
+
 const STATUS_TABS: { label: string; value: StatusFilter }[] = [
   { label: '전체', value: 'all' },
   { label: '승인대기', value: 'pending' },
@@ -92,16 +164,68 @@ const STATUS_TABS: { label: string; value: StatusFilter }[] = [
 
 export default function AdApplicationsPage(): React.ReactElement {
   const {
-    applications,
     loading,
     statusFilter,
     setStatusFilter,
     categoryFilter,
     setCategoryFilter,
+    subCategoryFilter,
+    setSubCategoryFilter,
+    searchTerm,
+    setSearchTerm,
+    apartmentFilter,
+    setApartmentFilter,
     categories,
+    subCategories,
+    allApartments,
     pricePerHousehold,
+    statusCounts,
+    categoryCounts,
+    paginatedApplications,
+    page,
+    setPage,
+    totalPages,
+    filteredCount,
     handleRowClick,
+    selectedAd,
+    approveDialog,
+    setApproveDialog,
+    rejectDialog,
+    setRejectDialog,
+    freeMonths,
+    setFreeMonths,
+    overrideEnabled,
+    setOverrideEnabled,
+    discountRate,
+    setDiscountRate,
+    discountNote,
+    setDiscountNote,
+    adminMemo,
+    setAdminMemo,
+    rejectReason,
+    setRejectReason,
+    processing,
+    handleOpenApprove,
+    handleApprove,
+    handleOpenReject,
+    handleReject,
+    grantAnalytics,
+    setGrantAnalytics,
+    allCategoriesWithSubs,
+    approveCategory,
+    handleApproveCategoryChange,
+    approveSubCategoryIds,
+    setApproveSubCategoryIds,
   } = useApplicationsPage();
+
+  const selectedAdIsFirstAd = selectedAd
+    ? selectedAd.isFirstAdApplication && !selectedAd.partner_users?.hasHadRunningAd
+    : false;
+  const selectedAdTotalHouseholds = selectedAd
+    ? selectedAd.apartments.reduce((sum, a) => sum + a.totalHouseholds, 0)
+    : 0;
+  const selectedAdMonthlyAmount = selectedAdTotalHouseholds * pricePerHousehold;
+  const approveCategoryData = allCategoriesWithSubs.find((c) => c.id === approveCategory);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -114,34 +238,67 @@ export default function AdApplicationsPage(): React.ReactElement {
         </PageHeader>
 
         <PageContent>
-          {/* 상태 탭 — 모던 segmented control */}
-          <div className="inline-flex w-full max-w-md items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
-                className={cn(
-                  'h-9 flex-1 rounded-md px-4 text-sm font-medium transition-all',
-                  statusFilter === tab.value
-                    ? 'bg-primary text-primary-foreground shadow-card'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* 아파트 필터 + 검색 */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="상호명·광고 제목 검색"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-11 w-[260px] pl-9"
+              />
+            </div>
+            <ApartmentCombobox
+              apartments={allApartments}
+              value={apartmentFilter}
+              onChange={setApartmentFilter}
+              placeholder="아파트 필터"
+            />
+          </div>
+
+          {/* 상태 탭 — 개수 배지 포함 */}
+          <div className="inline-flex w-full max-w-xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
+            {STATUS_TABS.map((tab) => {
+              const isActive = statusFilter === tab.value;
+              const count = statusCounts[tab.value];
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setStatusFilter(tab.value)}
+                  className={cn(
+                    'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-card'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                  )}
+                >
+                  {tab.label}
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
+                      isActive && 'bg-primary-foreground/20 text-primary-foreground'
+                    )}
+                  >
+                    {count}
+                  </Badge>
+                </button>
+              );
+            })}
           </div>
 
           <DataTableShell
             toolbar={
-              categories.length > 0 ? (
-                <DataToolbar>
+              <DataToolbar className="flex-col sm:flex-col sm:items-stretch gap-2 py-3">
+                {/* 카테고리 필터 */}
+                {categories.length > 0 && (
                   <DataToolbarFilters>
                     <button
                       type="button"
                       onClick={() => setCategoryFilter(null)}
                       className={cn(
-                        'inline-flex h-11 items-center rounded-md border px-5 text-sm font-medium transition-colors',
+                        'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
                         categoryFilter === null
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
@@ -151,30 +308,80 @@ export default function AdApplicationsPage(): React.ReactElement {
                     </button>
                     {categories.map((cat) => {
                       const isActive = categoryFilter === cat.id;
+                      const count = categoryCounts[cat.id] ?? 0;
                       return (
                         <button
                           key={cat.id}
                           type="button"
                           onClick={() => setCategoryFilter(isActive ? null : cat.id)}
                           className={cn(
-                            'inline-flex h-11 items-center rounded-md border px-5 text-sm font-medium transition-colors',
+                            'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
                             isActive
                               ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
                           )}
                         >
                           {cat.categoryName}
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
+                              isActive && 'bg-primary-foreground/20 text-primary-foreground'
+                            )}
+                          >
+                            {count}
+                          </Badge>
                         </button>
                       );
                     })}
                   </DataToolbarFilters>
-                </DataToolbar>
-              ) : undefined
+                )}
+
+                {/* 서브카테고리 필터 — 카테고리 선택 시 표시 */}
+                {subCategories.length > 0 && (
+                  <DataToolbarFilters>
+                    <button
+                      type="button"
+                      onClick={() => setSubCategoryFilter(null)}
+                      className={cn(
+                        'inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors',
+                        subCategoryFilter === null
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
+                      )}
+                    >
+                      전체
+                    </button>
+                    {subCategories.map((sub) => {
+                      const isActive = subCategoryFilter === sub.id;
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => setSubCategoryFilter(isActive ? null : sub.id)}
+                          className={cn(
+                            'inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors',
+                            isActive
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
+                          )}
+                        >
+                          {sub.subCategoryName}
+                        </button>
+                      );
+                    })}
+                  </DataToolbarFilters>
+                )}
+
+              </DataToolbar>
+            }
+            pagination={
+              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
             }
           >
             {loading ? (
               <TableSkeleton rows={6} columns={9} />
-            ) : applications.length === 0 ? (
+            ) : paginatedApplications.length === 0 ? (
               <EmptyState
                 icon={Inbox}
                 title="신청 내역이 없습니다"
@@ -186,17 +393,17 @@ export default function AdApplicationsPage(): React.ReactElement {
                   <TableRow>
                     <TableHead>상호명</TableHead>
                     <TableHead className="text-center">첫광고</TableHead>
-                    <TableHead>광고표시용번호</TableHead>
-                    <TableHead>광고 내용</TableHead>
+                    <TableHead>광고 제목</TableHead>
                     <TableHead>카테고리</TableHead>
                     <TableHead className="text-center">신청 아파트</TableHead>
                     <TableHead className="text-center">광고 상태</TableHead>
                     <TableHead className="text-center">결제 상태</TableHead>
-                    <TableHead>신청일시</TableHead>
+                    <TableHead>광고 시작일</TableHead>
+                    <TableHead className="text-center">액션</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {applications.map((app) => (
+                  {paginatedApplications.map((app) => (
                     <TableRow
                       key={app.id}
                       className="cursor-pointer"
@@ -214,12 +421,9 @@ export default function AdApplicationsPage(): React.ReactElement {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {app.partner_users?.displayPhoneNumber ?? '-'}
-                      </TableCell>
                       <TableCell className="max-w-[240px]">
-                        {app.content ? (
-                          <div className="truncate text-sm">{app.content}</div>
+                        {app.title ? (
+                          <div className="truncate text-sm">{app.title}</div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -249,6 +453,11 @@ export default function AdApplicationsPage(): React.ReactElement {
                       <TableCell className="text-center">
                         <div className="flex flex-col items-center gap-1">
                           <StatusBadge.Ad status={app.adStatus} />
+                          {app.adStatus === 'running' && app.freeMonths > 0 && (
+                            <StatusBadge variant="success" size="sm" withDot={false}>
+                              무료체험
+                            </StatusBadge>
+                          )}
                           {app.modificationStatus && (
                             <StatusBadge.Modification status={app.modificationStatus} />
                           )}
@@ -258,9 +467,38 @@ export default function AdApplicationsPage(): React.ReactElement {
                         <StatusBadge.Payment status={app.paymentStatus} />
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {app.submittedAt
-                          ? new Date(app.submittedAt).toLocaleString('ko-KR')
+                        {app.activatedAt
+                          ? new Date(app.activatedAt).toLocaleDateString('ko-KR')
                           : '-'}
+                      </TableCell>
+                      <TableCell
+                        className="text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          {app.adStatus === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 gap-1 px-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                              onClick={() => handleOpenApprove(app)}
+                            >
+                              <Check className="h-3 w-3" />
+                              승인
+                            </Button>
+                          )}
+                          {app.adStatus === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 gap-1 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => handleOpenReject(app)}
+                            >
+                              <X className="h-3 w-3" />
+                              거절
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -268,8 +506,254 @@ export default function AdApplicationsPage(): React.ReactElement {
               </Table>
             )}
           </DataTableShell>
+
+          {/* 결과 개수 안내 */}
+          {!loading && filteredCount > 0 && (
+            <p className="text-right text-xs text-muted-foreground">
+              총 {filteredCount.toLocaleString()}건 · {page}/{totalPages} 페이지
+            </p>
+          )}
         </PageContent>
       </PageShell>
+
+      {/* 승인 다이얼로그 */}
+      <Dialog open={approveDialog} onOpenChange={setApproveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>광고 신청 승인</DialogTitle>
+            <DialogDescription>
+              <strong className="text-foreground">
+                {selectedAd?.partner_users?.businessName}
+              </strong>
+              의 광고 신청을 승인합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            {!selectedAdIsFirstAd && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div className="flex-1">
+                  <p className="text-sm text-amber-800">
+                    이 파트너는 이미 광고를 운영한 이력이 있습니다.
+                  </p>
+                  <label className="mt-2 flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={overrideEnabled}
+                      onChange={(e) => setOverrideEnabled(e.target.checked)}
+                    />
+                    <span className="text-sm font-medium text-amber-900">
+                      예외 적용 (파트너 협의 완료)
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+            {/* 광고 분석 열람 권한 부여 */}
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1.5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={grantAnalytics}
+                  disabled={selectedAd?.partner_users?.analyticsEnabled}
+                  onCheckedChange={(checked) => setGrantAnalytics(!!checked)}
+                  className="border-blue-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                />
+                <span className="text-base font-semibold text-blue-900">광고 분석 열람 권한 부여</span>
+              </label>
+              {selectedAd?.partner_users?.analyticsEnabled ? (
+                <p className="text-sm text-blue-600 pl-6">이미 분석 열람 권한이 허용된 파트너입니다.</p>
+              ) : (
+                <p className="text-sm text-blue-700/70 pl-6">승인 시 파트너가 앱에서 광고 통계를 열람할 수 있습니다.</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <label className="text-base font-medium">
+                  카테고리{' '}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    (변경 시에만 수정)
+                  </span>
+                </label>
+                <Select
+                  value={approveCategory ?? ''}
+                  onValueChange={handleApproveCategoryChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="카테고리 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allCategoriesWithSubs.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.categoryName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {approveCategoryData && approveCategoryData.subCategories.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    서브카테고리
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {approveCategoryData.subCategories.map((sub) => (
+                      <label key={sub.id} className="flex cursor-pointer items-center gap-1.5">
+                        <Checkbox
+                          checked={approveSubCategoryIds.includes(sub.id)}
+                          onCheckedChange={(checked) => {
+                            setApproveSubCategoryIds(
+                              checked
+                                ? [...approveSubCategoryIds, sub.id]
+                                : approveSubCategoryIds.filter((id) => id !== sub.id)
+                            );
+                          }}
+                        />
+                        <span className="text-sm">{sub.subCategoryName}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-base font-medium">무료 개월 수</label>
+              <Input
+                type="number"
+                min={0}
+                max={24}
+                placeholder="0"
+                disabled={!selectedAdIsFirstAd && !overrideEnabled}
+                value={freeMonths || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFreeMonths(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                }}
+              />
+              {(selectedAdIsFirstAd || overrideEnabled) && (
+                <p className="text-sm text-muted-foreground">
+                  무료 기간: <strong>{freeMonths}개월</strong>
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-base font-medium">
+                {overrideEnabled ? '예외 결제 할인율 (%)' : '첫 결제 할인율 (%)'}
+              </label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="0"
+                disabled={!selectedAdIsFirstAd && !overrideEnabled}
+                value={discountRate || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDiscountRate(
+                    val === '' ? 0 : Math.min(100, Math.max(0, parseInt(val) || 0))
+                  );
+                }}
+              />
+              {(selectedAdIsFirstAd || overrideEnabled) && (
+                <p className="text-sm text-muted-foreground">
+                  적용 후 월 결제금액:{' '}
+                  <strong>
+                    {(
+                      Math.round(
+                        (selectedAdMonthlyAmount * (1 - discountRate / 100)) / 10
+                      ) * 10
+                    ).toLocaleString()}
+                    원
+                  </strong>
+                </p>
+              )}
+            </div>
+            {overrideEnabled && (
+              <div className="space-y-1.5">
+                <label className="text-base font-medium">
+                  할인 사유{' '}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    (파트너에게 표시, 선택)
+                  </span>
+                </label>
+                <Textarea
+                  className="min-h-[80px] resize-none"
+                  placeholder="예: 신규 상권 지원 / 장기 계약 협의 완료 등"
+                  maxLength={100}
+                  value={discountNote}
+                  onChange={(e) => setDiscountNote(e.target.value)}
+                />
+                <p className="text-right text-xs text-muted-foreground">
+                  {discountNote.length}/100
+                </p>
+              </div>
+            )}
+          </div>
+            <div className="space-y-1.5">
+              <label className="text-base font-medium">
+                관리 메모{' '}
+                <span className="text-sm font-normal text-muted-foreground">
+                  (내부용, 파트너 비공개)
+                </span>
+              </label>
+              <Textarea
+                className="min-h-[80px] resize-none"
+                placeholder="승인 관련 내부 메모를 남겨주세요..."
+                maxLength={500}
+                value={adminMemo}
+                onChange={(e) => setAdminMemo(e.target.value)}
+              />
+              <p className="text-right text-xs text-muted-foreground">{adminMemo.length}/500</p>
+            </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setApproveDialog(false)}
+              disabled={processing}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleApprove}
+              disabled={processing}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {processing ? '처리 중...' : '승인'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 거절 다이얼로그 */}
+      <Dialog open={rejectDialog} onOpenChange={setRejectDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>광고 신청 거절</DialogTitle>
+            <DialogDescription>
+              거절 사유를 입력해주세요. 파트너가 이 사유를 확인할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              className="min-h-[120px] resize-none"
+              placeholder="거절 사유를 입력해주세요..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRejectDialog(false)}
+              disabled={processing}
+            >
+              취소
+            </Button>
+            <Button variant="destructive" onClick={handleReject} disabled={processing}>
+              {processing ? '처리 중...' : '거절'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

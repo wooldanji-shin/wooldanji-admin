@@ -1,8 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Sparkles } from 'lucide-react';
+import { Check, Search, Sparkles, X } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
@@ -13,8 +11,20 @@ import { DataTableShell } from '@/components/data-table-shell';
 import { StatusBadge, type PremiumStatus } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
+import { ApartmentCombobox } from '@/components/apartment-combobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -23,25 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
-
-interface PremiumAd {
-  id: string;
-  partnerId: string;
-  baseAdId: string;
-  title: string | null;
-  weeks: number;
-  status: PremiumStatus;
-  paymentStatus: 'unpaid' | 'paid';
-  totalAmount: number | null;
-  cumulativeAmount: number | null;
-  modificationStatus: string | null;
-  startedAt: string | null;
-  endedAt: string | null;
-  createdAt: string;
-  partnerBusinessName?: string;
-}
+import { usePremiumPage } from './usePremiumPage';
 
 const STATUS_FILTERS: { value: PremiumStatus | 'all'; label: string }[] = [
   { value: 'all', label: '전체' },
@@ -53,83 +46,92 @@ const STATUS_FILTERS: { value: PremiumStatus | 'all'; label: string }[] = [
   { value: 'rejected', label: '거절됨' },
 ];
 
+interface PaginationProps {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}
+
+function Pagination({ page, totalPages, onPageChange }: PaginationProps): React.ReactElement | null {
+  if (totalPages <= 1) return null;
+
+  const getPageNumbers = (): number[] => {
+    const half = 2;
+    let start = Math.max(1, page - half);
+    const end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-1 border-t border-border px-4 py-3">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={page === 1}
+        onClick={() => onPageChange(page - 1)}
+      >
+        이전
+      </Button>
+      {getPageNumbers().map((n) => (
+        <Button
+          key={n}
+          variant={n === page ? 'default' : 'ghost'}
+          size="sm"
+          className="w-9"
+          onClick={() => onPageChange(n)}
+        >
+          {n}
+        </Button>
+      ))}
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={page === totalPages}
+        onClick={() => onPageChange(page + 1)}
+      >
+        다음
+      </Button>
+    </div>
+  );
+}
+
 export default function PremiumAdListPage(): React.ReactElement {
-  const router = useRouter();
-  const [ads, setAds] = useState<PremiumAd[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [statusFilter, setStatusFilter] = useState<PremiumStatus | 'all'>('all');
-
-  useEffect(() => {
-    loadAds();
-  }, []);
-
-  async function loadAds(): Promise<void> {
-    setIsLoading(true);
-    try {
-      const supabase = createClient();
-
-      const { data: adsData, error: adsError } = await supabase
-        .from('premium_advertisements_v2')
-        .select(
-          'id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "modificationStatus", "startedAt", "endedAt", "createdAt"'
-        )
-        .neq('status', 'draft')
-        .order('createdAt', { ascending: false });
-
-      if (adsError) throw adsError;
-      if (!adsData || adsData.length === 0) {
-        setAds([]);
-        return;
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const partnerUserIds = [...new Set(adsData.map((a: any) => a.partnerId))];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const adIds = adsData.map((a: any) => a.id);
-
-      const [{ data: partnerData }, { data: paymentRows }] = await Promise.all([
-        supabase
-          .from('partner_users')
-          .select('"userId", "businessName"')
-          .in('userId', partnerUserIds),
-        supabase
-          .from('ad_payment_history_v2')
-          .select('"premiumAdId", amount')
-          .in('premiumAdId', adIds)
-          .eq('status', 'paid'),
-      ]);
-
-      const partnerMap = Object.fromEntries(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (partnerData ?? []).map((p: any) => [p.userId, p.businessName])
-      );
-
-      const cumulativeAmountMap = (paymentRows ?? []).reduce<Record<string, number>>(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (acc, r: any) => {
-          const k = r.premiumAdId as string;
-          acc[k] = (acc[k] ?? 0) + ((r.amount as number | null) ?? 0);
-          return acc;
-        },
-        {}
-      );
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped: PremiumAd[] = adsData.map((row: any) => ({
-        ...row,
-        partnerBusinessName: partnerMap[row.partnerId] ?? '-',
-        cumulativeAmount: cumulativeAmountMap[row.id] ?? null,
-      }));
-      setAds(mapped);
-    } catch (err) {
-      console.error('프리미엄 광고 목록 로드 실패:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  const filtered =
-    statusFilter === 'all' ? ads : ads.filter((ad) => ad.status === statusFilter);
+  const {
+    isLoading,
+    statusFilter,
+    setStatusFilter,
+    searchTerm,
+    setSearchTerm,
+    apartmentFilter,
+    setApartmentFilter,
+    allApartments,
+    statusCounts,
+    paginatedAds,
+    page,
+    setPage,
+    totalPages,
+    filteredCount,
+    handleRowClick,
+    selectedAd,
+    approveDialog,
+    setApproveDialog,
+    rejectDialog,
+    setRejectDialog,
+    discountRate,
+    setDiscountRate,
+    adminMemo,
+    setAdminMemo,
+    rejectReason,
+    setRejectReason,
+    processing,
+    handleOpenApprove,
+    handleApproveConfirm,
+    handleOpenReject,
+    handleReject,
+    grantAnalytics,
+    setGrantAnalytics,
+  } = usePremiumPage();
 
   return (
     <PageShell>
@@ -141,11 +143,30 @@ export default function PremiumAdListPage(): React.ReactElement {
       </PageHeader>
 
       <PageContent>
-        {/* 상태 필터 — 카운트 배지가 있는 segmented filter */}
+        {/* 아파트 필터 + 검색 */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="업체명·광고 제목 검색"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-11 w-[260px] pl-9"
+            />
+          </div>
+          <ApartmentCombobox
+            apartments={allApartments}
+            value={apartmentFilter}
+            onChange={setApartmentFilter}
+            placeholder="아파트 필터"
+          />
+        </div>
+
+        {/* 상태 필터 — 카운트 배지 포함 */}
         <div className="flex flex-wrap gap-2">
           {STATUS_FILTERS.map((f) => {
             const isActive = statusFilter === f.value;
-            const count = f.value === 'all' ? ads.length : ads.filter((ad) => ad.status === f.value).length;
+            const count = statusCounts[f.value] ?? 0;
             return (
               <button
                 key={f.value}
@@ -172,10 +193,14 @@ export default function PremiumAdListPage(): React.ReactElement {
           })}
         </div>
 
-        <DataTableShell>
+        <DataTableShell
+          pagination={
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          }
+        >
           {isLoading ? (
             <TableSkeleton rows={6} columns={7} />
-          ) : filtered.length === 0 ? (
+          ) : paginatedAds.length === 0 ? (
             <EmptyState
               icon={Sparkles}
               title="해당하는 프리미엄 광고가 없습니다"
@@ -191,11 +216,11 @@ export default function PremiumAdListPage(): React.ReactElement {
                   <TableHead>금액</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead>신청일</TableHead>
-                  <TableHead className="w-16 text-right" />
+                  <TableHead className="text-center">액션</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((ad) => {
+                {paginatedAds.map((ad) => {
                   const cumulativeWeeks =
                     ad.startedAt && ad.endedAt
                       ? Math.floor(
@@ -211,7 +236,7 @@ export default function PremiumAdListPage(): React.ReactElement {
                     <TableRow
                       key={ad.id}
                       className="cursor-pointer"
-                      onClick={() => router.push(`/admin/advertising-v2/premium/${ad.id}`)}
+                      onClick={() => handleRowClick(ad.id)}
                     >
                       <TableCell className="font-medium">
                         {ad.partnerBusinessName ?? '-'}
@@ -248,17 +273,34 @@ export default function PremiumAdListPage(): React.ReactElement {
                       <TableCell className="text-muted-foreground">
                         {new Date(ad.createdAt).toLocaleDateString('ko-KR')}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/admin/advertising-v2/premium/${ad.id}`);
-                          }}
-                        >
-                          상세
-                        </Button>
+                      <TableCell
+                        className="text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          {ad.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 gap-1 px-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                              onClick={() => handleOpenApprove(ad)}
+                            >
+                              <Check className="h-3 w-3" />
+                              승인
+                            </Button>
+                          )}
+                          {ad.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 gap-1 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => handleOpenReject(ad)}
+                            >
+                              <X className="h-3 w-3" />
+                              거절
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -267,7 +309,131 @@ export default function PremiumAdListPage(): React.ReactElement {
             </Table>
           )}
         </DataTableShell>
+
+        {/* 결과 개수 안내 */}
+        {!isLoading && filteredCount > 0 && (
+          <p className="text-right text-xs text-muted-foreground">
+            총 {filteredCount.toLocaleString()}건 · {page}/{totalPages} 페이지
+          </p>
+        )}
       </PageContent>
+
+      {/* 승인 다이얼로그 */}
+      <Dialog open={approveDialog} onOpenChange={setApproveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>프리미엄 광고 승인</DialogTitle>
+            <DialogDescription>
+              할인율을 입력하면 파트너에게 할인된 금액으로 결제 요청됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* 광고 분석 열람 권한 부여 */}
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1.5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={grantAnalytics}
+                  disabled={selectedAd?.partnerAnalyticsEnabled}
+                  onCheckedChange={(checked) => setGrantAnalytics(!!checked)}
+                  className="border-blue-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                />
+                <span className="text-sm font-semibold text-blue-900">광고 분석 열람 권한 부여</span>
+              </label>
+              {selectedAd?.partnerAnalyticsEnabled ? (
+                <p className="text-sm text-blue-600 pl-6">이미 분석 열람 권한이 허용된 파트너입니다.</p>
+              ) : (
+                <p className="text-sm text-blue-700/70 pl-6">승인 시 파트너가 앱에서 광고 통계를 열람할 수 있습니다.</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">할인율 (%)</label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="0 (할인 없음)"
+                value={discountRate || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDiscountRate(
+                    val === '' ? 0 : Math.min(100, Math.max(0, parseInt(val) || 0))
+                  );
+                }}
+              />
+            </div>
+            {selectedAd?.totalAmount != null && discountRate > 0 && (
+              <div className="rounded-md bg-muted p-3 text-sm">
+                <span className="text-muted-foreground">할인 후 결제금액: </span>
+                <span className="font-semibold">
+                  {(
+                    Math.round(
+                      (selectedAd.totalAmount * (100 - discountRate)) / 100 / 10
+                    ) * 10
+                  ).toLocaleString()}
+                  원
+                </span>
+                <span className="ml-1 text-muted-foreground">
+                  (정상가 {selectedAd.totalAmount.toLocaleString()}원)
+                </span>
+              </div>
+            )}
+          </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                관리 메모{' '}
+                <span className="font-normal text-muted-foreground">(내부용, 파트너 비공개)</span>
+              </label>
+              <Textarea
+                className="min-h-[80px] resize-none"
+                placeholder="승인 관련 내부 메모를 남겨주세요..."
+                maxLength={500}
+                value={adminMemo}
+                onChange={(e) => setAdminMemo(e.target.value)}
+              />
+              <p className="text-right text-xs text-muted-foreground">{adminMemo.length}/500</p>
+            </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApproveDialog(false)}>
+              취소
+            </Button>
+            <Button onClick={handleApproveConfirm} disabled={processing}>
+              {processing ? '처리 중...' : '승인 확정'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 거절 다이얼로그 */}
+      <Dialog open={rejectDialog} onOpenChange={setRejectDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>프리미엄 광고 거절</DialogTitle>
+            <DialogDescription>
+              거절 사유를 입력해주세요. 파트너가 이 사유를 확인할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              className="min-h-[120px] resize-none"
+              placeholder="거절 사유를 입력해주세요..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRejectDialog(false)}
+              disabled={processing}
+            >
+              취소
+            </Button>
+            <Button variant="destructive" onClick={handleReject} disabled={processing}>
+              {processing ? '처리 중...' : '거절'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }
