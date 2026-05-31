@@ -238,7 +238,7 @@ export default function PartnerAnnouncementsPage() {
 
   // ─── 선택 동작 ─────────────────────────────────────────────────
   const eligiblePartners = useMemo(
-    () => partners.filter((p) => p.marketingAgreed),
+    () => partners.filter((p) => p.marketingAgreed && p.hasFcmToken),
     [partners],
   );
 
@@ -249,7 +249,7 @@ export default function PartnerAnnouncementsPage() {
 
   function togglePartner(id: string) {
     const partner = partners.find((p) => p.id === id);
-    if (!partner?.marketingAgreed) return;
+    if (!partner?.marketingAgreed || !partner?.hasFcmToken) return;
     const next = new Set(selected);
     next.has(id) ? next.delete(id) : next.add(id);
     setSelected(next);
@@ -435,13 +435,13 @@ export default function PartnerAnnouncementsPage() {
                     partners.map((p) => (
                       <TableRow
                         key={p.id}
-                        className={p.marketingAgreed ? 'cursor-pointer' : 'opacity-40'}
+                        className={p.marketingAgreed && p.hasFcmToken ? 'cursor-pointer' : 'opacity-40'}
                         onClick={() => togglePartner(p.id)}
                       >
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selected.has(p.id)}
-                            disabled={!p.marketingAgreed}
+                            disabled={!p.marketingAgreed || !p.hasFcmToken}
                             onCheckedChange={() => togglePartner(p.id)}
                           />
                         </TableCell>

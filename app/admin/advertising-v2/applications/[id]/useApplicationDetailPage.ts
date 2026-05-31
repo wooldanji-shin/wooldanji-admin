@@ -29,6 +29,8 @@ export interface PendingChanges {
   youtubeUrl?: string | null;
   instagramUrl?: string | null;
   kakaoOpenChatUrl?: string | null;
+  baeminUrl?: string | null;
+  coupangEatsUrl?: string | null;
   apartments?: { apartmentId: string; totalHouseholds: number }[];
   // 비교용: 카테고리 이름 (훅에서 resolve)
   resolvedCategoryName?: string | null;
@@ -51,6 +53,8 @@ export interface AdApplicationDetail {
   youtubeUrl: string | null;
   instagramUrl: string | null;
   kakaoOpenChatUrl: string | null;
+  baeminUrl: string | null;
+  coupangEatsUrl: string | null;
   rejectReason: string | null;
   adminMemo: string | null;
   modificationStatus: string | null;
@@ -206,6 +210,8 @@ export function useApplicationDetailPage(
             youtubeUrl,
             instagramUrl,
             kakaoOpenChatUrl,
+            baeminUrl,
+            coupangEatsUrl,
             rejectReason,
             adminMemo,
             modificationStatus,
@@ -341,6 +347,8 @@ export function useApplicationDetailPage(
         youtubeUrl: row.youtubeUrl,
         instagramUrl: row.instagramUrl,
         kakaoOpenChatUrl: row.kakaoOpenChatUrl,
+        baeminUrl: (row as any).baeminUrl ?? null,
+        coupangEatsUrl: (row as any).coupangEatsUrl ?? null,
         rejectReason: row.rejectReason,
         adminMemo: row.adminMemo ?? null,
         modificationStatus: row.modificationStatus ?? null,

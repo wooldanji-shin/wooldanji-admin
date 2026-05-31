@@ -46,6 +46,8 @@ const FIELD_LABELS: Record<string, string> = {
   youtubeUrl: '유튜브',
   instagramUrl: '인스타그램',
   kakaoOpenChatUrl: '카카오 오픈채팅',
+  baeminUrl: '배달의민족',
+  coupangEatsUrl: '쿠팡이츠',
 };
 
 function StatusBadge({ status }: { status: PremiumStatus }): React.ReactElement {
@@ -117,6 +119,8 @@ export default function PremiumAdDetailPage({
     { label: '유튜브', url: detail.youtubeUrl },
     { label: '인스타그램', url: detail.instagramUrl },
     { label: '카카오톡 오픈채팅', url: detail.kakaoOpenChatUrl },
+    { label: '배달의민족', url: detail.baeminUrl },
+    { label: '쿠팡이츠', url: detail.coupangEatsUrl },
   ].filter((s) => s.url);
 
   return (

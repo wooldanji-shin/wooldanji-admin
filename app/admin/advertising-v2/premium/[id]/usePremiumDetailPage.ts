@@ -43,6 +43,8 @@ export interface PremiumAdDetail {
   youtubeUrl: string | null;
   instagramUrl: string | null;
   kakaoOpenChatUrl: string | null;
+  baeminUrl: string | null;
+  coupangEatsUrl: string | null;
   weeks: number;
   status: PremiumStatus;
   paymentStatus: 'unpaid' | 'paid';
@@ -161,6 +163,7 @@ export function usePremiumDetailPage(
         .select(
           'id, "partnerId", "baseAdId", title, content, "imageUrls", ' +
             '"naverMapUrl", "blogUrl", "youtubeUrl", "instagramUrl", "kakaoOpenChatUrl", ' +
+            '"baeminUrl", "coupangEatsUrl", ' +
             'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", "adminMemo", ' +
             '"modificationStatus", "modificationRejectedReason", "pendingChanges", ' +
             '"startedAt", "endedAt", "createdAt", "snapshotApartments", ' +
@@ -215,6 +218,8 @@ export function usePremiumDetailPage(
         youtubeUrl: (row.youtubeUrl as string | null) ?? null,
         instagramUrl: (row.instagramUrl as string | null) ?? null,
         kakaoOpenChatUrl: (row.kakaoOpenChatUrl as string | null) ?? null,
+        baeminUrl: (row as any).baeminUrl ?? null,
+        coupangEatsUrl: (row as any).coupangEatsUrl ?? null,
         weeks: row.weeks as number,
         status: row.status as PremiumStatus,
         paymentStatus: row.paymentStatus as 'unpaid' | 'paid',

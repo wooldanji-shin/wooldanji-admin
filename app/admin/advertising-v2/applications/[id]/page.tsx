@@ -113,6 +113,8 @@ export default function AdApplicationDetailPage({
     { label: '유튜브', url: detail.youtubeUrl },
     { label: '인스타그램', url: detail.instagramUrl },
     { label: '카카오톡 오픈채팅', url: detail.kakaoOpenChatUrl },
+    { label: '배달의민족', url: detail.baeminUrl },
+    { label: '쿠팡이츠', url: detail.coupangEatsUrl },
   ].filter((s) => s.url);
 
   return (
@@ -283,10 +285,10 @@ export default function AdApplicationDetailPage({
                   />
                 )}
                 {/* SNS 링크 비교 */}
-                {(['naverMapUrl', 'blogUrl', 'youtubeUrl', 'instagramUrl', 'kakaoOpenChatUrl'] as const).map((key) => {
-                  const labelMap = { naverMapUrl: '네이버 지도', blogUrl: '블로그', youtubeUrl: '유튜브', instagramUrl: '인스타그램', kakaoOpenChatUrl: '카카오톡 오픈채팅' };
-                  const proposed = detail.pendingChanges![key];
-                  const current = detail[key];
+                {(['naverMapUrl', 'blogUrl', 'youtubeUrl', 'instagramUrl', 'kakaoOpenChatUrl', 'baeminUrl', 'coupangEatsUrl'] as const).map((key) => {
+                  const labelMap: Record<string, string> = { naverMapUrl: '네이버 지도', blogUrl: '블로그', youtubeUrl: '유튜브', instagramUrl: '인스타그램', kakaoOpenChatUrl: '카카오톡 오픈채팅', baeminUrl: '배달의민족', coupangEatsUrl: '쿠팡이츠' };
+                  const proposed = (detail.pendingChanges as any)?.[key] as string | null | undefined;
+                  const current = (detail as any)[key] as string | null;
                   if (proposed === undefined || proposed === current) return null;
                   return (
                     <CompareRow
