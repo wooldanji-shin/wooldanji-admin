@@ -86,6 +86,14 @@ serve(async (req) => {
       eligibleUsers.push(u);
     }
 
+    // 수신자 목록 먼저 저장 (FCM 수신 시 앱이 DB 조회하는 타이밍보다 앞서야 함)
+    if (eligibleUsers.length > 0 && announcementId) {
+      const { error: insertErr } = await supabase.from("user_announcement_recipients").insert(
+        eligibleUsers.map((u) => ({ announcementId, userId: u.id })),
+      );
+      if (insertErr) console.error(`[user-bulk-fcm] user_announcement_recipients INSERT 실패:`, insertErr);
+    }
+
     for (let i = 0; i < eligibleUsers.length; i += BATCH_SIZE) {
       const batch = eligibleUsers.slice(i, i + BATCH_SIZE);
       const tasks: Promise<{ user: UserRow; token: string; ok: boolean; errCode?: string; errMsg?: string }>[] = [];
@@ -143,13 +151,6 @@ serve(async (req) => {
       });
     }
 
-    // 수신자 목록 저장
-    if (eligibleUsers.length > 0 && announcementId) {
-      const { error: insertErr } = await supabase.from("user_announcement_recipients").insert(
-        eligibleUsers.map((u) => ({ announcementId, userId: u.id })),
-      );
-      if (insertErr) console.error(`[user-bulk-fcm] user_announcement_recipients INSERT 실패:`, insertErr);
-    }
 
     const durationMs = Date.now() - t0;
     console.log(`[user-bulk-fcm] done: total=${users.length}, success=${success}, failed=${failed}, noToken=${noToken}, skippedByPreference=${skippedByPreference}, ${durationMs}ms`);

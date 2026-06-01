@@ -269,15 +269,13 @@ export function usePremiumDetailPage(
           .eq('status', 'paid')
           .order('paymentDate', { ascending: true }),
         supabase
-          .from('ad_analytics_v2')
+          .from('premium_ad_analytics_v2')
           .select(analyticsSelect)
-          .eq('targetType', 'premium_advertisements_v2')
-          .eq('targetId', adId),
+          .eq('premiumAdId', adId),
         supabase
           .from('ad_analytics_v2')
           .select(analyticsSelect)
-          .eq('targetType', 'advertisement_v2')
-          .eq('targetId', baseAdId),
+          .eq('baseAdId', baseAdId),
       ]);
 
       const sum = (paidRows ?? []).reduce(

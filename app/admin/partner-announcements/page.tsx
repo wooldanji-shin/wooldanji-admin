@@ -53,6 +53,7 @@ import {
   XCircle,
   History,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -135,6 +136,8 @@ export default function PartnerAnnouncementsPage() {
   // 우측 이력
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // 수신자 모달
   const [recipientsModal, setRecipientsModal] = useState<{ key: string; title: string } | null>(null);
@@ -308,6 +311,22 @@ export default function PartnerAnnouncementsPage() {
       toast.error(`발송 실패: ${e?.message ?? e}`);
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleDelete(id: string, title: string) {
+    if (!confirm(`"${title}" 알림을 삭제합니다. 수신자 기록도 함께 삭제됩니다.`)) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/partner-announcements/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? '삭제 실패');
+      setHistory((prev) => prev.filter((h) => h.key !== id));
+      toast.success('삭제됐습니다');
+    } catch (e: any) {
+      toast.error(`삭제 실패: ${e?.message ?? e}`);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -593,18 +612,31 @@ export default function PartnerAnnouncementsPage() {
                       key={h.key}
                       className='rounded-lg border bg-card p-3'
                     >
-                      <div className='flex items-start justify-between'>
+                      <div className='flex items-start justify-between gap-2'>
                         <div className='font-medium'>{h.title}</div>
-                        <Badge
-                          variant='outline'
-                          className='cursor-pointer hover:bg-accent'
-                          onClick={() => {
-                            setRecipientsModal({ key: h.key, title: h.title });
-                            void loadRecipients(h.key);
-                          }}
-                        >
-                          {h.recipients}명
-                        </Badge>
+                        <div className='flex shrink-0 items-center gap-1'>
+                          <Badge
+                            variant='outline'
+                            className='cursor-pointer hover:bg-accent'
+                            onClick={() => {
+                              setRecipientsModal({ key: h.key, title: h.title });
+                              void loadRecipients(h.key);
+                            }}
+                          >
+                            {h.recipients}명
+                          </Badge>
+                          <button
+                            onClick={() => handleDelete(h.key, h.title)}
+                            disabled={deletingId === h.key}
+                            className='rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50'
+                          >
+                            {deletingId === h.key ? (
+                              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                            ) : (
+                              <Trash2 className='h-3.5 w-3.5' />
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <div className='line-clamp-2 mt-1 text-sm text-muted-foreground'>
                         {h.body}

@@ -49,6 +49,7 @@ import {
   XCircle,
   History,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -129,6 +130,8 @@ export default function UserAnnouncementsPage() {
   const [recipientsModal, setRecipientsModal] = useState<{ key: string; title: string } | null>(null);
   const [recipients, setRecipients] = useState<Array<{ userId: string; name: string; phoneNumber: string; email: string }>>([]);
   const [recipientsLoading, setRecipientsLoading] = useState(false);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     void initialAuth();
@@ -318,6 +321,22 @@ export default function UserAnnouncementsPage() {
     }
   }
 
+  async function handleDelete(id: string, title: string) {
+    if (!confirm(`"${title}" 알림을 삭제합니다. 수신자 기록도 함께 삭제됩니다.`)) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/user-announcements/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? '삭제 실패');
+      setHistory((prev) => prev.filter((h) => h.key !== id));
+      toast.success('삭제됐습니다');
+    } catch (e: any) {
+      toast.error(`삭제 실패: ${e?.message ?? e}`);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (loading && users.length === 0) {
     return (
       <PageShell>
@@ -441,6 +460,7 @@ export default function UserAnnouncementsPage() {
                         </TableHead>
                         <TableHead>이름</TableHead>
                         <TableHead>전화번호</TableHead>
+                        <TableHead>이메일</TableHead>
                         <TableHead>아파트</TableHead>
                         <TableHead>회원 유형</TableHead>
                         <TableHead className='w-[90px]'>승인 상태</TableHead>
@@ -451,7 +471,7 @@ export default function UserAnnouncementsPage() {
                     <TableBody>
                       {users.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className='py-8 text-center text-muted-foreground'>
+                          <TableCell colSpan={9} className='py-8 text-center text-muted-foreground'>
                             조회된 회원이 없습니다
                           </TableCell>
                         </TableRow>
@@ -471,6 +491,9 @@ export default function UserAnnouncementsPage() {
                             </TableCell>
                             <TableCell>{u.name}</TableCell>
                             <TableCell>{u.phoneNumber}</TableCell>
+                            <TableCell className='max-w-[160px] truncate text-sm text-muted-foreground'>
+                              {u.email || '-'}
+                            </TableCell>
                             <TableCell className='max-w-[120px] truncate'>
                               {u.apartmentName ?? '-'}
                             </TableCell>
@@ -631,18 +654,31 @@ export default function UserAnnouncementsPage() {
                   <div className='space-y-3'>
                     {history.map((h) => (
                       <div key={h.key} className='rounded-lg border bg-card p-3'>
-                        <div className='flex items-start justify-between'>
+                        <div className='flex items-start justify-between gap-2'>
                           <div className='font-medium'>{h.title}</div>
-                          <Badge
-                            variant='outline'
-                            className='cursor-pointer hover:bg-accent'
-                            onClick={() => {
-                              setRecipientsModal({ key: h.key, title: h.title });
-                              void loadRecipients(h.key);
-                            }}
-                          >
-                            {h.recipients}명
-                          </Badge>
+                          <div className='flex shrink-0 items-center gap-1'>
+                            <Badge
+                              variant='outline'
+                              className='cursor-pointer hover:bg-accent'
+                              onClick={() => {
+                                setRecipientsModal({ key: h.key, title: h.title });
+                                void loadRecipients(h.key);
+                              }}
+                            >
+                              {h.recipients}명
+                            </Badge>
+                            <button
+                              onClick={() => handleDelete(h.key, h.title)}
+                              disabled={deletingId === h.key}
+                              className='rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50'
+                            >
+                              {deletingId === h.key ? (
+                                <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                              ) : (
+                                <Trash2 className='h-3.5 w-3.5' />
+                              )}
+                            </button>
+                          </div>
                         </div>
                         <div className='line-clamp-2 mt-1 text-sm text-muted-foreground'>
                           {h.body}

@@ -238,7 +238,7 @@ export function useApplicationDetailPage(
         supabase
           .from('ad_analytics_v2')
           .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, wishCount')
-          .eq('targetId', adId),
+          .eq('baseAdId', adId),
         supabase
           .from('ad_categories_v2')
           .select('id, categoryName, ad_sub_categories_v2(id, subCategoryName, isActive, orderIndex)')
