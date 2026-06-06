@@ -518,6 +518,8 @@ export default function AdApplicationDetailPage({
                   { label: '유튜브 클릭', value: a?.youtubeClickCount ?? 0 },
                   { label: '인스타그램 클릭', value: a?.instagramClickCount ?? 0 },
                   { label: '카카오채팅 클릭', value: a?.kakaoChatClickCount ?? 0 },
+                  { label: '배민 클릭', value: a?.baeminClickCount ?? 0 },
+                  { label: '쿠팡이츠 클릭', value: a?.coupangEatsClickCount ?? 0 },
                   { label: '찜 수', value: a?.wishCount ?? 0 },
                 ];
                 return (
@@ -702,7 +704,7 @@ export default function AdApplicationDetailPage({
                   <p className='mb-1 text-sm text-muted-foreground'>수정 내용을 검토해주세요.</p>
                   <Button
                     size='lg'
-                    onClick={() => page.setModificationApproveDialog(true)}
+                    onClick={page.handleApproveModification}
                     disabled={page.processing}
                     className='w-full gap-2 bg-blue-600 text-white hover:bg-blue-700'
                   >
@@ -974,52 +976,6 @@ export default function AdApplicationDetailPage({
 
       <ImageLightbox {...adImgLb.props} />
       <ImageLightbox {...pendingImgLb.props} />
-
-      {/* 수정 승인 다이얼로그 */}
-      <Dialog open={page.modificationApproveDialog} onOpenChange={page.setModificationApproveDialog}>
-        <DialogContent className='sm:max-w-md'>
-          <DialogHeader>
-            <DialogTitle>수정 내용 승인</DialogTitle>
-            <DialogDescription>
-              결제금액을 직접 설정하려면 입력하세요. 비워두면 기존 금액이 유지됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className='space-y-1.5 py-2'>
-            <label className='text-sm font-medium'>월 결제금액 변경 (선택)</label>
-            <div className='flex items-center gap-2'>
-              <Input
-                type='number'
-                min={0}
-                placeholder='예: 50000'
-                value={page.newMonthlyAmount}
-                onChange={(e) => page.setNewMonthlyAmount(e.target.value)}
-              />
-              <span className='shrink-0 text-sm text-muted-foreground'>원</span>
-            </div>
-            {page.newMonthlyAmount && !isNaN(parseInt(page.newMonthlyAmount)) && parseInt(page.newMonthlyAmount) > 0 && (
-              <p className='text-sm text-blue-600'>
-                변경 금액: <strong>{parseInt(page.newMonthlyAmount).toLocaleString()}원</strong>
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant='outline'
-              onClick={() => { page.setModificationApproveDialog(false); page.setNewMonthlyAmount(''); }}
-              disabled={page.processing}
-            >
-              취소
-            </Button>
-            <Button
-              onClick={page.handleApproveModification}
-              disabled={page.processing}
-              className='bg-blue-600 text-white hover:bg-blue-700'
-            >
-              {page.processing ? '처리 중...' : '승인'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* 수정 거절 다이얼로그 */}
       <Dialog open={page.modificationRejectDialog} onOpenChange={page.setModificationRejectDialog}>

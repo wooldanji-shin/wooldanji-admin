@@ -198,11 +198,6 @@ export async function POST(
       const freeEndDate: string | null = (subscription as any)?.freeEndDate ?? null;
       const isInFreeTrial = freeEndDate !== null && new Date(freeEndDate) > new Date();
 
-      // pendingChanges에서 apartments 제거 (나머지 텍스트 변경은 유지)
-      const pendingChangesWithoutApartments = Object.keys(adChanges).length > 0
-        ? adChanges
-        : null;
-
       if (newFee > currentFee) {
         if (isInFreeTrial) {
           // 케이스 1: 금액 증가 + 무료기간 → 즉시 적용, 결제 없음
@@ -212,7 +207,7 @@ export async function POST(
             apartmentChangeStatus: null,
             modificationStatus: null,
             modificationRejectedReason: null,
-            pendingChanges: pendingChangesWithoutApartments,
+            pendingChanges: null,  // adChanges가 이미 컬럼에 직접 적용됨
             approvedMonthlyAmount: actualNewFee,
             updatedAt: now,
           }).eq('id', id);
@@ -247,7 +242,7 @@ export async function POST(
             apartmentChangeStatus: null,
             modificationStatus: null,
             modificationRejectedReason: null,
-            pendingChanges: pendingChangesWithoutApartments,
+            pendingChanges: null,  // adChanges가 이미 컬럼에 직접 적용됨
             approvedMonthlyAmount: actualNewFee,
             updatedAt: now,
           }).eq('id', id);

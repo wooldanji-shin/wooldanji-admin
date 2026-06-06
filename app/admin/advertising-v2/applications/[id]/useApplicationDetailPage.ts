@@ -102,6 +102,8 @@ export interface AdAnalyticsSummary {
   kakaoChatClickCount: number;
   homeImpressionCount: number;
   dialogImpressionCount: number;
+  baeminClickCount: number;
+  coupangEatsClickCount: number;
   wishCount: number;
 }
 
@@ -130,10 +132,6 @@ export interface UseApplicationDetailPageReturn {
   handleReject: () => Promise<void>;
   handleUpdateMemo: () => Promise<void>;
   // 수정 심사
-  modificationApproveDialog: boolean;
-  setModificationApproveDialog: (open: boolean) => void;
-  newMonthlyAmount: string;
-  setNewMonthlyAmount: (v: string) => void;
   modificationRejectDialog: boolean;
   setModificationRejectDialog: (open: boolean) => void;
   modificationRejectReason: string;
@@ -170,8 +168,7 @@ export function useApplicationDetailPage(
   const [adminMemo, setAdminMemo] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [modificationApproveDialog, setModificationApproveDialog] = useState(false);
-  const [newMonthlyAmount, setNewMonthlyAmount] = useState('');
+
   const [modificationRejectDialog, setModificationRejectDialog] = useState(false);
   const [modificationRejectReason, setModificationRejectReason] = useState('');
   const [grantAnalytics, setGrantAnalytics] = useState(false);
@@ -237,7 +234,7 @@ export function useApplicationDetailPage(
           .maybeSingle(),
         supabase
           .from('ad_analytics_v2')
-          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, wishCount')
+          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, baeminClickCount, coupangEatsClickCount, wishCount')
           .eq('baseAdId', adId),
         supabase
           .from('ad_categories_v2')
@@ -378,7 +375,8 @@ export function useApplicationDetailPage(
           impressionCount: 0, clickCount: 0, phoneClickCount: 0,
           messageClickCount: 0, naverMapClickCount: 0, blogClickCount: 0,
           youtubeClickCount: 0, instagramClickCount: 0, kakaoChatClickCount: 0,
-          homeImpressionCount: 0, dialogImpressionCount: 0, wishCount: 0,
+          homeImpressionCount: 0, dialogImpressionCount: 0,
+          baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
         };
         for (const r of analyticsRows) {
           sum.impressionCount += r.impressionCount ?? 0;
@@ -392,6 +390,8 @@ export function useApplicationDetailPage(
           sum.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
           sum.homeImpressionCount += r.homeImpressionCount ?? 0;
           sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+          sum.baeminClickCount += r.baeminClickCount ?? 0;
+          sum.coupangEatsClickCount += r.coupangEatsClickCount ?? 0;
           sum.wishCount += r.wishCount ?? 0;
         }
         setAnalytics(sum);
@@ -536,14 +536,12 @@ export function useApplicationDetailPage(
     if (!detail) return;
     setProcessing(true);
     try {
-      const parsed = parseInt(newMonthlyAmount.replace(/,/g, ''), 10);
-      const monthlyAmount = !isNaN(parsed) && parsed > 0 ? parsed : undefined;
       const response = await fetch(
         `/api/advertising-v2/applications/${detail.id}/approve-modification`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...(monthlyAmount !== undefined ? { monthlyAmount } : {}) }),
+          body: JSON.stringify({}),
         }
       );
       if (!response.ok) {
@@ -551,8 +549,6 @@ export function useApplicationDetailPage(
         throw new Error(err.error || 'Failed to approve modification');
       }
       toast.success('수정 내용이 승인되었습니다.');
-      setModificationApproveDialog(false);
-      setNewMonthlyAmount('');
       fetchDetail();
     } catch (err) {
       console.error('Failed to approve modification:', err);
@@ -625,10 +621,6 @@ export function useApplicationDetailPage(
     handleApprove,
     handleReject,
     handleUpdateMemo,
-    modificationApproveDialog,
-    setModificationApproveDialog,
-    newMonthlyAmount,
-    setNewMonthlyAmount,
     modificationRejectDialog,
     setModificationRejectDialog,
     modificationRejectReason,

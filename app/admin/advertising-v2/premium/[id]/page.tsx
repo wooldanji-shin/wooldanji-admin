@@ -422,6 +422,8 @@ export default function PremiumAdDetailPage({
                   { label: '유튜브 클릭', value: a?.youtubeClickCount ?? 0 },
                   { label: '인스타그램 클릭', value: a?.instagramClickCount ?? 0 },
                   { label: '카카오채팅 클릭', value: a?.kakaoChatClickCount ?? 0 },
+                  { label: '배민 클릭', value: a?.baeminClickCount ?? 0 },
+                  { label: '쿠팡이츠 클릭', value: a?.coupangEatsClickCount ?? 0 },
                   { label: '찜 수', value: a?.wishCount ?? 0 },
                 ];
                 return (
@@ -582,11 +584,25 @@ export default function PremiumAdDetailPage({
 
                 <div className='flex items-center justify-between text-base font-semibold'>
                   <span>결제 금액</span>
-                  <span className='text-primary tabular-nums'>
-                    {page.displayAmount != null
-                      ? `${page.displayAmount.toLocaleString()}원`
-                      : '-'}
-                  </span>
+                  <div className='flex flex-col items-end gap-0.5'>
+                    <div className='flex items-center gap-1.5'>
+                      <span className='text-primary tabular-nums'>
+                        {page.displayAmount != null
+                          ? `${page.displayAmount.toLocaleString()}원`
+                          : '-'}
+                      </span>
+                      {(detail.approvedDiscountRate ?? 0) > 0 && (
+                        <span className='text-xs font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded'>
+                          {detail.approvedDiscountRate}%↓
+                        </span>
+                      )}
+                    </div>
+                    {(detail.approvedDiscountRate ?? 0) > 0 && page.baseDisplayAmount != null && (
+                      <span className='text-xs text-muted-foreground line-through tabular-nums'>
+                        정상가 {page.baseDisplayAmount.toLocaleString()}원
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {page.extensionAmount != null &&
                   page.extensionAmount > 0 &&

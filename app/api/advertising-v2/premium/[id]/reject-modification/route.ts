@@ -33,7 +33,7 @@ export async function POST(
     // 프리미엄 광고 조회
     const { data: ad, error: fetchError } = await supabase
       .from('premium_advertisements_v2')
-      .select('modificationStatus, partnerId')
+      .select('modificationStatus, partnerId, baseAdId')
       .eq('id', id)
       .single();
 
@@ -82,7 +82,7 @@ export async function POST(
           type: 'premium_ad_modification_rejected',
           navigationData: {
             type: 'premium_ad_detail',
-            params: { premiumAdId: id },
+            params: { premiumAdId: id, baseAdId: ad.baseAdId },
           },
         }),
       });

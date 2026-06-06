@@ -27,7 +27,7 @@ export async function POST(
     // 프리미엄 광고 조회 (pendingChanges 포함)
     const { data: ad, error: fetchError } = await supabase
       .from('premium_advertisements_v2')
-      .select('status, modificationStatus, pendingChanges, partnerId')
+      .select('status, modificationStatus, pendingChanges, partnerId, baseAdId')
       .eq('id', id)
       .single();
 
@@ -82,7 +82,7 @@ export async function POST(
           type: 'premium_ad_modification_approved',
           navigationData: {
             type: 'premium_ad_detail',
-            params: { premiumAdId: id },
+            params: { premiumAdId: id, baseAdId: ad.baseAdId },
           },
         }),
       });

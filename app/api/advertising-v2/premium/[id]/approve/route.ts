@@ -39,7 +39,7 @@ export async function POST(
     // 프리미엄 광고 조회 (할인 계산에 totalAmount 필요)
     const { data: ad, error: fetchError } = await supabase
       .from('premium_advertisements_v2')
-      .select('status, partnerId, totalAmount')
+      .select('status, partnerId, totalAmount, baseAdId')
       .eq('id', id)
       .single();
 
@@ -98,7 +98,7 @@ export async function POST(
           type: 'premium_ad_approved',
           navigationData: {
             type: 'premium_ad_detail',
-            params: { premiumAdId: id },
+            params: { premiumAdId: id, baseAdId: ad.baseAdId },
           },
         }),
       });

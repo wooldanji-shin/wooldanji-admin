@@ -17,6 +17,8 @@ export interface PremiumAd {
   status: PremiumStatus;
   paymentStatus: 'unpaid' | 'paid';
   totalAmount: number | null;
+  approvedDiscountRate: number | null;
+  discountedTotalAmount: number | null;
   cumulativeAmount: number | null;
   modificationStatus: string | null;
   startedAt: string | null;
@@ -94,7 +96,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
       const { data: adsData, error: adsError } = await supabase
         .from('premium_advertisements_v2')
         .select(
-          'id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "modificationStatus", "startedAt", "endedAt", "createdAt"'
+          'id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "startedAt", "endedAt", "createdAt"'
         )
         .neq('status', 'draft')
         .order('createdAt', { ascending: false });
@@ -185,13 +187,22 @@ export function usePremiumPage(): UsePremiumPageReturn {
   const statusCounts = useMemo<Record<PremiumStatus | 'all', number>>(() => {
     const counts: Record<string, number> = { all: ads.length };
     for (const ad of ads) {
-      counts[ad.status] = (counts[ad.status] ?? 0) + 1;
+      if (ad.status === 'running' && ad.modificationStatus === 'pending') {
+        counts['modification_pending'] = (counts['modification_pending'] ?? 0) + 1;
+      } else {
+        counts[ad.status] = (counts[ad.status] ?? 0) + 1;
+      }
     }
     return counts as Record<PremiumStatus | 'all', number>;
   }, [ads]);
 
   const filtered = useMemo(() => {
-    let result = statusFilter === 'all' ? ads : ads.filter((ad) => ad.status === statusFilter);
+    let result =
+      statusFilter === 'all'
+        ? ads
+        : statusFilter === 'modification_pending'
+          ? ads.filter((ad) => ad.status === 'running' && ad.modificationStatus === 'pending')
+          : ads.filter((ad) => ad.status === statusFilter);
 
     if (apartmentFilter) {
       result = result.filter((ad) => ad.apartmentIds.includes(apartmentFilter));

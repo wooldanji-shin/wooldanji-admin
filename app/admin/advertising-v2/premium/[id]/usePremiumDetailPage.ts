@@ -80,6 +80,8 @@ export interface PremiumAdAnalyticsSummary {
   youtubeClickCount: number;
   instagramClickCount: number;
   kakaoChatClickCount: number;
+  baeminClickCount: number;
+  coupangEatsClickCount: number;
   wishCount: number;
 }
 
@@ -94,6 +96,7 @@ export interface UsePremiumDetailPageReturn {
   cumulativeWeeks: number;
   extensionWeeks: number;
   displayAmount: number | null;
+  baseDisplayAmount: number | null;
   extensionAmount: number | null;
   // 분석 권한 부여
   grantAnalytics: boolean;
@@ -251,7 +254,7 @@ export function usePremiumDetailPage(
 
       // 누적 결제 합계 + 연장 이력 + 통계 동시 조회
       const analyticsSelect =
-        'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, wishCount';
+        'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, baeminClickCount, coupangEatsClickCount, wishCount';
 
       const [{ data: paidRows }, { data: extRows }, { data: premiumAnalyticsRows }, { data: baseAnalyticsRows }] = await Promise.all([
         supabase
@@ -293,7 +296,8 @@ export function usePremiumDetailPage(
           impressionCount: 0, homePremiumImpressionCount: 0, dialogImpressionCount: 0,
           clickCount: 0, phoneClickCount: 0, messageClickCount: 0,
           naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
-          instagramClickCount: 0, kakaoChatClickCount: 0, wishCount: 0,
+          instagramClickCount: 0, kakaoChatClickCount: 0,
+          baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
         };
         for (const r of allRows) {
           s.impressionCount += r.impressionCount ?? 0;
@@ -307,6 +311,8 @@ export function usePremiumDetailPage(
           s.youtubeClickCount += r.youtubeClickCount ?? 0;
           s.instagramClickCount += r.instagramClickCount ?? 0;
           s.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
+          s.baeminClickCount += r.baeminClickCount ?? 0;
+          s.coupangEatsClickCount += r.coupangEatsClickCount ?? 0;
           s.wishCount += r.wishCount ?? 0;
         }
         setAnalytics(s);
@@ -487,16 +493,15 @@ export function usePremiumDetailPage(
     ? detail.snapshotApartments.reduce((s, a) => s + a.totalHouseholds, 0)
     : 0;
 
-  const cumulativeWeeks = detail
-    ? detail.startedAt && detail.endedAt
-      ? Math.floor(
-          (new Date(detail.endedAt).getTime() - new Date(detail.startedAt).getTime()) /
-            (7 * 24 * 60 * 60 * 1000)
-        )
-      : detail.weeks
-    : 0;
-  const extensionWeeks = detail ? cumulativeWeeks - detail.weeks : 0;
-  const displayAmount = detail ? cumulativeAmount ?? detail.totalAmount : null;
+  // 앱과 동일하게 DB weeks 직접 사용 (날짜 계산은 KST 자정 정규화로 오차 발생)
+  const cumulativeWeeks = detail?.weeks ?? 0;
+  const extensionWeeks = 0;
+  // totalAmount = EF가 누적 관리하는 정상가 (payment_history 합산 불필요)
+  const hasDiscount = (detail?.approvedDiscountRate ?? 0) > 0;
+  const baseDisplayAmount = detail?.totalAmount ?? null;
+  const displayAmount = hasDiscount
+    ? (detail?.discountedTotalAmount ?? baseDisplayAmount)
+    : baseDisplayAmount;
   const extensionAmount =
     detail && displayAmount != null && detail.totalAmount != null
       ? displayAmount - detail.totalAmount
@@ -512,6 +517,7 @@ export function usePremiumDetailPage(
     cumulativeWeeks,
     extensionWeeks,
     displayAmount,
+    baseDisplayAmount,
     extensionAmount,
     grantAnalytics,
     setGrantAnalytics,

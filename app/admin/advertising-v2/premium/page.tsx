@@ -214,6 +214,7 @@ export default function PremiumAdListPage(): React.ReactElement {
                   <TableHead>광고 제목</TableHead>
                   <TableHead>기간</TableHead>
                   <TableHead>금액</TableHead>
+                  <TableHead>할인율</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead>신청일</TableHead>
                   <TableHead className="text-center">액션</TableHead>
@@ -221,16 +222,15 @@ export default function PremiumAdListPage(): React.ReactElement {
               </TableHeader>
               <TableBody>
                 {paginatedAds.map((ad) => {
-                  const cumulativeWeeks =
-                    ad.startedAt && ad.endedAt
-                      ? Math.floor(
-                          (new Date(ad.endedAt).getTime() -
-                            new Date(ad.startedAt).getTime()) /
-                            (7 * 24 * 60 * 60 * 1000)
-                        )
-                      : ad.weeks;
-                  const extWeeks = cumulativeWeeks - ad.weeks;
-                  const amount = ad.cumulativeAmount ?? ad.totalAmount;
+                  // 앱과 동일하게 DB weeks 직접 사용
+                  const cumulativeWeeks = ad.weeks;
+                  const extWeeks = 0;
+                  // totalAmount = EF가 누적 관리하는 정상가 (payment_history 합산 불필요)
+                  const baseAmount = ad.totalAmount;
+                  const hasDiscount = (ad.approvedDiscountRate ?? 0) > 0;
+                  const amount = hasDiscount
+                    ? (ad.discountedTotalAmount ?? baseAmount)
+                    : baseAmount;
 
                   return (
                     <TableRow
@@ -260,7 +260,20 @@ export default function PremiumAdListPage(): React.ReactElement {
                         </div>
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {amount != null ? `${amount.toLocaleString()}원` : '-'}
+                        <div className="flex flex-col gap-0.5">
+                          <span>{amount != null ? `${amount.toLocaleString()}원` : '-'}</span>
+                          {hasDiscount && baseAmount != null && (
+                            <span className="text-xs text-muted-foreground line-through">
+                              {baseAmount.toLocaleString()}원
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {hasDiscount
+                          ? <span className="text-xs font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{ad.approvedDiscountRate}%</span>
+                          : <span className="text-xs text-muted-foreground">-</span>
+                        }
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-1.5">
