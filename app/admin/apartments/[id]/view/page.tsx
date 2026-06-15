@@ -760,56 +760,51 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <div className="text-sm text-muted-foreground">
-            {currentPage} / {totalPages} 페이지
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              이전
-            </Button>
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
+        <div className="flex items-center justify-center gap-2 mt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            이전
+          </Button>
+          <div className="flex gap-1">
+            {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 10) {
+                pageNum = i + 1;
+              } else if (currentPage <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 4) {
+                pageNum = totalPages - 9 + i;
+              } else {
+                pageNum = currentPage - 4 + i;
+              }
 
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handlePageChange(pageNum)}
-                    className="w-10"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              다음
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handlePageChange(pageNum)}
+                  className="w-10"
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            다음
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       )}
 

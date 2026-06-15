@@ -346,9 +346,6 @@ export default function UserReconfirmPage() {
                       이름
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
-                      이메일
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
                       전화번호
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
@@ -371,13 +368,13 @@ export default function UserReconfirmPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
   <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                       </TableCell>
                     </TableRow>
                   ) : combinedItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
                         보류 대상이 없습니다.
                       </TableCell>
                     </TableRow>
@@ -402,9 +399,6 @@ export default function UserReconfirmPage() {
                               <Badge className='bg-purple-500 text-white text-xs'>파트너</Badge>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {item.userEmail}
                         </TableCell>
                         <TableCell className='text-muted-foreground'>
                           {item.userPhone || '-'}

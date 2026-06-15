@@ -814,9 +814,6 @@ export default function UsersPage() {
                       이름
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
-                      이메일
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
                       전화번호
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
@@ -826,7 +823,7 @@ export default function UsersPage() {
                       아파트/동/호
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
-                      역할
+                      출생년도
                     </TableHead>
                     <TableHead className='text-muted-foreground'>
                       승인상태
@@ -845,13 +842,13 @@ export default function UsersPage() {
                 <TableBody>
                   {initialLoading && loading ? (
                     <TableRow>
-                      <TableCell colSpan={11} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={10} className='text-center py-12 text-muted-foreground'>
   <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                       </TableCell>
                     </TableRow>
                   ) : users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={10} className='text-center py-12 text-muted-foreground'>
                         {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
                       </TableCell>
                     </TableRow>
@@ -887,11 +884,6 @@ export default function UsersPage() {
                         <TableCell className='font-medium text-card-foreground'>
                           <div className='flex items-center gap-1.5'>
                             {user.name || '-'}
-                          </div>
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          <div className='flex items-center gap-2'>
-                            <span>{user.email}</span>
                             {getRegisterMethodBadge(user.registerMethod)}
                           </div>
                         </TableCell>
@@ -918,7 +910,14 @@ export default function UsersPage() {
                           )}
                         </TableCell>
                         <TableCell className='text-muted-foreground text-sm'>
-                          {getUserRole(user.user_roles)}
+                          {(user as any).birthDay ? (
+                            <>
+                              {(user as any).birthDay.substring(0, 4)}
+                              <span className='text-xs ml-1'>
+                                (만 {new Date().getFullYear() - parseInt((user as any).birthDay.substring(0, 4))}세)
+                              </span>
+                            </>
+                          ) : '-'}
                         </TableCell>
                         <TableCell>
                           {getApprovalBadge(user.approvalStatus)}
@@ -935,30 +934,26 @@ export default function UsersPage() {
                         </TableCell>
                         <TableCell className='text-right' onClick={(e) => e.stopPropagation()}>
                           <div className='flex items-center justify-end gap-1'>
-                            {user.registrationType === 'APARTMENT' && (
+                            {user.registrationType === 'APARTMENT' && user.approvalStatus === 'pending' && (
                               <>
-                                {user.approvalStatus !== 'approve' && (
-                                  <Button
-                                    variant='ghost'
-                                    size='sm'
-                                    className='text-green-600 hover:text-green-700 hover:bg-green-50 h-8 px-2 text-xs'
-                                    onClick={() => handleApprovalStatusChange(user.id, 'approve')}
-                                  >
-                                    <Check className='h-3 w-3 mr-1' />
-                                    승인
-                                  </Button>
-                                )}
-                                {user.approvalStatus !== 'suspended' && (
-                                  <Button
-                                    variant='ghost'
-                                    size='sm'
-                                    className='text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 h-8 px-2 text-xs'
-                                    onClick={() => handleSuspendClick(user)}
-                                  >
-                                    <Ban className='h-3 w-3 mr-1' />
-                                    보류
-                                  </Button>
-                                )}
+                                <Button
+                                  variant='ghost'
+                                  size='sm'
+                                  className='text-green-600 hover:text-green-700 hover:bg-green-50 h-8 px-2 text-xs'
+                                  onClick={() => handleApprovalStatusChange(user.id, 'approve')}
+                                >
+                                  <Check className='h-3 w-3 mr-1' />
+                                  승인
+                                </Button>
+                                <Button
+                                  variant='ghost'
+                                  size='sm'
+                                  className='text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 h-8 px-2 text-xs'
+                                  onClick={() => handleSuspendClick(user)}
+                                >
+                                  <Ban className='h-3 w-3 mr-1' />
+                                  보류
+                                </Button>
                               </>
                             )}
                             <DropdownMenu>
@@ -1006,56 +1001,51 @@ export default function UsersPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className='flex items-center justify-between'>
-            <div className='text-sm text-muted-foreground'>
-              {currentPage} / {totalPages} 페이지
-            </div>
-            <div className='flex gap-2'>
-              <Button
-                variant='outline'
-                size='sm'
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className='h-4 w-4' />
-                이전
-              </Button>
-              <div className='flex gap-1'>
-                {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 10) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 4) {
-                    pageNum = totalPages - 9 + i;
-                  } else {
-                    pageNum = currentPage - 4 + i;
-                  }
+          <div className='flex items-center justify-center gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className='h-4 w-4' />
+              이전
+            </Button>
+            <div className='flex gap-1'>
+              {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 10) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 4) {
+                  pageNum = totalPages - 9 + i;
+                } else {
+                  pageNum = currentPage - 4 + i;
+                }
 
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? 'default' : 'outline'}
-                      size='sm'
-                      onClick={() => handlePageChange(pageNum)}
-                      className='w-10'
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </div>
-              <Button
-                variant='outline'
-                size='sm'
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-              >
-                다음
-                <ChevronRight className='h-4 w-4' />
-              </Button>
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? 'default' : 'outline'}
+                    size='sm'
+                    onClick={() => handlePageChange(pageNum)}
+                    className='w-10'
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
             </div>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              다음
+              <ChevronRight className='h-4 w-4' />
+            </Button>
           </div>
         )}
       </PageContent>

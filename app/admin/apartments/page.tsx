@@ -13,6 +13,8 @@ import {
   ArrowDown,
   Home,
   DoorOpen,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import {
   PageContent,
@@ -37,7 +39,6 @@ import {
 } from '@/components/page-shell';
 import { DataTableShell } from '@/components/data-table-shell';
 import { DataToolbar, DataToolbarSearch, DataToolbarActions } from '@/components/data-toolbar';
-import { DataPagination } from '@/components/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
 import { toast } from 'sonner';
@@ -68,6 +69,8 @@ interface Apartment {
   totalDevices: number;
   memberCount: number;
   totalOpenDoorCount: number;
+  basicAdCount: number;
+  premiumAdCount: number;
   lineRanges: { id: string; line: number[] }[];
   createdAt: string;
   createdBy: string | null;
@@ -82,13 +85,24 @@ type SortDirection = 'asc' | 'desc';
 
 export default function ApartmentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingApartment, setDeletingApartment] = useState<Apartment | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const currentPage = parseInt(searchParams.get('page') || '1');
+  const setCurrentPage = (p: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (p <= 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(p));
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+  };
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [hideOpenDoorColumn, setHideOpenDoorColumn] = useState(false);
@@ -170,6 +184,17 @@ export default function ApartmentsPage() {
         ])
       );
 
+      // 아파트별 광고 수 (RPC로 DB 집계)
+      const { data: adCounts } = await supabase
+        .rpc('get_apartment_ad_counts');
+
+      const adCountMap = new Map<string, { basic: number; premium: number }>(
+        (adCounts || []).map((r: { apartment_id: string; basic_ad_count: number; premium_ad_count: number }) => [
+          r.apartment_id,
+          { basic: r.basic_ad_count, premium: r.premium_ad_count },
+        ])
+      );
+
       // 매니저인 경우 자신이 관리하는 아파트만 필터링
       if (isManager) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -227,6 +252,9 @@ export default function ApartmentsPage() {
         // 총 문 열기 횟수 (RPC 집계 결과에서 조회)
         const totalOpenDoorCount = openDoorCountMap.get(apt.id) ?? 0;
 
+        // 광고 수 (RPC 집계 결과에서 조회)
+        const adCount = adCountMap.get(apt.id) ?? { basic: 0, premium: 0 };
+
         return {
           id: apt.id,
           name: apt.name,
@@ -236,6 +264,8 @@ export default function ApartmentsPage() {
           totalDevices,
           memberCount,
           totalOpenDoorCount,
+          basicAdCount: adCount.basic,
+          premiumAdCount: adCount.premium,
           lineRanges,
           createdAt: new Date(apt.createdAt).toLocaleDateString('ko-KR'),
           createdBy: (apt as any).createdBy || null,
@@ -445,11 +475,10 @@ export default function ApartmentsPage() {
           </DataToolbar>
         }
         pagination={
-          !loading && filteredApartments.length > 0 ? (
-            <DataPagination
+          !loading && totalPages > 1 ? (
+            <ApartmentsPagination
               page={currentPage}
-              pageSize={ITEMS_PER_PAGE}
-              totalCount={filteredApartments.length}
+              totalPages={totalPages}
               onPageChange={setCurrentPage}
             />
           ) : undefined
@@ -510,10 +539,16 @@ export default function ApartmentsPage() {
                     </TableHead>
                   )}
                   <TableHead className="text-muted-foreground text-center">
+                    기본광고
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-center">
+                    프리미엄
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-center">
                     광고
                   </TableHead>
                   <TableHead className="text-muted-foreground text-center">
-                    등록자
+                    매니저
                   </TableHead>
                   <TableHead
                     className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
@@ -530,13 +565,13 @@ export default function ApartmentsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className="p-0">
-                      <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 9 : 10} showHeader={false} />
+                    <TableCell colSpan={hideOpenDoorColumn ? 12 : 13} className="p-0">
+                      <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 11 : 12} showHeader={false} />
                     </TableCell>
                   </TableRow>
                 ) : filteredApartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 10 : 11} className="p-0">
+                    <TableCell colSpan={hideOpenDoorColumn ? 12 : 13} className="p-0">
                       <EmptyState
                         icon={Building2}
                         title={searchTerm ? '검색 결과가 없습니다' : '등록된 아파트가 없습니다'}
@@ -591,6 +626,16 @@ export default function ApartmentsPage() {
                           )}
                         </TableCell>
                       )}
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {apartment.basicAdCount > 0 ? apartment.basicAdCount : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {apartment.premiumAdCount > 0 ? apartment.premiumAdCount : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <Switch
                           checked={apartment.isAdEnabled}
@@ -693,5 +738,63 @@ export default function ApartmentsPage() {
       </Dialog>
       </PageContent>
     </PageShell>
+  );
+}
+
+function ApartmentsPagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}): React.ReactElement {
+  return (
+    <div className="flex items-center justify-center gap-2 border-t border-border/60 px-4 py-3">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(page - 1)}
+        disabled={page === 1}
+      >
+        <ChevronLeft className="h-4 w-4" />
+        이전
+      </Button>
+      <div className="flex gap-1">
+        {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
+          let pageNum;
+          if (totalPages <= 10) {
+            pageNum = i + 1;
+          } else if (page <= 5) {
+            pageNum = i + 1;
+          } else if (page >= totalPages - 4) {
+            pageNum = totalPages - 9 + i;
+          } else {
+            pageNum = page - 4 + i;
+          }
+          return (
+            <Button
+              key={pageNum}
+              variant={page === pageNum ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onPageChange(pageNum)}
+              className="w-10"
+            >
+              {pageNum}
+            </Button>
+          );
+        })}
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(page + 1)}
+        disabled={page === totalPages}
+      >
+        다음
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }

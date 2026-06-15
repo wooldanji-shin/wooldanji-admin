@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { ApartmentOption } from '@/components/apartment-combobox';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 export type AdStatus = 'pending' | 'approved' | 'rejected' | 'running' | 'ended' | 'draft';
 export type ModificationStatus = 'pending' | 'approved' | 'rejected' | null;
 export type PaymentStatus = 'unpaid' | 'paid';
-export type StatusFilter = 'pending' | 'approved' | 'all' | 'modification';
+export type StatusFilter = 'all' | 'free_running' | 'paid_running' | 'pending' | 'modification' | 'ended' | 'rejected';
 
 export interface AdCategoryWithSubs {
   id: string;
@@ -46,6 +46,8 @@ export interface AdApplication {
   freeMonths: number;
   isFirstAdApplication: boolean;
   categoryId: string | null;
+  approvedMonthlyAmount: number | null;
+  approvedDiscountRate: number | null;
   partner_users: {
     id: string;
     businessName: string;
@@ -59,6 +61,8 @@ export interface AdApplication {
   subCategoryNames: string[];
   subCategoryIds: string[];
   apartments: ApartmentSummary[];
+  totalImpressions: number;
+  totalClicks: number;
 }
 
 const PAGE_SIZE = 20;
@@ -122,22 +126,44 @@ export interface UseApplicationsPageReturn {
 
 export function useApplicationsPage(): UseApplicationsPageReturn {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [applications, setApplications] = useState<AdApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [subCategoryFilter, setSubCategoryFilter] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, _setStatusFilter] = useState<StatusFilter>('all');
+  const [categoryFilter, _setCategoryFilter] = useState<string | null>(null);
+  const [subCategoryFilter, _setSubCategoryFilter] = useState<string | null>(null);
+  const [searchTerm, _setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm);
-  const [apartmentFilter, setApartmentFilter] = useState<string | null>(null);
+  const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
   const [categories, setCategories] = useState<AdCategory[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [allApartments, setAllApartments] = useState<ApartmentOption[]>([]);
   const [pricePerHousehold, setPricePerHousehold] = useState(70);
   const [defaultDiscountRate, setDefaultDiscountRate] = useState(28);
-  const [page, setPage] = useState(1);
+  const page = useMemo(() => {
+    const p = parseInt(searchParams.get('page') ?? '1');
+    return isNaN(p) || p < 1 ? 1 : p;
+  }, [searchParams]);
+
+  const setPage = useCallback((p: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (p <= 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(p));
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+  }, [router, searchParams]);
+
+  const setStatusFilter = useCallback((v: StatusFilter) => { _setStatusFilter(v); setPage(1); }, [setPage]);
+  const setCategoryFilter = useCallback((v: string | null) => { _setCategoryFilter(v); setPage(1); }, [setPage]);
+  const setSubCategoryFilter = useCallback((v: string | null) => { _setSubCategoryFilter(v); setPage(1); }, [setPage]);
+  const setSearchTerm = useCallback((v: string) => { _setSearchTerm(v); setPage(1); }, [setPage]);
+  const setApartmentFilter = useCallback((v: string | null) => { _setApartmentFilter(v); setPage(1); }, [setPage]);
+
   const [allCategoriesWithSubs, setAllCategoriesWithSubs] = useState<AdCategoryWithSubs[]>([]);
   const [selectedAd, setSelectedAd] = useState<AdApplication | null>(null);
   const [approveDialog, setApproveDialog] = useState(false);
@@ -213,7 +239,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     } else {
       setSubCategories([]);
     }
-    setSubCategoryFilter(null);
+    _setSubCategoryFilter(null);
   }, [categoryFilter, fetchSubCategories]);
 
   const fetchApplications = useCallback(async () => {
@@ -233,6 +259,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           activatedAt,
           freeMonths,
           isFirstAdApplication,
+          approvedMonthlyAmount,
+          approvedDiscountRate,
           partner_users:partnerId(id, businessName, displayPhoneNumber, hasHadRunningAd, analyticsEnabled),
           ad_categories_v2:categoryId(categoryName),
           advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
@@ -246,6 +274,27 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
 
       if (error) throw error;
 
+      const adIds = (data ?? []).map((r: any) => r.id as string);
+
+      const { data: analyticsRows } = adIds.length > 0
+        ? await supabase
+            .from('ad_analytics_v2')
+            .select('baseAdId, impressionCount, homeImpressionCount, clickCount')
+            .in('baseAdId', adIds)
+        : { data: [] };
+
+      // baseAdId별 누적 집계
+      const analyticsMap = (analyticsRows ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
+        (acc, r: any) => {
+          const key = r.baseAdId as string;
+          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
+          acc[key].impressions += (r.homeImpressionCount ?? 0) + (r.impressionCount ?? 0);
+          acc[key].clicks += (r.clickCount ?? 0);
+          return acc;
+        },
+        {}
+      );
+
       const mapped: AdApplication[] = (data ?? []).map((row: any) => ({
         id: row.id,
         categoryId: row.categoryId ?? null,
@@ -258,6 +307,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         activatedAt: row.activatedAt ?? null,
         freeMonths: row.freeMonths,
         isFirstAdApplication: row.isFirstAdApplication ?? false,
+        approvedMonthlyAmount: row.approvedMonthlyAmount ?? null,
+        approvedDiscountRate: row.approvedDiscountRate ?? null,
         partner_users: row.partner_users,
         ad_categories_v2: row.ad_categories_v2,
         subCategoryNames: (row.advertisement_sub_categories_v2 ?? []).map(
@@ -271,6 +322,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           apartmentName: apt.apartments?.name ?? '-',
           totalHouseholds: apt.totalHouseholds,
         })),
+        totalImpressions: analyticsMap[row.id]?.impressions ?? 0,
+        totalClicks: analyticsMap[row.id]?.clicks ?? 0,
       }));
 
       setApplications(mapped);
@@ -288,18 +341,24 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   // 상태 필터 적용 후 목록
   const statusFiltered = useMemo(() => {
     if (statusFilter === 'all') return applications;
+    if (statusFilter === 'free_running') return applications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0);
+    if (statusFilter === 'paid_running') return applications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0);
     if (statusFilter === 'pending') return applications.filter((a) => a.adStatus === 'pending');
-    if (statusFilter === 'approved') return applications.filter((a) => a.adStatus === 'approved');
     if (statusFilter === 'modification') return applications.filter((a) => a.modificationStatus === 'pending');
+    if (statusFilter === 'ended') return applications.filter((a) => a.adStatus === 'ended');
+    if (statusFilter === 'rejected') return applications.filter((a) => a.adStatus === 'rejected');
     return applications;
   }, [applications, statusFilter]);
 
   // 상태별 개수 (전체 데이터 기준)
   const statusCounts = useMemo<Record<StatusFilter, number>>(() => ({
     all: applications.length,
+    free_running: applications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0).length,
+    paid_running: applications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0).length,
     pending: applications.filter((a) => a.adStatus === 'pending').length,
-    approved: applications.filter((a) => a.adStatus === 'approved').length,
     modification: applications.filter((a) => a.modificationStatus === 'pending').length,
+    ended: applications.filter((a) => a.adStatus === 'ended').length,
+    rejected: applications.filter((a) => a.adStatus === 'rejected').length,
   }), [applications]);
 
   // 카테고리별 개수 (상태 필터 후 기준)
@@ -350,10 +409,6 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     return result;
   }, [statusFiltered, categoryFilter, subCategoryFilter, apartmentFilter, debouncedSearchTerm, categories]);
 
-  // 페이지 초기화 — 필터 변경 시
-  useEffect(() => {
-    setPage(1);
-  }, [statusFilter, categoryFilter, subCategoryFilter, apartmentFilter, debouncedSearchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 

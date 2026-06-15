@@ -24,6 +24,8 @@ export interface PartnerUser {
   email: string | null;
   createdAt: string;
   categoryName: string | null;
+  totalImpressionCount: number;
+  totalClickCount: number;
 }
 
 export interface UsePartnersPageReturn {
@@ -91,6 +93,23 @@ export function usePartnersPage(): UsePartnersPageReturn {
         (users ?? []).forEach((u: any) => { emailMap[u.id] = u.email; });
       }
 
+      // 파트너별 노출수/클릭수 집계 (기본광고 + 프리미엄 합산)
+      const partnerIds = rows.map((r: any) => r.id);
+      const analyticsMap: Record<string, { impression: number; click: number }> = {};
+      partnerIds.forEach((id: string) => { analyticsMap[id] = { impression: 0, click: 0 }; });
+
+      if (partnerIds.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: analyticsData } = await (supabase as any)
+          .rpc('get_partner_analytics_totals', { partner_ids: partnerIds });
+        (analyticsData ?? []).forEach((a: any) => {
+          analyticsMap[a.partner_id] = {
+            impression: Number(a.total_impression_count) || 0,
+            click: Number(a.total_click_count) || 0,
+          };
+        });
+      }
+
       const mapped: PartnerUser[] = rows.map((row: any) => ({
         id: row.id,
         userId: row.userId,
@@ -110,6 +129,8 @@ export function usePartnersPage(): UsePartnersPageReturn {
         email: emailMap[row.userId] ?? null,
         createdAt: row.createdAt,
         categoryName: (row.ad_categories_v2 as any)?.categoryName ?? null,
+        totalImpressionCount: analyticsMap[row.id]?.impression ?? 0,
+        totalClickCount: analyticsMap[row.id]?.click ?? 0,
       }));
 
       setPartners(mapped);

@@ -24,7 +24,6 @@ import {
   ChevronLeft,
   ExternalLink,
   GitCompare,
-  ImageIcon,
   MapPin,
   Tag,
   X,
@@ -140,33 +139,22 @@ export default function PremiumAdDetailPage({
       <div className='grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]'>
         {/* ───────────────────── 좌측 메인 ───────────────────── */}
         <div className='min-w-0 space-y-5'>
-          {/* 1. 광고 본문 카드 */}
+          {/* 1. 광고 본문 카드: 카테고리 → 이미지 → 제목 → 내용 → 링크 */}
           <Card>
             <CardContent className='space-y-4 px-6 py-5'>
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
-                <div className='min-w-0 flex-1'>
-                  <h1 className='text-xl font-bold text-foreground'>
-                    {detail.title ?? '(제목 없음)'}
-                  </h1>
-                  <p className='mt-1.5 text-sm text-muted-foreground'>
-                    신청일시: {new Date(detail.createdAt).toLocaleString('ko-KR')}
-                  </p>
-                  <div className='mt-2 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground'>
-                    <span>카테고리:</span>
-                    <span className='inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary'>
-                      <Tag className='h-3.5 w-3.5' />
-                      {detail.category?.categoryName ?? '-'}
-                      {detail.subCategoryNames.length > 0 && (
-                        <>
-                          <span className='text-primary/60'>›</span>
-                          {detail.subCategoryNames.join(', ')}
-                        </>
-                      )}
-                    </span>
-                  </div>
-                </div>
+              {/* 카테고리 태그 + 상태 뱃지 */}
+              <div className='flex flex-wrap items-center justify-between gap-2'>
+                <span className='inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary'>
+                  <Tag className='h-3.5 w-3.5' />
+                  {detail.category?.categoryName ?? '-'}
+                  {detail.subCategoryNames.length > 0 && (
+                    <>
+                      <span className='text-primary/60'>›</span>
+                      {detail.subCategoryNames.join(', ')}
+                    </>
+                  )}
+                </span>
                 <div className='flex flex-wrap items-center gap-2'>
-                  <StatusBadge status={detail.status} />
                   {detail.modificationStatus === 'pending' && (
                     <Badge
                       variant='outline'
@@ -177,6 +165,32 @@ export default function PremiumAdDetailPage({
                   )}
                 </div>
               </div>
+              {/* 이미지 */}
+              {detail.imageUrls.length > 0 && (
+                <div className='flex flex-wrap gap-2.5'>
+                  {detail.imageUrls.map((url, i) => (
+                    <ImageThumbnail
+                      key={i}
+                      src={url}
+                      alt={`광고 이미지 ${i + 1}`}
+                      onClick={() => adImgLb.open(i)}
+                    />
+                  ))}
+                </div>
+              )}
+              {/* 제목 + 신청일시 */}
+              <div>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <h1 className='text-xl font-bold text-foreground'>
+                    {detail.title ?? '(제목 없음)'}
+                  </h1>
+                  <StatusBadge status={detail.status} />
+                </div>
+                <p className='mt-1.5 text-sm text-muted-foreground'>
+                  신청일시: {new Date(detail.createdAt).toLocaleString('ko-KR')}
+                </p>
+              </div>
+              {/* 내용 */}
               {detail.content && (
                 <div className='border-t border-border/60 pt-4'>
                   <p className='whitespace-pre-wrap text-base leading-relaxed text-foreground'>
@@ -184,6 +198,7 @@ export default function PremiumAdDetailPage({
                   </p>
                 </div>
               )}
+              {/* 소셜 링크 */}
               {socialLinks.length > 0 && (
                 <div className='border-t border-border/60 pt-4'>
                   <p className='mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground'>
@@ -208,33 +223,6 @@ export default function PremiumAdDetailPage({
               )}
             </CardContent>
           </Card>
-
-          {/* 2. 광고 이미지 카드 */}
-          {detail.imageUrls.length > 0 && (
-            <Card>
-              <CardHeader className='pb-3'>
-                <CardTitle className='flex items-center gap-2 text-base font-semibold'>
-                  <ImageIcon className='h-4 w-4 text-muted-foreground' />
-                  광고 이미지
-                  <span className='ml-auto text-sm font-normal text-muted-foreground'>
-                    {detail.imageUrls.length}장
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className='px-6 pb-5'>
-                <div className='flex flex-wrap gap-2.5'>
-                  {detail.imageUrls.map((url, i) => (
-                    <ImageThumbnail
-                      key={i}
-                      src={url}
-                      alt={`광고 이미지 ${i + 1}`}
-                      onClick={() => adImgLb.open(i)}
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* 거절 사유 배너 */}
           {detail.rejectedReason && (
@@ -427,13 +415,19 @@ export default function PremiumAdDetailPage({
                   { label: '찜 수', value: a?.wishCount ?? 0 },
                 ];
                 return (
-                  <div className='space-y-2 text-sm'>
-                    {rows.map(({ label, value }) => (
-                      <div key={label} className='flex items-center justify-between'>
-                        <span className='text-muted-foreground'>{label}</span>
-                        <span className='tabular-nums font-medium'>{fmt(value)}</span>
-                      </div>
-                    ))}
+                  <div className='space-y-1.5 text-sm'>
+                    {rows.flatMap(({ label, value }) => {
+                      const row = (
+                        <div key={label} className='flex items-center'>
+                          <span className='text-muted-foreground min-w-[9rem] shrink-0'>{label}</span>
+                          <span className='tabular-nums font-medium'>{fmt(value)}</span>
+                        </div>
+                      );
+                      if (label === '네이버지도 클릭') {
+                        return [<hr key={`${label}-hr`} className='border-border/50 my-1' />, row];
+                      }
+                      return [row];
+                    })}
                   </div>
                 );
               })()}
@@ -460,48 +454,8 @@ export default function PremiumAdDetailPage({
         </div>
 
         {/* ───────────────────── 우측 Sticky 사이드바 ───────────────────── */}
-        <aside className='lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto'>
+        <aside>
           <div className='space-y-4'>
-            {/* 상태 요약 */}
-            <Card>
-              <CardHeader className='pb-3'>
-                <CardTitle className='text-base font-semibold'>상태</CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-2.5 px-6 pb-4 text-sm'>
-                <div className='flex items-center justify-between'>
-                  <span className='text-muted-foreground'>광고 상태</span>
-                  <StatusBadge status={detail.status} />
-                </div>
-                {detail.modificationStatus && (
-                  <div className='flex items-center justify-between'>
-                    <span className='text-muted-foreground'>수정 심사</span>
-                    <Badge
-                      variant='outline'
-                      className='border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700'
-                    >
-                      {detail.modificationStatus === 'pending'
-                        ? '심사 대기'
-                        : detail.modificationStatus === 'approved'
-                        ? '승인'
-                        : '거절'}
-                    </Badge>
-                  </div>
-                )}
-                <div className='flex items-center justify-between'>
-                  <span className='text-muted-foreground'>결제 상태</span>
-                  <span className='font-medium'>
-                    {detail.paymentStatus === 'paid' ? '결제 완료' : '결제 대기'}
-                  </span>
-                </div>
-                <div className='flex items-center justify-between'>
-                  <span className='text-muted-foreground'>신청일</span>
-                  <span className='font-medium'>
-                    {new Date(detail.createdAt).toLocaleDateString('ko-KR')}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* 결제/기간 요약 */}
             <Card>
               <CardHeader className='pb-3'>

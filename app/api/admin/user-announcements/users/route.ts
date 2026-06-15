@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from('user')
       .select(
-        'id, name, phoneNumber, email, approvalStatus, fcmToken, marketingAgreed, apartments!user_apartmentId_fkey(name), user_roles(role)',
+        'id, name, phoneNumber, email, approvalStatus, fcmToken, marketingAgreed, openDoorCount, apartments!user_apartmentId_fkey(name), user_roles(role)',
         { count: 'exact' },
       );
 
@@ -104,6 +104,7 @@ export async function GET(req: NextRequest) {
       roles: (u.user_roles as { role: string }[] ?? []).map((r) => r.role),
       hasFcmToken: Array.isArray(u.fcmToken) && u.fcmToken.length > 0,
       marketingAgreed: u.marketingAgreed,
+      openDoorCount: u.openDoorCount ?? 0,
     }));
 
     return NextResponse.json({ rows, totalCount: count ?? 0 });

@@ -50,9 +50,11 @@ import {
   History,
   RefreshCw,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -66,6 +68,7 @@ interface UserRow {
   roles: string[];
   hasFcmToken: boolean;
   marketingAgreed: boolean;
+  openDoorCount: number;
   total_count: number;
 }
 
@@ -107,6 +110,7 @@ const PAGE_SIZE = 50;
 
 export default function UserAnnouncementsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -116,7 +120,19 @@ export default function UserAnnouncementsPage() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('ALL');
   const [filterRole, setFilterRole] = useState<FilterRole>('ALL');
-  const [page, setPage] = useState(0);
+  // URL query param 기반 페이지 (URL은 1-indexed, 내부는 0-indexed)
+  const page = Math.max(0, parseInt(searchParams.get('page') || '1') - 1);
+  const setPage = (newPage: number | ((prev: number) => number)) => {
+    const resolved = typeof newPage === 'function' ? newPage(page) : newPage;
+    const params = new URLSearchParams(searchParams.toString());
+    if (resolved <= 0) {
+      params.delete('page');
+    } else {
+      params.set('page', String(resolved + 1));
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+  };
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const [title, setTitle] = useState('');
@@ -464,6 +480,7 @@ export default function UserAnnouncementsPage() {
                         <TableHead>아파트</TableHead>
                         <TableHead>회원 유형</TableHead>
                         <TableHead className='w-[90px]'>승인 상태</TableHead>
+                        <TableHead className='w-[80px]'>문연횟수</TableHead>
                         <TableHead className='w-[80px]'>FCM</TableHead>
                         <TableHead className='w-[80px]'>마케팅</TableHead>
                       </TableRow>
@@ -471,7 +488,7 @@ export default function UserAnnouncementsPage() {
                     <TableBody>
                       {users.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className='py-8 text-center text-muted-foreground'>
+                          <TableCell colSpan={10} className='py-8 text-center text-muted-foreground'>
                             조회된 회원이 없습니다
                           </TableCell>
                         </TableRow>
@@ -519,6 +536,9 @@ export default function UserAnnouncementsPage() {
                                 <Badge variant='destructive'>정지</Badge>
                               )}
                             </TableCell>
+                            <TableCell className='text-sm text-muted-foreground'>
+                              {u.openDoorCount > 0 ? `${u.openDoorCount}회` : '-'}
+                            </TableCell>
                             <TableCell>
                               {u.hasFcmToken ? (
                                 <CheckCircle2 className='h-4 w-4 text-green-600' />
@@ -541,30 +561,48 @@ export default function UserAnnouncementsPage() {
                 </div>
 
                 {/* 페이지네이션 */}
-                <div className='flex items-center justify-between'>
-                  <div className='text-sm text-muted-foreground'>
-                    {page * PAGE_SIZE + 1}–
-                    {Math.min((page + 1) * PAGE_SIZE, totalCount)} / {totalCount}
-                  </div>
-                  <div className='flex gap-2'>
+                {totalPages > 1 && (
+                  <div className='flex items-center justify-center gap-2'>
                     <Button
                       size='sm'
                       variant='outline'
                       disabled={page === 0}
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      onClick={() => setPage(Math.max(0, page - 1))}
                     >
+                      <ChevronLeft className='h-4 w-4' />
                       이전
                     </Button>
+                    <div className='flex gap-1'>
+                      {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
+                        let pageNum: number;
+                        if (totalPages <= 10) pageNum = i + 1;
+                        else if ((page + 1) <= 5) pageNum = i + 1;
+                        else if ((page + 1) >= totalPages - 4) pageNum = totalPages - 9 + i;
+                        else pageNum = (page + 1) - 4 + i;
+                        return (
+                          <Button
+                            key={pageNum}
+                            size='sm'
+                            variant={(page + 1) === pageNum ? 'default' : 'outline'}
+                            onClick={() => setPage(pageNum - 1)}
+                            className='w-10'
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
                     <Button
                       size='sm'
                       variant='outline'
                       disabled={page + 1 >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
+                      onClick={() => setPage(page + 1)}
                     >
                       다음
+                      <ChevronRight className='h-4 w-4' />
                     </Button>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 

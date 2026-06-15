@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { PremiumStatus } from '@/components/status-badge';
 import type { ApartmentOption } from '@/components/apartment-combobox';
@@ -27,6 +27,8 @@ export interface PremiumAd {
   partnerBusinessName?: string;
   partnerAnalyticsEnabled: boolean;
   apartmentIds: string[];
+  totalImpressions: number;
+  totalClicks: number;
 }
 
 const PAGE_SIZE = 20;
@@ -71,14 +73,34 @@ export interface UsePremiumPageReturn {
 
 export function usePremiumPage(): UsePremiumPageReturn {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [ads, setAds] = useState<PremiumAd[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<PremiumStatus | 'all'>('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, _setStatusFilter] = useState<PremiumStatus | 'all'>('all');
+  const [searchTerm, _setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm);
-  const [apartmentFilter, setApartmentFilter] = useState<string | null>(null);
+  const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
   const [allApartments, setAllApartments] = useState<ApartmentOption[]>([]);
-  const [page, setPage] = useState(1);
+  const page = useMemo(() => {
+    const p = parseInt(searchParams.get('page') ?? '1');
+    return isNaN(p) || p < 1 ? 1 : p;
+  }, [searchParams]);
+
+  const setPage = useCallback((p: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (p <= 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(p));
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+  }, [router, searchParams]);
+
+  const setStatusFilter = useCallback((v: PremiumStatus | 'all') => { _setStatusFilter(v); setPage(1); }, [setPage]);
+  const setSearchTerm = useCallback((v: string) => { _setSearchTerm(v); setPage(1); }, [setPage]);
+  const setApartmentFilter = useCallback((v: string | null) => { _setApartmentFilter(v); setPage(1); }, [setPage]);
+
   const [selectedAd, setSelectedAd] = useState<PremiumAd | null>(null);
   const [approveDialog, setApproveDialog] = useState(false);
   const [rejectDialog, setRejectDialog] = useState(false);
@@ -116,6 +138,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
         { data: paymentRows },
         { data: apartmentRows },
         { data: apartmentList },
+        { data: analyticsRows },
       ] = await Promise.all([
         supabase
           .from('partner_users')
@@ -137,6 +160,10 @@ export function usePremiumPage(): UsePremiumPageReturn {
           .from('apartments')
           .select('id, name')
           .order('name'),
+        supabase
+          .from('premium_ad_analytics_v2')
+          .select('"premiumAdId", "impressionCount", "homePremiumImpressionCount", "clickCount"')
+          .in('premiumAdId', adIds),
       ]);
 
       const partnerMap = Object.fromEntries(
@@ -147,6 +174,18 @@ export function usePremiumPage(): UsePremiumPageReturn {
         (acc, r: any) => {
           const k = r.premiumAdId as string;
           acc[k] = (acc[k] ?? 0) + ((r.amount as number | null) ?? 0);
+          return acc;
+        },
+        {}
+      );
+
+      // premiumAdId별 analytics 집계
+      const analyticsMap = (analyticsRows ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
+        (acc, r: any) => {
+          const key = r.premiumAdId as string;
+          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
+          acc[key].impressions += (r.homePremiumImpressionCount ?? 0) + (r.impressionCount ?? 0);
+          acc[key].clicks += (r.clickCount ?? 0);
           return acc;
         },
         {}
@@ -169,6 +208,8 @@ export function usePremiumPage(): UsePremiumPageReturn {
         partnerAnalyticsEnabled: partnerMap[row.partnerId]?.analyticsEnabled ?? false,
         cumulativeAmount: cumulativeAmountMap[row.id] ?? null,
         apartmentIds: baseAdApartmentMap[row.baseAdId] ?? [],
+        totalImpressions: analyticsMap[row.id]?.impressions ?? 0,
+        totalClicks: analyticsMap[row.id]?.clicks ?? 0,
       }));
 
       setAds(mapped);
@@ -220,9 +261,6 @@ export function usePremiumPage(): UsePremiumPageReturn {
     return result;
   }, [ads, statusFilter, apartmentFilter, debouncedSearchTerm]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [statusFilter, apartmentFilter, debouncedSearchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 

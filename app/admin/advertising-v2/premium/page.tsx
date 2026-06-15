@@ -38,12 +38,11 @@ import { usePremiumPage } from './usePremiumPage';
 
 const STATUS_FILTERS: { value: PremiumStatus | 'all'; label: string }[] = [
   { value: 'all', label: '전체' },
-  { value: 'pending', label: '승인 대기' },
-  { value: 'modification_pending', label: '수정 심사' },
-  { value: 'approved', label: '승인됨' },
-  { value: 'running', label: '진행중' },
+  { value: 'running', label: '진행' },
+  { value: 'pending', label: '승인대기' },
+  { value: 'modification_pending', label: '수정심사' },
   { value: 'ended', label: '종료' },
-  { value: 'rejected', label: '거절됨' },
+  { value: 'rejected', label: '거절' },
 ];
 
 interface PaginationProps {
@@ -56,10 +55,9 @@ function Pagination({ page, totalPages, onPageChange }: PaginationProps): React.
   if (totalPages <= 1) return null;
 
   const getPageNumbers = (): number[] => {
-    const half = 2;
-    let start = Math.max(1, page - half);
-    const end = Math.min(totalPages, start + 4);
-    start = Math.max(1, end - 4);
+    let start = Math.max(1, page - 4);
+    const end = Math.min(totalPages, start + 9);
+    start = Math.max(1, end - 9);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   };
 
@@ -214,9 +212,10 @@ export default function PremiumAdListPage(): React.ReactElement {
                   <TableHead>광고 제목</TableHead>
                   <TableHead>기간</TableHead>
                   <TableHead>금액</TableHead>
-                  <TableHead>할인율</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead>신청일</TableHead>
+                  <TableHead className="text-center">노출수</TableHead>
+                  <TableHead className="text-center">클릭수</TableHead>
                   <TableHead className="text-center">액션</TableHead>
                 </TableRow>
               </TableHeader>
@@ -260,20 +259,17 @@ export default function PremiumAdListPage(): React.ReactElement {
                         </div>
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        <div className="flex flex-col gap-0.5">
-                          <span>{amount != null ? `${amount.toLocaleString()}원` : '-'}</span>
-                          {hasDiscount && baseAmount != null && (
-                            <span className="text-xs text-muted-foreground line-through">
-                              {baseAmount.toLocaleString()}원
-                            </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {hasDiscount && (
+                            <StatusBadge variant="error" withDot={false}>
+                              할인{ad.approvedDiscountRate}%
+                            </StatusBadge>
                           )}
+                          {hasDiscount && baseAmount != null && (
+                            <span className="text-xs text-muted-foreground line-through">{baseAmount.toLocaleString()}원</span>
+                          )}
+                          <span className="text-sm font-medium">{amount != null ? `${amount.toLocaleString()}원` : '-'}</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {hasDiscount
-                          ? <span className="text-xs font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{ad.approvedDiscountRate}%</span>
-                          : <span className="text-xs text-muted-foreground">-</span>
-                        }
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -285,6 +281,12 @@ export default function PremiumAdListPage(): React.ReactElement {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(ad.createdAt).toLocaleDateString('ko-KR')}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
                       </TableCell>
                       <TableCell
                         className="text-center"

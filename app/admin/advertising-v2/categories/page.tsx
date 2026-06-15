@@ -59,6 +59,8 @@ interface AdCategoryV2 {
   note: string | null;
   isActive: boolean;
   orderIndex: number;
+  basicAdCount: number;
+  premiumAdCount: number;
 }
 
 interface AdSubCategoryV2 {
@@ -143,6 +145,20 @@ function SortableRow({
       {/* 소개내용 (20자 말줄임) */}
       <TableCell className="text-sm text-muted-foreground max-w-[200px]">
         {truncatedNote}
+      </TableCell>
+
+      {/* 기본광고 수 */}
+      <TableCell className="text-center tabular-nums text-sm">
+        {category.basicAdCount > 0 ? category.basicAdCount : (
+          <span className="text-muted-foreground">-</span>
+        )}
+      </TableCell>
+
+      {/* 프리미엄광고 수 */}
+      <TableCell className="text-center tabular-nums text-sm">
+        {category.premiumAdCount > 0 ? category.premiumAdCount : (
+          <span className="text-muted-foreground">-</span>
+        )}
       </TableCell>
 
       {/* 활성 여부 */}
@@ -316,13 +332,28 @@ export default function AdCategoriesV2Page() {
   const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
-      // ad_categories_v2는 Supabase 자동 타입에 아직 미포함이므로 any 캐스팅
-      const { data, error } = await (supabase as any)
-        .from('ad_categories_v2')
-        .select('*')
-        .order('orderIndex', { ascending: true });
+      const [{ data, error }, { data: adCounts }] = await Promise.all([
+        (supabase as any)
+          .from('ad_categories_v2')
+          .select('*')
+          .order('orderIndex', { ascending: true }),
+        supabase.rpc('get_category_ad_counts'),
+      ]);
       if (error) throw error;
-      setCategories(data ?? []);
+
+      const countMap = new Map<string, { basic: number; premium: number }>(
+        (adCounts || []).map((r: { category_id: string; basic_ad_count: number; premium_ad_count: number }) => [
+          r.category_id,
+          { basic: r.basic_ad_count, premium: r.premium_ad_count },
+        ])
+      );
+
+      const merged = (data ?? []).map((c: AdCategoryV2) => {
+        const counts = countMap.get(c.id) ?? { basic: 0, premium: 0 };
+        return { ...c, basicAdCount: counts.basic, premiumAdCount: counts.premium };
+      });
+
+      setCategories(merged);
     } catch (err) {
       console.error('카테고리 목록 조회 실패:', err);
       toast.error('카테고리 목록을 불러오는데 실패했습니다.');
@@ -712,6 +743,8 @@ export default function AdCategoriesV2Page() {
                       <TableHead className="text-muted-foreground w-32">순서</TableHead>
                       <TableHead className="text-muted-foreground">카테고리명</TableHead>
                       <TableHead className="text-muted-foreground">소개내용</TableHead>
+                      <TableHead className="text-muted-foreground text-center">기본광고</TableHead>
+                      <TableHead className="text-muted-foreground text-center">프리미엄</TableHead>
                       <TableHead className="text-muted-foreground">상태</TableHead>
                       <TableHead className="text-muted-foreground text-right">작업</TableHead>
                     </TableRow>
@@ -719,7 +752,7 @@ export default function AdCategoriesV2Page() {
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                           <div className="flex flex-col gap-3 py-2">
                             <Skeleton className="h-4 w-2/3 mx-auto" />
                             <Skeleton className="h-4 w-full" />
@@ -729,7 +762,7 @@ export default function AdCategoriesV2Page() {
                       </TableRow>
                     ) : categories.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                           카테고리가 없습니다.
                         </TableCell>
                       </TableRow>
@@ -750,7 +783,7 @@ export default function AdCategoriesV2Page() {
                             />
                             {selectedCategory?.id === category.id && (
                               <TableRow className="hover:bg-transparent">
-                                <TableCell colSpan={5} className="p-0 border-b border-border">
+                                <TableCell colSpan={7} className="p-0 border-b border-border">
                                   <div className="bg-muted/30 px-4 py-3">
                                     <DndContext
                                       sensors={sensors}

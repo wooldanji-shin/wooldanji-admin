@@ -424,7 +424,7 @@ export default function NotificationSettingsPage() {
     return (
       <PageShell>
         <PageHeader>
-          <PageHeaderTitle title="알림 관리" />
+          <PageHeaderTitle title="비활성 아파트 첫 화면" />
         </PageHeader>
         <InlineLoadingSkeleton />
       </PageShell>
@@ -435,8 +435,8 @@ export default function NotificationSettingsPage() {
     <PageShell>
       <PageHeader>
         <PageHeaderTitle
-          title="알림 관리"
-          description="홈 화면 상단 알림 메시지를 관리합니다."
+          title="비활성 아파트 첫 화면"
+          description="홈 화면 상단 비활성화 시 이미지를 관리합니다."
         />
       </PageHeader>
 
@@ -524,11 +524,10 @@ export default function NotificationSettingsPage() {
                   </div>
                 ) : (
                   <div
-                    className={`relative border-2 border-dashed rounded-lg p-8 transition-colors ${
-                      dragActive
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
+                    className={`relative border-2 border-dashed rounded-lg p-8 transition-colors ${dragActive
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                      }`}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}

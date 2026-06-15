@@ -25,9 +25,7 @@ import {
   UserCog,
   MessageSquare,
   Megaphone,
-  LayoutList,
   Briefcase,
-  FileText,
   HelpCircle,
   Image as ImageIcon,
   ShieldAlert,
@@ -64,7 +62,7 @@ interface MenuItem {
 // ─── 관리 ──────────────────────────────────────────────────
 const navigationItems: MenuItem[] = [
   {
-    name: '아파트 관리',
+    name: '아파트 등록/설정',
     href: '/admin/apartments',
     icon: Building2,
     roles: ['SUPER_ADMIN', 'APT_ADMIN', 'MANAGER'],
@@ -204,33 +202,9 @@ const settingsItems: MenuItem[] = [
 // ─── V1 시스템 관리 ────────────────────────────────────────
 const v1Items: MenuItem[] = [
   {
-    name: '홈 섹션 관리',
-    href: '/admin/advertising/categories',
-    icon: LayoutList,
-    roles: ['SUPER_ADMIN'],
-  },
-  {
-    name: '광고주 관리',
-    href: '/admin/advertising/advertisers',
-    icon: Building2,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    name: '광고 등록/수정',
-    href: '/admin/advertising/ads',
-    icon: Megaphone,
-    roles: ['SUPER_ADMIN', 'MANAGER'],
-  },
-  {
-    name: '알림 관리',
+    name: '비활성 아파트 첫 화면',
     href: '/admin/settings/notifications',
     icon: Bell,
-    roles: ['SUPER_ADMIN'],
-  },
-  {
-    name: '공지사항 관리',
-    href: '/admin/settings/announcements',
-    icon: FileText,
     roles: ['SUPER_ADMIN'],
   },
 ];
@@ -377,7 +351,7 @@ export function AppSidebar(): React.ReactElement {
         </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu className="gap-1">
-            {visible.map((item) => {
+            {visible.map((item, index) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
               const badgeCount = getBadgeCount(item.href);
@@ -396,7 +370,7 @@ export function AppSidebar(): React.ReactElement {
                       'data-[active=true]:active:bg-primary data-[active=true]:active:text-primary-foreground'
                     )}
                   >
-                    <span>{item.name}</span>
+                    <span>{index + 1}. {item.name}</span>
                   </SidebarMenuButton>
                   {badgeCount > 0 && (
                     <SidebarMenuBadge
@@ -432,7 +406,7 @@ export function AppSidebar(): React.ReactElement {
       </SidebarHeader>
 
       <SidebarContent className="gap-1 py-2">
-        {renderMenuGroup('관리', navigationItems)}
+        {renderMenuGroup('아파트 관리', navigationItems)}
         {renderMenuGroup('파트너', partnerItems)}
         {renderMenuGroup('광고 시스템', advertisingItems)}
         {renderMenuGroup('홈화면 수정', homeSettingsItems)}

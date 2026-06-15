@@ -8,8 +8,8 @@ export interface CouponItem {
   id: string;
   title: string;
   description: string | null;
-  discountType: 'percent' | 'fixed';
-  discountValue: number;
+  discountType: 'percent' | 'fixed' | 'gift';
+  discountValue: number | null;
   minAmount: number | null;
   expiresAt: string;
   isActive: boolean;

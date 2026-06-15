@@ -77,9 +77,11 @@ function CouponsContent(): React.ReactElement {
                       </TableCell>
                       <TableCell>{coupon.partnerBusinessName}</TableCell>
                       <TableCell>
-                        {coupon.discountType === 'percent'
+                        {coupon.discountType === 'gift'
+                          ? '증정 이벤트'
+                          : coupon.discountType === 'percent'
                           ? `${coupon.discountValue}% 할인`
-                          : `${coupon.discountValue.toLocaleString()}원 할인`}
+                          : `${coupon.discountValue?.toLocaleString()}원 할인`}
                       </TableCell>
                       <TableCell>
                         {coupon.minAmount

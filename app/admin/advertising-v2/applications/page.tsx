@@ -57,18 +57,22 @@ import {
 interface ApartmentTooltipProps {
   apartments: ApartmentSummary[];
   pricePerHousehold: number;
+  discountRate?: number | null;
   children: React.ReactNode;
 }
 
 function ApartmentTooltip({
   apartments,
   pricePerHousehold,
+  discountRate,
   children,
 }: ApartmentTooltipProps): React.ReactElement {
   if (apartments.length === 0) return <>{children}</>;
 
+  const hasDiscount = (discountRate ?? 0) > 0;
   const totalHouseholds = apartments.reduce((sum, a) => sum + a.totalHouseholds, 0);
-  const totalAmount = totalHouseholds * pricePerHousehold;
+  const totalBase = totalHouseholds * pricePerHousehold;
+  const totalDiscounted = hasDiscount ? Math.round(totalBase * (1 - (discountRate ?? 0) / 100)) : totalBase;
 
   return (
     <Tooltip>
@@ -78,23 +82,30 @@ function ApartmentTooltip({
         className="max-w-xs border border-border bg-popover p-0 text-popover-foreground shadow-popover"
       >
         <div className="space-y-1.5 p-3">
-          {apartments.map((apt) => (
-            <div
-              key={apt.apartmentId}
-              className="flex items-center justify-between gap-6 text-xs"
-            >
-              <span className="font-medium">{apt.apartmentName}</span>
-              <span className="shrink-0 text-muted-foreground">
-                {apt.totalHouseholds.toLocaleString()}세대 ·{' '}
-                {(apt.totalHouseholds * pricePerHousehold).toLocaleString()}원
-              </span>
-            </div>
-          ))}
+          {apartments.map((apt) => {
+            const base = apt.totalHouseholds * pricePerHousehold;
+            const discounted = hasDiscount ? Math.round(base * (1 - (discountRate ?? 0) / 100)) : base;
+            return (
+              <div
+                key={apt.apartmentId}
+                className="flex items-center justify-between gap-6 text-xs"
+              >
+                <span className="font-medium">{apt.apartmentName}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {apt.totalHouseholds.toLocaleString()}세대 ·{' '}
+                  {hasDiscount && <span className="line-through opacity-50">{base.toLocaleString()}원 </span>}
+                  {discounted.toLocaleString()}원
+                </span>
+              </div>
+            );
+          })}
           {apartments.length > 1 && (
             <div className="flex items-center justify-between border-t border-border pt-1.5 text-xs font-semibold">
               <span>합계</span>
               <span>
-                {totalHouseholds.toLocaleString()}세대 · {totalAmount.toLocaleString()}원
+                {totalHouseholds.toLocaleString()}세대 ·{' '}
+                {hasDiscount && <span className="line-through font-normal opacity-50">{totalBase.toLocaleString()}원 </span>}
+                {totalDiscounted.toLocaleString()}원
               </span>
             </div>
           )}
@@ -113,12 +124,10 @@ interface PaginationProps {
 function Pagination({ page, totalPages, onPageChange }: PaginationProps): React.ReactElement | null {
   if (totalPages <= 1) return null;
 
-  // 최대 5개 페이지 번호 표시
   const getPageNumbers = (): number[] => {
-    const half = 2;
-    let start = Math.max(1, page - half);
-    const end = Math.min(totalPages, start + 4);
-    start = Math.max(1, end - 4);
+    let start = Math.max(1, page - 4);
+    const end = Math.min(totalPages, start + 9);
+    start = Math.max(1, end - 9);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   };
 
@@ -157,9 +166,12 @@ function Pagination({ page, totalPages, onPageChange }: PaginationProps): React.
 
 const STATUS_TABS: { label: string; value: StatusFilter }[] = [
   { label: '전체', value: 'all' },
+  { label: '무료진행', value: 'free_running' },
+  { label: '유료진행', value: 'paid_running' },
   { label: '승인대기', value: 'pending' },
-  { label: '승인됨', value: 'approved' },
   { label: '수정심사', value: 'modification' },
+  { label: '종료', value: 'ended' },
+  { label: '거절', value: 'rejected' },
 ];
 
 export default function AdApplicationsPage(): React.ReactElement {
@@ -258,7 +270,7 @@ export default function AdApplicationsPage(): React.ReactElement {
           </div>
 
           {/* 상태 탭 — 개수 배지 포함 */}
-          <div className="inline-flex w-full max-w-xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
+          <div className="inline-flex w-full max-w-4xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
             {STATUS_TABS.map((tab) => {
               const isActive = statusFilter === tab.value;
               const count = statusCounts[tab.value];
@@ -267,7 +279,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                   key={tab.value}
                   onClick={() => setStatusFilter(tab.value)}
                   className={cn(
-                    'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all',
+                    'inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-md px-2 text-sm font-medium transition-all whitespace-nowrap',
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-card'
                       : 'text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -398,7 +410,10 @@ export default function AdApplicationsPage(): React.ReactElement {
                     <TableHead className="text-center">신청 아파트</TableHead>
                     <TableHead className="text-center">광고 상태</TableHead>
                     <TableHead className="text-center">결제 상태</TableHead>
+                    <TableHead className="text-right">금액(월)</TableHead>
                     <TableHead>광고 시작일</TableHead>
+                    <TableHead className="text-center">노출수</TableHead>
+                    <TableHead className="text-center">클릭수</TableHead>
                     <TableHead className="text-center">액션</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -441,6 +456,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                         <ApartmentTooltip
                           apartments={app.apartments}
                           pricePerHousehold={pricePerHousehold}
+                          discountRate={app.approvedDiscountRate}
                         >
                           <span
                             className="cursor-default text-muted-foreground underline decoration-dashed underline-offset-2"
@@ -451,10 +467,10 @@ export default function AdApplicationsPage(): React.ReactElement {
                         </ApartmentTooltip>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex flex-col items-center gap-1">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
                           <StatusBadge.Ad status={app.adStatus} />
                           {app.adStatus === 'running' && app.freeMonths > 0 && (
-                            <StatusBadge variant="success" size="sm" withDot={false}>
+                            <StatusBadge variant="success">
                               무료체험
                             </StatusBadge>
                           )}
@@ -466,10 +482,40 @@ export default function AdApplicationsPage(): React.ReactElement {
                       <TableCell className="text-center">
                         <StatusBadge.Payment status={app.paymentStatus} />
                       </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {(() => {
+                          const totalHouseholds = app.apartments.reduce((s, a) => s + a.totalHouseholds, 0);
+                          const base = app.approvedMonthlyAmount ?? (totalHouseholds * pricePerHousehold);
+                          const hasDiscount = (app.approvedDiscountRate ?? 0) > 0;
+                          const discounted = hasDiscount ? Math.round(base * (1 - (app.approvedDiscountRate ?? 0) / 100)) : base;
+                          if (base === 0) return <span className="text-muted-foreground">-</span>;
+                          return (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                {hasDiscount && (
+                                  <span className="text-xs text-gray-500 line-through">{base.toLocaleString()}원</span>
+                                )}
+                                <span className="text-sm font-medium">{discounted.toLocaleString()}원</span>
+                              </div>
+                              {hasDiscount && (
+                                <StatusBadge variant="error" withDot={false}>
+                                  할인{app.approvedDiscountRate}%
+                                </StatusBadge>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {app.activatedAt
                           ? new Date(app.activatedAt).toLocaleDateString('ko-KR')
                           : '-'}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {app.totalImpressions > 0 ? app.totalImpressions.toLocaleString() : '-'}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {app.totalClicks > 0 ? app.totalClicks.toLocaleString() : '-'}
                       </TableCell>
                       <TableCell
                         className="text-center"
