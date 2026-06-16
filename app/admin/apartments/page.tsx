@@ -184,14 +184,14 @@ export default function ApartmentsPage() {
         ])
       );
 
-      // 아파트별 광고 수 (RPC로 DB 집계)
+      // 아파트별 running 광고 수 (RPC로 DB 집계)
       const { data: adCounts } = await supabase
-        .rpc('get_apartment_ad_counts');
+        .rpc('get_apartment_running_ad_counts');
 
       const adCountMap = new Map<string, { basic: number; premium: number }>(
-        (adCounts || []).map((r: { apartment_id: string; basic_ad_count: number; premium_ad_count: number }) => [
+        (adCounts || []).map((r: { apartment_id: string; basic_running_count: number; premium_running_count: number }) => [
           r.apartment_id,
-          { basic: r.basic_ad_count, premium: r.premium_ad_count },
+          { basic: r.basic_running_count, premium: r.premium_running_count },
         ])
       );
 
@@ -644,16 +644,7 @@ export default function ApartmentsPage() {
                       </TableCell>
                       <TableCell className="text-center text-sm">
                         {apartment.createdByName ? (
-                          <div>
-                            <div className="font-medium">
-                              {apartment.createdByName}
-                            </div>
-                            {apartment.createdByPhone && (
-                              <div className="text-xs text-muted-foreground">
-                                {apartment.createdByPhone}
-                              </div>
-                            )}
-                          </div>
+                          <span className="font-medium">{apartment.createdByName}</span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

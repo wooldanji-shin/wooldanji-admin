@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import {
@@ -16,7 +16,9 @@ import {
   ChevronDown,
   Cpu,
   Save,
+  BarChart2,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,6 +85,29 @@ interface Apartment {
   status: 'active' | 'pending' | 'inactive';
 }
 
+interface RunningBasicAd {
+  id: string;
+  title: string | null;
+  businessName: string;
+  categoryName: string | null;
+  activatedAt: string | null;
+  freeMonths: number;
+  totalImpressions: number;
+  totalClicks: number;
+}
+
+interface RunningPremiumAd {
+  id: string;
+  title: string | null;
+  businessName: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  weeks: number;
+  totalAmount: number | null;
+  totalImpressions: number;
+  totalClicks: number;
+}
+
 const AVAILABLE_LINES = [
   { value: 12, label: '12라인' },
   { value: 34, label: '34라인' },
@@ -113,6 +138,9 @@ export default function ApartmentDetailPage({ params }: PageProps) {
   const [editMode, setEditMode] = useState(false);
   const [expandedBuildings, setExpandedBuildings] = useState<string[]>([]);
   const [expandedLines, setExpandedLines] = useState<string[]>([]);
+  const [runningBasicAds, setRunningBasicAds] = useState<RunningBasicAd[]>([]);
+  const [runningPremiumAds, setRunningPremiumAds] = useState<RunningPremiumAd[]>([]);
+  const [adsLoading, setAdsLoading] = useState(true);
 
   // Device dialog state
   const [deviceDialog, setDeviceDialog] = useState(false);
@@ -123,9 +151,134 @@ export default function ApartmentDetailPage({ params }: PageProps) {
     password: '',
   });
 
+  const fetchRunningAds = useCallback(async () => {
+    setAdsLoading(true);
+    try {
+      const supabase = createClient();
+
+      // 기본광고: 이 아파트에 running 상태인 광고
+      const { data: basicRows } = await supabase
+        .from('advertisement_apartments_v2')
+        .select(`
+          advertisementId,
+          advertisements_v2!inner(
+            id, title, adStatus, activatedAt, freeMonths,
+            partner_users:partnerId(businessName),
+            ad_categories_v2:categoryId(categoryName)
+          )
+        `)
+        .eq('apartmentId', id)
+        .eq('advertisements_v2.adStatus', 'running');
+
+      const basicAdIds = (basicRows ?? []).map((r: any) => r.advertisementId as string);
+
+      const { data: basicAnalytics } = basicAdIds.length > 0
+        ? await supabase
+            .from('ad_analytics_v2')
+            .select('baseAdId, impressionCount, homeImpressionCount, clickCount')
+            .in('baseAdId', basicAdIds)
+        : { data: [] };
+
+      const basicAnalyticsMap = (basicAnalytics ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
+        (acc, r: any) => {
+          const key = r.baseAdId as string;
+          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
+          acc[key].impressions += (r.homeImpressionCount ?? 0) + (r.impressionCount ?? 0);
+          acc[key].clicks += (r.clickCount ?? 0);
+          return acc;
+        },
+        {}
+      );
+
+      setRunningBasicAds(
+        (basicRows ?? []).map((r: any) => {
+          const ad = r.advertisements_v2;
+          return {
+            id: ad.id,
+            title: ad.title,
+            businessName: ad.partner_users?.businessName ?? '-',
+            categoryName: ad.ad_categories_v2?.categoryName ?? null,
+            activatedAt: ad.activatedAt ?? null,
+            freeMonths: ad.freeMonths ?? 0,
+            totalImpressions: basicAnalyticsMap[ad.id]?.impressions ?? 0,
+            totalClicks: basicAnalyticsMap[ad.id]?.clicks ?? 0,
+          };
+        })
+      );
+
+      // 프리미엄 광고: baseAdId가 이 아파트에 연결된 running 상태인 광고
+      const { data: premiumBaseAdIds } = await supabase
+        .from('advertisement_apartments_v2')
+        .select('advertisementId')
+        .eq('apartmentId', id);
+
+      const baseAdIdList = (premiumBaseAdIds ?? []).map((r: any) => r.advertisementId as string);
+
+      const { data: premiumRows } = baseAdIdList.length > 0
+        ? await supabase
+            .from('premium_advertisements_v2')
+            .select(`
+              id, title, weeks, status, totalAmount, approvedDiscountRate, discountedTotalAmount,
+              startedAt, endedAt, partnerId
+            `)
+            .in('baseAdId', baseAdIdList)
+            .eq('status', 'running')
+        : { data: [] };
+
+      const premiumAdIds = (premiumRows ?? []).map((r: any) => r.id as string);
+      const partnerIds = [...new Set((premiumRows ?? []).map((r: any) => r.partnerId as string))];
+
+      const [{ data: partnerData }, { data: premiumAnalytics }] = await Promise.all([
+        partnerIds.length > 0
+          ? supabase.from('partner_users').select('"userId", "businessName"').in('userId', partnerIds)
+          : Promise.resolve({ data: [] }),
+        premiumAdIds.length > 0
+          ? supabase
+              .from('premium_ad_analytics_v2')
+              .select('"premiumAdId", "impressionCount", "homePremiumImpressionCount", "clickCount"')
+              .in('premiumAdId', premiumAdIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const partnerMap = Object.fromEntries(
+        (partnerData ?? []).map((p: any) => [p.userId, p.businessName])
+      );
+
+      const premiumAnalyticsMap = (premiumAnalytics ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
+        (acc, r: any) => {
+          const key = r.premiumAdId as string;
+          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
+          acc[key].impressions += (r.homePremiumImpressionCount ?? 0) + (r.impressionCount ?? 0);
+          acc[key].clicks += (r.clickCount ?? 0);
+          return acc;
+        },
+        {}
+      );
+
+      setRunningPremiumAds(
+        (premiumRows ?? []).map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          businessName: partnerMap[r.partnerId] ?? '-',
+          startedAt: r.startedAt,
+          endedAt: r.endedAt,
+          weeks: r.weeks,
+          totalAmount: (r.approvedDiscountRate ?? 0) > 0 ? r.discountedTotalAmount : r.totalAmount,
+          totalImpressions: premiumAnalyticsMap[r.id]?.impressions ?? 0,
+          totalClicks: premiumAnalyticsMap[r.id]?.clicks ?? 0,
+        }))
+      );
+    } catch (err) {
+      console.error('running 광고 로드 실패:', err);
+    } finally {
+      setAdsLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchApartmentDetail();
-  }, [id]);
+    fetchRunningAds();
+  }, [id, fetchRunningAds]);
 
   const fetchApartmentDetail = async () => {
     try {
@@ -305,11 +458,12 @@ export default function ApartmentDetailPage({ params }: PageProps) {
 
       {/* Tabs */}
       <Tabs defaultValue="basic" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="basic">기본 정보</TabsTrigger>
           <TabsTrigger value="buildings">동 관리</TabsTrigger>
           <TabsTrigger value="devices">기기 관리</TabsTrigger>
           <TabsTrigger value="permissions">권한 설정</TabsTrigger>
+          <TabsTrigger value="ads">광고 현황</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: 기본 정보 */}
@@ -602,6 +756,131 @@ export default function ApartmentDetailPage({ params }: PageProps) {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">권한 설정 기능은 준비 중입니다.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 5: 광고 현황 */}
+        <TabsContent value="ads" className="space-y-6">
+          {/* 기본광고 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <BarChart2 className="inline-block mr-2 h-5 w-5" />
+                기본광고 진행 중
+                <Badge variant="secondary" className="ml-2">{runningBasicAds.length}</Badge>
+              </CardTitle>
+              <CardDescription>이 아파트에서 현재 running 상태인 기본광고입니다</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : runningBasicAds.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">진행 중인 기본광고가 없습니다</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground text-left">
+                      <th className="py-2 pr-4 font-medium">상호명</th>
+                      <th className="py-2 pr-4 font-medium">광고 제목</th>
+                      <th className="py-2 pr-4 font-medium">카테고리</th>
+                      <th className="py-2 pr-4 font-medium">시작일</th>
+                      <th className="py-2 pr-4 font-medium text-center">무료</th>
+                      <th className="py-2 pr-4 font-medium text-right">노출수</th>
+                      <th className="py-2 font-medium text-right">클릭수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runningBasicAds.map((ad) => (
+                      <tr key={ad.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="py-2.5 pr-4 font-medium">{ad.businessName}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground max-w-[200px] truncate">{ad.title ?? '-'}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground">{ad.categoryName ?? '-'}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground">
+                          {ad.activatedAt ? new Date(ad.activatedAt).toLocaleDateString('ko-KR') : '-'}
+                        </td>
+                        <td className="py-2.5 pr-4 text-center">
+                          {ad.freeMonths > 0 ? (
+                            <Badge variant="outline" className="text-xs">{ad.freeMonths}개월</Badge>
+                          ) : '-'}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right tabular-nums">
+                          {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums">
+                          {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 프리미엄광고 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <BarChart2 className="inline-block mr-2 h-5 w-5 text-amber-500" />
+                프리미엄광고 진행 중
+                <Badge variant="secondary" className="ml-2">{runningPremiumAds.length}</Badge>
+              </CardTitle>
+              <CardDescription>이 아파트에서 현재 running 상태인 프리미엄광고입니다</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : runningPremiumAds.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">진행 중인 프리미엄광고가 없습니다</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground text-left">
+                      <th className="py-2 pr-4 font-medium">상호명</th>
+                      <th className="py-2 pr-4 font-medium">광고 제목</th>
+                      <th className="py-2 pr-4 font-medium">기간</th>
+                      <th className="py-2 pr-4 font-medium">주수</th>
+                      <th className="py-2 pr-4 font-medium text-right">금액</th>
+                      <th className="py-2 pr-4 font-medium text-right">노출수</th>
+                      <th className="py-2 font-medium text-right">클릭수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runningPremiumAds.map((ad) => (
+                      <tr key={ad.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="py-2.5 pr-4 font-medium">{ad.businessName}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground max-w-[200px] truncate">{ad.title ?? '-'}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground tabular-nums text-xs">
+                          {ad.startedAt && ad.endedAt ? (
+                            <>
+                              {new Date(ad.startedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
+                              {' ~ '}
+                              {new Date(ad.endedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
+                            </>
+                          ) : '-'}
+                        </td>
+                        <td className="py-2.5 pr-4 text-muted-foreground">{ad.weeks}주</td>
+                        <td className="py-2.5 pr-4 text-right tabular-nums">
+                          {ad.totalAmount != null ? `${ad.totalAmount.toLocaleString()}원` : '-'}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right tabular-nums">
+                          {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums">
+                          {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
