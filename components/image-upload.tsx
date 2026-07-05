@@ -179,7 +179,7 @@ export function ImageUpload({
     });
   };
 
-  // 이미지를 WebP로 변환하는 함수 (1080px 리사이징 + 100% 품질)
+  // 이미지를 WebP로 변환하는 함수 (긴 변 1920px 리사이징 + 95% 품질)
   const convertToWebP = async (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -190,13 +190,20 @@ export function ImageUpload({
         img.onload = () => {
           const canvas = document.createElement('canvas');
 
-          const MAX_WIDTH = 1080;
+          // 최대 크기 제한 (긴 쪽 기준)
+          const MAX_SIZE = 1920; // 레티나 디스플레이 대응
           let width = img.width;
           let height = img.height;
 
-          if (width > MAX_WIDTH) {
-            height = Math.round((height * MAX_WIDTH) / width);
-            width = MAX_WIDTH;
+          // 비율 유지하면서 크기 조절
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            if (width > height) {
+              height = Math.round((height * MAX_SIZE) / width);
+              width = MAX_SIZE;
+            } else {
+              width = Math.round((width * MAX_SIZE) / height);
+              height = MAX_SIZE;
+            }
           }
 
           canvas.width = width;
@@ -222,7 +229,7 @@ export function ImageUpload({
               }
             },
             'image/webp',
-            0.85
+            0.95 // 고품질 유지 (95%)
           );
         };
 
@@ -273,8 +280,8 @@ export function ImageUpload({
           원본크기: `${(file.size / 1024).toFixed(2)}KB`,
           변환후크기: `${(webpBlob.size / 1024).toFixed(2)}KB`,
           감소율: `${sizeDiff}%`,
-          품질: '85%',
-          최대너비: '1080px',
+          품질: '95%',
+          최대크기: '1920px (긴 변 기준)',
         });
       }
 

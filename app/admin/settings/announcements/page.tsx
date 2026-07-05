@@ -401,7 +401,7 @@ export default function AnnouncementsPage() {
           const canvas = document.createElement('canvas');
 
           // 최대 크기 제한 (긴 쪽 기준)
-          const MAX_SIZE = 1080; // 모바일에 최적화된 크기
+          const MAX_SIZE = 1920; // 레티나 디스플레이 대응
           let width = img.width;
           let height = img.height;
 

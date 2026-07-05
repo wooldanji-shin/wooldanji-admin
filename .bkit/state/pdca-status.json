@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "lastUpdated": "2026-05-18T01:45:35.566Z",
+  "lastUpdated": "2026-07-05T12:29:19.794Z",
   "activeFeatures": [
     "wooldanji-admin",
     "admin",
@@ -42,9 +42,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:43:00.824Z",
-        "lastUpdated": "2026-05-03T13:49:24.841Z"
+        "lastUpdated": "2026-07-05T12:29:11.893Z"
       },
-      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/components/app-sidebar.tsx",
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/components/image-upload.tsx",
       "stateMachine": {
         "currentState": "do",
         "previousState": null,
@@ -319,7 +319,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:18:45.051Z",
-        "lastUpdated": "2026-05-18T01:45:00.021Z"
+        "lastUpdated": "2026-07-05T12:29:15.608Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/settings/announcements/page.tsx"
     },
@@ -332,7 +332,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:19:04.286Z",
-        "lastUpdated": "2026-04-28T05:17:09.686Z"
+        "lastUpdated": "2026-07-05T12:29:19.793Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/settings/notifications/page.tsx"
     },
@@ -423,7 +423,7 @@
   "session": {
     "startedAt": "2026-04-28T03:43:00.823Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-18T01:45:35.566Z"
+    "lastActivity": "2026-07-05T12:29:19.794Z"
   },
   "history": [
     {
@@ -2247,6 +2247,30 @@
     {
       "timestamp": "2026-05-18T01:45:35.566Z",
       "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-05T12:28:59.472Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-05T12:29:11.894Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-05T12:29:15.609Z",
+      "feature": "announcements",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-05T12:29:19.794Z",
+      "feature": "notifications",
       "phase": "do",
       "action": "updated"
     }
