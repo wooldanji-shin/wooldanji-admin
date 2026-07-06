@@ -183,7 +183,7 @@ export default function NotificationSettingsPage() {
           const canvas = document.createElement('canvas');
 
           // 최대 크기 제한 (긴 쪽 기준)
-          const MAX_SIZE = 1920; // 레티나 디스플레이 대응
+          const MAX_SIZE = 2560; // 레티나 디스플레이 대응
           let width = img.width;
           let height = img.height;
 

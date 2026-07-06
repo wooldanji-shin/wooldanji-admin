@@ -191,7 +191,7 @@ export function ImageUpload({
           const canvas = document.createElement('canvas');
 
           // 최대 크기 제한 (긴 쪽 기준)
-          const MAX_SIZE = 1920; // 레티나 디스플레이 대응
+          const MAX_SIZE = 2560; // 레티나 디스플레이 대응
           let width = img.width;
           let height = img.height;
 
@@ -281,7 +281,7 @@ export function ImageUpload({
           변환후크기: `${(webpBlob.size / 1024).toFixed(2)}KB`,
           감소율: `${sizeDiff}%`,
           품질: '95%',
-          최대크기: '1920px (긴 변 기준)',
+          최대크기: '2560px (긴 변 기준)',
         });
       }
 

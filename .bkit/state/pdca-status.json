@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "lastUpdated": "2026-07-05T12:29:19.794Z",
+  "lastUpdated": "2026-07-06T00:50:06.406Z",
   "activeFeatures": [
     "wooldanji-admin",
     "admin",
@@ -42,7 +42,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:43:00.824Z",
-        "lastUpdated": "2026-07-05T12:29:11.893Z"
+        "lastUpdated": "2026-07-06T00:50:06.405Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/components/image-upload.tsx",
       "stateMachine": {
@@ -319,7 +319,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:18:45.051Z",
-        "lastUpdated": "2026-07-05T12:29:15.608Z"
+        "lastUpdated": "2026-07-06T00:50:02.781Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/settings/announcements/page.tsx"
     },
@@ -332,7 +332,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T04:19:04.286Z",
-        "lastUpdated": "2026-07-05T12:29:19.793Z"
+        "lastUpdated": "2026-07-06T00:50:02.834Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/settings/notifications/page.tsx"
     },
@@ -423,7 +423,7 @@
   "session": {
     "startedAt": "2026-04-28T03:43:00.823Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-07-05T12:29:19.794Z"
+    "lastActivity": "2026-07-06T00:50:06.406Z"
   },
   "history": [
     {
@@ -2271,6 +2271,30 @@
     {
       "timestamp": "2026-07-05T12:29:19.794Z",
       "feature": "notifications",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-06T00:49:57.101Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-06T00:50:02.782Z",
+      "feature": "announcements",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-06T00:50:02.835Z",
+      "feature": "notifications",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-07-06T00:50:06.406Z",
+      "feature": "wooldanji-admin",
       "phase": "do",
       "action": "updated"
     }
