@@ -23,9 +23,19 @@ export interface PartnerUser {
   analyticsEnabled: boolean;
   email: string | null;
   createdAt: string;
-  categoryName: string | null;
+  categoryNames: string[];
   totalImpressionCount: number;
   totalClickCount: number;
+}
+
+export interface PartnerCategory {
+  id: string;
+  categoryName: string;
+}
+
+export interface PartnerSubCategory {
+  id: string;
+  subCategoryName: string;
 }
 
 export interface UsePartnersPageReturn {
@@ -35,7 +45,13 @@ export interface UsePartnersPageReturn {
   totalPages: number;
   currentPage: number;
   searchInput: string;
+  categories: PartnerCategory[];
+  subCategories: PartnerSubCategory[];
+  categoryFilter: string | null;
+  subCategoryFilter: string | null;
   handleSearch: (value: string) => void;
+  handleCategoryFilterChange: (categoryId: string | null) => void;
+  handleSubCategoryFilterChange: (subCategoryId: string | null) => void;
   handlePageChange: (page: number) => void;
   handleRowClick: (id: string) => void;
   handleToggleAnalytics: (partnerId: string, current: boolean) => Promise<void>;
@@ -50,20 +66,96 @@ export function usePartnersPage(): UsePartnersPageReturn {
   const debounceTimer = useRef<NodeJS.Timeout>(null);
 
   const searchQuery = searchParams.get('search') ?? '';
+  const categoryFilter = searchParams.get('category') ?? null;
+  const subCategoryFilter = searchParams.get('subCategory') ?? null;
   const currentPage = parseInt(searchParams.get('page') ?? '1');
 
   const [partners, setPartners] = useState<PartnerUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [searchInput, setSearchInput] = useState(searchQuery);
+  const [categories, setCategories] = useState<PartnerCategory[]>([]);
+  const [subCategories, setSubCategories] = useState<PartnerSubCategory[]>([]);
+
+  const fetchCategories = useCallback(async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('ad_categories_v2')
+      .select('id, categoryName')
+      .order('categoryName');
+    if (error) {
+      console.error('카테고리 목록 로드 실패:', error);
+      return;
+    }
+    setCategories((data as PartnerCategory[]) ?? []);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const fetchSubCategories = useCallback(async (categoryId: string): Promise<void> => {
+    const { data, error } = await supabase
+      .from('ad_sub_categories_v2')
+      .select('id, subCategoryName')
+      .eq('categoryId', categoryId)
+      .order('orderIndex', { ascending: true });
+    if (error) {
+      console.error('서브카테고리 목록 로드 실패:', error);
+      return;
+    }
+    setSubCategories((data as PartnerSubCategory[]) ?? []);
+  }, [supabase]);
+
+  useEffect(() => {
+    if (categoryFilter) {
+      fetchSubCategories(categoryFilter);
+    } else {
+      setSubCategories([]);
+    }
+  }, [categoryFilter, fetchSubCategories]);
 
   const fetchPartners = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
+      // 카테고리/서브카테고리 필터 — advertisements_v2에서 해당 카테고리의 광고를 보유한 partnerId 추출
+      let partnerIdsFilter: string[] | null = null;
+      if (categoryFilter) {
+        const { data: adsData, error: adsError } = await supabase
+          .from('advertisements_v2')
+          .select('id, partnerId')
+          .eq('categoryId', categoryFilter)
+          .neq('adStatus', 'draft');
+        if (adsError) throw adsError;
+
+        let matchingAds = adsData ?? [];
+        if (subCategoryFilter) {
+          const adIds = matchingAds.map((a: any) => a.id);
+          if (adIds.length === 0) {
+            matchingAds = [];
+          } else {
+            const { data: subData, error: subError } = await supabase
+              .from('advertisement_sub_categories_v2')
+              .select('advertisementId')
+              .eq('subCategoryId', subCategoryFilter)
+              .in('advertisementId', adIds);
+            if (subError) throw subError;
+            const matchedAdIds = new Set((subData ?? []).map((s: any) => s.advertisementId));
+            matchingAds = matchingAds.filter((a: any) => matchedAdIds.has(a.id));
+          }
+        }
+        partnerIdsFilter = Array.from(new Set(matchingAds.map((a: any) => a.partnerId)));
+      }
+
+      if (partnerIdsFilter !== null && partnerIdsFilter.length === 0) {
+        setPartners([]);
+        setTotalCount(0);
+        return;
+      }
+
       let query = supabase
         .from('partner_users')
         .select(
-          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, hasHadRunningAd, marketingAgreed, analyticsEnabled, createdAt, ad_categories_v2:categoryId(categoryName)',
+          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, hasHadRunningAd, marketingAgreed, analyticsEnabled, createdAt',
           { count: 'exact' }
         );
 
@@ -71,6 +163,10 @@ export function usePartnersPage(): UsePartnersPageReturn {
         query = query.or(
           `businessName.ilike.%${searchQuery}%,representativeName.ilike.%${searchQuery}%,displayPhoneNumber.ilike.%${searchQuery}%,phoneNumber.ilike.%${searchQuery}%,businessRegistrationNumber.ilike.%${searchQuery}%`
         );
+      }
+
+      if (partnerIdsFilter !== null) {
+        query = query.in('id', partnerIdsFilter);
       }
 
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -110,6 +206,22 @@ export function usePartnersPage(): UsePartnersPageReturn {
         });
       }
 
+      // 파트너별 보유 광고 카테고리 집계 (중복 없이)
+      const categoryNamesMap: Record<string, Set<string>> = {};
+      partnerIds.forEach((id: string) => { categoryNamesMap[id] = new Set(); });
+
+      if (partnerIds.length > 0) {
+        const { data: adCategoryData } = await supabase
+          .from('advertisements_v2')
+          .select('partnerId, ad_categories_v2:categoryId(categoryName)')
+          .in('partnerId', partnerIds)
+          .neq('adStatus', 'draft');
+        (adCategoryData ?? []).forEach((row: any) => {
+          const name = row.ad_categories_v2?.categoryName;
+          if (name) categoryNamesMap[row.partnerId]?.add(name);
+        });
+      }
+
       const mapped: PartnerUser[] = rows.map((row: any) => ({
         id: row.id,
         userId: row.userId,
@@ -128,7 +240,7 @@ export function usePartnersPage(): UsePartnersPageReturn {
         analyticsEnabled: row.analyticsEnabled ?? false,
         email: emailMap[row.userId] ?? null,
         createdAt: row.createdAt,
-        categoryName: (row.ad_categories_v2 as any)?.categoryName ?? null,
+        categoryNames: Array.from(categoryNamesMap[row.id] ?? []),
         totalImpressionCount: analyticsMap[row.id]?.impression ?? 0,
         totalClickCount: analyticsMap[row.id]?.click ?? 0,
       }));
@@ -141,7 +253,7 @@ export function usePartnersPage(): UsePartnersPageReturn {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, currentPage, supabase]);
+  }, [searchQuery, categoryFilter, subCategoryFilter, currentPage, supabase]);
 
   useEffect(() => {
     fetchPartners();
@@ -163,6 +275,14 @@ export function usePartnersPage(): UsePartnersPageReturn {
     debounceTimer.current = setTimeout(() => {
       updateSearchParams({ search: value, page: '1' });
     }, 500);
+  };
+
+  const handleCategoryFilterChange = (categoryId: string | null): void => {
+    updateSearchParams({ category: categoryId ?? '', subCategory: '', page: '1' });
+  };
+
+  const handleSubCategoryFilterChange = (subCategoryId: string | null): void => {
+    updateSearchParams({ subCategory: subCategoryId ?? '', page: '1' });
   };
 
   const handlePageChange = (page: number): void => {
@@ -205,7 +325,13 @@ export function usePartnersPage(): UsePartnersPageReturn {
     totalPages,
     currentPage,
     searchInput,
+    categories,
+    subCategories,
+    categoryFilter,
+    subCategoryFilter,
     handleSearch,
+    handleCategoryFilterChange,
+    handleSubCategoryFilterChange,
     handlePageChange,
     handleRowClick,
     handleToggleAnalytics,

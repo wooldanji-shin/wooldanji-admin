@@ -52,6 +52,23 @@ export const formatLandlineNumber = (value: string): string => {
 };
 
 /**
+ * 날짜 슬래시 포맷팅 (2026/01/08)
+ * 브라우저 native date input의 표시 형식이 OS/브라우저 locale에 좌우되는 것을 피하기 위한 용도.
+ * digits: 숫자만 있는 문자열(최대 8자리, YYYYMMDD)
+ */
+export const formatDateSlash = (digits: string): string => {
+  const numbers = digits.replace(/[^\d]/g, '');
+
+  if (numbers.length <= 4) {
+    return numbers;
+  } else if (numbers.length <= 6) {
+    return `${numbers.slice(0, 4)}/${numbers.slice(4)}`;
+  } else {
+    return `${numbers.slice(0, 4)}/${numbers.slice(4, 6)}/${numbers.slice(6, 8)}`;
+  }
+};
+
+/**
  * 사업자등록번호 포맷팅 (123-45-678901)
  * 3자리-2자리-6자리
  */

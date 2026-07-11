@@ -16,6 +16,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -40,14 +47,54 @@ function PartnersContent(): React.ReactElement {
 
       <PageContent>
         <div className="flex items-center justify-between gap-4">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="상호명, 대표자명, 전화번호, 사업자번호 검색..."
-              value={page.searchInput}
-              onChange={(e) => page.handleSearch(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center gap-2 w-full max-w-2xl">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="상호명, 대표자명, 전화번호, 사업자번호 검색..."
+                value={page.searchInput}
+                onChange={(e) => page.handleSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select
+              value={page.categoryFilter ?? 'all'}
+              onValueChange={(value) =>
+                page.handleCategoryFilterChange(value === 'all' ? null : value)
+              }
+            >
+              <SelectTrigger className="w-[140px] shrink-0">
+                <SelectValue placeholder="카테고리" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체 카테고리</SelectItem>
+                {page.categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.categoryName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {page.categoryFilter && page.subCategories.length > 0 && (
+              <Select
+                value={page.subCategoryFilter ?? 'all'}
+                onValueChange={(value) =>
+                  page.handleSubCategoryFilterChange(value === 'all' ? null : value)
+                }
+              >
+                <SelectTrigger className="w-[140px] shrink-0">
+                  <SelectValue placeholder="서브카테고리" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 서브카테고리</SelectItem>
+                  {page.subCategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id}>
+                      {sub.subCategoryName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <span className="shrink-0 text-sm text-muted-foreground">
             전체 {page.totalCount.toLocaleString()}명
@@ -56,7 +103,7 @@ function PartnersContent(): React.ReactElement {
 
         <DataTableShell>
           {page.loading ? (
-            <TableSkeleton rows={8} columns={7} />
+            <TableSkeleton rows={8} columns={9} />
           ) : page.partners.length === 0 ? (
             <EmptyState
               icon={Users}
@@ -69,6 +116,7 @@ function PartnersContent(): React.ReactElement {
                 <TableRow>
                   <TableHead>상호명</TableHead>
                   <TableHead>대표자명</TableHead>
+                  <TableHead>카테고리</TableHead>
                   <TableHead>주소</TableHead>
                   <TableHead>연락처</TableHead>
                   <TableHead>노출수/클릭수</TableHead>
@@ -86,6 +134,19 @@ function PartnersContent(): React.ReactElement {
                   >
                     <TableCell className="font-medium">{partner.businessName}</TableCell>
                     <TableCell>{partner.representativeName}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {partner.categoryNames.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {partner.categoryNames.map((name) => (
+                            <Badge key={name} variant="outline">
+                              {name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground max-w-[160px] truncate">
                       {partner.businessAddress ?? '-'}
                     </TableCell>

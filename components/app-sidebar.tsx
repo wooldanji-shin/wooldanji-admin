@@ -33,6 +33,7 @@ import {
   Tag,
   DoorOpen,
   TrendingUp,
+  Receipt,
   type LucideIcon,
 } from 'lucide-react';
 import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -158,6 +159,12 @@ const advertisingItems: MenuItem[] = [
     href: '/admin/advertising-v2/pricing',
     icon: TrendingUp,
     roles: ['SUPER_ADMIN'],
+  },
+  {
+    name: '정산 관리',
+    href: '/admin/settlement',
+    icon: Receipt,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
   },
 ];
 

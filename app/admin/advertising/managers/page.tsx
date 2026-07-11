@@ -99,6 +99,11 @@ interface Apartment {
   address: string;
 }
 
+interface RunningAdCounts {
+  basic: number;
+  premium: number;
+}
+
 export default function AdvertisingManagersPage() {
   const supabase = createClient();
 
@@ -106,6 +111,7 @@ export default function AdvertisingManagersPage() {
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [runningAdCounts, setRunningAdCounts] = useState<Record<string, RunningAdCounts>>({});
 
   // Create dialog
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -171,6 +177,7 @@ export default function AdvertisingManagersPage() {
       if (fetchError) throw fetchError;
 
       setManagers(data || []);
+      fetchRunningAdCounts(data || []);
     } catch (err) {
       console.error('Failed to fetch managers:', err);
       toast.error('매니저 목록을 불러오는데 실패했습니다.');
@@ -186,6 +193,32 @@ export default function AdvertisingManagersPage() {
       .select('*')
       .order('name');
     setApartments(data || []);
+  };
+
+  // 매니저별 관리 아파트에서 진행중(running)인 일반/프리미엄 광고 개수 집계
+  // — /admin/apartments와 동일하게 get_apartment_running_ad_counts RPC 결과를 아파트 기준으로 합산
+  const fetchRunningAdCounts = async (managersData: Manager[]) => {
+    const { data: adCounts } = await supabase.rpc('get_apartment_running_ad_counts');
+
+    const adCountMap = new Map<string, { basic: number; premium: number }>(
+      (adCounts || []).map((r: { apartment_id: string; basic_running_count: number; premium_running_count: number }) => [
+        r.apartment_id,
+        { basic: r.basic_running_count, premium: r.premium_running_count },
+      ])
+    );
+
+    const counts: Record<string, RunningAdCounts> = {};
+    managersData.forEach((m) => {
+      counts[m.id] = (m.manager_apartments ?? []).reduce(
+        (acc, ma) => {
+          const c = adCountMap.get(ma.apartmentId);
+          return { basic: acc.basic + (c?.basic ?? 0), premium: acc.premium + (c?.premium ?? 0) };
+        },
+        { basic: 0, premium: 0 }
+      );
+    });
+
+    setRunningAdCounts(counts);
   };
 
   useEffect(() => {
@@ -465,6 +498,7 @@ export default function AdvertisingManagersPage() {
                     <TableHead className='text-muted-foreground'>이메일</TableHead>
                     <TableHead className='text-muted-foreground'>전화번호</TableHead>
                     <TableHead className='text-muted-foreground'>관리 아파트</TableHead>
+                    <TableHead className='text-muted-foreground'>일반/프리미엄</TableHead>
                     <TableHead className='text-muted-foreground'>등록일</TableHead>
                     <TableHead className='text-muted-foreground text-right'>작업</TableHead>
                   </TableRow>
@@ -472,13 +506,13 @@ export default function AdvertisingManagersPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={7} className='text-center py-12 text-muted-foreground'>
   <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
                       </TableCell>
                     </TableRow>
                   ) : filteredManagers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className='text-center py-12 text-muted-foreground'>
+                      <TableCell colSpan={7} className='text-center py-12 text-muted-foreground'>
                         {searchQuery ? '검색 결과가 없습니다.' : '매니저가 없습니다.'}
                       </TableCell>
                     </TableRow>
@@ -526,6 +560,15 @@ export default function AdvertisingManagersPage() {
                           ) : (
                             <span className='text-muted-foreground text-sm'>미지정</span>
                           )}
+                        </TableCell>
+                        <TableCell
+                          className='text-muted-foreground'
+                          onClick={() => {
+                            setViewingManager(manager);
+                            setDetailDialog(true);
+                          }}
+                        >
+                          {(runningAdCounts[manager.id]?.basic ?? 0)}/{(runningAdCounts[manager.id]?.premium ?? 0)}
                         </TableCell>
                         <TableCell
                           className='text-muted-foreground'

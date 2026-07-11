@@ -399,20 +399,23 @@ export default function PremiumAdDetailPage({
               {(() => {
                 const a = page.analytics;
                 const fmt = (n: number) => n.toLocaleString();
+                const isFoodCategory = detail.category?.categoryName === '음식';
                 const rows: { label: string; value: number }[] = [
-                  { label: '노출수', value: a?.impressionCount ?? 0 },
+                  { label: '카테고리 노출', value: a?.impressionCount ?? 0 },
                   { label: '홈 프리미엄 노출수', value: a?.homePremiumImpressionCount ?? 0 },
                   { label: '다이얼로그 노출수', value: a?.dialogImpressionCount ?? 0 },
                   { label: '클릭수', value: a?.clickCount ?? 0 },
                   { label: '전화 클릭', value: a?.phoneClickCount ?? 0 },
+                  { label: '찜 수', value: a?.wishCount ?? 0 },
                   { label: '네이버지도 클릭', value: a?.naverMapClickCount ?? 0 },
                   { label: '블로그 클릭', value: a?.blogClickCount ?? 0 },
                   { label: '유튜브 클릭', value: a?.youtubeClickCount ?? 0 },
                   { label: '인스타그램 클릭', value: a?.instagramClickCount ?? 0 },
                   { label: '카카오채팅 클릭', value: a?.kakaoChatClickCount ?? 0 },
-                  { label: '배민 클릭', value: a?.baeminClickCount ?? 0 },
-                  { label: '쿠팡이츠 클릭', value: a?.coupangEatsClickCount ?? 0 },
-                  { label: '찜 수', value: a?.wishCount ?? 0 },
+                  ...(isFoodCategory ? [
+                    { label: '배민 클릭', value: a?.baeminClickCount ?? 0 },
+                    { label: '쿠팡이츠 클릭', value: a?.coupangEatsClickCount ?? 0 },
+                  ] : []),
                 ];
                 return (
                   <div className='space-y-1.5 text-sm'>
