@@ -56,7 +56,7 @@ export async function POST(
     // 광고 조회 (modificationStatus, pendingChanges, 할인율 포함)
     const { data: ad, error: fetchError } = await supabase
       .from('advertisements_v2')
-      .select('adStatus, modificationStatus, pendingChanges, partnerId, "approvedDiscountRate", "approvedMonthlyAmount"')
+      .select('adStatus, modificationStatus, pendingChanges, partnerId, title, "approvedDiscountRate", "approvedMonthlyAmount"')
       .eq('id', id)
       .single();
 
@@ -81,8 +81,8 @@ export async function POST(
     const hasPendingApartments = Array.isArray(pendingApartments) && pendingApartments.length > 0;
     const now = new Date().toISOString();
 
-    // 케이스 2는 텍스트/서브카테고리 변경까지 결제 후 일괄 적용 — 승인 시 서브카테고리 업데이트 건너뜀
-    let deferSubCategoryUpdate = false;
+    // 승인 결과 상태 (알림 문구 분기용): 아파트 변경으로 차액결제/변경예정이 걸린 경우만 설정
+    let notificationStatus: 'pending_payment' | 'pending_next_cycle' | null = null;
 
     if (hasPendingApartments) {
       // 아파트 변경 포함 — 4가지 케이스 분기
@@ -218,20 +218,20 @@ export async function POST(
             }).eq('id', (subscription as any).id);
           }
         } else {
-          // 케이스 2: 금액 증가 + 결제 이력 → 차액 결제 대기
+          // 케이스 2: 금액 증가 + 결제 이력 → 아파트 노출만 차액결제까지 보류, 나머지는 승인 즉시 반영
           await supabase.from('advertisements_v2').update({
+            ...adChanges,                                       // 제목/내용/이미지/링크 즉시 반영
             apartmentChangeStatus: 'pending_payment',
             modificationStatus: null,
             modificationRejectedReason: null,
+            pendingChanges: { apartments: pendingApartments },  // 아파트만 차액결제 시 적용하도록 보존
             updatedAt: now,
           }).eq('id', id);
-          deferSubCategoryUpdate = true;
+          notificationStatus = 'pending_payment';
 
-          if ((subscription as any)?.id) {
-            await adminSupabase.from('ad_subscriptions_v2').update({
-              monthlyAmount: actualNewFee,
-            }).eq('id', (subscription as any).id);
-          }
+          // 차액결제 대기(pending_payment) 중에는 monthlyAmount를 미리 올리지 않는다.
+          // 정기결제는 기존 요금(approvedMonthlyAmount)으로 청구되어야 하며,
+          // monthlyAmount는 차액결제 성공 시 inicis-charge-apartment-difference EF가 세팅한다.
         }
       } else {
         if (isInFreeTrial || newFee === currentFee) {
@@ -253,14 +253,16 @@ export async function POST(
             }).eq('id', (subscription as any).id);
           }
         } else {
-          // 케이스 4: 금액 감소 + 결제 이력 → 다음달 정기결제일에 자동 적용 예약
+          // 케이스 4: 금액 감소 + 결제 이력 → 아파트 노출만 다음 정기결제일에 적용, 나머지는 승인 즉시 반영
           await supabase.from('advertisements_v2').update({
+            ...adChanges,                                       // 제목/내용/이미지/링크 즉시 반영
             apartmentChangeStatus: 'pending_next_cycle',
             modificationStatus: null,
             modificationRejectedReason: null,
+            pendingChanges: { apartments: pendingApartments },  // 아파트만 다음 정기일에 적용하도록 보존
             updatedAt: now,
           }).eq('id', id);
-          deferSubCategoryUpdate = true;
+          notificationStatus = 'pending_next_cycle';
 
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
@@ -305,8 +307,8 @@ export async function POST(
       }
     }
 
-    // 서브카테고리 junction table 업데이트 (케이스 2는 charge-apartment-difference EF에서 처리)
-    if (Array.isArray(subCategoryIds) && !deferSubCategoryUpdate) {
+    // 서브카테고리 junction table 업데이트 (아파트 변경 여부와 무관하게 승인 즉시 반영)
+    if (Array.isArray(subCategoryIds)) {
       const { error: deleteError } = await supabase
         .from('advertisement_sub_categories_v2')
         .delete()
@@ -333,6 +335,15 @@ export async function POST(
       }
     }
 
+    // 알림 문구: 아파트 변경으로 차액결제/변경예정이 걸린 경우 상태별로 분기 (그 외는 기존 문구 유지)
+    const adTitle = (adChanges.title as string | undefined) ?? (ad as any).title ?? '광고';
+    let notificationBody = '광고 수정 요청이 승인되었습니다.';
+    if (notificationStatus === 'pending_payment') {
+      notificationBody = `${adTitle} 수정이 승인되었습니다. 앱에서 차액결제가 필요합니다.`;
+    } else if (notificationStatus === 'pending_next_cycle') {
+      notificationBody = `${adTitle} 수정이 승인되었습니다. 다음 정기일에 변경 예정입니다.`;
+    }
+
     // 수정 승인 FCM 알림 전송 (non-critical: 실패해도 승인 처리는 유지)
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -347,7 +358,7 @@ export async function POST(
         body: JSON.stringify({
           partnerUserId: ad.partnerId,
           title: '광고 수정 심사 결과',
-          body: '광고 수정 요청이 승인되었습니다.',
+          body: notificationBody,
           type: 'ad_approved',
           navigationData: {
             type: 'ad_detail',
