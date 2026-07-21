@@ -14,7 +14,7 @@ export interface CouponItem {
   expiresAt: string;
   isActive: boolean;
   createdAt: string;
-  partnerUserId: string;
+  partnerUserId: string | null;
   partnerBusinessName: string;
   downloadCount: number;
   usageCount: number;
@@ -46,7 +46,7 @@ export function useCouponsPage(): UseCouponsPageReturn {
           id, title, description, discountType, discountValue,
           minAmount, expiresAt, isActive, createdAt, partnerUserId,
           expiredAt, expiredReason, updateReason,
-          partner_users!inner(businessName),
+          partner_users(businessName),
           coupon_downloads(count)
         `)
         .order('createdAt', { ascending: false });

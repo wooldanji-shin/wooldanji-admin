@@ -225,9 +225,15 @@ export function usePremiumPage(): UsePremiumPageReturn {
     loadAds();
   }, [loadAds]);
 
+  // 아파트 필터 적용 후 목록 (상태별 개수도 이 기준으로 계산)
+  const apartmentFilteredAds = useMemo(() => {
+    if (!apartmentFilter) return ads;
+    return ads.filter((ad) => ad.apartmentIds.includes(apartmentFilter));
+  }, [ads, apartmentFilter]);
+
   const statusCounts = useMemo<Record<PremiumStatus | 'all', number>>(() => {
-    const counts: Record<string, number> = { all: ads.length };
-    for (const ad of ads) {
+    const counts: Record<string, number> = { all: apartmentFilteredAds.length };
+    for (const ad of apartmentFilteredAds) {
       if (ad.status === 'running' && ad.modificationStatus === 'pending') {
         counts['modification_pending'] = (counts['modification_pending'] ?? 0) + 1;
       } else {
@@ -235,19 +241,15 @@ export function usePremiumPage(): UsePremiumPageReturn {
       }
     }
     return counts as Record<PremiumStatus | 'all', number>;
-  }, [ads]);
+  }, [apartmentFilteredAds]);
 
   const filtered = useMemo(() => {
     let result =
       statusFilter === 'all'
-        ? ads
+        ? apartmentFilteredAds
         : statusFilter === 'modification_pending'
-          ? ads.filter((ad) => ad.status === 'running' && ad.modificationStatus === 'pending')
-          : ads.filter((ad) => ad.status === statusFilter);
-
-    if (apartmentFilter) {
-      result = result.filter((ad) => ad.apartmentIds.includes(apartmentFilter));
-    }
+          ? apartmentFilteredAds.filter((ad) => ad.status === 'running' && ad.modificationStatus === 'pending')
+          : apartmentFilteredAds.filter((ad) => ad.status === statusFilter);
 
     if (debouncedSearchTerm.trim()) {
       const term = debouncedSearchTerm.trim().toLowerCase();
@@ -259,7 +261,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
     }
 
     return result;
-  }, [ads, statusFilter, apartmentFilter, debouncedSearchTerm]);
+  }, [apartmentFilteredAds, statusFilter, debouncedSearchTerm]);
 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

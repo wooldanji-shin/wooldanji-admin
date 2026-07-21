@@ -338,28 +338,36 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     fetchApplications();
   }, [fetchApplications]);
 
+  // 아파트 필터 적용 후 목록 (상태별 개수도 이 기준으로 계산)
+  const apartmentFilteredApplications = useMemo(() => {
+    if (!apartmentFilter) return applications;
+    return applications.filter((a) =>
+      a.apartments.some((apt) => apt.apartmentId === apartmentFilter)
+    );
+  }, [applications, apartmentFilter]);
+
   // 상태 필터 적용 후 목록
   const statusFiltered = useMemo(() => {
-    if (statusFilter === 'all') return applications;
-    if (statusFilter === 'free_running') return applications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0);
-    if (statusFilter === 'paid_running') return applications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0);
-    if (statusFilter === 'pending') return applications.filter((a) => a.adStatus === 'pending');
-    if (statusFilter === 'modification') return applications.filter((a) => a.modificationStatus === 'pending');
-    if (statusFilter === 'ended') return applications.filter((a) => a.adStatus === 'ended');
-    if (statusFilter === 'rejected') return applications.filter((a) => a.adStatus === 'rejected');
-    return applications;
-  }, [applications, statusFilter]);
+    if (statusFilter === 'all') return apartmentFilteredApplications;
+    if (statusFilter === 'free_running') return apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0);
+    if (statusFilter === 'paid_running') return apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0);
+    if (statusFilter === 'pending') return apartmentFilteredApplications.filter((a) => a.adStatus === 'pending');
+    if (statusFilter === 'modification') return apartmentFilteredApplications.filter((a) => a.modificationStatus === 'pending');
+    if (statusFilter === 'ended') return apartmentFilteredApplications.filter((a) => a.adStatus === 'ended');
+    if (statusFilter === 'rejected') return apartmentFilteredApplications.filter((a) => a.adStatus === 'rejected');
+    return apartmentFilteredApplications;
+  }, [apartmentFilteredApplications, statusFilter]);
 
-  // 상태별 개수 (전체 데이터 기준)
+  // 상태별 개수 (아파트 필터 적용 기준)
   const statusCounts = useMemo<Record<StatusFilter, number>>(() => ({
-    all: applications.length,
-    free_running: applications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0).length,
-    paid_running: applications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0).length,
-    pending: applications.filter((a) => a.adStatus === 'pending').length,
-    modification: applications.filter((a) => a.modificationStatus === 'pending').length,
-    ended: applications.filter((a) => a.adStatus === 'ended').length,
-    rejected: applications.filter((a) => a.adStatus === 'rejected').length,
-  }), [applications]);
+    all: apartmentFilteredApplications.length,
+    free_running: apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0).length,
+    paid_running: apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0).length,
+    pending: apartmentFilteredApplications.filter((a) => a.adStatus === 'pending').length,
+    modification: apartmentFilteredApplications.filter((a) => a.modificationStatus === 'pending').length,
+    ended: apartmentFilteredApplications.filter((a) => a.adStatus === 'ended').length,
+    rejected: apartmentFilteredApplications.filter((a) => a.adStatus === 'rejected').length,
+  }), [apartmentFilteredApplications]);
 
   // 카테고리별 개수 (상태 필터 후 기준)
   const categoryCounts = useMemo<Record<string, number>>(() => {
@@ -390,12 +398,6 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       result = result.filter((a) => a.subCategoryIds.includes(subCategoryFilter));
     }
 
-    if (apartmentFilter) {
-      result = result.filter((a) =>
-        a.apartments.some((apt) => apt.apartmentId === apartmentFilter)
-      );
-    }
-
     if (debouncedSearchTerm.trim()) {
       const term = debouncedSearchTerm.trim().toLowerCase();
       result = result.filter(
@@ -407,7 +409,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     }
 
     return result;
-  }, [statusFiltered, categoryFilter, subCategoryFilter, apartmentFilter, debouncedSearchTerm, categories]);
+  }, [statusFiltered, categoryFilter, subCategoryFilter, debouncedSearchTerm, categories]);
 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

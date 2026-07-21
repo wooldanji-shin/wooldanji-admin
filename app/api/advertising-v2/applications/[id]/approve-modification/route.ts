@@ -341,7 +341,7 @@ export async function POST(
     if (notificationStatus === 'pending_payment') {
       notificationBody = `${adTitle} 수정이 승인되었습니다. 앱에서 차액결제가 필요합니다.`;
     } else if (notificationStatus === 'pending_next_cycle') {
-      notificationBody = `${adTitle} 수정이 승인되었습니다. 다음 정기일에 변경 예정입니다.`;
+      notificationBody = `${adTitle} 수정이 승인되었습니다.`;
     }
 
     // 수정 승인 FCM 알림 전송 (non-critical: 실패해도 승인 처리는 유지)
