@@ -440,9 +440,6 @@ export default function NotificationSettingsPage() {
         />
       </PageHeader>
 
-      클라이언트 키	Client 승인S1_b51ac491e95d4afc9d52c8015df457f0
-      시크릿 키	Basic 인증a9d7dcd7df744bf0bebeb286521120f5
-
       <PageContent>
         <div className='space-y-6'>
           {/* Current Notification Display */}
