@@ -485,9 +485,14 @@ export default function AdApplicationsPage(): React.ReactElement {
                       <TableCell className="text-right tabular-nums">
                         {(() => {
                           const totalHouseholds = app.apartments.reduce((s, a) => s + a.totalHouseholds, 0);
-                          const base = app.approvedMonthlyAmount ?? (totalHouseholds * pricePerHousehold);
                           const hasDiscount = (app.approvedDiscountRate ?? 0) > 0;
-                          const discounted = hasDiscount ? Math.round(base * (1 - (app.approvedDiscountRate ?? 0) / 100)) : base;
+                          // 정상가는 세대수 × 단가로 계산 (approvedMonthlyAmount는 이미 할인이 적용된 최종 금액)
+                          const base = totalHouseholds * pricePerHousehold;
+                          const discounted =
+                            app.approvedMonthlyAmount ??
+                            (hasDiscount
+                              ? Math.round((base * (1 - (app.approvedDiscountRate ?? 0) / 100)) / 10) * 10
+                              : base);
                           if (base === 0) return <span className="text-muted-foreground">-</span>;
                           return (
                             <div className="flex flex-col items-end gap-0.5">
