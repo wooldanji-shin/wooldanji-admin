@@ -178,6 +178,11 @@ export default function AdApplicationDetailPage({
                 <div className='flex flex-wrap items-center gap-2'>
                   <h1 className='text-xl font-bold text-foreground'>{detail.title}</h1>
                   <StatusBadge status={detail.adStatus} />
+                  {detail.adStatus === 'running' && detail.freeMonths > 0 && (
+                    <DomainStatusBadge variant='success' size='md'>
+                      무료체험
+                    </DomainStatusBadge>
+                  )}
                 </div>
                 {detail.submittedAt && (
                   <p className='mt-1.5 text-sm text-muted-foreground'>
