@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import {
+  usePartnerExtraInfo,
+  type UsePartnerExtraInfoReturn,
+} from '@/lib/hooks/usePartnerExtraInfo';
 
 export interface ApartmentInfo {
   apartmentId: string;
@@ -68,6 +72,7 @@ export interface AdApplicationDetail {
     businessAddress: string | null;
     businessDetailAddress: string | null;
     parkingInfo: string | null;
+    businessHoursNote: string | null;
     businessRegistrationNumber: string | null;
     createdAt: string | null;
   } | null;
@@ -147,6 +152,8 @@ export interface UseApplicationDetailPageReturn {
   handleApproveCategoryChange: (categoryId: string) => void;
   approveSubCategoryIds: string[];
   setApproveSubCategoryIds: (ids: string[]) => void;
+  /** 파트너 영업시간·발급 쿠폰 (usePartnerExtraInfo 합성) */
+  partnerExtra: UsePartnerExtraInfoReturn;
 }
 
 export function useApplicationDetailPage(
@@ -157,6 +164,7 @@ export function useApplicationDetailPage(
 
   const [adId, setAdId] = useState<string>('');
   const [detail, setDetail] = useState<AdApplicationDetail | null>(null);
+  // 파트너 영업시간·쿠폰은 공용 훅으로 분리 (partner_users.id 기준)
   const [analytics, setAnalytics] = useState<AdAnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [approveDialog, setApproveDialog] = useState(false);
@@ -215,7 +223,7 @@ export function useApplicationDetailPage(
             modificationRejectedReason,
             apartmentChangeStatus,
             pendingChanges,
-            partner_users:partnerId(businessName, displayPhoneNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, businessRegistrationNumber, createdAt),
+            partner_users:partnerId(businessName, displayPhoneNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, businessHoursNote, businessRegistrationNumber, createdAt),
             ad_categories_v2:categoryId(categoryName),
             advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
             advertisement_apartments_v2(
@@ -597,10 +605,13 @@ export function useApplicationDetailPage(
 
   const monthlyAmount = totalHouseholds * (detail?.pricePerHousehold ?? 70);
 
+  const partnerExtra = usePartnerExtraInfo(detail?.partnerDbId ?? null);
+
   return {
     detail,
     loading,
     analytics,
+    partnerExtra,
     approveDialog,
     setApproveDialog,
     rejectDialog,

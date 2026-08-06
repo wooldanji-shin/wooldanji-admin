@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "lastUpdated": "2026-07-06T00:50:06.406Z",
+  "lastUpdated": "2026-08-06T14:39:02.538Z",
   "activeFeatures": [
     "wooldanji-admin",
     "admin",
@@ -29,7 +29,9 @@
     "header",
     "[userId]",
     "ads",
-    "partners"
+    "partners",
+    "coupons",
+    "auth-info"
   ],
   "primaryFeature": "wooldanji-admin",
   "features": {
@@ -42,9 +44,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:43:00.824Z",
-        "lastUpdated": "2026-07-06T00:50:06.405Z"
+        "lastUpdated": "2026-08-06T14:39:02.537Z"
       },
-      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/components/image-upload.tsx",
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/components/partner-business-hours-card.tsx",
       "stateMachine": {
         "currentState": "do",
         "previousState": null,
@@ -124,9 +126,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-28T03:48:45.531Z",
-        "lastUpdated": "2026-05-18T01:45:35.565Z"
+        "lastUpdated": "2026-08-06T14:16:40.459Z"
       },
-      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/partners/[id]/page.tsx"
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/advertising-v2/premium/[id]/page.tsx"
     },
     "edit": {
       "phase": "do",
@@ -413,6 +415,32 @@
         "lastUpdated": "2026-05-03T13:49:18.532Z"
       },
       "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/partners/page.tsx"
+    },
+    "coupons": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-06T12:57:50.487Z",
+        "lastUpdated": "2026-08-06T13:33:53.089Z"
+      },
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/admin/coupons/page.tsx"
+    },
+    "auth-info": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-06T14:14:14.800Z",
+        "lastUpdated": "2026-08-06T14:14:14.800Z"
+      },
+      "lastFile": "/Users/hyeonwoo/Code/wooldanji-admin/app/api/partners/[partnerId]/auth-info/route.ts"
     }
   },
   "pipeline": {
@@ -423,7 +451,7 @@
   "session": {
     "startedAt": "2026-04-28T03:43:00.823Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-07-06T00:50:06.406Z"
+    "lastActivity": "2026-08-06T14:39:02.538Z"
   },
   "history": [
     {
@@ -2294,6 +2322,276 @@
     },
     {
       "timestamp": "2026-07-06T00:50:06.406Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T12:57:50.488Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T12:57:54.635Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T12:58:05.658Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T12:58:09.995Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:01:52.943Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:02:19.794Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:04:27.759Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:07:34.376Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:07:46.461Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:07:51.036Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:33:38.286Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:33:53.090Z",
+      "feature": "coupons",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:47:12.607Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:47:31.635Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:47:49.769Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:48:03.497Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:48:25.449Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:48:30.161Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:48:44.470Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:48:53.602Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:49:02.091Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:49:05.582Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:49:12.166Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:49:23.331Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:49:30.632Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:49:47.591Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:49:59.116Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:50:05.645Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:50:18.007Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:50:23.624Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:50:35.166Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:51:03.383Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T13:51:12.187Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:14:01.374Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:14:14.801Z",
+      "feature": "auth-info",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:14:23.133Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:14:29.767Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:14:35.154Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:14:49.089Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:14:58.254Z",
+      "feature": "wooldanji-admin",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:15:14.778Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:16:24.901Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:16:34.503Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:16:40.461Z",
+      "feature": "[id]",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T14:39:02.538Z",
       "feature": "wooldanji-admin",
       "phase": "do",
       "action": "updated"

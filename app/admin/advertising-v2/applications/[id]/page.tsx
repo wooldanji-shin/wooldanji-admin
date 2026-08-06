@@ -1,6 +1,9 @@
 'use client';
 
 import { AdminHeader } from '@/components/admin-header';
+import { PartnerBusinessHoursCard } from '@/components/partner-business-hours-card';
+import { PartnerCouponsCard } from '@/components/partner-coupons-card';
+import { formatAuthProviders } from '@/lib/utils/format';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -467,6 +470,18 @@ export default function AdApplicationDetailPage({
                     ? new Date(detail.partner.createdAt).toLocaleDateString('ko-KR')
                     : '-'}
                 </InfoRow>
+                {/* auth.users 기반 계정 정보 (관리자 API 경유 조회) */}
+                <InfoRow label='로그인 이메일'>
+                  {page.partnerExtra.authInfo?.email ?? '-'}
+                </InfoRow>
+                <InfoRow label='로그인 방식'>
+                  {formatAuthProviders(page.partnerExtra.authInfo?.providers)}
+                </InfoRow>
+                <InfoRow label='최근 로그인'>
+                  {page.partnerExtra.authInfo?.lastSignInAt
+                    ? new Date(page.partnerExtra.authInfo.lastSignInAt).toLocaleString('ko-KR')
+                    : '-'}
+                </InfoRow>
                 <div className='sm:col-span-2'>
                   <InfoRow label='사업장 주소'>
                     {detail.partner?.businessAddress ? (
@@ -487,6 +502,19 @@ export default function AdApplicationDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          {/* 3-1. 파트너 영업시간 / 발급 쿠폰 */}
+          <div className='grid gap-4 lg:grid-cols-2'>
+            <PartnerBusinessHoursCard
+              businessHours={page.partnerExtra.businessHours}
+              businessHoursNote={detail.partner?.businessHoursNote}
+              loading={page.partnerExtra.loading}
+            />
+            <PartnerCouponsCard
+              coupons={page.partnerExtra.coupons}
+              loading={page.partnerExtra.loading}
+            />
+          </div>
 
           {/* 4. 광고 통계 */}
           <Card>

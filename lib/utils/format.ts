@@ -1,3 +1,5 @@
+import { AUTH_PROVIDER_LABEL } from '@/lib/types/partner';
+
 /**
  * 휴대폰 번호 포맷팅 (010-1234-5678)
  */
@@ -84,4 +86,13 @@ export const formatBusinessRegistrationNumber = (value: string): string => {
   } else {
     return `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5, 11)}`;
   }
+};
+
+/**
+ * auth.users의 provider 목록을 한글 라벨로 변환
+ * 예: ['email'] → '이메일', ['google', 'email'] → '구글, 이메일'
+ */
+export const formatAuthProviders = (providers: string[] | undefined): string => {
+  if (!providers || providers.length === 0) return '-';
+  return providers.map((p) => AUTH_PROVIDER_LABEL[p] ?? p).join(', ');
 };

@@ -1,6 +1,9 @@
 'use client';
 
 import { AdminHeader } from '@/components/admin-header';
+import { PartnerBusinessHoursCard } from '@/components/partner-business-hours-card';
+import { PartnerCouponsCard } from '@/components/partner-coupons-card';
+import { formatAuthProviders } from '@/lib/utils/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -448,12 +451,70 @@ export default function PremiumAdDetailPage({
             <CardContent className='px-6 py-0 pb-4'>
               <div className='grid gap-x-6 sm:grid-cols-2'>
                 <InfoRow label='상호명'>{detail.partner?.businessName ?? '-'}</InfoRow>
+                <InfoRow label='대표자명'>{detail.partner?.representativeName ?? '-'}</InfoRow>
+                <InfoRow label='광고표시용 전화'>
+                  {detail.partner?.displayPhoneNumber ?? '-'}
+                </InfoRow>
+                <InfoRow label='연락처'>{detail.partner?.phoneNumber ?? '-'}</InfoRow>
+                <InfoRow label='사업자등록번호'>
+                  {detail.partner?.businessRegistrationNumber ?? '-'}
+                </InfoRow>
+                <InfoRow label='파트너 가입일'>
+                  {detail.partner?.createdAt
+                    ? new Date(detail.partner.createdAt).toLocaleDateString('ko-KR')
+                    : '-'}
+                </InfoRow>
+                {/* auth.users 기반 계정 정보 (관리자 API 경유 조회) */}
+                <InfoRow label='로그인 이메일'>
+                  {page.partnerExtra.authInfo?.email ?? '-'}
+                </InfoRow>
+                <InfoRow label='로그인 방식'>
+                  {formatAuthProviders(page.partnerExtra.authInfo?.providers)}
+                </InfoRow>
+                <InfoRow label='최근 로그인'>
+                  {page.partnerExtra.authInfo?.lastSignInAt
+                    ? new Date(page.partnerExtra.authInfo.lastSignInAt).toLocaleString('ko-KR')
+                    : '-'}
+                </InfoRow>
+                <div className='sm:col-span-2'>
+                  <InfoRow label='사업장 주소'>
+                    {detail.partner?.businessAddress ? (
+                      <span>
+                        {detail.partner.businessAddress}
+                        {detail.partner.businessDetailAddress && (
+                          <span className='text-muted-foreground'>
+                            {' '}
+                            {detail.partner.businessDetailAddress}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
+                  </InfoRow>
+                </div>
+                <div className='sm:col-span-2'>
+                  <InfoRow label='주차 정보'>{detail.partner?.parkingInfo ?? '-'}</InfoRow>
+                </div>
                 <InfoRow label='기본 광고 ID'>
                   <span className='font-mono text-sm'>{detail.baseAdId.slice(0, 8)}…</span>
                 </InfoRow>
               </div>
             </CardContent>
           </Card>
+
+          {/* 파트너 영업시간 / 발급 쿠폰 */}
+          <div className='grid gap-4 lg:grid-cols-2'>
+            <PartnerBusinessHoursCard
+              businessHours={page.partnerExtra.businessHours}
+              businessHoursNote={detail.partner?.businessHoursNote}
+              loading={page.partnerExtra.loading}
+            />
+            <PartnerCouponsCard
+              coupons={page.partnerExtra.coupons}
+              loading={page.partnerExtra.loading}
+            />
+          </div>
         </div>
 
         {/* ───────────────────── 우측 Sticky 사이드바 ───────────────────── */}

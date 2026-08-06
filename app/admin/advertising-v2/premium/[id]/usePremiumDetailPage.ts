@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import {
+  usePartnerExtraInfo,
+  type UsePartnerExtraInfoReturn,
+} from '@/lib/hooks/usePartnerExtraInfo';
 
 export type PremiumStatus =
   | 'pending'
@@ -63,7 +67,18 @@ export interface PremiumAdDetail {
   partner: {
     businessName: string | null;
     analyticsEnabled: boolean;
+    representativeName: string | null;
+    displayPhoneNumber: string | null;
+    phoneNumber: string | null;
+    businessAddress: string | null;
+    businessDetailAddress: string | null;
+    parkingInfo: string | null;
+    businessHoursNote: string | null;
+    businessRegistrationNumber: string | null;
+    createdAt: string | null;
   } | null;
+  /** partner_users.id (영업시간·쿠폰 조회 기준) */
+  partnerDbId: string | null;
   category: { categoryName: string } | null;
   subCategoryNames: string[];
 }
@@ -89,6 +104,8 @@ export interface UsePremiumDetailPageReturn {
   detail: PremiumAdDetail | null;
   loading: boolean;
   analytics: PremiumAdAnalyticsSummary | null;
+  /** 파트너 영업시간·발급 쿠폰 (usePartnerExtraInfo 합성) */
+  partnerExtra: UsePartnerExtraInfoReturn;
   cumulativeAmount: number | null;
   extensions: ExtensionRow[];
   // 파생값
@@ -179,9 +196,13 @@ export function usePremiumDetailPage(
 
       const row = data as Record<string, unknown> & { partnerId: string };
 
+      // premium 광고의 partnerId는 auth user id 기준이므로 userId로 조회한다
+      // (영업시간·쿠폰 조회에 필요한 partner_users.id는 별도로 함께 가져옴)
       const { data: partnerData } = await supabase
         .from('partner_users')
-        .select('"businessName", "analyticsEnabled"')
+        .select(
+          'id, "businessName", "analyticsEnabled", "representativeName", "displayPhoneNumber", "phoneNumber", "businessAddress", "businessDetailAddress", "parkingInfo", "businessHoursNote", "businessRegistrationNumber", "createdAt"'
+        )
         .eq('userId', row.partnerId)
         .maybeSingle();
 
@@ -240,10 +261,20 @@ export function usePremiumDetailPage(
         discountedTotalAmount: (row.discountedTotalAmount as number | null) ?? null,
         partner: partnerData
           ? {
-              businessName: (partnerData as { businessName: string | null; analyticsEnabled: boolean }).businessName,
-              analyticsEnabled: (partnerData as { businessName: string | null; analyticsEnabled: boolean }).analyticsEnabled ?? false,
+              businessName: (partnerData as any).businessName,
+              analyticsEnabled: (partnerData as any).analyticsEnabled ?? false,
+              representativeName: (partnerData as any).representativeName ?? null,
+              displayPhoneNumber: (partnerData as any).displayPhoneNumber ?? null,
+              phoneNumber: (partnerData as any).phoneNumber ?? null,
+              businessAddress: (partnerData as any).businessAddress ?? null,
+              businessDetailAddress: (partnerData as any).businessDetailAddress ?? null,
+              parkingInfo: (partnerData as any).parkingInfo ?? null,
+              businessHoursNote: (partnerData as any).businessHoursNote ?? null,
+              businessRegistrationNumber: (partnerData as any).businessRegistrationNumber ?? null,
+              createdAt: (partnerData as any).createdAt ?? null,
             }
           : null,
+        partnerDbId: (partnerData as any)?.id ?? null,
         category,
         subCategoryNames,
       };
@@ -507,10 +538,13 @@ export function usePremiumDetailPage(
       ? displayAmount - detail.totalAmount
       : null;
 
+  const partnerExtra = usePartnerExtraInfo(detail?.partnerDbId ?? null);
+
   return {
     detail,
     loading,
     analytics,
+    partnerExtra,
     cumulativeAmount,
     extensions,
     totalHouseholds,
