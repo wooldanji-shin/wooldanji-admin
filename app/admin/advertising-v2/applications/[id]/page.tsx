@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApplicationDetailPage } from './useApplicationDetailPage';
+import { ctaButtonLabel, ctaButtonsSummary, customCtaButtons, parseCtaButtons } from '@/lib/cta-button';
 
 import { StatusBadge as DomainStatusBadge, type AdStatus, type ModificationStatus } from '@/components/status-badge';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
@@ -109,14 +110,17 @@ export default function AdApplicationDetailPage({
 
   const approveCategoryData = page.allCategories.find(c => c.id === page.approveCategory);
 
+  // 하단 버튼을 설정한 광고는 배달앱 링크를 아래 '하단 버튼' 항목에서 보여준다
   const socialLinks = [
     { label: '네이버 지도', url: detail.naverMapUrl },
     { label: '블로그', url: detail.blogUrl },
     { label: '유튜브', url: detail.youtubeUrl },
     { label: '인스타그램', url: detail.instagramUrl },
     { label: '카카오톡 오픈채팅', url: detail.kakaoOpenChatUrl },
-    { label: '배달의민족', url: detail.baeminUrl },
-    { label: '쿠팡이츠', url: detail.coupangEatsUrl },
+    ...(detail.ctaButtons ? [] : [
+      { label: '배달의민족', url: detail.baeminUrl },
+      { label: '쿠팡이츠', url: detail.coupangEatsUrl },
+    ]),
   ].filter((s) => s.url);
 
   return (
@@ -224,6 +228,35 @@ export default function AdApplicationDetailPage({
                   </div>
                 </div>
               )}
+
+              {/* 광고 하단에 노출되는 버튼 — 커스텀 버튼 이름은 심사 대상 */}
+              {detail.ctaButtons && detail.ctaButtons.length > 0 && (
+                <div className='border-t border-border/60 pt-4'>
+                  <p className='mb-2 text-sm font-medium text-muted-foreground'>
+                    하단 버튼
+                  </p>
+                  <div className='flex flex-wrap gap-2'>
+                    {detail.ctaButtons.map((b) => (
+                      <span
+                        key={b.id}
+                        className='inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-sm'
+                      >
+                        {ctaButtonLabel(b)}
+                        {b.url && (
+                          <a
+                            href={b.url}
+                            target='_blank'
+                            rel='noreferrer'
+                            className='text-primary hover:underline'
+                          >
+                            <ExternalLink className='h-3.5 w-3.5' />
+                          </a>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -295,6 +328,21 @@ export default function AdApplicationDetailPage({
                     />
                   );
                 })}
+                {/* 하단 버튼 비교 — 커스텀 버튼 이름도 심사 대상이므로 반드시 노출 */}
+                {(() => {
+                  const proposedRaw = (detail.pendingChanges as any)?.ctaButtons;
+                  if (proposedRaw === undefined) return null;
+                  const proposed = ctaButtonsSummary(parseCtaButtons(proposedRaw));
+                  const current = ctaButtonsSummary(detail.ctaButtons);
+                  if (proposed === current) return null;
+                  return (
+                    <CompareRow
+                      label='하단 버튼'
+                      current={current}
+                      proposed={proposed}
+                    />
+                  );
+                })()}
                 {/* 아파트 비교 */}
                 {detail.pendingChanges.resolvedApartments && detail.pendingChanges.resolvedApartments.length > 0 && (() => {
                   const discountRate = detail.approvedDiscountRate ?? detail.defaultDiscountRate;
@@ -545,6 +593,11 @@ export default function AdApplicationDetailPage({
                     { label: '배민 클릭', value: a?.baeminClickCount ?? 0 },
                     { label: '쿠팡이츠 클릭', value: a?.coupangEatsClickCount ?? 0 },
                   ] : []),
+                  // 파트너가 직접 추가한 버튼 — 라벨을 그대로 항목명으로 사용
+                  ...customCtaButtons(detail.ctaButtons).map((b) => ({
+                    label: `${ctaButtonLabel(b)} 클릭`,
+                    value: a?.extraClickCounts?.[b.id] ?? 0,
+                  })),
                 ];
                 return (
                   <div className='space-y-1.5 text-sm'>

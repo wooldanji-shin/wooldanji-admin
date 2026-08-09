@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { CtaButton, mergeExtraClickCounts, parseCtaButtons } from '@/lib/cta-button';
 import { toast } from 'sonner';
 import {
   usePartnerExtraInfo,
@@ -35,6 +36,7 @@ export interface PendingChanges {
   kakaoOpenChatUrl?: string | null;
   baeminUrl?: string | null;
   coupangEatsUrl?: string | null;
+  ctaButtons?: CtaButton[] | null;
   apartments?: { apartmentId: string; totalHouseholds: number }[];
   // 비교용: 카테고리 이름 (훅에서 resolve)
   resolvedCategoryName?: string | null;
@@ -59,6 +61,8 @@ export interface AdApplicationDetail {
   kakaoOpenChatUrl: string | null;
   baeminUrl: string | null;
   coupangEatsUrl: string | null;
+  /** null이면 하단 버튼 미설정 광고 (기존 방식으로 노출) */
+  ctaButtons: CtaButton[] | null;
   rejectReason: string | null;
   adminMemo: string | null;
   modificationStatus: string | null;
@@ -110,6 +114,8 @@ export interface AdAnalyticsSummary {
   baeminClickCount: number;
   coupangEatsClickCount: number;
   wishCount: number;
+  /** 커스텀 CTA 버튼 클릭수 — {버튼id: 클릭수} */
+  extraClickCounts: Record<string, number>;
 }
 
 export interface UseApplicationDetailPageReturn {
@@ -217,6 +223,7 @@ export function useApplicationDetailPage(
             kakaoOpenChatUrl,
             baeminUrl,
             coupangEatsUrl,
+            ctaButtons,
             rejectReason,
             adminMemo,
             modificationStatus,
@@ -242,7 +249,7 @@ export function useApplicationDetailPage(
           .maybeSingle(),
         supabase
           .from('ad_analytics_v2')
-          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, baeminClickCount, coupangEatsClickCount, wishCount')
+          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts')
           .eq('baseAdId', adId),
         supabase
           .from('ad_categories_v2')
@@ -354,6 +361,7 @@ export function useApplicationDetailPage(
         kakaoOpenChatUrl: row.kakaoOpenChatUrl,
         baeminUrl: (row as any).baeminUrl ?? null,
         coupangEatsUrl: (row as any).coupangEatsUrl ?? null,
+        ctaButtons: parseCtaButtons((row as any).ctaButtons),
         rejectReason: row.rejectReason,
         adminMemo: row.adminMemo ?? null,
         modificationStatus: row.modificationStatus ?? null,
@@ -385,6 +393,8 @@ export function useApplicationDetailPage(
           youtubeClickCount: 0, instagramClickCount: 0, kakaoChatClickCount: 0,
           homeImpressionCount: 0, dialogImpressionCount: 0,
           baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
+          // jsonb라 단순 덧셈이 안 되므로 별도 병합
+          extraClickCounts: mergeExtraClickCounts(analyticsRows),
         };
         for (const r of analyticsRows) {
           sum.impressionCount += r.impressionCount ?? 0;

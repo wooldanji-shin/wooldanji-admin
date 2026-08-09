@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { CtaButton, mergeExtraClickCounts, parseCtaButtons } from '@/lib/cta-button';
 import { toast } from 'sonner';
 import {
   usePartnerExtraInfo,
@@ -49,6 +50,8 @@ export interface PremiumAdDetail {
   kakaoOpenChatUrl: string | null;
   baeminUrl: string | null;
   coupangEatsUrl: string | null;
+  /** null이면 하단 버튼 미설정 광고 (기존 방식으로 노출) */
+  ctaButtons: CtaButton[] | null;
   weeks: number;
   status: PremiumStatus;
   paymentStatus: 'unpaid' | 'paid';
@@ -98,6 +101,8 @@ export interface PremiumAdAnalyticsSummary {
   baeminClickCount: number;
   coupangEatsClickCount: number;
   wishCount: number;
+  /** 커스텀 CTA 버튼 클릭수 — {버튼id: 클릭수} */
+  extraClickCounts: Record<string, number>;
 }
 
 export interface UsePremiumDetailPageReturn {
@@ -183,7 +188,7 @@ export function usePremiumDetailPage(
         .select(
           'id, "partnerId", "baseAdId", title, content, "imageUrls", ' +
             '"naverMapUrl", "blogUrl", "youtubeUrl", "instagramUrl", "kakaoOpenChatUrl", ' +
-            '"baeminUrl", "coupangEatsUrl", ' +
+            '"baeminUrl", "coupangEatsUrl", "ctaButtons", ' +
             'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", "adminMemo", ' +
             '"modificationStatus", "modificationRejectedReason", "pendingChanges", ' +
             '"startedAt", "endedAt", "createdAt", "snapshotApartments", ' +
@@ -244,6 +249,7 @@ export function usePremiumDetailPage(
         kakaoOpenChatUrl: (row.kakaoOpenChatUrl as string | null) ?? null,
         baeminUrl: (row as any).baeminUrl ?? null,
         coupangEatsUrl: (row as any).coupangEatsUrl ?? null,
+        ctaButtons: parseCtaButtons((row as any).ctaButtons),
         weeks: row.weeks as number,
         status: row.status as PremiumStatus,
         paymentStatus: row.paymentStatus as 'unpaid' | 'paid',
@@ -285,7 +291,7 @@ export function usePremiumDetailPage(
 
       // 누적 결제 합계 + 연장 이력 + 통계 동시 조회
       const analyticsSelect =
-        'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, baeminClickCount, coupangEatsClickCount, wishCount';
+        'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts';
 
       const [{ data: paidRows }, { data: extRows }, { data: premiumAnalyticsRows }, { data: baseAnalyticsRows }] = await Promise.all([
         supabase
@@ -329,6 +335,8 @@ export function usePremiumDetailPage(
           naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
           instagramClickCount: 0, kakaoChatClickCount: 0,
           baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
+          // jsonb라 단순 덧셈이 안 되므로 별도 병합
+          extraClickCounts: mergeExtraClickCounts(allRows),
         };
         for (const r of allRows) {
           s.impressionCount += r.impressionCount ?? 0;
