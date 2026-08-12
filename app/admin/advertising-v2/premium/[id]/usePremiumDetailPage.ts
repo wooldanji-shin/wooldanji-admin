@@ -58,6 +58,7 @@ export interface PremiumAdDetail {
   totalAmount: number | null;
   rejectedReason: string | null;
   adminMemo: string | null;
+  salesRepName: string | null;
   modificationStatus: string | null;
   modificationRejectedReason: string | null;
   approvedDiscountRate: number | null;
@@ -129,6 +130,8 @@ export interface UsePremiumDetailPageReturn {
   discountRate: number;
   setDiscountRate: (v: number) => void;
   adminMemo: string;
+  salesRepId: string | null;
+  setSalesRepId: (v: string | null) => void;
   setAdminMemo: (v: string) => void;
   handleApproveConfirm: () => Promise<void>;
   // 거절 다이얼로그
@@ -168,6 +171,7 @@ export function usePremiumDetailPage(
   const [approveDialog, setApproveDialog] = useState<boolean>(false);
   const [discountRate, setDiscountRate] = useState<number>(0);
   const [adminMemo, setAdminMemo] = useState<string>('');
+  const [salesRepId, setSalesRepId] = useState<string | null>(null);
   const [rejectDialog, setRejectDialog] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('');
   const [modificationRejectDialog, setModificationRejectDialog] = useState<boolean>(false);
@@ -189,7 +193,7 @@ export function usePremiumDetailPage(
           'id, "partnerId", "baseAdId", title, content, "imageUrls", ' +
             '"naverMapUrl", "blogUrl", "youtubeUrl", "instagramUrl", "kakaoOpenChatUrl", ' +
             '"baeminUrl", "coupangEatsUrl", "ctaButtons", ' +
-            'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", "adminMemo", ' +
+            'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", "adminMemo", "salesRepId", sales_reps:salesRepId(name), ' +
             '"modificationStatus", "modificationRejectedReason", "pendingChanges", ' +
             '"startedAt", "endedAt", "createdAt", "snapshotApartments", ' +
             '"approvedDiscountRate", "discountedTotalAmount"'
@@ -256,6 +260,7 @@ export function usePremiumDetailPage(
         totalAmount: (row.totalAmount as number | null) ?? null,
         rejectedReason: (row.rejectedReason as string | null) ?? null,
         adminMemo: (row.adminMemo as string | null) ?? null,
+        salesRepName: ((row.sales_reps as { name?: string } | null)?.name) ?? null,
         modificationStatus: (row.modificationStatus as string | null) ?? null,
         modificationRejectedReason: (row.modificationRejectedReason as string | null) ?? null,
         pendingChanges: (row.pendingChanges as Record<string, unknown> | null) ?? null,
@@ -288,6 +293,7 @@ export function usePremiumDetailPage(
       setDetail(mapped);
       setGrantAnalytics((partnerData as any)?.analyticsEnabled ?? false);
       setAdminMemo((row.adminMemo as string | null) ?? '');
+      setSalesRepId((row.salesRepId as string | null) ?? null);
 
       // 누적 결제 합계 + 연장 이력 + 통계 동시 조회
       const analyticsSelect =
@@ -401,7 +407,7 @@ export function usePremiumDetailPage(
       const res = await fetch(`/api/advertising-v2/premium/${detail.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discountRate, adminMemo }),
+        body: JSON.stringify({ discountRate, adminMemo, salesRepId }),
       });
       if (!res.ok) {
         const result = await res.json();
@@ -568,6 +574,8 @@ export function usePremiumDetailPage(
     discountRate,
     setDiscountRate,
     adminMemo,
+    salesRepId,
+    setSalesRepId,
     setAdminMemo,
     handleApproveConfirm,
     rejectDialog,

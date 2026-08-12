@@ -21,6 +21,10 @@ import {
 export interface PartnerOption {
   id: string;
   businessName: string;
+  /** 상호명이 같은 파트너를 구분하기 위한 부가 정보 (대표자·전화번호 등) */
+  description?: string | null;
+  /** 계정 이메일 — 부가 정보 아래 줄에 표시 */
+  email?: string | null;
 }
 
 interface PartnerComboboxProps {
@@ -67,7 +71,8 @@ export function PartnerCombobox({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[240px] p-0" align="start">
+      {/* 상호명 아래 대표자·전화번호가 잘리지 않을 만큼 넓힌다 */}
+      <PopoverContent className="w-[340px] p-0" align="start">
         <Command>
           <CommandInput placeholder="파트너 검색..." />
           <CommandList>
@@ -76,7 +81,15 @@ export function PartnerCombobox({
               {partners.map((partner) => (
                 <CommandItem
                   key={partner.id}
-                  value={partner.businessName}
+                  // 상호명이 같은 파트너가 있으면 cmdk가 같은 항목으로 취급해
+                  // 엉뚱한 파트너가 선택되므로 id를 붙여 값을 고유하게 만든다
+                  value={`${partner.businessName} ${partner.id}`}
+                  // 화면에 보이는 항목은 모두 검색되게 한다 (상호명·대표자·전화번호·이메일)
+                  keywords={[
+                    partner.businessName,
+                    partner.description ?? '',
+                    partner.email ?? '',
+                  ].filter(Boolean)}
                   onSelect={() => {
                     onChange(partner.id === value ? null : partner.id);
                     setOpen(false);
@@ -84,11 +97,23 @@ export function PartnerCombobox({
                 >
                   <Check
                     className={cn(
-                      'mr-2 h-4 w-4',
+                      'mr-2 h-4 w-4 shrink-0',
                       value === partner.id ? 'opacity-100' : 'opacity-0'
                     )}
                   />
-                  {partner.businessName}
+                  <span className="min-w-0">
+                    <span className="block truncate">{partner.businessName}</span>
+                    {partner.description && (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {partner.description}
+                      </span>
+                    )}
+                    {partner.email && (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {partner.email}
+                      </span>
+                    )}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>

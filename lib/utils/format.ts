@@ -54,6 +54,30 @@ export const formatLandlineNumber = (value: string): string => {
 };
 
 /**
+ * 비즈콜(안심번호) 포맷팅 — 0507-1234-5678 / 010-1234-5678 / 02-123-4567
+ *
+ * 안심번호는 050X로 시작해 국번이 4자리라, 3자리로 끊는 formatPhoneNumber·
+ * formatLandlineNumber를 쓰면 0507이 050-7...로 잘못 잘린다.
+ * Flutter 앱의 PhoneNumberFormatter와 동일한 규칙을 쓴다 — 양쪽 저장 형식을 맞추기 위함.
+ */
+export const formatBizCallNumber = (value: string): string => {
+  const digits = value.replace(/[^\d]/g, '');
+
+  // [prefix 길이, 최대 자릿수] — 서울(02) / 안심번호(050X) / 그 외 3자리 지역번호
+  const [prefixLength, maxLength] = digits.startsWith('02')
+    ? [2, 10]
+    : digits.startsWith('050')
+      ? [4, 12]
+      : [3, 11];
+
+  const d = digits.slice(0, maxLength);
+  if (d.length <= prefixLength) return d;
+  // 마지막 4자리는 항상 가입자번호, 중간은 나머지 국번
+  if (d.length <= prefixLength + 4) return `${d.slice(0, prefixLength)}-${d.slice(prefixLength)}`;
+  return `${d.slice(0, prefixLength)}-${d.slice(prefixLength, d.length - 4)}-${d.slice(d.length - 4)}`;
+};
+
+/**
  * 날짜 슬래시 포맷팅 (2026/01/08)
  * 브라우저 native date input의 표시 형식이 OS/브라우저 locale에 좌우되는 것을 피하기 위한 용도.
  * digits: 숫자만 있는 문자열(최대 8자리, YYYYMMDD)

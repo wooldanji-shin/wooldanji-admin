@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { PremiumStatus } from '@/components/status-badge';
 import type { ApartmentOption } from '@/components/apartment-combobox';
+import { SALES_REP_UNASSIGNED } from '@/components/sales-rep-filter';
 import { useDebounce } from '@/hooks/use-debounce';
 import { toast } from 'sonner';
 
@@ -19,6 +20,8 @@ export interface PremiumAd {
   totalAmount: number | null;
   approvedDiscountRate: number | null;
   discountedTotalAmount: number | null;
+  salesRepId: string | null;
+  salesRepName: string | null;
   cumulativeAmount: number | null;
   modificationStatus: string | null;
   startedAt: string | null;
@@ -41,6 +44,8 @@ export interface UsePremiumPageReturn {
   searchTerm: string;
   setSearchTerm: (v: string) => void;
   apartmentFilter: string | null;
+  salesRepFilter: string | null;
+  setSalesRepFilter: (v: string | null) => void;
   setApartmentFilter: (v: string | null) => void;
   allApartments: ApartmentOption[];
   statusCounts: Record<PremiumStatus | 'all', number>;
@@ -80,6 +85,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
   const [searchTerm, _setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm);
   const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
+  const [salesRepFilter, _setSalesRepFilter] = useState<string | null>(null);
   const [allApartments, setAllApartments] = useState<ApartmentOption[]>([]);
   const page = useMemo(() => {
     const p = parseInt(searchParams.get('page') ?? '1');
@@ -100,6 +106,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
   const setStatusFilter = useCallback((v: PremiumStatus | 'all') => { _setStatusFilter(v); setPage(1); }, [setPage]);
   const setSearchTerm = useCallback((v: string) => { _setSearchTerm(v); setPage(1); }, [setPage]);
   const setApartmentFilter = useCallback((v: string | null) => { _setApartmentFilter(v); setPage(1); }, [setPage]);
+  const setSalesRepFilter = useCallback((v: string | null) => { _setSalesRepFilter(v); setPage(1); }, [setPage]);
 
   const [selectedAd, setSelectedAd] = useState<PremiumAd | null>(null);
   const [approveDialog, setApproveDialog] = useState(false);
@@ -118,7 +125,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
       const { data: adsData, error: adsError } = await supabase
         .from('premium_advertisements_v2')
         .select(
-          'id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "startedAt", "endedAt", "createdAt"'
+          'id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "startedAt", "endedAt", "createdAt", "salesRepId", sales_reps:salesRepId(name)'
         )
         .neq('status', 'draft')
         .order('createdAt', { ascending: false });
@@ -205,6 +212,8 @@ export function usePremiumPage(): UsePremiumPageReturn {
       const mapped: PremiumAd[] = adsData.map((row: any) => ({
         ...row,
         partnerBusinessName: partnerMap[row.partnerId]?.businessName ?? '-',
+        salesRepId: row.salesRepId ?? null,
+        salesRepName: row.sales_reps?.name ?? null,
         partnerAnalyticsEnabled: partnerMap[row.partnerId]?.analyticsEnabled ?? false,
         cumulativeAmount: cumulativeAmountMap[row.id] ?? null,
         apartmentIds: baseAdApartmentMap[row.baseAdId] ?? [],
@@ -226,10 +235,22 @@ export function usePremiumPage(): UsePremiumPageReturn {
   }, [loadAds]);
 
   // 아파트 필터 적용 후 목록 (상태별 개수도 이 기준으로 계산)
+  // 아파트·영업담당자 필터는 상태 카운트에도 반영돼야 하므로 여기서 함께 적용한다
   const apartmentFilteredAds = useMemo(() => {
-    if (!apartmentFilter) return ads;
-    return ads.filter((ad) => ad.apartmentIds.includes(apartmentFilter));
-  }, [ads, apartmentFilter]);
+    let result = ads;
+
+    if (apartmentFilter) {
+      result = result.filter((ad) => ad.apartmentIds.includes(apartmentFilter));
+    }
+
+    if (salesRepFilter === SALES_REP_UNASSIGNED) {
+      result = result.filter((ad) => ad.salesRepId === null);
+    } else if (salesRepFilter) {
+      result = result.filter((ad) => ad.salesRepId === salesRepFilter);
+    }
+
+    return result;
+  }, [ads, apartmentFilter, salesRepFilter]);
 
   const statusCounts = useMemo<Record<PremiumStatus | 'all', number>>(() => {
     const counts: Record<string, number> = { all: apartmentFilteredAds.length };
@@ -360,6 +381,8 @@ export function usePremiumPage(): UsePremiumPageReturn {
     setSearchTerm,
     apartmentFilter,
     setApartmentFilter,
+    salesRepFilter,
+    setSalesRepFilter,
     allApartments,
     statusCounts,
     paginatedAds,

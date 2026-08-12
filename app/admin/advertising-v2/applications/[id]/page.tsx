@@ -1,9 +1,10 @@
 'use client';
 
 import { AdminHeader } from '@/components/admin-header';
+import { SalesRepSelect } from '@/components/sales-rep-select';
 import { PartnerBusinessHoursCard } from '@/components/partner-business-hours-card';
 import { PartnerCouponsCard } from '@/components/partner-coupons-card';
-import { formatAuthProviders } from '@/lib/utils/format';
+import { formatAuthProviders, formatBizCallNumber } from '@/lib/utils/format';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ import {
   ExternalLink,
   GitCompare,
   MapPin,
+  Pencil,
   Phone,
   Tag,
   User,
@@ -728,6 +730,19 @@ export default function AdApplicationDetailPage({
                       승인하기
                     </Button>
                   )}
+                  {/* 결제 전이라 내용·금액을 고쳐도 청구와 어긋나지 않는다 */}
+                  {detail.adStatus === 'approved' && detail.paymentStatus === 'unpaid' && (
+                    <Button
+                      variant='outline'
+                      size='lg'
+                      onClick={() => router.push(`/admin/advertising-v2/applications/${detail.id}/edit`)}
+                      disabled={page.processing}
+                      className='w-full gap-2'
+                    >
+                      <Pencil className='h-4 w-4' />
+                      광고 수정
+                    </Button>
+                  )}
                   <Button
                     variant='outline'
                     size='lg'
@@ -770,6 +785,16 @@ export default function AdApplicationDetailPage({
               </Card>
             )}
 
+            {/* 영업 담당자 */}
+            <Card>
+              <CardContent className='flex items-center justify-between px-6 py-4'>
+                <span className='text-sm font-medium text-muted-foreground'>영업 담당자</span>
+                <span className='text-base font-medium text-foreground'>
+                  {detail.salesRepName ?? '지정 안 함'}
+                </span>
+              </CardContent>
+            </Card>
+
             {/* 관리 메모 */}
             <Card>
               <CardHeader className='pb-3'>
@@ -803,7 +828,8 @@ export default function AdApplicationDetailPage({
 
       {/* 승인 다이얼로그 */}
       <Dialog open={page.approveDialog} onOpenChange={page.setApproveDialog}>
-        <DialogContent className='sm:max-w-md'>
+        {/* 입력 항목이 많아 작은 화면에서 잘리므로 내용 영역을 스크롤 가능하게 둔다 */}
+        <DialogContent className='sm:max-w-md max-h-[85vh] overflow-y-auto'>
           <DialogHeader>
             <DialogTitle>광고 신청 승인</DialogTitle>
             <DialogDescription>
@@ -950,6 +976,27 @@ export default function AdApplicationDetailPage({
                 </p>
               </div>
             )}
+            <div className='space-y-1.5'>
+              <label className='text-base font-medium'>
+                비즈콜 번호 <span className='text-sm font-normal text-muted-foreground'>(안심번호, 선택)</span>
+              </label>
+              <Input
+                placeholder='예: 0507-1234-5678'
+                inputMode='numeric'
+                value={page.bizCallNumber}
+                onChange={(e) => page.setBizCallNumber(formatBizCallNumber(e.target.value))}
+              />
+              <p className='text-xs text-muted-foreground'>
+                입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
+                {detail.partner?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
+              </p>
+            </div>
+            <div className='space-y-1.5'>
+              <label className='text-base font-medium'>
+                영업 담당자 <span className='text-sm font-normal text-muted-foreground'>(선택)</span>
+              </label>
+              <SalesRepSelect value={page.salesRepId} onChange={page.setSalesRepId} />
+            </div>
             <div className='space-y-1.5'>
               <label className='text-base font-medium'>
                 관리 메모 <span className='text-sm font-normal text-muted-foreground'>(내부용, 파트너 비공개)</span>

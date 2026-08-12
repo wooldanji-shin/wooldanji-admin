@@ -28,10 +28,12 @@ import {
   ExternalLink,
   GitCompare,
   MapPin,
+  Pencil,
   Tag,
   X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { SalesRepSelect } from '@/components/sales-rep-select';
 import {
   StatusBadge as DomainStatusBadge,
   type PremiumStatus,
@@ -550,6 +552,7 @@ export default function PremiumAdDetailPage({
                 <InfoRow label='기본 광고 ID'>
                   <span className='font-mono text-sm'>{detail.baseAdId.slice(0, 8)}…</span>
                 </InfoRow>
+                <InfoRow label='영업 담당자'>{detail.salesRepName ?? '지정 안 함'}</InfoRow>
               </div>
             </CardContent>
           </Card>
@@ -711,6 +714,24 @@ export default function PremiumAdDetailPage({
               </Card>
             )}
 
+            {/* 결제 전이라 내용·주수·금액을 고쳐도 결제 내역과 어긋나지 않는다 */}
+            {detail.status === 'approved' && detail.paymentStatus === 'unpaid' && (
+              <Card>
+                <CardContent className='px-6 py-4'>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() => router.push(`/admin/advertising-v2/premium/${detail.id}/edit`)}
+                    disabled={page.processing}
+                    className='w-full gap-2'
+                  >
+                    <Pencil className='h-4 w-4' />
+                    프리미엄 광고 수정
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 수정 심사 액션 */}
             {detail.modificationStatus === 'pending' && (
               <Card>
@@ -817,6 +838,10 @@ export default function PremiumAdDetailPage({
           </DialogHeader>
           <div className='space-y-4 py-2'>
             <div className='space-y-2'>
+              <label className='text-sm font-medium'>영업 담당자 (선택)</label>
+              <SalesRepSelect value={page.salesRepId} onChange={page.setSalesRepId} />
+            </div>
+            <div className='space-y-1.5'>
               <label className='text-sm font-medium'>할인율 (%)</label>
               <Input
                 type='number'

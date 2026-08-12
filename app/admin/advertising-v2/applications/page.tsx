@@ -1,6 +1,7 @@
 'use client';
 
-import { AlertCircle, Check, Inbox, Search, X } from 'lucide-react';
+import Link from 'next/link';
+import { AlertCircle, Check, Inbox, Plus, Search, X } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
@@ -13,9 +14,12 @@ import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
 import { ApartmentCombobox } from '@/components/apartment-combobox';
+import { SalesRepFilter } from '@/components/sales-rep-filter';
+import { SalesRepSelect } from '@/components/sales-rep-select';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { formatBizCallNumber } from '@/lib/utils/format';
 import {
   Dialog,
   DialogContent,
@@ -187,6 +191,8 @@ export default function AdApplicationsPage(): React.ReactElement {
     setSearchTerm,
     apartmentFilter,
     setApartmentFilter,
+    salesRepFilter,
+    setSalesRepFilter,
     categories,
     subCategories,
     allApartments,
@@ -214,6 +220,10 @@ export default function AdApplicationsPage(): React.ReactElement {
     setDiscountNote,
     adminMemo,
     setAdminMemo,
+    bizCallNumber,
+    setBizCallNumber,
+    salesRepId,
+    setSalesRepId,
     rejectReason,
     setRejectReason,
     processing,
@@ -247,6 +257,12 @@ export default function AdApplicationsPage(): React.ReactElement {
             title="기본광고 관리"
             description="광고 신청을 검토하고 승인 상태를 관리합니다."
           />
+          <Button asChild>
+            <Link href="/admin/advertising-v2/applications/new">
+              <Plus className="mr-2 h-4 w-4" />
+              광고 대리 등록
+            </Link>
+          </Button>
         </PageHeader>
 
         <PageContent>
@@ -267,6 +283,7 @@ export default function AdApplicationsPage(): React.ReactElement {
               onChange={setApartmentFilter}
               placeholder="아파트 필터"
             />
+            <SalesRepFilter value={salesRepFilter} onChange={setSalesRepFilter} />
           </div>
 
           {/* 상태 탭 — 개수 배지 포함 */}
@@ -412,6 +429,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                     <TableHead className="text-center">결제 상태</TableHead>
                     <TableHead className="text-right">금액(월)</TableHead>
                     <TableHead>광고 시작일</TableHead>
+                    <TableHead>영업 담당자</TableHead>
                     <TableHead className="text-center">노출수</TableHead>
                     <TableHead className="text-center">클릭수</TableHead>
                     <TableHead className="text-center">액션</TableHead>
@@ -516,6 +534,9 @@ export default function AdApplicationsPage(): React.ReactElement {
                           ? new Date(app.activatedAt).toLocaleDateString('ko-KR')
                           : '-'}
                       </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {app.salesRepName ?? '-'}
+                      </TableCell>
                       <TableCell className="text-center tabular-nums text-sm">
                         {app.totalImpressions > 0 ? app.totalImpressions.toLocaleString() : '-'}
                       </TableCell>
@@ -569,7 +590,8 @@ export default function AdApplicationsPage(): React.ReactElement {
 
       {/* 승인 다이얼로그 */}
       <Dialog open={approveDialog} onOpenChange={setApproveDialog}>
-        <DialogContent className="sm:max-w-md">
+        {/* 입력 항목이 많아 작은 화면에서 잘리므로 내용 영역을 스크롤 가능하게 둔다 */}
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>광고 신청 승인</DialogTitle>
             <DialogDescription>
@@ -739,6 +761,31 @@ export default function AdApplicationsPage(): React.ReactElement {
               </div>
             )}
           </div>
+            <div className="space-y-1.5">
+              <label className="text-base font-medium">
+                비즈콜 번호{' '}
+                <span className="text-sm font-normal text-muted-foreground">
+                  (안심번호, 선택)
+                </span>
+              </label>
+              <Input
+                placeholder="예: 0507-1234-5678"
+                inputMode="numeric"
+                value={bizCallNumber}
+                onChange={(e) => setBizCallNumber(formatBizCallNumber(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
+                {selectedAd?.partner_users?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-base font-medium">
+                영업 담당자{' '}
+                <span className="text-sm font-normal text-muted-foreground">(선택)</span>
+              </label>
+              <SalesRepSelect value={salesRepId} onChange={setSalesRepId} />
+            </div>
             <div className="space-y-1.5">
               <label className="text-base font-medium">
                 관리 메모{' '}

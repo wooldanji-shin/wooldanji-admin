@@ -166,6 +166,12 @@ const advertisingItems: MenuItem[] = [
     icon: Receipt,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
+  {
+    name: '영업 담당자 관리',
+    href: '/admin/advertising-v2/sales-reps',
+    icon: Briefcase,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
 ];
 
 // ─── 홈화면 수정 ───────────────────────────────────────────

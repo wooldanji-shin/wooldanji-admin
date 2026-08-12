@@ -65,12 +65,15 @@ export interface AdApplicationDetail {
   ctaButtons: CtaButton[] | null;
   rejectReason: string | null;
   adminMemo: string | null;
+  salesRepName: string | null;
   modificationStatus: string | null;
   modificationRejectedReason: string | null;
   pendingChanges: PendingChanges | null;
   partner: {
     businessName: string;
     displayPhoneNumber: string | null;
+    /** 관리자가 부여한 비즈콜(안심) 번호. 있으면 앱에서 displayPhoneNumber 대신 노출 */
+    bizCallNumber: string | null;
     representativeName: string | null;
     phoneNumber: string | null;
     businessAddress: string | null;
@@ -136,6 +139,10 @@ export interface UseApplicationDetailPageReturn {
   setDiscountNote: (v: string) => void;
   adminMemo: string;
   setAdminMemo: (v: string) => void;
+  bizCallNumber: string;
+  salesRepId: string | null;
+  setSalesRepId: (v: string | null) => void;
+  setBizCallNumber: (v: string) => void;
   rejectReason: string;
   setRejectReason: (v: string) => void;
   processing: boolean;
@@ -180,6 +187,8 @@ export function useApplicationDetailPage(
   const [discountRate, setDiscountRate] = useState(28);
   const [discountNote, setDiscountNote] = useState('');
   const [adminMemo, setAdminMemo] = useState('');
+  const [bizCallNumber, setBizCallNumber] = useState('');
+  const [salesRepId, setSalesRepId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
 
@@ -226,11 +235,13 @@ export function useApplicationDetailPage(
             ctaButtons,
             rejectReason,
             adminMemo,
+            salesRepId,
+            sales_reps:salesRepId(name),
             modificationStatus,
             modificationRejectedReason,
             apartmentChangeStatus,
             pendingChanges,
-            partner_users:partnerId(businessName, displayPhoneNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, businessHoursNote, businessRegistrationNumber, createdAt),
+            partner_users:partnerId(businessName, displayPhoneNumber, bizCallNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, businessHoursNote, businessRegistrationNumber, createdAt),
             ad_categories_v2:categoryId(categoryName),
             advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
             advertisement_apartments_v2(
@@ -364,6 +375,7 @@ export function useApplicationDetailPage(
         ctaButtons: parseCtaButtons((row as any).ctaButtons),
         rejectReason: row.rejectReason,
         adminMemo: row.adminMemo ?? null,
+        salesRepName: row.sales_reps?.name ?? null,
         modificationStatus: row.modificationStatus ?? null,
         modificationRejectedReason: row.modificationRejectedReason ?? null,
         pendingChanges,
@@ -426,6 +438,9 @@ export function useApplicationDetailPage(
       setDiscountRate(isFirstAd ? mapped.defaultDiscountRate : 0);
       setDiscountNote('');
       setAdminMemo(row.adminMemo ?? '');
+      // 이미 부여된 비즈콜이 있으면 그대로 노출 (재승인 시 실수로 지워지는 것 방지)
+      setBizCallNumber(row.partner_users?.bizCallNumber ?? '');
+      setSalesRepId((row.salesRepId as string | null) ?? null);
       // 승인 다이얼로그 카테고리 초기값: 현재 광고의 카테고리/서브카테고리
       const currentSubCategoryIds = (row.advertisement_sub_categories_v2 ?? [])
         .map((sc: any) => sc.subCategoryId)
@@ -469,7 +484,7 @@ export function useApplicationDetailPage(
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, categoryId: approveCategory, subCategoryIds: approveSubCategoryIds }),
+          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, bizCallNumber, salesRepId, categoryId: approveCategory, subCategoryIds: approveSubCategoryIds }),
         }
       );
       if (!response.ok) {
@@ -636,6 +651,10 @@ export function useApplicationDetailPage(
     setDiscountNote,
     adminMemo,
     setAdminMemo,
+    bizCallNumber,
+    setBizCallNumber,
+    salesRepId,
+    setSalesRepId,
     rejectReason,
     setRejectReason,
     processing,

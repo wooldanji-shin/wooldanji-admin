@@ -27,10 +27,12 @@ export async function POST(
     // 요청 body에서 할인율 및 관리자 메모 파싱
     let discountRate = 0;
     let adminMemo: string | undefined;
+    let salesRepId: string | null | undefined;
     try {
       const body = await request.json();
       discountRate = body?.discountRate ?? 0;
       adminMemo = body?.adminMemo;
+      salesRepId = body?.salesRepId;
     } catch {
       // body 없거나 파싱 실패 시 기본값으로 처리
     }
@@ -69,6 +71,8 @@ export async function POST(
         approvedDiscountRate: effectiveDiscountRate > 0 ? effectiveDiscountRate : null,
         discountedTotalAmount,
         adminMemo: adminMemo?.trim() || null,
+        // 영업 담당자는 선택 항목 — 미지정이면 null로 비운다
+        ...(salesRepId !== undefined ? { salesRepId: salesRepId || null } : {}),
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id);

@@ -1,6 +1,7 @@
 'use client';
 
-import { Check, Search, Sparkles, X } from 'lucide-react';
+import Link from 'next/link';
+import { Check, Plus, Search, Sparkles, X } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
@@ -12,6 +13,7 @@ import { StatusBadge, type PremiumStatus } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
 import { ApartmentCombobox } from '@/components/apartment-combobox';
+import { SalesRepFilter } from '@/components/sales-rep-filter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,6 +105,8 @@ export default function PremiumAdListPage(): React.ReactElement {
     setSearchTerm,
     apartmentFilter,
     setApartmentFilter,
+    salesRepFilter,
+    setSalesRepFilter,
     allApartments,
     statusCounts,
     paginatedAds,
@@ -138,6 +142,12 @@ export default function PremiumAdListPage(): React.ReactElement {
           title="프리미엄 광고 목록"
           description="프리미엄 광고 신청과 진행 상태를 관리합니다."
         />
+        <Button asChild>
+          <Link href="/admin/advertising-v2/premium/new">
+            <Plus className="mr-2 h-4 w-4" />
+            프리미엄 대리 등록
+          </Link>
+        </Button>
       </PageHeader>
 
       <PageContent>
@@ -158,6 +168,7 @@ export default function PremiumAdListPage(): React.ReactElement {
             onChange={setApartmentFilter}
             placeholder="아파트 필터"
           />
+          <SalesRepFilter value={salesRepFilter} onChange={setSalesRepFilter} />
         </div>
 
         {/* 상태 필터 — 카운트 배지 포함 */}
@@ -214,6 +225,7 @@ export default function PremiumAdListPage(): React.ReactElement {
                   <TableHead>금액</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead>신청일</TableHead>
+                  <TableHead>영업 담당자</TableHead>
                   <TableHead className="text-center">노출수</TableHead>
                   <TableHead className="text-center">클릭수</TableHead>
                   <TableHead className="text-center">액션</TableHead>
@@ -281,6 +293,9 @@ export default function PremiumAdListPage(): React.ReactElement {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(ad.createdAt).toLocaleDateString('ko-KR')}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {ad.salesRepName ?? '-'}
                       </TableCell>
                       <TableCell className="text-center tabular-nums text-sm">
                         {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}

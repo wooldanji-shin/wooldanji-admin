@@ -34,7 +34,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { freeMonths, discountRate, overrideEnabled, discountNote, categoryId, subCategoryIds, adminMemo } = body as {
+    const { freeMonths, discountRate, overrideEnabled, discountNote, categoryId, subCategoryIds, adminMemo, bizCallNumber, salesRepId } = body as {
       freeMonths: number;
       discountRate: number;
       overrideEnabled?: boolean;
@@ -42,6 +42,8 @@ export async function POST(
       categoryId?: string;
       subCategoryIds?: string[];
       adminMemo?: string;
+      bizCallNumber?: string;
+      salesRepId?: string | null;
     };
 
     const [adResult, pricingResult] = await Promise.all([
@@ -110,6 +112,23 @@ export async function POST(
     const approvedMonthlyAmount =
       Math.round((totalHouseholds * pricePerHousehold * (1 - effectiveDiscountRate / 100)) / 10) * 10;
 
+    // 비즈콜(안심번호)은 파트너 단위 속성이라 partner_users에 저장.
+    // 광고 상태 변경 전에 처리해야 실패 시 pending으로 남아 재시도할 수 있다.
+    if (bizCallNumber !== undefined) {
+      const { error: bizCallError } = await supabase
+        .from('partner_users')
+        .update({ bizCallNumber: bizCallNumber.trim() || null })
+        .eq('id', ad.partnerId);
+
+      if (bizCallError) {
+        console.error('Failed to update bizCallNumber:', bizCallError);
+        return NextResponse.json(
+          { error: 'Failed to update biz call number' },
+          { status: 500 }
+        );
+      }
+    }
+
     const { error: updateError } = await supabase
       .from('advertisements_v2')
       .update({
@@ -121,6 +140,8 @@ export async function POST(
         // overrideEnabled가 아닌 경우 항상 null로 저장 (예외 할인 아닌 승인에는 사유 불필요)
         discountNote: overrideEnabled === true ? (discountNote?.trim() || null) : null,
         adminMemo: adminMemo?.trim() || null,
+        // 영업 담당자는 선택 항목 — 미지정이면 null로 비운다
+        ...(salesRepId !== undefined ? { salesRepId: salesRepId || null } : {}),
         ...(categoryId ? { categoryId } : {}),
       })
       .eq('id', id);
