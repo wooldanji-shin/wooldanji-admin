@@ -1,9 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { CtaButton, mergeExtraClickCounts, parseCtaButtons } from '@/lib/cta-button';
+import {
+  ALL_PERIOD,
+  extractPeriods,
+  filterRowsByPeriod,
+  type AnalyticsPeriod,
+} from '@/lib/ad-analytics-period';
 import { toast } from 'sonner';
 import {
   usePartnerExtraInfo,
@@ -77,6 +83,7 @@ export interface PremiumAdDetail {
     businessAddress: string | null;
     businessDetailAddress: string | null;
     parkingInfo: string | null;
+    directionsInfo: string | null;
     businessHoursNote: string | null;
     businessRegistrationNumber: string | null;
     createdAt: string | null;
@@ -89,7 +96,8 @@ export interface PremiumAdDetail {
 
 export interface PremiumAdAnalyticsSummary {
   impressionCount: number;
-  homePremiumImpressionCount: number;
+  /** 일반 광고는 홈 노출수, 프리미엄 광고는 홈 프리미엄 노출수 */
+  homeImpressionCount: number;
   dialogImpressionCount: number;
   clickCount: number;
   phoneClickCount: number;
@@ -106,10 +114,54 @@ export interface PremiumAdAnalyticsSummary {
   extraClickCounts: Record<string, number>;
 }
 
+/** 일별 통계 행들을 하나로 합산. homeKey는 테이블마다 홈 노출 컬럼명이 달라 받는다 */
+function sumAnalyticsRows(
+  rows: any[],
+  homeKey: 'homeImpressionCount' | 'homePremiumImpressionCount'
+): PremiumAdAnalyticsSummary {
+  const sum: PremiumAdAnalyticsSummary = {
+    impressionCount: 0, homeImpressionCount: 0, dialogImpressionCount: 0,
+    clickCount: 0, phoneClickCount: 0, messageClickCount: 0,
+    naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
+    instagramClickCount: 0, kakaoChatClickCount: 0,
+    baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
+    // jsonb라 단순 덧셈이 안 되므로 별도 병합
+    extraClickCounts: mergeExtraClickCounts(rows),
+  };
+  for (const r of rows) {
+    sum.impressionCount += r.impressionCount ?? 0;
+    sum.homeImpressionCount += r[homeKey] ?? 0;
+    sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+    sum.clickCount += r.clickCount ?? 0;
+    sum.phoneClickCount += r.phoneClickCount ?? 0;
+    sum.messageClickCount += r.messageClickCount ?? 0;
+    sum.naverMapClickCount += r.naverMapClickCount ?? 0;
+    sum.blogClickCount += r.blogClickCount ?? 0;
+    sum.youtubeClickCount += r.youtubeClickCount ?? 0;
+    sum.instagramClickCount += r.instagramClickCount ?? 0;
+    sum.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
+    sum.baeminClickCount += r.baeminClickCount ?? 0;
+    sum.coupangEatsClickCount += r.coupangEatsClickCount ?? 0;
+    sum.wishCount += r.wishCount ?? 0;
+  }
+  return sum;
+}
+
+/** 일반 광고 / 프리미엄 광고를 나눠 담은 통계 */
+export interface PremiumAdAnalyticsSplit {
+  basic: PremiumAdAnalyticsSummary;
+  premium: PremiumAdAnalyticsSummary;
+}
+
 export interface UsePremiumDetailPageReturn {
   detail: PremiumAdDetail | null;
   loading: boolean;
-  analytics: PremiumAdAnalyticsSummary | null;
+  /** 선택한 기간의 통계 — 해당 기간에 데이터가 없으면 null */
+  analytics: PremiumAdAnalyticsSplit | null;
+  /** 통계 데이터가 존재하는 (연, 월) 목록 — 최신순 */
+  analyticsPeriods: { year: number; month: number }[];
+  analyticsPeriod: AnalyticsPeriod;
+  setAnalyticsPeriod: (period: AnalyticsPeriod) => void;
   /** 파트너 영업시간·발급 쿠폰 (usePartnerExtraInfo 합성) */
   partnerExtra: UsePartnerExtraInfoReturn;
   cumulativeAmount: number | null;
@@ -163,7 +215,10 @@ export function usePremiumDetailPage(
   const [adId, setAdId] = useState<string>('');
   const [detail, setDetail] = useState<PremiumAdDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [analytics, setAnalytics] = useState<PremiumAdAnalyticsSummary | null>(null);
+  // 일별 통계 원본 — 기간 필터는 클라이언트에서 적용한다
+  const [premiumAnalyticsRows, setPremiumAnalyticsRows] = useState<any[]>([]);
+  const [baseAnalyticsRows, setBaseAnalyticsRows] = useState<any[]>([]);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>(ALL_PERIOD);
   const [cumulativeAmount, setCumulativeAmount] = useState<number | null>(null);
   const [extensions, setExtensions] = useState<ExtensionRow[]>([]);
 
@@ -210,7 +265,7 @@ export function usePremiumDetailPage(
       const { data: partnerData } = await supabase
         .from('partner_users')
         .select(
-          'id, "businessName", "analyticsEnabled", "representativeName", "displayPhoneNumber", "phoneNumber", "businessAddress", "businessDetailAddress", "parkingInfo", "businessHoursNote", "businessRegistrationNumber", "createdAt"'
+          'id, "businessName", "analyticsEnabled", "representativeName", "displayPhoneNumber", "phoneNumber", "businessAddress", "businessDetailAddress", "parkingInfo", "directionsInfo", "businessHoursNote", "businessRegistrationNumber", "createdAt"'
         )
         .eq('userId', row.partnerId)
         .maybeSingle();
@@ -280,6 +335,7 @@ export function usePremiumDetailPage(
               businessAddress: (partnerData as any).businessAddress ?? null,
               businessDetailAddress: (partnerData as any).businessDetailAddress ?? null,
               parkingInfo: (partnerData as any).parkingInfo ?? null,
+              directionsInfo: (partnerData as any).directionsInfo ?? null,
               businessHoursNote: (partnerData as any).businessHoursNote ?? null,
               businessRegistrationNumber: (partnerData as any).businessRegistrationNumber ?? null,
               createdAt: (partnerData as any).createdAt ?? null,
@@ -296,10 +352,11 @@ export function usePremiumDetailPage(
       setSalesRepId((row.salesRepId as string | null) ?? null);
 
       // 누적 결제 합계 + 연장 이력 + 통계 동시 조회
+      // 홈 노출 컬럼명이 테이블마다 달라(homePremiumImpressionCount / homeImpressionCount) select를 나눈다
       const analyticsSelect =
-        'impressionCount, homePremiumImpressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts';
+        'date, impressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts';
 
-      const [{ data: paidRows }, { data: extRows }, { data: premiumAnalyticsRows }, { data: baseAnalyticsRows }] = await Promise.all([
+      const [{ data: paidRows }, { data: extRows }, { data: premiumRows }, { data: baseRows }] = await Promise.all([
         supabase
           .from('ad_payment_history_v2')
           .select('amount')
@@ -316,11 +373,11 @@ export function usePremiumDetailPage(
           .order('paymentDate', { ascending: true }),
         supabase
           .from('premium_ad_analytics_v2')
-          .select(analyticsSelect)
+          .select(`${analyticsSelect}, homePremiumImpressionCount`)
           .eq('premiumAdId', adId),
         supabase
           .from('ad_analytics_v2')
-          .select(analyticsSelect)
+          .select(`${analyticsSelect}, homeImpressionCount`)
           .eq('baseAdId', baseAdId),
       ]);
 
@@ -330,40 +387,8 @@ export function usePremiumDetailPage(
       );
       setCumulativeAmount(sum > 0 ? sum : null);
 
-      const allRows = [
-        ...((premiumAnalyticsRows ?? []) as Record<string, number>[]),
-        ...((baseAnalyticsRows ?? []) as Record<string, number>[]),
-      ];
-      if (allRows.length > 0) {
-        const s: PremiumAdAnalyticsSummary = {
-          impressionCount: 0, homePremiumImpressionCount: 0, dialogImpressionCount: 0,
-          clickCount: 0, phoneClickCount: 0, messageClickCount: 0,
-          naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
-          instagramClickCount: 0, kakaoChatClickCount: 0,
-          baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
-          // jsonb라 단순 덧셈이 안 되므로 별도 병합
-          extraClickCounts: mergeExtraClickCounts(allRows),
-        };
-        for (const r of allRows) {
-          s.impressionCount += r.impressionCount ?? 0;
-          s.homePremiumImpressionCount += r.homePremiumImpressionCount ?? 0;
-          s.dialogImpressionCount += r.dialogImpressionCount ?? 0;
-          s.clickCount += r.clickCount ?? 0;
-          s.phoneClickCount += r.phoneClickCount ?? 0;
-          s.messageClickCount += r.messageClickCount ?? 0;
-          s.naverMapClickCount += r.naverMapClickCount ?? 0;
-          s.blogClickCount += r.blogClickCount ?? 0;
-          s.youtubeClickCount += r.youtubeClickCount ?? 0;
-          s.instagramClickCount += r.instagramClickCount ?? 0;
-          s.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
-          s.baeminClickCount += r.baeminClickCount ?? 0;
-          s.coupangEatsClickCount += r.coupangEatsClickCount ?? 0;
-          s.wishCount += r.wishCount ?? 0;
-        }
-        setAnalytics(s);
-      } else {
-        setAnalytics(null);
-      }
+      setPremiumAnalyticsRows((premiumRows ?? []) as any[]);
+      setBaseAnalyticsRows((baseRows ?? []) as any[]);
 
       const parsedExtensions: ExtensionRow[] = (extRows ?? []).map((r) => {
         const periodStart = new Date(r.billingPeriodStart as string);
@@ -554,10 +579,30 @@ export function usePremiumDetailPage(
 
   const partnerExtra = usePartnerExtraInfo(detail?.partnerDbId ?? null);
 
+  // 기간 목록은 일반·프리미엄 양쪽 기록을 합쳐 만든다 (프리미엄 전환 이전 달도 선택할 수 있다)
+  const analyticsPeriods = useMemo(
+    () => extractPeriods([...premiumAnalyticsRows, ...baseAnalyticsRows]),
+    [premiumAnalyticsRows, baseAnalyticsRows]
+  );
+
+  const analytics = useMemo<PremiumAdAnalyticsSplit | null>(() => {
+    const premium = filterRowsByPeriod(premiumAnalyticsRows, analyticsPeriod);
+    const basic = filterRowsByPeriod(baseAnalyticsRows, analyticsPeriod);
+    if (premium.length === 0 && basic.length === 0) return null;
+
+    return {
+      basic: sumAnalyticsRows(basic, 'homeImpressionCount'),
+      premium: sumAnalyticsRows(premium, 'homePremiumImpressionCount'),
+    };
+  }, [premiumAnalyticsRows, baseAnalyticsRows, analyticsPeriod]);
+
   return {
     detail,
     loading,
     analytics,
+    analyticsPeriods,
+    analyticsPeriod,
+    setAnalyticsPeriod,
     partnerExtra,
     cumulativeAmount,
     extensions,

@@ -34,6 +34,7 @@ import {
   DoorOpen,
   TrendingUp,
   Receipt,
+  BookText,
   type LucideIcon,
 } from 'lucide-react';
 import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -138,6 +139,12 @@ const partnerItems: MenuItem[] = [
     icon: Bell,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
+  {
+    name: '상호명 관리',
+    href: '/admin/business-names',
+    icon: BookText,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
 ];
 
 // ─── 광고 시스템 ───────────────────────────────────────────
@@ -170,6 +177,12 @@ const advertisingItems: MenuItem[] = [
     name: '영업 담당자 관리',
     href: '/admin/advertising-v2/sales-reps',
     icon: Briefcase,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '광고 소개 이미지',
+    href: '/admin/partner-ad-intro-image',
+    icon: ImageIcon,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
 ];

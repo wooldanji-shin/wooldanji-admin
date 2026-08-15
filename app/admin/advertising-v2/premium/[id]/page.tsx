@@ -3,6 +3,8 @@
 import { AdminHeader } from '@/components/admin-header';
 import { PartnerBusinessHoursCard } from '@/components/partner-business-hours-card';
 import { PartnerCouponsCard } from '@/components/partner-coupons-card';
+import { AnalyticsPeriodSelect } from '@/components/analytics-period-select';
+import { formatPeriodLabel } from '@/lib/ad-analytics-period';
 import { formatAuthProviders } from '@/lib/utils/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -441,52 +443,77 @@ export default function PremiumAdDetailPage({
           {/* 광고 통계 */}
           <Card>
             <CardHeader className='pb-3'>
-              <CardTitle className='flex items-center gap-2 text-base font-semibold'>
-                <BarChart2 className='h-4 w-4 text-muted-foreground' />
-                광고 통계 (누적)
-              </CardTitle>
+              <div className='flex items-center justify-between gap-2'>
+                <CardTitle className='flex items-center gap-2 text-base font-semibold'>
+                  <BarChart2 className='h-4 w-4 text-muted-foreground' />
+                  광고 통계 {formatPeriodLabel(page.analyticsPeriod)}
+                </CardTitle>
+                <AnalyticsPeriodSelect
+                  periods={page.analyticsPeriods}
+                  value={page.analyticsPeriod}
+                  onChange={page.setAnalyticsPeriod}
+                />
+              </div>
             </CardHeader>
             <CardContent className='px-6 pb-4'>
               {(() => {
-                const a = page.analytics;
-                const fmt = (n: number) => n.toLocaleString();
+                const basic = page.analytics?.basic;
+                const premium = page.analytics?.premium;
                 const isFoodCategory = detail.category?.categoryName === '음식';
-                const rows: { label: string; value: number }[] = [
-                  { label: '카테고리 노출', value: a?.impressionCount ?? 0 },
-                  { label: '홈 프리미엄 노출수', value: a?.homePremiumImpressionCount ?? 0 },
-                  { label: '다이얼로그 노출수', value: a?.dialogImpressionCount ?? 0 },
-                  { label: '클릭수', value: a?.clickCount ?? 0 },
-                  { label: '전화 클릭', value: a?.phoneClickCount ?? 0 },
-                  { label: '찜 수', value: a?.wishCount ?? 0 },
-                  { label: '네이버지도 클릭', value: a?.naverMapClickCount ?? 0 },
-                  { label: '블로그 클릭', value: a?.blogClickCount ?? 0 },
-                  { label: '유튜브 클릭', value: a?.youtubeClickCount ?? 0 },
-                  { label: '인스타그램 클릭', value: a?.instagramClickCount ?? 0 },
-                  { label: '카카오채팅 클릭', value: a?.kakaoChatClickCount ?? 0 },
+                // null인 열은 해당 광고에 없는 지표라 '-'로 표시한다
+                const rows: { label: string; basic: number | null; premium: number | null }[] = [
+                  { label: '카테고리 노출', basic: basic?.impressionCount ?? 0, premium: premium?.impressionCount ?? 0 },
+                  { label: '홈 노출수', basic: basic?.homeImpressionCount ?? 0, premium: null },
+                  { label: '홈 프리미엄 노출수', basic: null, premium: premium?.homeImpressionCount ?? 0 },
+                  { label: '다이얼로그 노출수', basic: basic?.dialogImpressionCount ?? 0, premium: premium?.dialogImpressionCount ?? 0 },
+                  { label: '클릭수', basic: basic?.clickCount ?? 0, premium: premium?.clickCount ?? 0 },
+                  { label: '전화 클릭', basic: basic?.phoneClickCount ?? 0, premium: premium?.phoneClickCount ?? 0 },
+                  { label: '찜 수', basic: basic?.wishCount ?? 0, premium: premium?.wishCount ?? 0 },
+                  { label: '네이버지도 클릭', basic: basic?.naverMapClickCount ?? 0, premium: premium?.naverMapClickCount ?? 0 },
+                  { label: '블로그 클릭', basic: basic?.blogClickCount ?? 0, premium: premium?.blogClickCount ?? 0 },
+                  { label: '유튜브 클릭', basic: basic?.youtubeClickCount ?? 0, premium: premium?.youtubeClickCount ?? 0 },
+                  { label: '인스타그램 클릭', basic: basic?.instagramClickCount ?? 0, premium: premium?.instagramClickCount ?? 0 },
+                  { label: '카카오채팅 클릭', basic: basic?.kakaoChatClickCount ?? 0, premium: premium?.kakaoChatClickCount ?? 0 },
                   ...(isFoodCategory ? [
-                    { label: '배민 클릭', value: a?.baeminClickCount ?? 0 },
-                    { label: '쿠팡이츠 클릭', value: a?.coupangEatsClickCount ?? 0 },
+                    { label: '배민 클릭', basic: basic?.baeminClickCount ?? 0, premium: premium?.baeminClickCount ?? 0 },
+                    { label: '쿠팡이츠 클릭', basic: basic?.coupangEatsClickCount ?? 0, premium: premium?.coupangEatsClickCount ?? 0 },
                   ] : []),
                   // 파트너가 직접 추가한 버튼 — 라벨을 그대로 항목명으로 사용
                   ...customCtaButtons(detail.ctaButtons).map((b) => ({
                     label: `${ctaButtonLabel(b)} 클릭`,
-                    value: a?.extraClickCounts?.[b.id] ?? 0,
+                    basic: basic?.extraClickCounts?.[b.id] ?? 0,
+                    premium: premium?.extraClickCounts?.[b.id] ?? 0,
                   })),
                 ];
+                const cell = (v: number | null) =>
+                  v === null ? '-' : v.toLocaleString();
+
                 return (
-                  <div className='space-y-1.5 text-sm'>
-                    {rows.flatMap(({ label, value }) => {
-                      const row = (
-                        <div key={label} className='flex items-center'>
-                          <span className='text-muted-foreground min-w-[9rem] shrink-0'>{label}</span>
-                          <span className='tabular-nums font-medium'>{fmt(value)}</span>
-                        </div>
-                      );
-                      if (label === '네이버지도 클릭') {
-                        return [<hr key={`${label}-hr`} className='border-border/50 my-1' />, row];
-                      }
-                      return [row];
-                    })}
+                  <div className='text-sm'>
+                    <div className='grid grid-cols-[9rem_repeat(3,1fr)] gap-x-3 border-b pb-1.5 text-xs font-medium text-muted-foreground'>
+                      <span />
+                      <span className='text-right'>일반</span>
+                      <span className='text-right'>프리미엄</span>
+                      <span className='text-right'>합계</span>
+                    </div>
+                    <div className='space-y-1.5 pt-1.5'>
+                      {rows.flatMap((r) => {
+                        const row = (
+                          <div key={r.label} className='grid grid-cols-[9rem_repeat(3,1fr)] items-center gap-x-3'>
+                            <span className='text-muted-foreground'>{r.label}</span>
+                            <span className='tabular-nums text-right'>{cell(r.basic)}</span>
+                            <span className='tabular-nums text-right'>{cell(r.premium)}</span>
+                            <span className='tabular-nums text-right font-medium'>
+                              {((r.basic ?? 0) + (r.premium ?? 0)).toLocaleString()}
+                            </span>
+                          </div>
+                        );
+                        if (r.label === '네이버지도 클릭') {
+                          return [<hr key={`${r.label}-hr`} className='border-border/50 my-1' />, row];
+                        }
+                        return [row];
+                      })}
+                    </div>
                   </div>
                 );
               })()}
@@ -548,6 +575,7 @@ export default function PremiumAdDetailPage({
                 </div>
                 <div className='sm:col-span-2'>
                   <InfoRow label='주차 정보'>{detail.partner?.parkingInfo ?? '-'}</InfoRow>
+                  <InfoRow label='오시는길'>{detail.partner?.directionsInfo ?? '-'}</InfoRow>
                 </div>
                 <InfoRow label='기본 광고 ID'>
                   <span className='font-mono text-sm'>{detail.baseAdId.slice(0, 8)}…</span>

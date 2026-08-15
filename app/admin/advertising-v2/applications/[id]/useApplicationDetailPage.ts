@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { CtaButton, mergeExtraClickCounts, parseCtaButtons } from '@/lib/cta-button';
+import {
+  ALL_PERIOD,
+  extractPeriods,
+  filterRowsByPeriod,
+  type AnalyticsPeriod,
+} from '@/lib/ad-analytics-period';
 import { toast } from 'sonner';
 import {
   usePartnerExtraInfo,
@@ -79,6 +85,7 @@ export interface AdApplicationDetail {
     businessAddress: string | null;
     businessDetailAddress: string | null;
     parkingInfo: string | null;
+    directionsInfo: string | null;
     businessHoursNote: string | null;
     businessRegistrationNumber: string | null;
     createdAt: string | null;
@@ -121,10 +128,45 @@ export interface AdAnalyticsSummary {
   extraClickCounts: Record<string, number>;
 }
 
+/** 일별 통계 행들을 하나로 합산 */
+function sumAnalyticsRows(rows: any[]): AdAnalyticsSummary {
+  const sum: AdAnalyticsSummary = {
+    impressionCount: 0, clickCount: 0, phoneClickCount: 0,
+    messageClickCount: 0, naverMapClickCount: 0, blogClickCount: 0,
+    youtubeClickCount: 0, instagramClickCount: 0, kakaoChatClickCount: 0,
+    homeImpressionCount: 0, dialogImpressionCount: 0,
+    baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
+    // jsonb라 단순 덧셈이 안 되므로 별도 병합
+    extraClickCounts: mergeExtraClickCounts(rows),
+  };
+  for (const r of rows) {
+    sum.impressionCount += r.impressionCount ?? 0;
+    sum.clickCount += r.clickCount ?? 0;
+    sum.phoneClickCount += r.phoneClickCount ?? 0;
+    sum.messageClickCount += r.messageClickCount ?? 0;
+    sum.naverMapClickCount += r.naverMapClickCount ?? 0;
+    sum.blogClickCount += r.blogClickCount ?? 0;
+    sum.youtubeClickCount += r.youtubeClickCount ?? 0;
+    sum.instagramClickCount += r.instagramClickCount ?? 0;
+    sum.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
+    sum.homeImpressionCount += r.homeImpressionCount ?? 0;
+    sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+    sum.baeminClickCount += r.baeminClickCount ?? 0;
+    sum.coupangEatsClickCount += r.coupangEatsClickCount ?? 0;
+    sum.wishCount += r.wishCount ?? 0;
+  }
+  return sum;
+}
+
 export interface UseApplicationDetailPageReturn {
   detail: AdApplicationDetail | null;
   loading: boolean;
+  /** 선택한 기간의 통계 — 해당 기간에 데이터가 없으면 null */
   analytics: AdAnalyticsSummary | null;
+  /** 통계 데이터가 존재하는 (연, 월) 목록 — 최신순 */
+  analyticsPeriods: { year: number; month: number }[];
+  analyticsPeriod: AnalyticsPeriod;
+  setAnalyticsPeriod: (period: AnalyticsPeriod) => void;
   approveDialog: boolean;
   setApproveDialog: (open: boolean) => void;
   rejectDialog: boolean;
@@ -178,7 +220,9 @@ export function useApplicationDetailPage(
   const [adId, setAdId] = useState<string>('');
   const [detail, setDetail] = useState<AdApplicationDetail | null>(null);
   // 파트너 영업시간·쿠폰은 공용 훅으로 분리 (partner_users.id 기준)
-  const [analytics, setAnalytics] = useState<AdAnalyticsSummary | null>(null);
+  // 일별 통계 원본 — 기간 필터는 클라이언트에서 적용한다
+  const [analyticsRows, setAnalyticsRows] = useState<any[]>([]);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>(ALL_PERIOD);
   const [loading, setLoading] = useState(true);
   const [approveDialog, setApproveDialog] = useState(false);
   const [rejectDialog, setRejectDialog] = useState(false);
@@ -241,7 +285,7 @@ export function useApplicationDetailPage(
             modificationRejectedReason,
             apartmentChangeStatus,
             pendingChanges,
-            partner_users:partnerId(businessName, displayPhoneNumber, bizCallNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, businessHoursNote, businessRegistrationNumber, createdAt),
+            partner_users:partnerId(businessName, displayPhoneNumber, bizCallNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, directionsInfo, businessHoursNote, businessRegistrationNumber, createdAt),
             ad_categories_v2:categoryId(categoryName),
             advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
             advertisement_apartments_v2(
@@ -260,7 +304,7 @@ export function useApplicationDetailPage(
           .maybeSingle(),
         supabase
           .from('ad_analytics_v2')
-          .select('impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts')
+          .select('date, impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts')
           .eq('baseAdId', adId),
         supabase
           .from('ad_categories_v2')
@@ -397,37 +441,7 @@ export function useApplicationDetailPage(
         partnerAnalyticsEnabled: (partnerData as any)?.analyticsEnabled ?? false,
       };
 
-      const analyticsRows = (analyticsResult.data ?? []) as any[];
-      if (analyticsRows.length > 0) {
-        const sum: AdAnalyticsSummary = {
-          impressionCount: 0, clickCount: 0, phoneClickCount: 0,
-          messageClickCount: 0, naverMapClickCount: 0, blogClickCount: 0,
-          youtubeClickCount: 0, instagramClickCount: 0, kakaoChatClickCount: 0,
-          homeImpressionCount: 0, dialogImpressionCount: 0,
-          baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
-          // jsonb라 단순 덧셈이 안 되므로 별도 병합
-          extraClickCounts: mergeExtraClickCounts(analyticsRows),
-        };
-        for (const r of analyticsRows) {
-          sum.impressionCount += r.impressionCount ?? 0;
-          sum.clickCount += r.clickCount ?? 0;
-          sum.phoneClickCount += r.phoneClickCount ?? 0;
-          sum.messageClickCount += r.messageClickCount ?? 0;
-          sum.naverMapClickCount += r.naverMapClickCount ?? 0;
-          sum.blogClickCount += r.blogClickCount ?? 0;
-          sum.youtubeClickCount += r.youtubeClickCount ?? 0;
-          sum.instagramClickCount += r.instagramClickCount ?? 0;
-          sum.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
-          sum.homeImpressionCount += r.homeImpressionCount ?? 0;
-          sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
-          sum.baeminClickCount += r.baeminClickCount ?? 0;
-          sum.coupangEatsClickCount += r.coupangEatsClickCount ?? 0;
-          sum.wishCount += r.wishCount ?? 0;
-        }
-        setAnalytics(sum);
-      } else {
-        setAnalytics(null);
-      }
+      setAnalyticsRows((analyticsResult.data ?? []) as any[]);
 
       setDetail(mapped);
       setGrantAnalytics((partnerData as any)?.analyticsEnabled ?? false);
@@ -632,10 +646,23 @@ export function useApplicationDetailPage(
 
   const partnerExtra = usePartnerExtraInfo(detail?.partnerDbId ?? null);
 
+  const analyticsPeriods = useMemo(
+    () => extractPeriods(analyticsRows),
+    [analyticsRows]
+  );
+
+  const analytics = useMemo<AdAnalyticsSummary | null>(() => {
+    const rows = filterRowsByPeriod(analyticsRows, analyticsPeriod);
+    return rows.length > 0 ? sumAnalyticsRows(rows) : null;
+  }, [analyticsRows, analyticsPeriod]);
+
   return {
     detail,
     loading,
     analytics,
+    analyticsPeriods,
+    analyticsPeriod,
+    setAnalyticsPeriod,
     partnerExtra,
     approveDialog,
     setApproveDialog,

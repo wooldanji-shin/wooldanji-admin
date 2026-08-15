@@ -18,6 +18,7 @@ export interface PartnerUser {
   businessRegistrationImageUrl: string | null;
   businessHoursNote: string | null;
   parkingInfo: string | null;
+  directionsInfo: string | null;
   hasHadRunningAd: boolean;
   marketingAgreed: boolean;
   analyticsEnabled: boolean;
@@ -155,7 +156,7 @@ export function usePartnersPage(): UsePartnersPageReturn {
       let query = supabase
         .from('partner_users')
         .select(
-          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, hasHadRunningAd, marketingAgreed, analyticsEnabled, createdAt',
+          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, directionsInfo, hasHadRunningAd, marketingAgreed, analyticsEnabled, createdAt',
           { count: 'exact' }
         );
 
@@ -235,6 +236,7 @@ export function usePartnersPage(): UsePartnersPageReturn {
         businessRegistrationImageUrl: row.businessRegistrationImageUrl,
         businessHoursNote: row.businessHoursNote,
         parkingInfo: row.parkingInfo,
+        directionsInfo: row.directionsInfo,
         hasHadRunningAd: row.hasHadRunningAd,
         marketingAgreed: row.marketingAgreed,
         analyticsEnabled: row.analyticsEnabled ?? false,

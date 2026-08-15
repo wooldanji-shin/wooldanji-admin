@@ -4,6 +4,8 @@ import { AdminHeader } from '@/components/admin-header';
 import { SalesRepSelect } from '@/components/sales-rep-select';
 import { PartnerBusinessHoursCard } from '@/components/partner-business-hours-card';
 import { PartnerCouponsCard } from '@/components/partner-coupons-card';
+import { AnalyticsPeriodSelect } from '@/components/analytics-period-select';
+import { formatPeriodLabel } from '@/lib/ad-analytics-period';
 import { formatAuthProviders, formatBizCallNumber } from '@/lib/utils/format';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -548,6 +550,7 @@ export default function AdApplicationDetailPage({
                 </div>
                 <div className='sm:col-span-2'>
                   <InfoRow label='주차 정보'>{detail.partner?.parkingInfo ?? '-'}</InfoRow>
+                  <InfoRow label='오시는길'>{detail.partner?.directionsInfo ?? '-'}</InfoRow>
                 </div>
               </div>
             </CardContent>
@@ -569,10 +572,17 @@ export default function AdApplicationDetailPage({
           {/* 4. 광고 통계 */}
           <Card>
             <CardHeader className='pb-3'>
-              <CardTitle className='flex items-center gap-2 text-base font-semibold'>
-                <BarChart2 className='h-4 w-4 text-muted-foreground' />
-                광고 통계 (누적)
-              </CardTitle>
+              <div className='flex items-center justify-between gap-2'>
+                <CardTitle className='flex items-center gap-2 text-base font-semibold'>
+                  <BarChart2 className='h-4 w-4 text-muted-foreground' />
+                  광고 통계 {formatPeriodLabel(page.analyticsPeriod)}
+                </CardTitle>
+                <AnalyticsPeriodSelect
+                  periods={page.analyticsPeriods}
+                  value={page.analyticsPeriod}
+                  onChange={page.setAnalyticsPeriod}
+                />
+              </div>
             </CardHeader>
             <CardContent className='px-6 pb-4'>
               {(() => {

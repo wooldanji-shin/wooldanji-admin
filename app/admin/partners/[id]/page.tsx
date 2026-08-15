@@ -177,6 +177,7 @@ export default function PartnerDetailPage({
               </InfoRow>
               <InfoRow label="영업시간">{partner.businessHoursNote ?? '-'}</InfoRow>
               <InfoRow label="주차 정보">{partner.parkingInfo ?? '-'}</InfoRow>
+              <InfoRow label="오시는길">{partner.directionsInfo ?? '-'}</InfoRow>
               {partner.businessRegistrationImageUrl && (
                 <div className="mt-3">
                   <p className="mb-2 text-sm font-medium text-muted-foreground">

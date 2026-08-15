@@ -244,6 +244,7 @@ export interface Database {
           businessRegistrationImageUrl: string | null;
           businessHoursNote: string | null;
           parkingInfo: string | null;
+          directionsInfo: string | null;
           hasHadRunningAd: boolean;
           marketingAgreed: boolean;
           analyticsEnabled: boolean;
@@ -262,6 +263,7 @@ export interface Database {
           businessRegistrationImageUrl?: string | null;
           businessHoursNote?: string | null;
           parkingInfo?: string | null;
+          directionsInfo?: string | null;
           hasHadRunningAd?: boolean;
           marketingAgreed?: boolean;
           analyticsEnabled?: boolean;
@@ -280,6 +282,7 @@ export interface Database {
           businessRegistrationImageUrl?: string | null;
           businessHoursNote?: string | null;
           parkingInfo?: string | null;
+          directionsInfo?: string | null;
           hasHadRunningAd?: boolean;
           marketingAgreed?: boolean;
           analyticsEnabled?: boolean;
