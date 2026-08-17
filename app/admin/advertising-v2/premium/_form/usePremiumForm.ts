@@ -94,7 +94,8 @@ const EMPTY_FORM: PremiumFormState = {
  * 프리미엄은 기본 광고에 얹히는 광고라, 운영 중(running·paid)인 기본 광고를 골라야 하고
  * 노출 아파트는 그 기본 광고의 것을 그대로 승계한다(선택 불가).
  *
- * [premiumId]를 주면 수정 모드 — 결제 전(approved + unpaid)만 허용한다.
+ * [premiumId]를 주면 수정 모드 — 광고중(running)이면 내용만 고치는 모드(contentOnly)로,
+ * 이미 결제된 금액의 근거인 주수·할인율은 잠근다.
  */
 export function usePremiumForm(premiumId?: string) {
   const router = useRouter();
@@ -106,6 +107,8 @@ export function usePremiumForm(premiumId?: string) {
   const [partnerEmails, setPartnerEmails] = useState<Record<string, string | null>>({});
   const [baseAds, setBaseAds] = useState<BaseAdOption[]>([]);
   const [pricePerWeek, setPricePerWeek] = useState(20);
+  // 광고중 수정 — 결제된 금액의 근거가 되는 입력을 잠근다
+  const [contentOnly, setContentOnly] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -184,10 +187,18 @@ export function usePremiumForm(premiumId?: string) {
         setLoadError('프리미엄 광고를 찾을 수 없습니다.');
         return;
       }
-      if (premium.status !== 'approved' || premium.paymentStatus !== 'unpaid') {
-        setLoadError('결제 전(승인·미결제) 프리미엄 광고만 수정할 수 있습니다.');
+      const isRunning = premium.status === 'running';
+      const isBeforePayment =
+        premium.status === 'approved' && premium.paymentStatus === 'unpaid';
+      if (!isRunning && !isBeforePayment) {
+        setLoadError('결제 전(승인·미결제) 또는 광고중인 프리미엄 광고만 수정할 수 있습니다.');
         return;
       }
+      if (isRunning && premium.modificationStatus === 'pending') {
+        setLoadError('파트너의 수정 심사가 진행 중입니다. 먼저 승인하거나 거절해주세요.');
+        return;
+      }
+      setContentOnly(isRunning);
 
       setForm({
         partnerId: premium.partnerId,
@@ -459,6 +470,7 @@ export function usePremiumForm(premiumId?: string) {
 
   return {
     isEdit,
+    contentOnly,
     loadError,
     form,
     patch,

@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { ApartmentOption } from '@/components/apartment-combobox';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
+import { BIZ_CALL_DUPLICATE_MESSAGE } from '@/lib/biz-call';
 import { SALES_REP_UNASSIGNED } from '@/components/sales-rep-filter';
 import { toast } from 'sonner';
 
@@ -117,6 +119,8 @@ export interface UseApplicationsPageReturn {
   setAdminMemo: (v: string) => void;
   bizCallNumber: string;
   setBizCallNumber: (v: string) => void;
+  /** 같은 비즈콜을 이미 쓰는 다른 파트너의 상호명 (중복 없으면 null) */
+  bizCallDuplicateName: string | null;
   salesRepId: string | null;
   setSalesRepId: (v: string | null) => void;
   rejectReason: string;
@@ -193,6 +197,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const [grantAnalytics, setGrantAnalytics] = useState(false);
   const [approveCategory, setApproveCategory] = useState<string | null>(null);
   const [approveSubCategoryIds, setApproveSubCategoryIds] = useState<string[]>([]);
+
+  const bizCallDuplicateName = useBizCallDuplicate(
+    bizCallNumber,
+    selectedAd?.partner_users?.id ?? null
+  );
 
   const fetchCategories = useCallback(async () => {
     const { data } = await supabase
@@ -478,6 +487,10 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
 
   const handleApprove = useCallback(async () => {
     if (!selectedAd) return;
+    if (bizCallDuplicateName) {
+      toast.error(`${BIZ_CALL_DUPLICATE_MESSAGE} (${bizCallDuplicateName})`);
+      return;
+    }
     setProcessing(true);
     try {
       const response = await fetch(
@@ -490,6 +503,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       );
       if (!response.ok) {
         const err = await response.json();
+        // 비즈콜 중복(409)은 관리자가 바로 고칠 수 있도록 서버 메시지를 그대로 보여준다
+        if (response.status === 409) {
+          toast.error(err.error);
+          return;
+        }
         throw new Error(err.error || 'Failed to approve');
       }
       if (grantAnalytics && !selectedAd.partner_users?.analyticsEnabled && selectedAd.partner_users?.id) {
@@ -507,7 +525,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     } finally {
       setProcessing(false);
     }
-  }, [selectedAd, freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, bizCallNumber, salesRepId, approveCategory, approveSubCategoryIds, grantAnalytics, supabase, fetchApplications]);
+  }, [selectedAd, freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, bizCallNumber, bizCallDuplicateName, salesRepId, approveCategory, approveSubCategoryIds, grantAnalytics, supabase, fetchApplications]);
 
   const handleOpenReject = useCallback((ad: AdApplication) => {
     setSelectedAd(ad);
@@ -590,6 +608,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     setAdminMemo,
     bizCallNumber,
     setBizCallNumber,
+    bizCallDuplicateName,
     salesRepId,
     setSalesRepId,
     rejectReason,

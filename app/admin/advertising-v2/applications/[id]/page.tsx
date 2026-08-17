@@ -725,6 +725,24 @@ export default function AdApplicationDetailPage({
               </CardContent>
             </Card>
 
+            {/* 광고중 수정 — 내용만 고칠 수 있고, 파트너 수정 심사 중이면 그쪽을 먼저 끝내야 한다 */}
+            {detail.adStatus === 'running' && detail.modificationStatus !== 'pending' && (
+              <Card>
+                <CardContent className='px-6 py-4'>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() => router.push(`/admin/advertising-v2/applications/${detail.id}/edit`)}
+                    disabled={page.processing}
+                    className='w-full gap-2'
+                  >
+                    <Pencil className='h-4 w-4' />
+                    광고 내용 수정
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 액션 버튼 */}
             {(detail.adStatus === 'pending' || detail.adStatus === 'approved') && (
               <Card>
@@ -996,10 +1014,16 @@ export default function AdApplicationDetailPage({
                 value={page.bizCallNumber}
                 onChange={(e) => page.setBizCallNumber(formatBizCallNumber(e.target.value))}
               />
-              <p className='text-xs text-muted-foreground'>
-                입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
-                {detail.partner?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
-              </p>
+              {page.bizCallDuplicateName ? (
+                <p className='text-xs text-red-600'>
+                  이미 다른 파트너({page.bizCallDuplicateName})가 사용 중인 번호입니다.
+                </p>
+              ) : (
+                <p className='text-xs text-muted-foreground'>
+                  입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
+                  {detail.partner?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
+                </p>
+              )}
             </div>
             <div className='space-y-1.5'>
               <label className='text-base font-medium'>
@@ -1031,7 +1055,7 @@ export default function AdApplicationDetailPage({
             </Button>
             <Button
               onClick={page.handleApprove}
-              disabled={page.processing}
+              disabled={page.processing || !!page.bizCallDuplicateName}
               className='bg-blue-600 text-white hover:bg-blue-700'
             >
               {page.processing ? '처리 중...' : '승인'}

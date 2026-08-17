@@ -15,6 +15,8 @@ import {
   usePartnerExtraInfo,
   type UsePartnerExtraInfoReturn,
 } from '@/lib/hooks/usePartnerExtraInfo';
+import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
+import { BIZ_CALL_DUPLICATE_MESSAGE } from '@/lib/biz-call';
 
 export interface ApartmentInfo {
   apartmentId: string;
@@ -182,6 +184,8 @@ export interface UseApplicationDetailPageReturn {
   adminMemo: string;
   setAdminMemo: (v: string) => void;
   bizCallNumber: string;
+  /** 같은 비즈콜을 이미 쓰는 다른 파트너의 상호명 (중복 없으면 null) */
+  bizCallDuplicateName: string | null;
   salesRepId: string | null;
   setSalesRepId: (v: string | null) => void;
   setBizCallNumber: (v: string) => void;
@@ -242,6 +246,11 @@ export function useApplicationDetailPage(
   const [allCategories, setAllCategories] = useState<AdCategoryWithSubs[]>([]);
   const [approveCategory, setApproveCategory] = useState<string | null>(null);
   const [approveSubCategoryIds, setApproveSubCategoryIds] = useState<string[]>([]);
+
+  const bizCallDuplicateName = useBizCallDuplicate(
+    bizCallNumber,
+    detail?.partnerDbId ?? null
+  );
 
   useEffect(() => {
     params.then((p) => setAdId(p.id));
@@ -491,6 +500,10 @@ export function useApplicationDetailPage(
 
   const handleApprove = async () => {
     if (!detail) return;
+    if (bizCallDuplicateName) {
+      toast.error(`${BIZ_CALL_DUPLICATE_MESSAGE} (${bizCallDuplicateName})`);
+      return;
+    }
     setProcessing(true);
     try {
       const response = await fetch(
@@ -503,6 +516,11 @@ export function useApplicationDetailPage(
       );
       if (!response.ok) {
         const err = await response.json();
+        // 비즈콜 중복(409)은 관리자가 바로 고칠 수 있도록 서버 메시지를 그대로 보여준다
+        if (response.status === 409) {
+          toast.error(err.error);
+          return;
+        }
         throw new Error(err.error || 'Failed to approve');
       }
       if (grantAnalytics && !detail.partnerAnalyticsEnabled) {
@@ -512,13 +530,13 @@ export function useApplicationDetailPage(
           .eq('id', detail.partnerDbId);
       }
       toast.success('광고 신청이 승인되었습니다.');
+      setApproveDialog(false);
       router.push('/admin/advertising-v2/applications');
     } catch (err) {
       console.error('Failed to approve:', err);
       toast.error('광고 승인에 실패했습니다.');
     } finally {
       setProcessing(false);
-      setApproveDialog(false);
     }
   };
 
@@ -680,6 +698,7 @@ export function useApplicationDetailPage(
     setAdminMemo,
     bizCallNumber,
     setBizCallNumber,
+    bizCallDuplicateName,
     salesRepId,
     setSalesRepId,
     rejectReason,

@@ -47,6 +47,7 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
   const page = usePremiumForm(premiumId);
   const {
     isEdit,
+    contentOnly,
     loadError,
     form,
     patch,
@@ -88,9 +89,11 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
       <PageHeader>
         <PageHeaderTitle
           title={isEdit ? '프리미엄 광고 수정' : '프리미엄 광고 대리 등록'}
-          description={isEdit
-            ? '결제 전 프리미엄 광고의 내용과 승인 조건을 고칩니다.'
-            : '운영 중인 기본 광고 위에 프리미엄 광고를 대신 등록합니다.'}
+          description={contentOnly
+            ? '광고중인 프리미엄 광고의 내용을 고칩니다. 저장하면 앱에 바로 반영됩니다.'
+            : isEdit
+              ? '결제 전 프리미엄 광고의 내용과 승인 조건을 고칩니다.'
+              : '운영 중인 기본 광고 위에 프리미엄 광고를 대신 등록합니다.'}
         />
         <Button variant="outline" asChild>
           <Link
@@ -251,43 +254,56 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
               <CardTitle>노출 기간 · 승인 조건</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">노출 주수</label>
-                  <Select
-                    value={String(form.weeks)}
-                    onValueChange={(v) => patch({ weeks: Number(v) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WEEK_OPTIONS.map((week) => (
-                        <SelectItem key={week} value={String(week)}>
-                          {week}주
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* 광고중에는 주수·할인율이 이미 받은 결제의 근거다 */}
+              {contentOnly ? (
+                <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
+                  <p>
+                    노출 {form.weeks}주
+                    {form.discountRate > 0 && ` · 할인 ${form.discountRate}%`}
+                  </p>
+                  <p className="text-muted-foreground">
+                    광고중에는 이미 결제된 금액의 근거라 바꿀 수 없습니다.
+                  </p>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">할인율 (%)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={form.discountRate || ''}
-                    onChange={(e) =>
-                      patch({
-                        discountRate: Math.min(
-                          100,
-                          Math.max(0, parseInt(e.target.value) || 0)
-                        ),
-                      })
-                    }
-                  />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">노출 주수</label>
+                    <Select
+                      value={String(form.weeks)}
+                      onValueChange={(v) => patch({ weeks: Number(v) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEEK_OPTIONS.map((week) => (
+                          <SelectItem key={week} value={String(week)}>
+                            {week}주
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">할인율 (%)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={form.discountRate || ''}
+                      onChange={(e) =>
+                        patch({
+                          discountRate: Math.min(
+                            100,
+                            Math.max(0, parseInt(e.target.value) || 0)
+                          ),
+                        })
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
                   영업 담당자{' '}
@@ -321,7 +337,7 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
         <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
           <div className="text-sm">
             <p>
-              결제 예정 금액{' '}
+              {contentOnly ? '결제 완료 금액' : '결제 예정 금액'}{' '}
               <strong className="text-base">
                 {(discountedTotalAmount ?? totalAmount).toLocaleString()}원
               </strong>

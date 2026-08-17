@@ -10,10 +10,11 @@ import {
 } from '@/lib/ads/premium-shared';
 
 /**
- * 관리자가 대리 등록한 프리미엄 광고를 고친다 (잘못 등록한 경우의 정정).
+ * 관리자가 프리미엄 광고를 고친다.
  *
- * 결제 전(approved + unpaid)만 허용한다. 결제 후에는 노출이 이미 시작돼
- * 주수·금액을 여기서 바꾸면 결제 내역과 어긋난다.
+ * 결제 전(approved + unpaid)은 전부 고칠 수 있다 — 결제가 아직 없으므로 주수·금액이 바뀌어도 된다.
+ * 광고중(running)은 내용·이미지·링크·CTA만 고친다. 주수·금액은 이미 받은 결제의 근거라
+ * 여기서 바꾸면 결제 내역과 어긋난다.
  *
  * 기본 광고는 바꿀 수 없다 — 노출 아파트와 금액의 근거가 통째로 달라진다.
  */
@@ -51,7 +52,7 @@ export async function POST(
 
     const { data: premium } = await admin
       .from('premium_advertisements_v2')
-      .select('id, baseAdId, status, paymentStatus')
+      .select('id, baseAdId, status, paymentStatus, modificationStatus')
       .eq('id', id)
       .maybeSingle();
 
@@ -66,13 +67,49 @@ export async function POST(
       baseAdId: string;
       status: string;
       paymentStatus: string;
+      modificationStatus: string | null;
     };
 
-    if (existing.status !== 'approved' || existing.paymentStatus !== 'unpaid') {
+    const isRunning = existing.status === 'running';
+    const isBeforePayment =
+      existing.status === 'approved' && existing.paymentStatus === 'unpaid';
+
+    if (!isRunning && !isBeforePayment) {
       return NextResponse.json(
-        { error: '결제 전(승인·미결제) 프리미엄 광고만 수정할 수 있습니다.' },
+        { error: '결제 전(승인·미결제) 또는 광고중인 프리미엄 광고만 수정할 수 있습니다.' },
         { status: 400 }
       );
+    }
+
+    // 파트너 수정 심사가 걸려 있는데 여기서 덮어쓰면, 승인 시 어느 쪽 값이 남는지 알 수 없다
+    if (isRunning && existing.modificationStatus === 'pending') {
+      return NextResponse.json(
+        { error: '파트너의 수정 심사가 진행 중입니다. 먼저 승인하거나 거절해주세요.' },
+        { status: 409 }
+      );
+    }
+
+    // 광고중이면 결제 근거(주수·금액·아파트 스냅샷)는 그대로 두고 내용만 바꾼다
+    if (isRunning) {
+      const { error: runningUpdateError } = await admin
+        .from('premium_advertisements_v2')
+        .update({
+          ...premiumContentColumns(body),
+          adminMemo: trimmedOrNull(body.adminMemo),
+          salesRepId: body.salesRepId || null,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (runningUpdateError) {
+        console.error('Failed to update premium advertisement:', runningUpdateError);
+        return NextResponse.json(
+          { error: 'Failed to update premium advertisement' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, premiumAdId: id });
     }
 
     // 아파트·금액은 저장된 기본 광고를 기준으로 다시 계산한다

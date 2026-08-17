@@ -222,6 +222,7 @@ export default function AdApplicationsPage(): React.ReactElement {
     setAdminMemo,
     bizCallNumber,
     setBizCallNumber,
+    bizCallDuplicateName,
     salesRepId,
     setSalesRepId,
     rejectReason,
@@ -774,10 +775,16 @@ export default function AdApplicationsPage(): React.ReactElement {
                 value={bizCallNumber}
                 onChange={(e) => setBizCallNumber(formatBizCallNumber(e.target.value))}
               />
-              <p className="text-xs text-muted-foreground">
-                입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
-                {selectedAd?.partner_users?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
-              </p>
+              {bizCallDuplicateName ? (
+                <p className="text-xs text-red-600">
+                  이미 다른 파트너({bizCallDuplicateName})가 사용 중인 번호입니다.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
+                  {selectedAd?.partner_users?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-base font-medium">
@@ -812,7 +819,7 @@ export default function AdApplicationsPage(): React.ReactElement {
             </Button>
             <Button
               onClick={handleApprove}
-              disabled={processing}
+              disabled={processing || !!bizCallDuplicateName}
               className="bg-blue-600 text-white hover:bg-blue-700"
             >
               {processing ? '처리 중...' : '승인'}

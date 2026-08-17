@@ -9,6 +9,7 @@ import {
 } from '@/lib/ads/pricing';
 import { ctaButtonsError, ctaUrlOfType, type CtaButton } from '@/lib/cta-button';
 import { MAX_AD_IMAGES } from '@/lib/ads/constants';
+import { BIZ_CALL_DUPLICATE_MESSAGE, findBizCallDuplicate } from '@/lib/biz-call';
 
 interface CreateBody {
   partnerId: string;
@@ -125,6 +126,15 @@ export async function POST(request: NextRequest) {
 
     if (!partner) {
       return NextResponse.json({ error: '파트너를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 같은 번호를 두 파트너가 쓰면 앱에서 어느 광고로 걸려온 문의인지 구분할 수 없다
+    const bizCallOwner = await findBizCallDuplicate(admin, body.bizCallNumber, partnerId);
+    if (bizCallOwner) {
+      return NextResponse.json(
+        { error: `${BIZ_CALL_DUPLICATE_MESSAGE} (${bizCallOwner.businessName})` },
+        { status: 409 }
+      );
     }
 
     // 세대수는 클라이언트 값을 쓰지 않고 서버가 다시 집계한다

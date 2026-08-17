@@ -41,12 +41,14 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
   const page = useAdForm(adId);
   const {
     isEdit,
+    contentOnly,
     loadError,
     form,
     patch,
     apartments,
     categories,
     subCategories,
+    bizCallDuplicateName,
     selectedPartner,
     totalHouseholds,
     estimatedMonthlyAmount,
@@ -84,9 +86,11 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
       <PageHeader>
         <PageHeaderTitle
           title={isEdit ? '광고 수정' : '광고 대리 등록'}
-          description={isEdit
-            ? '결제 전 광고의 내용과 승인 조건을 고칩니다.'
-            : '파트너를 대신해 광고를 작성하고 결제만 남은 상태로 만듭니다.'}
+          description={contentOnly
+            ? '광고중인 광고의 내용을 고칩니다. 저장하면 앱에 바로 반영됩니다.'
+            : isEdit
+              ? '결제 전 광고의 내용과 승인 조건을 고칩니다.'
+              : '파트너를 대신해 광고를 작성하고 결제만 남은 상태로 만듭니다.'}
         />
         <Button variant="outline" asChild>
           <Link
@@ -248,27 +252,45 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
       <Card>
         <CardHeader>
           <CardTitle>
-            노출 아파트 <span className="text-destructive">*</span>
+            노출 아파트{' '}
+            {contentOnly
+              ? <span className="text-sm font-normal text-muted-foreground">(수정 불가)</span>
+              : <span className="text-destructive">*</span>}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {apartments.map((apt) => (
-              <label
-                key={apt.id}
-                className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2.5"
-              >
-                <Checkbox
-                  checked={form.apartmentIds.includes(apt.id)}
-                  onCheckedChange={() => page.toggleApartment(apt.id)}
-                />
-                <span className="min-w-0 flex-1 truncate text-sm">{apt.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {apt.totalHouseholds.toLocaleString()}세대
-                </span>
-              </label>
-            ))}
-          </div>
+          {/* 광고중에는 아파트가 곧 월 광고료의 근거라 여기서 바꾸지 않는다 */}
+          {contentOnly ? (
+            <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
+              <p className="text-muted-foreground">
+                {apartments
+                  .filter((apt) => form.apartmentIds.includes(apt.id))
+                  .map((apt) => apt.name)
+                  .join(', ') || '-'}
+              </p>
+              <p>
+                노출 아파트를 바꾸려면 파트너의 수정 요청을 받아 심사해야 합니다.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {apartments.map((apt) => (
+                <label
+                  key={apt.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2.5"
+                >
+                  <Checkbox
+                    checked={form.apartmentIds.includes(apt.id)}
+                    onCheckedChange={() => page.toggleApartment(apt.id)}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm">{apt.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {apt.totalHouseholds.toLocaleString()}세대
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
           <p className="text-sm">
             선택 {form.apartmentIds.length}곳 · 총{' '}
             <strong>{totalHouseholds.toLocaleString()}세대</strong>
@@ -281,66 +303,80 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
           <CardTitle>승인 조건</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!isFirstAdExpected && (
-            <label className="flex cursor-pointer items-center gap-2">
-              <Checkbox
-                checked={form.overrideEnabled}
-                onCheckedChange={(checked) => patch({ overrideEnabled: checked === true })}
-              />
-              <span className="text-sm">
-                첫 광고가 아니지만 협의된 할인·무료기간을 예외 적용
-              </span>
-            </label>
-          )}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">할인율 (%)</label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                disabled={!benefitsApplied}
-                value={form.discountRate || ''}
-                onChange={(e) =>
-                  patch({
-                    discountRate: Math.min(
-                      100,
-                      Math.max(0, parseInt(e.target.value) || 0)
-                    ),
-                  })
-                }
-              />
+          {/* 광고중에는 할인·무료기간이 이미 청구되고 있는 금액의 근거다 */}
+          {contentOnly ? (
+            <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
+              <p>
+                할인 {form.discountRate}% · 무료 {form.freeMonths}개월
+              </p>
+              <p className="text-muted-foreground">
+                광고중에는 이미 청구 중인 금액의 근거라 바꿀 수 없습니다.
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">무료 개월 수</label>
-              <Input
-                type="number"
-                min={0}
-                max={24}
-                disabled={!benefitsApplied}
-                value={form.freeMonths || ''}
-                onChange={(e) =>
-                  patch({ freeMonths: Math.max(0, parseInt(e.target.value) || 0) })
-                }
-              />
-            </div>
-          </div>
-          {form.overrideEnabled && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">
-                할인 사유{' '}
-                <span className="text-xs font-normal text-muted-foreground">
-                  (파트너에게 표시)
-                </span>
-              </label>
-              <Textarea
-                className="min-h-[80px] resize-none"
-                maxLength={100}
-                placeholder="예: 신규 상권 지원 / 장기 계약 협의 완료 등"
-                value={form.discountNote}
-                onChange={(e) => patch({ discountNote: e.target.value })}
-              />
-            </div>
+          ) : (
+            <>
+              {!isFirstAdExpected && (
+                <label className="flex cursor-pointer items-center gap-2">
+                  <Checkbox
+                    checked={form.overrideEnabled}
+                    onCheckedChange={(checked) => patch({ overrideEnabled: checked === true })}
+                  />
+                  <span className="text-sm">
+                    첫 광고가 아니지만 협의된 할인·무료기간을 예외 적용
+                  </span>
+                </label>
+              )}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">할인율 (%)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    disabled={!benefitsApplied}
+                    value={form.discountRate || ''}
+                    onChange={(e) =>
+                      patch({
+                        discountRate: Math.min(
+                          100,
+                          Math.max(0, parseInt(e.target.value) || 0)
+                        ),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">무료 개월 수</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={24}
+                    disabled={!benefitsApplied}
+                    value={form.freeMonths || ''}
+                    onChange={(e) =>
+                      patch({ freeMonths: Math.max(0, parseInt(e.target.value) || 0) })
+                    }
+                  />
+                </div>
+              </div>
+              {form.overrideEnabled && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    할인 사유{' '}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      (파트너에게 표시)
+                    </span>
+                  </label>
+                  <Textarea
+                    className="min-h-[80px] resize-none"
+                    maxLength={100}
+                    placeholder="예: 신규 상권 지원 / 장기 계약 협의 완료 등"
+                    value={form.discountNote}
+                    onChange={(e) => patch({ discountNote: e.target.value })}
+                  />
+                </div>
+              )}
+            </>
           )}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
@@ -355,10 +391,16 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
               value={form.bizCallNumber}
               onChange={(e) => patch({ bizCallNumber: formatBizCallNumber(e.target.value) })}
             />
-            <p className="text-xs text-muted-foreground">
-              입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
-              {selectedPartner?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
-            </p>
+            {bizCallDuplicateName ? (
+              <p className="text-xs text-red-600">
+                이미 다른 파트너({bizCallDuplicateName})가 사용 중인 번호입니다.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
+                {selectedPartner?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">
@@ -398,10 +440,13 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
         <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
           <div className="text-sm">
             <p>
-              예상 월 광고료{' '}
+              {contentOnly ? '현재 월 광고료' : '예상 월 광고료'}{' '}
               <strong className="text-base">
                 {estimatedMonthlyAmount.toLocaleString()}원
               </strong>
+              {contentOnly && (
+                <span className="ml-2 text-muted-foreground">변동 없음</span>
+              )}
             </p>
             <p className="text-muted-foreground">
               {totalHouseholds.toLocaleString()}세대 ×{' '}

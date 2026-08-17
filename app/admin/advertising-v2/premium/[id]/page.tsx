@@ -742,6 +742,24 @@ export default function PremiumAdDetailPage({
               </Card>
             )}
 
+            {/* 광고중 수정 — 내용만 고칠 수 있고, 파트너 수정 심사 중이면 그쪽을 먼저 끝내야 한다 */}
+            {detail.status === 'running' && detail.modificationStatus !== 'pending' && (
+              <Card>
+                <CardContent className='px-6 py-4'>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() => router.push(`/admin/advertising-v2/premium/${detail.id}/edit`)}
+                    disabled={page.processing}
+                    className='w-full gap-2'
+                  >
+                    <Pencil className='h-4 w-4' />
+                    광고 내용 수정
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 결제 전이라 내용·주수·금액을 고쳐도 결제 내역과 어긋나지 않는다 */}
             {detail.status === 'approved' && detail.paymentStatus === 'unpaid' && (
               <Card>

@@ -9,6 +9,7 @@ import { MAX_AD_IMAGES } from '@/lib/ads/constants';
 import { uploadImageFile } from '@/lib/utils/upload-image';
 import { deleteFilesFromStorage } from '@/lib/utils/storage';
 import { adImageKey, type AdImageItem } from '@/components/ad-image-picker';
+import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
 import {
   MAX_CTA_BUTTONS,
   ctaButtonsError,
@@ -95,8 +96,9 @@ const EMPTY_FORM: AdFormState = {
 /**
  * 광고 대리 등록/수정 폼 상태
  *
- * [adId]를 주면 기존 광고를 불러와 수정 모드로 동작한다.
- * 수정은 결제 전(approved + unpaid) 광고만 가능하므로 파트너는 바꿀 수 없다.
+ * [adId]를 주면 기존 광고를 불러와 수정 모드로 동작한다. 파트너는 바꿀 수 없다.
+ * 광고중(running)이면 내용·카테고리만 고치는 모드(contentOnly) — 아파트·할인·무료기간은
+ * 돌고 있는 구독 청구액의 근거라 잠근다.
  */
 export function useAdForm(adId?: string) {
   const router = useRouter();
@@ -112,6 +114,8 @@ export function useAdForm(adId?: string) {
   // 수정 모드에서는 저장된 첫 광고 여부를 그대로 쓴다 (파트너 상태로 다시 판정하면 어긋난다)
   const [existingIsFirstAd, setExistingIsFirstAd] = useState<boolean | null>(null);
   const [originalImageUrls, setOriginalImageUrls] = useState<string[]>([]);
+  // 광고중 수정 — 금액의 근거가 되는 입력을 잠근다
+  const [contentOnly, setContentOnly] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -143,10 +147,17 @@ export function useAdForm(adId?: string) {
         setLoadError('광고를 찾을 수 없습니다.');
         return;
       }
-      if (ad.adStatus !== 'approved' || ad.paymentStatus !== 'unpaid') {
-        setLoadError('결제 전(승인·미결제) 광고만 수정할 수 있습니다.');
+      const isRunning = ad.adStatus === 'running';
+      const isBeforePayment = ad.adStatus === 'approved' && ad.paymentStatus === 'unpaid';
+      if (!isRunning && !isBeforePayment) {
+        setLoadError('결제 전(승인·미결제) 또는 광고중인 광고만 수정할 수 있습니다.');
         return;
       }
+      if (isRunning && ad.modificationStatus === 'pending') {
+        setLoadError('파트너의 수정 심사가 진행 중입니다. 먼저 승인하거나 거절해주세요.');
+        return;
+      }
+      setContentOnly(isRunning);
 
       const partner = partnerList.find((p) => p.id === ad.partnerId);
 
@@ -404,6 +415,8 @@ export function useAdForm(adId?: string) {
 
   const ctaError = ctaButtonsError(form.ctaButtons);
 
+  const bizCallDuplicateName = useBizCallDuplicate(form.bizCallNumber, form.partnerId);
+
   const totalHouseholds = useMemo(
     () => form.apartmentIds.reduce((sum, id) => {
       const apt = apartments.find((a) => a.id === id);
@@ -430,6 +443,7 @@ export function useAdForm(adId?: string) {
     form.images.length > 0 &&
     form.apartmentIds.length > 0 &&
     ctaError === null &&
+    bizCallDuplicateName === null &&
     loadError === null &&
     !submitting;
 
@@ -470,8 +484,11 @@ export function useAdForm(adId?: string) {
         return;
       }
 
-      // 저장에 성공한 뒤에만 빠진 기존 이미지를 지운다
-      const removed = originalImageUrls.filter((url) => !imageUrls.includes(url));
+      // 저장에 성공한 뒤에만 빠진 기존 이미지를 지운다.
+      // 광고중 광고는 위에 얹힌 프리미엄이 같은 파일을 쓰고 있을 수 있어 파일을 남긴다.
+      const removed = contentOnly
+        ? []
+        : originalImageUrls.filter((url) => !imageUrls.includes(url));
       if (removed.length > 0) {
         await deleteFilesFromStorage(removed);
       }
@@ -487,10 +504,11 @@ export function useAdForm(adId?: string) {
     } finally {
       setSubmitting(false);
     }
-  }, [form, router, adId, originalImageUrls]);
+  }, [form, router, adId, originalImageUrls, contentOnly]);
 
   return {
     isEdit,
+    contentOnly,
     loadError,
     form,
     patch,
@@ -501,6 +519,7 @@ export function useAdForm(adId?: string) {
     subCategories,
     deliveryAvailable,
     ctaError,
+    bizCallDuplicateName,
     selectedPartner,
     selectPartner,
     selectCategory,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { BIZ_CALL_DUPLICATE_MESSAGE, findBizCallDuplicate } from '@/lib/biz-call';
 
 export async function POST(
   request: NextRequest,
@@ -115,6 +116,15 @@ export async function POST(
     // 비즈콜(안심번호)은 파트너 단위 속성이라 partner_users에 저장.
     // 광고 상태 변경 전에 처리해야 실패 시 pending으로 남아 재시도할 수 있다.
     if (bizCallNumber !== undefined) {
+      // 같은 번호를 두 파트너가 쓰면 앱에서 어느 광고로 걸려온 문의인지 구분할 수 없다
+      const bizCallOwner = await findBizCallDuplicate(supabase, bizCallNumber, ad.partnerId);
+      if (bizCallOwner) {
+        return NextResponse.json(
+          { error: `${BIZ_CALL_DUPLICATE_MESSAGE} (${bizCallOwner.businessName})` },
+          { status: 409 }
+        );
+      }
+
       const { error: bizCallError } = await supabase
         .from('partner_users')
         .update({ bizCallNumber: bizCallNumber.trim() || null })

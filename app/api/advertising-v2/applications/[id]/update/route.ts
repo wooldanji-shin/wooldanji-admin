@@ -8,6 +8,7 @@ import {
 } from '@/lib/ads/pricing';
 import { ctaButtonsError, ctaUrlOfType, type CtaButton } from '@/lib/cta-button';
 import { MAX_AD_IMAGES } from '@/lib/ads/constants';
+import { BIZ_CALL_DUPLICATE_MESSAGE, findBizCallDuplicate } from '@/lib/biz-call';
 
 interface UpdateBody {
   categoryId: string;
@@ -37,11 +38,86 @@ function trimmedOrNull(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+/** 청구 금액의 근거(아파트·할인·무료기간)와 무관한 컬럼 — 광고중에도 고칠 수 있다 */
+function contentColumns(body: UpdateBody, ctaButtons: CtaButton[]) {
+  return {
+    categoryId: body.categoryId,
+    title: body.title.trim(),
+    content: trimmedOrNull(body.content),
+    imageUrls: body.imageUrls ?? [],
+    naverMapUrl: trimmedOrNull(body.naverMapUrl),
+    blogUrl: trimmedOrNull(body.blogUrl),
+    youtubeUrl: trimmedOrNull(body.youtubeUrl),
+    instagramUrl: trimmedOrNull(body.instagramUrl),
+    kakaoOpenChatUrl: trimmedOrNull(body.kakaoOpenChatUrl),
+    baeminUrl: ctaUrlOfType(ctaButtons, 'baemin'),
+    coupangEatsUrl: ctaUrlOfType(ctaButtons, 'coupangEats'),
+    ctaButtons: ctaButtons.length > 0 ? ctaButtons : null,
+    adminMemo: trimmedOrNull(body.adminMemo),
+    salesRepId: body.salesRepId || null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/** 서브카테고리는 통째로 교체한다 — 문제가 있으면 메시지, 없으면 null */
+async function replaceSubCategories(
+  admin: ReturnType<typeof createAdminClient>,
+  advertisementId: string,
+  subCategoryIds: string[]
+): Promise<string | null> {
+  const { error: deleteError } = await admin
+    .from('advertisement_sub_categories_v2')
+    .delete()
+    .eq('advertisementId', advertisementId);
+
+  if (deleteError) {
+    console.error('Failed to clear sub categories:', deleteError);
+    return 'Failed to update sub categories';
+  }
+
+  if (subCategoryIds.length === 0) return null;
+
+  const { error: insertError } = await admin
+    .from('advertisement_sub_categories_v2')
+    .insert(subCategoryIds.map((subCategoryId) => ({ advertisementId, subCategoryId })));
+
+  if (insertError) {
+    console.error('Failed to insert sub categories:', insertError);
+    return 'Failed to update sub categories';
+  }
+
+  return null;
+}
+
+/** 비즈콜·분석 권한은 광고가 아니라 파트너에 붙어 있다 */
+async function updatePartner(
+  admin: ReturnType<typeof createAdminClient>,
+  partnerId: string,
+  body: UpdateBody
+): Promise<void> {
+  const partnerUpdate: Record<string, unknown> = {};
+  if (body.bizCallNumber !== undefined) {
+    partnerUpdate.bizCallNumber = trimmedOrNull(body.bizCallNumber);
+  }
+  if (body.grantAnalytics !== undefined) {
+    partnerUpdate.analyticsEnabled = body.grantAnalytics === true;
+  }
+  if (Object.keys(partnerUpdate).length === 0) return;
+
+  const { error } = await admin
+    .from('partner_users')
+    .update(partnerUpdate)
+    .eq('id', partnerId);
+
+  if (error) console.error('Failed to update partner:', error);
+}
+
 /**
- * 관리자가 대리 등록한 광고를 고친다 (잘못 등록한 경우의 정정).
+ * 관리자가 광고를 고친다.
  *
- * 결제 전(approved + unpaid) 광고만 허용한다. 결제가 끝난 광고는 구독이 이미 돌고 있어
- * 아파트·금액을 여기서 바꾸면 청구와 어긋나므로, 파트너의 수정 심사 흐름을 따라야 한다.
+ * 결제 전(approved + unpaid)은 전부 고칠 수 있다 — 청구가 아직 없으므로 금액이 바뀌어도 된다.
+ * 광고중(running)은 카테고리·내용·이미지·링크·CTA·비즈콜만 고친다. 아파트·할인·무료기간은
+ * 이미 돌고 있는 구독 청구액의 근거라, 바꾸려면 파트너의 수정 심사 흐름을 따라야 한다.
  *
  * 파트너는 바꿀 수 없다 — 다른 파트너의 광고는 새로 등록하는 것과 같다.
  */
@@ -77,7 +153,6 @@ export async function POST(
       imageUrls = [],
       ctaButtons = [],
       overrideEnabled,
-      grantAnalytics,
     } = body;
 
     if (!categoryId || !title?.trim()) {
@@ -107,18 +182,12 @@ export async function POST(
     }
 
     const uniqueApartmentIds = [...new Set(apartmentIds)];
-    if (uniqueApartmentIds.length === 0) {
-      return NextResponse.json(
-        { error: '노출할 아파트를 1곳 이상 선택해주세요.' },
-        { status: 400 }
-      );
-    }
 
     const admin = createAdminClient();
 
     const { data: ad } = await admin
       .from('advertisements_v2')
-      .select('id, partnerId, adStatus, paymentStatus, isFirstAdApplication')
+      .select('id, partnerId, adStatus, paymentStatus, modificationStatus, isFirstAdApplication')
       .eq('id', id)
       .maybeSingle();
 
@@ -130,12 +199,67 @@ export async function POST(
       partnerId: string;
       adStatus: string;
       paymentStatus: string;
+      modificationStatus: string | null;
       isFirstAdApplication: boolean | null;
     };
 
-    if (existing.adStatus !== 'approved' || existing.paymentStatus !== 'unpaid') {
+    const isRunning = existing.adStatus === 'running';
+    const isBeforePayment =
+      existing.adStatus === 'approved' && existing.paymentStatus === 'unpaid';
+
+    if (!isRunning && !isBeforePayment) {
       return NextResponse.json(
-        { error: '결제 전(승인·미결제) 광고만 수정할 수 있습니다.' },
+        { error: '결제 전(승인·미결제) 또는 광고중인 광고만 수정할 수 있습니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 파트너 수정 심사가 걸려 있는데 여기서 덮어쓰면, 승인 시 어느 쪽 값이 남는지 알 수 없다
+    if (isRunning && existing.modificationStatus === 'pending') {
+      return NextResponse.json(
+        { error: '파트너의 수정 심사가 진행 중입니다. 먼저 승인하거나 거절해주세요.' },
+        { status: 409 }
+      );
+    }
+
+    // 같은 번호를 두 파트너가 쓰면 앱에서 어느 광고로 걸려온 문의인지 구분할 수 없다
+    const bizCallOwner = await findBizCallDuplicate(
+      admin,
+      body.bizCallNumber,
+      existing.partnerId
+    );
+    if (bizCallOwner) {
+      return NextResponse.json(
+        { error: `${BIZ_CALL_DUPLICATE_MESSAGE} (${bizCallOwner.businessName})` },
+        { status: 409 }
+      );
+    }
+
+    // 광고중이면 금액의 근거는 그대로 두고 내용만 바꾼다
+    if (isRunning) {
+      const { error: runningUpdateError } = await admin
+        .from('advertisements_v2')
+        .update(contentColumns(body, ctaButtons))
+        .eq('id', id);
+
+      if (runningUpdateError) {
+        console.error('Failed to update advertisement:', runningUpdateError);
+        return NextResponse.json({ error: 'Failed to update advertisement' }, { status: 500 });
+      }
+
+      const subCategoryError = await replaceSubCategories(admin, id, subCategoryIds);
+      if (subCategoryError) {
+        return NextResponse.json({ error: subCategoryError }, { status: 500 });
+      }
+
+      await updatePartner(admin, existing.partnerId, body);
+
+      return NextResponse.json({ success: true, advertisementId: id });
+    }
+
+    if (uniqueApartmentIds.length === 0) {
+      return NextResponse.json(
+        { error: '노출할 아파트를 1곳 이상 선택해주세요.' },
         { status: 400 }
       );
     }
@@ -171,25 +295,11 @@ export async function POST(
     const { error: updateError } = await admin
       .from('advertisements_v2')
       .update({
-        categoryId,
-        title: title.trim(),
-        content: trimmedOrNull(body.content),
-        imageUrls,
-        naverMapUrl: trimmedOrNull(body.naverMapUrl),
-        blogUrl: trimmedOrNull(body.blogUrl),
-        youtubeUrl: trimmedOrNull(body.youtubeUrl),
-        instagramUrl: trimmedOrNull(body.instagramUrl),
-        kakaoOpenChatUrl: trimmedOrNull(body.kakaoOpenChatUrl),
-        baeminUrl: ctaUrlOfType(ctaButtons, 'baemin'),
-        coupangEatsUrl: ctaUrlOfType(ctaButtons, 'coupangEats'),
-        ctaButtons: ctaButtons.length > 0 ? ctaButtons : null,
+        ...contentColumns(body, ctaButtons),
         freeMonths,
         approvedDiscountRate: discountRate,
         approvedMonthlyAmount,
-        updatedAt: new Date().toISOString(),
         discountNote: overrideEnabled === true ? trimmedOrNull(body.discountNote) : null,
-        adminMemo: trimmedOrNull(body.adminMemo),
-        salesRepId: body.salesRepId || null,
       })
       .eq('id', id);
 
@@ -198,7 +308,7 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update advertisement' }, { status: 500 });
     }
 
-    // 아파트·서브카테고리는 통째로 교체한다
+    // 아파트는 통째로 교체한다
     const { error: apartmentDeleteError } = await admin
       .from('advertisement_apartments_v2')
       .delete()
@@ -224,46 +334,12 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update apartments' }, { status: 500 });
     }
 
-    const { error: subCategoryDeleteError } = await admin
-      .from('advertisement_sub_categories_v2')
-      .delete()
-      .eq('advertisementId', id);
-
-    if (subCategoryDeleteError) {
-      console.error('Failed to clear sub categories:', subCategoryDeleteError);
-      return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+    const subCategoryError = await replaceSubCategories(admin, id, subCategoryIds);
+    if (subCategoryError) {
+      return NextResponse.json({ error: subCategoryError }, { status: 500 });
     }
 
-    if (subCategoryIds.length > 0) {
-      const { error: subCategoryInsertError } = await admin
-        .from('advertisement_sub_categories_v2')
-        .insert(
-          subCategoryIds.map((subCategoryId) => ({ advertisementId: id, subCategoryId }))
-        );
-
-      if (subCategoryInsertError) {
-        console.error('Failed to insert sub categories:', subCategoryInsertError);
-        return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
-      }
-    }
-
-    const partnerUpdate: Record<string, unknown> = {};
-    if (body.bizCallNumber !== undefined) {
-      partnerUpdate.bizCallNumber = trimmedOrNull(body.bizCallNumber);
-    }
-    if (grantAnalytics !== undefined) {
-      partnerUpdate.analyticsEnabled = grantAnalytics === true;
-    }
-    if (Object.keys(partnerUpdate).length > 0) {
-      const { error: partnerError } = await admin
-        .from('partner_users')
-        .update(partnerUpdate)
-        .eq('id', existing.partnerId);
-
-      if (partnerError) {
-        console.error('Failed to update partner:', partnerError);
-      }
-    }
+    await updatePartner(admin, existing.partnerId, body);
 
     return NextResponse.json({
       success: true,
