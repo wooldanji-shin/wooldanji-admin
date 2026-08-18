@@ -336,6 +336,9 @@ export default function ApartmentsPage() {
     setCurrentPage(1);
   }, [searchTerm]);
 
+  // 회원이 소속된 아파트는 DB FK 제약(user.apartmentId)으로 삭제가 거부된다
+  const hasMembers = (deletingApartment?.memberCount ?? 0) > 0;
+
   const handleDeleteClick = (apartment: Apartment) => {
     setDeletingApartment(apartment);
     setDeleteDialog(true);
@@ -358,7 +361,13 @@ export default function ApartmentsPage() {
       toast.success('아파트가 삭제되었습니다.');
     } catch (error) {
       console.error('Failed to delete apartment:', error);
-      toast.error('아파트 삭제 중 오류가 발생했습니다.');
+      // 23503 = FK 위반. 회원·파트너 신청 등이 아직 이 아파트를 참조하는 경우다.
+      const isReferenced = (error as { code?: string })?.code === '23503';
+      toast.error(
+        isReferenced
+          ? '이 아파트를 참조하는 데이터가 남아 있어 삭제할 수 없습니다. 소속 회원을 먼저 다른 아파트로 이동시켜 주세요.'
+          : '아파트 삭제 중 오류가 발생했습니다.'
+      );
     }
   };
 
@@ -712,18 +721,31 @@ export default function ApartmentsPage() {
           <DialogHeader>
             <DialogTitle>아파트 삭제</DialogTitle>
             <DialogDescription>
-              정말로 <strong>{deletingApartment?.name}</strong> 아파트를 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없으며, 해당 아파트의 모든 데이터가 삭제됩니다.
+              {hasMembers ? (
+                <>
+                  <strong>{deletingApartment?.name}</strong> 아파트에 회원{' '}
+                  {deletingApartment?.memberCount.toLocaleString()}명이 소속되어 있어 삭제할 수 없습니다.
+                  <br />
+                  소속 회원을 다른 아파트로 이동시킨 뒤 다시 시도해 주세요.
+                </>
+              ) : (
+                <>
+                  정말로 <strong>{deletingApartment?.name}</strong> 아파트를 삭제하시겠습니까?
+                  <br />
+                  이 작업은 되돌릴 수 없으며, 해당 아파트의 모든 데이터가 삭제됩니다.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialog(false)}>
-              취소
+              {hasMembers ? '확인' : '취소'}
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              삭제
-            </Button>
+            {!hasMembers && (
+              <Button variant="destructive" onClick={handleDeleteConfirm}>
+                삭제
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
