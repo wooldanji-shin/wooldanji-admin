@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { setAutoApproveModification } from '@/lib/ads/auto-approve';
 import type { PremiumStatus } from '@/components/status-badge';
 import type { ApartmentOption } from '@/components/apartment-combobox';
 import { SALES_REP_UNASSIGNED } from '@/components/sales-rep-filter';
@@ -24,6 +25,7 @@ export interface PremiumAd {
   salesRepName: string | null;
   cumulativeAmount: number | null;
   modificationStatus: string | null;
+  autoApproveModification: boolean;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
@@ -32,6 +34,20 @@ export interface PremiumAd {
   apartmentIds: string[];
   totalImpressions: number;
   totalClicks: number;
+  totalPhoneClicks: number;
+  /** 프리미엄에는 카테고리가 없다 — 원본 기본광고(baseAdId)에서 가져온다 */
+  categoryId: string | null;
+  subCategoryIds: string[];
+}
+
+export interface PremiumCategory {
+  id: string;
+  categoryName: string;
+}
+
+export interface PremiumSubCategory {
+  id: string;
+  subCategoryName: string;
 }
 
 const PAGE_SIZE = 20;
@@ -47,6 +63,13 @@ export interface UsePremiumPageReturn {
   salesRepFilter: string | null;
   setSalesRepFilter: (v: string | null) => void;
   setApartmentFilter: (v: string | null) => void;
+  categoryFilter: string | null;
+  setCategoryFilter: (v: string | null) => void;
+  subCategoryFilter: string | null;
+  setSubCategoryFilter: (v: string | null) => void;
+  categories: PremiumCategory[];
+  subCategories: PremiumSubCategory[];
+  categoryCounts: Record<string, number>;
   allApartments: ApartmentOption[];
   statusCounts: Record<PremiumStatus | 'all', number>;
   paginatedAds: PremiumAd[];
@@ -72,6 +95,7 @@ export interface UsePremiumPageReturn {
   handleApproveConfirm: () => Promise<void>;
   handleOpenReject: (ad: PremiumAd) => void;
   handleReject: () => Promise<void>;
+  handleToggleAutoApprove: (ad: PremiumAd, next: boolean) => Promise<void>;
   grantAnalytics: boolean;
   setGrantAnalytics: (v: boolean) => void;
 }
@@ -86,6 +110,12 @@ export function usePremiumPage(): UsePremiumPageReturn {
   const debouncedSearchTerm = useDebounce(searchTerm);
   const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
   const [salesRepFilter, _setSalesRepFilter] = useState<string | null>(null);
+  const [categoryFilter, _setCategoryFilter] = useState<string | null>(null);
+  const [subCategoryFilter, _setSubCategoryFilter] = useState<string | null>(null);
+  const [categories, setCategories] = useState<PremiumCategory[]>([]);
+  const [allSubCategories, setAllSubCategories] = useState<
+    (PremiumSubCategory & { categoryId: string })[]
+  >([]);
   const [allApartments, setAllApartments] = useState<ApartmentOption[]>([]);
   const page = useMemo(() => {
     const p = parseInt(searchParams.get('page') ?? '1');
@@ -107,6 +137,13 @@ export function usePremiumPage(): UsePremiumPageReturn {
   const setSearchTerm = useCallback((v: string) => { _setSearchTerm(v); setPage(1); }, [setPage]);
   const setApartmentFilter = useCallback((v: string | null) => { _setApartmentFilter(v); setPage(1); }, [setPage]);
   const setSalesRepFilter = useCallback((v: string | null) => { _setSalesRepFilter(v); setPage(1); }, [setPage]);
+  // 카테고리를 바꾸면 하위 선택이 남아 결과가 0건이 되므로 서브카테고리도 함께 비운다
+  const setCategoryFilter = useCallback((v: string | null) => {
+    _setCategoryFilter(v);
+    _setSubCategoryFilter(null);
+    setPage(1);
+  }, [setPage]);
+  const setSubCategoryFilter = useCallback((v: string | null) => { _setSubCategoryFilter(v); setPage(1); }, [setPage]);
 
   const [selectedAd, setSelectedAd] = useState<PremiumAd | null>(null);
   const [approveDialog, setApproveDialog] = useState(false);
@@ -125,7 +162,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
       const { data: adsData, error: adsError } = await supabase
         .from('premium_advertisements_v2')
         .select(
-          'id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "startedAt", "endedAt", "createdAt", "salesRepId", sales_reps:salesRepId(name)'
+          'id, "partnerId", "baseAdId", title, weeks, status, "paymentStatus", "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "autoApproveModification", "startedAt", "endedAt", "createdAt", "salesRepId", sales_reps:salesRepId(name)'
         )
         .neq('status', 'draft')
         .order('createdAt', { ascending: false });
@@ -146,6 +183,8 @@ export function usePremiumPage(): UsePremiumPageReturn {
         { data: apartmentRows },
         { data: apartmentList },
         { data: analyticsRows },
+        { data: baseAdRows },
+        { data: categoryRows },
       ] = await Promise.all([
         supabase
           .from('partner_users')
@@ -169,8 +208,19 @@ export function usePremiumPage(): UsePremiumPageReturn {
           .order('name'),
         supabase
           .from('premium_ad_analytics_v2')
-          .select('"premiumAdId", "impressionCount", "homePremiumImpressionCount", "clickCount"')
+          .select('"premiumAdId", "impressionCount", "homePremiumImpressionCount", "clickCount", "phoneClickCount"')
           .in('premiumAdId', adIds),
+        // 프리미엄에는 카테고리 컬럼이 없어 원본 기본광고에서 끌어온다
+        baseAdIds.length > 0
+          ? supabase
+              .from('advertisements_v2')
+              .select('id, "categoryId", advertisement_sub_categories_v2("subCategoryId")')
+              .in('id', baseAdIds)
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from('ad_categories_v2')
+          .select('id, "categoryName", ad_sub_categories_v2(id, "subCategoryName", "isActive", "orderIndex")')
+          .order('categoryName'),
       ]);
 
       const partnerMap = Object.fromEntries(
@@ -187,12 +237,13 @@ export function usePremiumPage(): UsePremiumPageReturn {
       );
 
       // premiumAdId별 analytics 집계
-      const analyticsMap = (analyticsRows ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
+      const analyticsMap = (analyticsRows ?? []).reduce<Record<string, { impressions: number; clicks: number; phoneClicks: number }>>(
         (acc, r: any) => {
           const key = r.premiumAdId as string;
-          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
+          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0, phoneClicks: 0 };
           acc[key].impressions += (r.homePremiumImpressionCount ?? 0) + (r.impressionCount ?? 0);
           acc[key].clicks += (r.clickCount ?? 0);
+          acc[key].phoneClicks += (r.phoneClickCount ?? 0);
           return acc;
         },
         {}
@@ -209,8 +260,41 @@ export function usePremiumPage(): UsePremiumPageReturn {
         {}
       );
 
+      // baseAdId별 카테고리 / 서브카테고리
+      const baseAdCategoryMap = (baseAdRows ?? []).reduce<
+        Record<string, { categoryId: string | null; subCategoryIds: string[] }>
+      >((acc, r: any) => {
+        acc[r.id as string] = {
+          categoryId: (r.categoryId as string | null) ?? null,
+          subCategoryIds: (r.advertisement_sub_categories_v2 ?? []).map(
+            (sc: any) => sc.subCategoryId as string
+          ),
+        };
+        return acc;
+      }, {});
+
+      setCategories(
+        ((categoryRows ?? []) as any[]).map((c: any) => ({
+          id: c.id as string,
+          categoryName: c.categoryName as string,
+        }))
+      );
+      setAllSubCategories(
+        ((categoryRows ?? []) as any[]).flatMap((c: any) =>
+          ((c.ad_sub_categories_v2 ?? []) as any[])
+            .filter((sub: any) => sub.isActive !== false)
+            .sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+            .map((sub: any) => ({
+              id: sub.id as string,
+              subCategoryName: sub.subCategoryName as string,
+              categoryId: c.id as string,
+            }))
+        )
+      );
+
       const mapped: PremiumAd[] = adsData.map((row: any) => ({
         ...row,
+        autoApproveModification: row.autoApproveModification ?? false,
         partnerBusinessName: partnerMap[row.partnerId]?.businessName ?? '-',
         salesRepId: row.salesRepId ?? null,
         salesRepName: row.sales_reps?.name ?? null,
@@ -219,6 +303,9 @@ export function usePremiumPage(): UsePremiumPageReturn {
         apartmentIds: baseAdApartmentMap[row.baseAdId] ?? [],
         totalImpressions: analyticsMap[row.id]?.impressions ?? 0,
         totalClicks: analyticsMap[row.id]?.clicks ?? 0,
+        totalPhoneClicks: analyticsMap[row.id]?.phoneClicks ?? 0,
+        categoryId: baseAdCategoryMap[row.baseAdId]?.categoryId ?? null,
+        subCategoryIds: baseAdCategoryMap[row.baseAdId]?.subCategoryIds ?? [],
       }));
 
       setAds(mapped);
@@ -272,6 +359,14 @@ export function usePremiumPage(): UsePremiumPageReturn {
           ? apartmentFilteredAds.filter((ad) => ad.status === 'running' && ad.modificationStatus === 'pending')
           : apartmentFilteredAds.filter((ad) => ad.status === statusFilter);
 
+    if (categoryFilter) {
+      result = result.filter((ad) => ad.categoryId === categoryFilter);
+    }
+
+    if (subCategoryFilter) {
+      result = result.filter((ad) => ad.subCategoryIds.includes(subCategoryFilter));
+    }
+
     if (debouncedSearchTerm.trim()) {
       const term = debouncedSearchTerm.trim().toLowerCase();
       result = result.filter(
@@ -282,7 +377,34 @@ export function usePremiumPage(): UsePremiumPageReturn {
     }
 
     return result;
-  }, [apartmentFilteredAds, statusFilter, debouncedSearchTerm]);
+  }, [apartmentFilteredAds, statusFilter, categoryFilter, subCategoryFilter, debouncedSearchTerm]);
+
+  // 카테고리별 개수 — 기본광고 목록과 같이 상태 필터 적용 후 기준
+  const statusFilteredAds = useMemo(
+    () =>
+      statusFilter === 'all'
+        ? apartmentFilteredAds
+        : statusFilter === 'modification_pending'
+          ? apartmentFilteredAds.filter((ad) => ad.status === 'running' && ad.modificationStatus === 'pending')
+          : apartmentFilteredAds.filter((ad) => ad.status === statusFilter),
+    [apartmentFilteredAds, statusFilter]
+  );
+
+  const categoryCounts = useMemo<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    for (const ad of statusFilteredAds) {
+      if (ad.categoryId) counts[ad.categoryId] = (counts[ad.categoryId] ?? 0) + 1;
+    }
+    return counts;
+  }, [statusFilteredAds]);
+
+  const subCategories = useMemo<PremiumSubCategory[]>(
+    () =>
+      categoryFilter
+        ? allSubCategories.filter((sub) => sub.categoryId === categoryFilter)
+        : [],
+    [allSubCategories, categoryFilter]
+  );
 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -337,6 +459,19 @@ export function usePremiumPage(): UsePremiumPageReturn {
     }
   }, [selectedAd, discountRate, adminMemo, grantAnalytics, loadAds]);
 
+  const handleToggleAutoApprove = useCallback(async (ad: PremiumAd, next: boolean) => {
+    const ok = await setAutoApproveModification(
+      createClient(),
+      'premium_advertisements_v2',
+      ad.id,
+      next
+    );
+    if (!ok) return;
+    setAds((prev) =>
+      prev.map((a) => (a.id === ad.id ? { ...a, autoApproveModification: next } : a))
+    );
+  }, []);
+
   const handleOpenReject = useCallback((ad: PremiumAd) => {
     setSelectedAd(ad);
     setRejectReason('');
@@ -383,6 +518,13 @@ export function usePremiumPage(): UsePremiumPageReturn {
     setApartmentFilter,
     salesRepFilter,
     setSalesRepFilter,
+    categoryFilter,
+    setCategoryFilter,
+    subCategoryFilter,
+    setSubCategoryFilter,
+    categories,
+    subCategories,
+    categoryCounts,
     allApartments,
     statusCounts,
     paginatedAds,
@@ -407,6 +549,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
     handleApproveConfirm,
     handleOpenReject,
     handleReject,
+    handleToggleAutoApprove,
     grantAnalytics,
     setGrantAnalytics,
   };

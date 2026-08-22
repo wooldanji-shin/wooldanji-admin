@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { setAutoApproveModification } from '@/lib/ads/auto-approve';
 import type { ApartmentOption } from '@/components/apartment-combobox';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
@@ -14,6 +15,8 @@ export type AdStatus = 'pending' | 'approved' | 'rejected' | 'running' | 'ended'
 export type ModificationStatus = 'pending' | 'approved' | 'rejected' | null;
 export type PaymentStatus = 'unpaid' | 'paid';
 export type StatusFilter = 'all' | 'free_running' | 'paid_running' | 'pending' | 'modification' | 'ended' | 'rejected';
+/** 비즈콜(안심번호) 부여 여부 필터 */
+export type BizCallFilter = 'all' | 'used' | 'unused';
 
 export interface AdCategoryWithSubs {
   id: string;
@@ -41,9 +44,11 @@ export interface AdApplication {
   id: string;
   title: string;
   content: string | null;
+  imageUrls: string[];
   adStatus: AdStatus;
   paymentStatus: PaymentStatus;
   modificationStatus: ModificationStatus;
+  autoApproveModification: boolean;
   submittedAt: string | null;
   activatedAt: string | null;
   freeMonths: number;
@@ -65,14 +70,23 @@ export interface AdApplication {
   ad_categories_v2: {
     categoryName: string;
   } | null;
-  subCategoryNames: string[];
   subCategoryIds: string[];
   apartments: ApartmentSummary[];
   totalImpressions: number;
   totalClicks: number;
+  totalPhoneClicks: number;
+  /** 다음 정기결제일 — 현재 결제 주기가 끝나는 날 */
+  nextBillingDate: string | null;
+  /** 무료체험 종료일 */
+  freeEndDate: string | null;
 }
 
 const PAGE_SIZE = 20;
+
+/** 관리자가 비즈콜(안심번호)을 부여한 광고인지 */
+function hasBizCall(ad: AdApplication): boolean {
+  return (ad.partner_users?.bizCallNumber ?? '').trim() !== '';
+}
 
 export interface UseApplicationsPageReturn {
   applications: AdApplication[];
@@ -83,6 +97,9 @@ export interface UseApplicationsPageReturn {
   setCategoryFilter: (id: string | null) => void;
   subCategoryFilter: string | null;
   setSubCategoryFilter: (id: string | null) => void;
+  bizCallFilter: BizCallFilter;
+  setBizCallFilter: (v: BizCallFilter) => void;
+  bizCallCounts: Record<BizCallFilter, number>;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   apartmentFilter: string | null;
@@ -130,6 +147,7 @@ export interface UseApplicationsPageReturn {
   handleApprove: () => Promise<void>;
   handleOpenReject: (ad: AdApplication) => void;
   handleReject: () => Promise<void>;
+  handleToggleAutoApprove: (ad: AdApplication, next: boolean) => Promise<void>;
   grantAnalytics: boolean;
   setGrantAnalytics: (v: boolean) => void;
   allCategoriesWithSubs: AdCategoryWithSubs[];
@@ -149,6 +167,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const [statusFilter, _setStatusFilter] = useState<StatusFilter>('all');
   const [categoryFilter, _setCategoryFilter] = useState<string | null>(null);
   const [subCategoryFilter, _setSubCategoryFilter] = useState<string | null>(null);
+  const [bizCallFilter, _setBizCallFilter] = useState<BizCallFilter>('all');
   const [searchTerm, _setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm);
   const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
@@ -177,6 +196,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const setStatusFilter = useCallback((v: StatusFilter) => { _setStatusFilter(v); setPage(1); }, [setPage]);
   const setCategoryFilter = useCallback((v: string | null) => { _setCategoryFilter(v); setPage(1); }, [setPage]);
   const setSubCategoryFilter = useCallback((v: string | null) => { _setSubCategoryFilter(v); setPage(1); }, [setPage]);
+  const setBizCallFilter = useCallback((v: BizCallFilter) => { _setBizCallFilter(v); setPage(1); }, [setPage]);
   const setSearchTerm = useCallback((v: string) => { _setSearchTerm(v); setPage(1); }, [setPage]);
   const setApartmentFilter = useCallback((v: string | null) => { _setApartmentFilter(v); setPage(1); }, [setPage]);
   const setSalesRepFilter = useCallback((v: string | null) => { _setSalesRepFilter(v); setPage(1); }, [setPage]);
@@ -276,9 +296,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           categoryId,
           title,
           content,
+          imageUrls,
           adStatus,
           paymentStatus,
           modificationStatus,
+          autoApproveModification,
           submittedAt,
           activatedAt,
           freeMonths,
@@ -289,7 +311,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           sales_reps:salesRepId(name),
           partner_users:partnerId(id, businessName, displayPhoneNumber, bizCallNumber, hasHadRunningAd, analyticsEnabled),
           ad_categories_v2:categoryId(categoryName),
-          advertisement_sub_categories_v2(subCategoryId, ad_sub_categories_v2(subCategoryName)),
+          advertisement_sub_categories_v2(subCategoryId),
           advertisement_apartments_v2(
             apartmentId,
             totalHouseholds,
@@ -305,17 +327,41 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       const { data: analyticsRows } = adIds.length > 0
         ? await supabase
             .from('ad_analytics_v2')
-            .select('baseAdId, impressionCount, homeImpressionCount, clickCount')
+            .select('baseAdId, impressionCount, homeImpressionCount, clickCount, phoneClickCount')
             .in('baseAdId', adIds)
         : { data: [] };
 
+      const { data: subscriptionRows } = adIds.length > 0
+        ? await supabase
+            .from('ad_subscriptions_v2')
+            .select('advertisementId, nextBillingDate, freeEndDate, createdAt')
+            .in('advertisementId', adIds)
+            .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
+            .order('createdAt', { ascending: false })
+        : { data: [] };
+
+      // 광고당 가장 최근 구독 1건만 남긴다 (createdAt 내림차순이라 먼저 온 것이 최신)
+      const subscriptionMap = (subscriptionRows ?? []).reduce<
+        Record<string, { nextBillingDate: string | null; freeEndDate: string | null }>
+      >((acc, r: any) => {
+        const key = r.advertisementId as string;
+        if (!acc[key]) {
+          acc[key] = {
+            nextBillingDate: (r.nextBillingDate as string | null) ?? null,
+            freeEndDate: (r.freeEndDate as string | null) ?? null,
+          };
+        }
+        return acc;
+      }, {});
+
       // baseAdId별 누적 집계
-      const analyticsMap = (analyticsRows ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
+      const analyticsMap = (analyticsRows ?? []).reduce<Record<string, { impressions: number; clicks: number; phoneClicks: number }>>(
         (acc, r: any) => {
           const key = r.baseAdId as string;
-          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
+          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0, phoneClicks: 0 };
           acc[key].impressions += (r.homeImpressionCount ?? 0) + (r.impressionCount ?? 0);
           acc[key].clicks += (r.clickCount ?? 0);
+          acc[key].phoneClicks += (r.phoneClickCount ?? 0);
           return acc;
         },
         {}
@@ -326,9 +372,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         categoryId: row.categoryId ?? null,
         title: row.title,
         content: row.content,
+        imageUrls: (row.imageUrls ?? []) as string[],
         adStatus: row.adStatus,
         paymentStatus: row.paymentStatus,
         modificationStatus: row.modificationStatus ?? null,
+        autoApproveModification: row.autoApproveModification ?? false,
         submittedAt: row.submittedAt,
         activatedAt: row.activatedAt ?? null,
         freeMonths: row.freeMonths,
@@ -339,9 +387,6 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         salesRepName: row.sales_reps?.name ?? null,
         partner_users: row.partner_users,
         ad_categories_v2: row.ad_categories_v2,
-        subCategoryNames: (row.advertisement_sub_categories_v2 ?? []).map(
-          (sc: any) => sc.ad_sub_categories_v2?.subCategoryName ?? ''
-        ).filter(Boolean),
         subCategoryIds: (row.advertisement_sub_categories_v2 ?? []).map(
           (sc: any) => sc.subCategoryId ?? ''
         ).filter(Boolean),
@@ -352,6 +397,9 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         })),
         totalImpressions: analyticsMap[row.id]?.impressions ?? 0,
         totalClicks: analyticsMap[row.id]?.clicks ?? 0,
+        totalPhoneClicks: analyticsMap[row.id]?.phoneClicks ?? 0,
+        nextBillingDate: subscriptionMap[row.id]?.nextBillingDate ?? null,
+        freeEndDate: subscriptionMap[row.id]?.freeEndDate ?? null,
       }));
 
       setApplications(mapped);
@@ -421,7 +469,12 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     return counts;
   }, [statusFiltered, categories]);
 
-  // 전체 클라이언트 필터 (상태 → 카테고리 → 서브카테고리 → 아파트 → 검색)
+  const bizCallCounts = useMemo<Record<BizCallFilter, number>>(() => {
+    const used = statusFiltered.filter(hasBizCall).length;
+    return { all: statusFiltered.length, used, unused: statusFiltered.length - used };
+  }, [statusFiltered]);
+
+  // 전체 클라이언트 필터 (상태 → 카테고리 → 서브카테고리 → 비즈콜 → 검색)
   const filtered = useMemo(() => {
     let result = statusFiltered;
 
@@ -438,6 +491,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       result = result.filter((a) => a.subCategoryIds.includes(subCategoryFilter));
     }
 
+    if (bizCallFilter !== 'all') {
+      const want = bizCallFilter === 'used';
+      result = result.filter((a) => hasBizCall(a) === want);
+    }
+
     if (debouncedSearchTerm.trim()) {
       const term = debouncedSearchTerm.trim().toLowerCase();
       result = result.filter(
@@ -449,7 +507,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     }
 
     return result;
-  }, [statusFiltered, categoryFilter, subCategoryFilter, debouncedSearchTerm, categories]);
+  }, [statusFiltered, categoryFilter, subCategoryFilter, bizCallFilter, debouncedSearchTerm, categories]);
 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -527,6 +585,14 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     }
   }, [selectedAd, freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, bizCallNumber, bizCallDuplicateName, salesRepId, approveCategory, approveSubCategoryIds, grantAnalytics, supabase, fetchApplications]);
 
+  const handleToggleAutoApprove = useCallback(async (ad: AdApplication, next: boolean) => {
+    const ok = await setAutoApproveModification(supabase, 'advertisements_v2', ad.id, next);
+    if (!ok) return;
+    setApplications((prev) =>
+      prev.map((a) => (a.id === ad.id ? { ...a, autoApproveModification: next } : a))
+    );
+  }, [supabase]);
+
   const handleOpenReject = useCallback((ad: AdApplication) => {
     setSelectedAd(ad);
     setRejectReason('');
@@ -573,6 +639,9 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     setCategoryFilter,
     subCategoryFilter,
     setSubCategoryFilter,
+    bizCallFilter,
+    setBizCallFilter,
+    bizCallCounts,
     searchTerm,
     setSearchTerm,
     apartmentFilter,
@@ -618,6 +687,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     handleApprove,
     handleOpenReject,
     handleReject,
+    handleToggleAutoApprove,
     grantAnalytics,
     setGrantAnalytics,
     allCategoriesWithSubs,

@@ -213,6 +213,7 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
                   items={form.images}
                   onAdd={page.addImages}
                   onRemove={page.removeImage}
+                  onReorder={page.reorderImages}
                 />
                 <p className="text-xs text-muted-foreground">
                   기본 광고에서 가져온 이미지는 목록에서 빼도 파일이 지워지지 않습니다

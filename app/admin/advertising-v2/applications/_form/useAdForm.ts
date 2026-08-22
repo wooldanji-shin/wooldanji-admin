@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { arrayMove } from '@dnd-kit/sortable';
 import { createClient } from '@/lib/supabase/client';
 import { calcMonthlyAmount } from '@/lib/ads/pricing';
 import { MAX_AD_IMAGES } from '@/lib/ads/constants';
@@ -107,7 +108,6 @@ export function useAdForm(adId?: string) {
 
   const [form, setForm] = useState<AdFormState>(EMPTY_FORM);
   const [partners, setPartners] = useState<PartnerOption[]>([]);
-  const [partnerEmails, setPartnerEmails] = useState<Record<string, string | null>>({});
   const [apartments, setApartments] = useState<ApartmentOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [pricePerHousehold, setPricePerHousehold] = useState(70);
@@ -251,13 +251,6 @@ export function useAdForm(adId?: string) {
       }
 
       setLoading(false);
-
-      // 계정 이메일은 auth.users에 있어 서버 API로만 읽을 수 있다.
-      // 폼 진입을 막지 않도록 뒤늦게 채운다 (실패해도 이메일만 비어 보인다)
-      fetch('/api/partners/emails')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((result) => result && setPartnerEmails(result.emails ?? {}))
-        .catch(() => {});
     };
 
     load().catch(() => {
@@ -271,7 +264,7 @@ export function useAdForm(adId?: string) {
     [partners, form.partnerId]
   );
 
-  // 상호명이 겹치는 파트너가 있어 대표자·전화번호·계정 이메일을 함께 보여준다
+  // 상호명이 겹치는 파트너가 있어 대표자·전화번호를 함께 보여준다
   const partnerOptions = useMemo(
     () => partners.map((p) => ({
       id: p.id,
@@ -279,9 +272,8 @@ export function useAdForm(adId?: string) {
       description: [p.representativeName, p.displayPhoneNumber]
         .filter(Boolean)
         .join(' · '),
-      email: partnerEmails[p.id] ?? null,
     })),
-    [partners, partnerEmails]
+    [partners]
   );
 
   // 파트너를 바꾸면 그 파트너에 저장된 비즈콜·분석권한을 폼 기본값으로 가져온다
@@ -397,6 +389,17 @@ export function useAdForm(adId?: string) {
         ...prev,
         images: prev.images.filter((item) => adImageKey(item) !== key),
       };
+    });
+  }, []);
+
+  // 저장 시 images 순서가 그대로 imageUrls가 되므로 배열만 옮기면 된다
+  const reorderImages = useCallback((activeKey: string, overKey: string) => {
+    setForm((prev) => {
+      const from = prev.images.findIndex((item) => adImageKey(item) === activeKey);
+      const to = prev.images.findIndex((item) => adImageKey(item) === overKey);
+      if (from === -1 || to === -1) return prev;
+
+      return { ...prev, images: arrayMove(prev.images, from, to) };
     });
   }, []);
 
@@ -531,6 +534,7 @@ export function useAdForm(adId?: string) {
     toggleApartment,
     addImages,
     removeImage,
+    reorderImages,
     pricePerHousehold,
     totalHouseholds,
     estimatedMonthlyAmount,

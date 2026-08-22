@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { arrayMove } from '@dnd-kit/sortable';
 import { createClient } from '@/lib/supabase/client';
 import {
   calcDiscountedTotalAmount,
@@ -104,7 +105,6 @@ export function usePremiumForm(premiumId?: string) {
 
   const [form, setForm] = useState<PremiumFormState>(EMPTY_FORM);
   const [partners, setPartners] = useState<PremiumPartnerOption[]>([]);
-  const [partnerEmails, setPartnerEmails] = useState<Record<string, string | null>>({});
   const [baseAds, setBaseAds] = useState<BaseAdOption[]>([]);
   const [pricePerWeek, setPricePerWeek] = useState(20);
   // 광고중 수정 — 결제된 금액의 근거가 되는 입력을 잠근다
@@ -246,13 +246,6 @@ export function usePremiumForm(premiumId?: string) {
       if (premiumId) await loadExistingPremium(premiumId);
 
       setLoading(false);
-
-      // 계정 이메일은 auth.users에 있어 서버 API로만 읽을 수 있다.
-      // 폼 진입을 막지 않도록 뒤늦게 채운다 (실패해도 이메일만 비어 보인다)
-      fetch('/api/partners/emails')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((result) => result && setPartnerEmails(result.emails ?? {}))
-        .catch(() => {});
     };
 
     load().catch(() => {
@@ -266,7 +259,7 @@ export function usePremiumForm(premiumId?: string) {
     [partners, form.partnerId]
   );
 
-  // 상호명이 겹치는 파트너가 있어 대표자·전화번호·계정 이메일을 함께 보여준다
+  // 상호명이 겹치는 파트너가 있어 대표자·전화번호를 함께 보여준다
   const partnerOptions = useMemo(
     () => partners.map((p) => ({
       id: p.id,
@@ -274,9 +267,8 @@ export function usePremiumForm(premiumId?: string) {
       description: [p.representativeName, p.displayPhoneNumber]
         .filter(Boolean)
         .join(' · '),
-      email: partnerEmails[p.id] ?? null,
     })),
-    [partners, partnerEmails]
+    [partners]
   );
 
   /** 선택한 파트너의 프리미엄 등록 가능 기본 광고 */
@@ -390,6 +382,17 @@ export function usePremiumForm(premiumId?: string) {
     });
   }, []);
 
+  // 저장 시 images 순서가 그대로 imageUrls가 되므로 배열만 옮기면 된다
+  const reorderImages = useCallback((activeKey: string, overKey: string) => {
+    setForm((prev) => {
+      const from = prev.images.findIndex((item) => adImageKey(item) === activeKey);
+      const to = prev.images.findIndex((item) => adImageKey(item) === overKey);
+      if (from === -1 || to === -1) return prev;
+
+      return { ...prev, images: arrayMove(prev.images, from, to) };
+    });
+  }, []);
+
   // 배달앱 조건이 깨지면 해당 버튼을 남겨둘 수 없다
   useEffect(() => {
     if (deliveryAvailable) return;
@@ -488,6 +491,7 @@ export function usePremiumForm(premiumId?: string) {
     removeCtaButton,
     addImages,
     removeImage,
+    reorderImages,
     pricePerWeek,
     totalHouseholds,
     totalAmount,

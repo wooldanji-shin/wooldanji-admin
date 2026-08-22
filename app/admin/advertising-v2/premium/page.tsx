@@ -14,6 +14,8 @@ import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
 import { ApartmentCombobox } from '@/components/apartment-combobox';
 import { SalesRepFilter } from '@/components/sales-rep-filter';
+import { AdCategoryFilter } from '@/components/ad-category-filter';
+import { DataToolbar } from '@/components/data-toolbar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,6 +109,13 @@ export default function PremiumAdListPage(): React.ReactElement {
     setApartmentFilter,
     salesRepFilter,
     setSalesRepFilter,
+    categoryFilter,
+    setCategoryFilter,
+    subCategoryFilter,
+    setSubCategoryFilter,
+    categories,
+    subCategories,
+    categoryCounts,
     allApartments,
     statusCounts,
     paginatedAds,
@@ -131,6 +140,7 @@ export default function PremiumAdListPage(): React.ReactElement {
     handleApproveConfirm,
     handleOpenReject,
     handleReject,
+    handleToggleAutoApprove,
     grantAnalytics,
     setGrantAnalytics,
   } = usePremiumPage();
@@ -203,6 +213,19 @@ export default function PremiumAdListPage(): React.ReactElement {
         </div>
 
         <DataTableShell
+          toolbar={
+            <DataToolbar className="flex-col sm:flex-col sm:items-stretch gap-2 py-3">
+              <AdCategoryFilter
+                categories={categories}
+                categoryFilter={categoryFilter}
+                onCategoryChange={setCategoryFilter}
+                categoryCounts={categoryCounts}
+                subCategories={subCategories}
+                subCategoryFilter={subCategoryFilter}
+                onSubCategoryChange={setSubCategoryFilter}
+              />
+            </DataToolbar>
+          }
           pagination={
             <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
           }
@@ -224,10 +247,13 @@ export default function PremiumAdListPage(): React.ReactElement {
                   <TableHead>기간</TableHead>
                   <TableHead>금액</TableHead>
                   <TableHead>상태</TableHead>
-                  <TableHead>신청일</TableHead>
+                  <TableHead>광고 시작일</TableHead>
+                  <TableHead>광고 종료일</TableHead>
                   <TableHead>영업 담당자</TableHead>
                   <TableHead className="text-center">노출수</TableHead>
                   <TableHead className="text-center">클릭수</TableHead>
+                  <TableHead className="text-center">전화클릭수</TableHead>
+                  <TableHead className="text-center">자동승인</TableHead>
                   <TableHead className="text-center">액션</TableHead>
                 </TableRow>
               </TableHeader>
@@ -284,7 +310,7 @@ export default function PremiumAdListPage(): React.ReactElement {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex flex-col items-start gap-1.5">
                           <StatusBadge.Premium status={ad.status} />
                           {ad.status === 'running' && ad.modificationStatus === 'pending' && (
                             <StatusBadge variant="primary">수정 심사</StatusBadge>
@@ -292,7 +318,14 @@ export default function PremiumAdListPage(): React.ReactElement {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {new Date(ad.createdAt).toLocaleDateString('ko-KR')}
+                        {ad.startedAt
+                          ? new Date(ad.startedAt).toLocaleDateString('ko-KR')
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {ad.endedAt
+                          ? new Date(ad.endedAt).toLocaleDateString('ko-KR')
+                          : '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {ad.salesRepName ?? '-'}
@@ -302,6 +335,26 @@ export default function PremiumAdListPage(): React.ReactElement {
                       </TableCell>
                       <TableCell className="text-center tabular-nums text-sm">
                         {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {ad.totalPhoneClicks > 0 ? ad.totalPhoneClicks.toLocaleString() : '-'}
+                      </TableCell>
+                      {/* 행 클릭이 상세로 넘어가므로 체크박스 조작은 여기서 막는다 */}
+                      <TableCell
+                        className="text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {ad.status === 'running' ? (
+                          <Checkbox
+                            checked={ad.autoApproveModification}
+                            aria-label="수정 심사 자동승인"
+                            onCheckedChange={(v) =>
+                              handleToggleAutoApprove(ad, v === true)
+                            }
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell
                         className="text-center"

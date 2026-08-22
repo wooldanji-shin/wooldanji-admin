@@ -212,6 +212,7 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
                 items={form.images}
                 onAdd={page.addImages}
                 onRemove={page.removeImage}
+                onReorder={page.reorderImages}
               />
             ) : (
               <p className="text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 'use client';
 
 import { AdminHeader } from '@/components/admin-header';
+import { AutoApproveSwitch } from '@/components/auto-approve-switch';
 import { PartnerBusinessHoursCard } from '@/components/partner-business-hours-card';
 import { PartnerCouponsCard } from '@/components/partner-coupons-card';
 import { AnalyticsPeriodSelect } from '@/components/analytics-period-select';
@@ -738,6 +739,20 @@ export default function PremiumAdDetailPage({
                     <X className='h-4 w-4' />
                     거절하기
                   </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 수정 심사 자동승인 — 광고중일 때만 의미가 있다 */}
+            {detail.status === 'running' && (
+              <Card>
+                <CardContent className='px-6 py-4'>
+                  <AutoApproveSwitch
+                    id={detail.id}
+                    checked={detail.autoApproveModification}
+                    disabled={page.autoApproveToggling}
+                    onChange={page.handleToggleAutoApprove}
+                  />
                 </CardContent>
               </Card>
             )}

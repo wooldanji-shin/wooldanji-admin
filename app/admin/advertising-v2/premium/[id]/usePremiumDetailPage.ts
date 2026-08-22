@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { setAutoApproveModification } from '@/lib/ads/auto-approve';
 import { CtaButton, mergeExtraClickCounts, parseCtaButtons } from '@/lib/cta-button';
 import {
   ALL_PERIOD,
@@ -66,6 +67,7 @@ export interface PremiumAdDetail {
   adminMemo: string | null;
   salesRepName: string | null;
   modificationStatus: string | null;
+  autoApproveModification: boolean;
   modificationRejectedReason: string | null;
   approvedDiscountRate: number | null;
   discountedTotalAmount: number | null;
@@ -203,6 +205,8 @@ export interface UsePremiumDetailPageReturn {
   handleReject: () => Promise<void>;
   handleApproveModification: () => Promise<void>;
   handleRejectModification: () => Promise<void>;
+  autoApproveToggling: boolean;
+  handleToggleAutoApprove: (next: boolean) => Promise<void>;
   handleUpdateMemo: () => Promise<void>;
 }
 
@@ -250,6 +254,7 @@ export function usePremiumDetailPage(
             '"baeminUrl", "coupangEatsUrl", "ctaButtons", ' +
             'weeks, status, "paymentStatus", "totalAmount", "rejectedReason", "adminMemo", "salesRepId", sales_reps:salesRepId(name), ' +
             '"modificationStatus", "modificationRejectedReason", "pendingChanges", ' +
+            '"autoApproveModification", ' +
             '"startedAt", "endedAt", "createdAt", "snapshotApartments", ' +
             '"approvedDiscountRate", "discountedTotalAmount"'
         )
@@ -317,6 +322,7 @@ export function usePremiumDetailPage(
         adminMemo: (row.adminMemo as string | null) ?? null,
         salesRepName: ((row.sales_reps as { name?: string } | null)?.name) ?? null,
         modificationStatus: (row.modificationStatus as string | null) ?? null,
+        autoApproveModification: (row.autoApproveModification as boolean | null) ?? false,
         modificationRejectedReason: (row.modificationRejectedReason as string | null) ?? null,
         pendingChanges: (row.pendingChanges as Record<string, unknown> | null) ?? null,
         startedAt: (row.startedAt as string | null) ?? null,
@@ -529,6 +535,21 @@ export function usePremiumDetailPage(
     }
   };
 
+  const [autoApproveToggling, setAutoApproveToggling] = useState(false);
+
+  const handleToggleAutoApprove = async (next: boolean): Promise<void> => {
+    if (!detail || autoApproveToggling) return;
+    setAutoApproveToggling(true);
+    const ok = await setAutoApproveModification(
+      createClient(),
+      'premium_advertisements_v2',
+      detail.id,
+      next
+    );
+    if (ok) setDetail((prev) => (prev ? { ...prev, autoApproveModification: next } : prev));
+    setAutoApproveToggling(false);
+  };
+
   const handleRejectModification = async (): Promise<void> => {
     if (!detail) return;
     if (!modificationRejectReason.trim()) {
@@ -636,6 +657,8 @@ export function usePremiumDetailPage(
     handleReject,
     handleApproveModification,
     handleRejectModification,
+    autoApproveToggling,
+    handleToggleAutoApprove,
     handleUpdateMemo,
   };
 }

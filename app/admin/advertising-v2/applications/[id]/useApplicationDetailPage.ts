@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { setAutoApproveModification } from '@/lib/ads/auto-approve';
 import { CtaButton, mergeExtraClickCounts, parseCtaButtons } from '@/lib/cta-button';
 import {
   ALL_PERIOD,
@@ -75,6 +76,7 @@ export interface AdApplicationDetail {
   adminMemo: string | null;
   salesRepName: string | null;
   modificationStatus: string | null;
+  autoApproveModification: boolean;
   modificationRejectedReason: string | null;
   pendingChanges: PendingChanges | null;
   partner: {
@@ -202,6 +204,8 @@ export interface UseApplicationDetailPageReturn {
   setModificationRejectReason: (v: string) => void;
   handleApproveModification: () => Promise<void>;
   handleRejectModification: () => Promise<void>;
+  autoApproveToggling: boolean;
+  handleToggleAutoApprove: (next: boolean) => Promise<void>;
   grantAnalytics: boolean;
   setGrantAnalytics: (v: boolean) => void;
   totalHouseholds: number;
@@ -292,6 +296,7 @@ export function useApplicationDetailPage(
             sales_reps:salesRepId(name),
             modificationStatus,
             modificationRejectedReason,
+            autoApproveModification,
             apartmentChangeStatus,
             pendingChanges,
             partner_users:partnerId(businessName, displayPhoneNumber, bizCallNumber, representativeName, phoneNumber, businessAddress, businessDetailAddress, parkingInfo, directionsInfo, businessHoursNote, businessRegistrationNumber, createdAt),
@@ -430,6 +435,7 @@ export function useApplicationDetailPage(
         adminMemo: row.adminMemo ?? null,
         salesRepName: row.sales_reps?.name ?? null,
         modificationStatus: row.modificationStatus ?? null,
+        autoApproveModification: row.autoApproveModification ?? false,
         modificationRejectedReason: row.modificationRejectedReason ?? null,
         pendingChanges,
         partner: row.partner_users,
@@ -623,6 +629,16 @@ export function useApplicationDetailPage(
     }
   };
 
+  const [autoApproveToggling, setAutoApproveToggling] = useState(false);
+
+  const handleToggleAutoApprove = async (next: boolean): Promise<void> => {
+    if (!detail || autoApproveToggling) return;
+    setAutoApproveToggling(true);
+    const ok = await setAutoApproveModification(supabase, 'advertisements_v2', detail.id, next);
+    if (ok) setDetail((prev) => (prev ? { ...prev, autoApproveModification: next } : prev));
+    setAutoApproveToggling(false);
+  };
+
   const handleRejectModification = async () => {
     if (!detail) return;
     if (!modificationRejectReason.trim()) {
@@ -713,6 +729,8 @@ export function useApplicationDetailPage(
     setModificationRejectReason,
     handleApproveModification,
     handleRejectModification,
+    autoApproveToggling,
+    handleToggleAutoApprove,
     grantAnalytics,
     setGrantAnalytics,
     totalHouseholds,

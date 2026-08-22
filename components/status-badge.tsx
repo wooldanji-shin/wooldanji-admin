@@ -21,6 +21,9 @@ const statusBadgeVariants = cva(
           'border-info/30 bg-info/10 text-info-foreground [&>span:first-child]:bg-info',
         primary:
           'border-primary/30 bg-primary/10 text-primary [&>span:first-child]:bg-primary',
+        // 무료체험 전용 — 같은 셀에 서는 진행중(파랑)·수정신청(보라)과 색조를 띄운다
+        free:
+          'border-free/30 bg-free/12 text-free-foreground [&>span:first-child]:bg-free',
       },
       size: {
         sm: 'px-2 py-0 text-[14px]',

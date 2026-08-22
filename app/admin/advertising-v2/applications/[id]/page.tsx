@@ -49,6 +49,7 @@ import { useRouter } from 'next/navigation';
 import { useApplicationDetailPage } from './useApplicationDetailPage';
 import { ctaButtonLabel, ctaButtonsSummary, customCtaButtons, parseCtaButtons } from '@/lib/cta-button';
 
+import { AutoApproveSwitch } from '@/components/auto-approve-switch';
 import { StatusBadge as DomainStatusBadge, type AdStatus, type ModificationStatus } from '@/components/status-badge';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 
@@ -190,7 +191,7 @@ export default function AdApplicationDetailPage({
                   <h1 className='text-xl font-bold text-foreground'>{detail.title}</h1>
                   <StatusBadge status={detail.adStatus} />
                   {detail.adStatus === 'running' && detail.freeMonths > 0 && (
-                    <DomainStatusBadge variant='success' size='md'>
+                    <DomainStatusBadge variant='free' size='md'>
                       무료체험
                     </DomainStatusBadge>
                   )}
@@ -724,6 +725,20 @@ export default function AdApplicationDetailPage({
                 )}
               </CardContent>
             </Card>
+
+            {/* 수정 심사 자동승인 — 광고중일 때만 의미가 있다 */}
+            {detail.adStatus === 'running' && (
+              <Card>
+                <CardContent className='px-6 py-4'>
+                  <AutoApproveSwitch
+                    id={detail.id}
+                    checked={detail.autoApproveModification}
+                    disabled={page.autoApproveToggling}
+                    onChange={page.handleToggleAutoApprove}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             {/* 광고중 수정 — 내용만 고칠 수 있고, 파트너 수정 심사 중이면 그쪽을 먼저 끝내야 한다 */}
             {detail.adStatus === 'running' && detail.modificationStatus !== 'pending' && (

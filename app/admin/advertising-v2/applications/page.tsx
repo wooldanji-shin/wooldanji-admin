@@ -10,6 +10,7 @@ import {
 } from '@/components/page-shell';
 import { DataTableShell } from '@/components/data-table-shell';
 import { DataToolbar, DataToolbarFilters } from '@/components/data-toolbar';
+import { AdCategoryFilter } from '@/components/ad-category-filter';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
@@ -51,11 +52,19 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
+import { useRowHoverPreview } from './useRowHoverPreview';
 import { cn } from '@/lib/utils';
 import {
   useApplicationsPage,
+  type AdApplication,
   type ApartmentSummary,
   type StatusFilter,
+  type BizCallFilter,
 } from './useApplicationsPage';
 
 interface ApartmentTooltipProps {
@@ -178,6 +187,97 @@ const STATUS_TABS: { label: string; value: StatusFilter }[] = [
   { label: '거절', value: 'rejected' },
 ];
 
+/** 행에 3초 머물면 뜨는 광고 미리보기 — 앱 노출 모습과 운영 수치를 한 번에 본다 */
+function AdHoverPreview({
+  ad,
+  pricePerHousehold,
+}: {
+  ad: AdApplication;
+  pricePerHousehold: number;
+}): React.ReactElement {
+  const thumbnail = ad.imageUrls[0] ?? null;
+  const totalHouseholds = ad.apartments.reduce((sum, a) => sum + a.totalHouseholds, 0);
+  const monthlyAmount =
+    ad.approvedMonthlyAmount ?? totalHouseholds * pricePerHousehold;
+  const period = [ad.activatedAt, ad.nextBillingDate]
+    .map((d) => (d ? new Date(d).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }) : null));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-3">
+        {thumbnail ? (
+          // 광고 이미지는 원격 도메인이 파트너마다 달라 next/image 최적화 대상이 아니다
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnail}
+            alt=""
+            className="h-20 w-20 shrink-0 rounded-md border border-border object-cover"
+          />
+        ) : (
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
+            이미지 없음
+          </div>
+        )}
+        <div className="min-w-0 space-y-0.5">
+          <p className="truncate text-sm font-semibold">{ad.title ?? '(제목 없음)'}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {ad.ad_categories_v2?.categoryName ?? '카테고리 없음'}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {ad.partner_users?.businessName ?? '-'}
+          </p>
+        </div>
+      </div>
+
+      {ad.content && (
+        <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+          {ad.content}
+        </p>
+      )}
+
+      <div className="space-y-1 border-t border-border pt-2 text-xs">
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">월 금액</span>
+          <span className="tabular-nums font-medium">
+            {monthlyAmount.toLocaleString()}원
+            {(ad.approvedDiscountRate ?? 0) > 0 && ` (${ad.approvedDiscountRate}%↓)`}
+            {ad.freeMonths > 0 && ` · 무료 ${ad.freeMonths}개월`}
+          </span>
+        </div>
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">광고 기간</span>
+          <span className="tabular-nums">
+            {period[0] ? `${period[0]} ~ ${period[1] ?? '-'}` : '시작 전'}
+          </span>
+        </div>
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">아파트</span>
+          <span className="tabular-nums">
+            {ad.apartments.length}개 · {totalHouseholds.toLocaleString()}세대
+          </span>
+        </div>
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">노출 · 클릭 · 전화</span>
+          <span className="tabular-nums">
+            {ad.totalImpressions.toLocaleString()} · {ad.totalClicks.toLocaleString()} ·{' '}
+            {ad.totalPhoneClicks.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">영업 담당자</span>
+          <span>{ad.salesRepName ?? '-'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const BIZ_CALL_FILTERS: { label: string; value: BizCallFilter }[] = [
+  { label: '전체', value: 'all' },
+  { label: '비즈콜 사용', value: 'used' },
+  { label: '미사용', value: 'unused' },
+];
+
 export default function AdApplicationsPage(): React.ReactElement {
   const {
     loading,
@@ -187,6 +287,9 @@ export default function AdApplicationsPage(): React.ReactElement {
     setCategoryFilter,
     subCategoryFilter,
     setSubCategoryFilter,
+    bizCallFilter,
+    setBizCallFilter,
+    bizCallCounts,
     searchTerm,
     setSearchTerm,
     apartmentFilter,
@@ -232,6 +335,7 @@ export default function AdApplicationsPage(): React.ReactElement {
     handleApprove,
     handleOpenReject,
     handleReject,
+    handleToggleAutoApprove,
     grantAnalytics,
     setGrantAnalytics,
     allCategoriesWithSubs,
@@ -240,6 +344,8 @@ export default function AdApplicationsPage(): React.ReactElement {
     approveSubCategoryIds,
     setApproveSubCategoryIds,
   } = useApplicationsPage();
+
+  const preview = useRowHoverPreview<AdApplication>();
 
   const selectedAdIsFirstAd = selectedAd
     ? selectedAd.isFirstAdApplication && !selectedAd.partner_users?.hasHadRunningAd
@@ -321,88 +427,46 @@ export default function AdApplicationsPage(): React.ReactElement {
           <DataTableShell
             toolbar={
               <DataToolbar className="flex-col sm:flex-col sm:items-stretch gap-2 py-3">
-                {/* 카테고리 필터 */}
-                {categories.length > 0 && (
-                  <DataToolbarFilters>
-                    <button
-                      type="button"
-                      onClick={() => setCategoryFilter(null)}
-                      className={cn(
-                        'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
-                        categoryFilter === null
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                      )}
-                    >
-                      전체 카테고리
-                    </button>
-                    {categories.map((cat) => {
-                      const isActive = categoryFilter === cat.id;
-                      const count = categoryCounts[cat.id] ?? 0;
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => setCategoryFilter(isActive ? null : cat.id)}
+                <AdCategoryFilter
+                  categories={categories}
+                  categoryFilter={categoryFilter}
+                  onCategoryChange={setCategoryFilter}
+                  categoryCounts={categoryCounts}
+                  subCategories={subCategories}
+                  subCategoryFilter={subCategoryFilter}
+                  onSubCategoryChange={setSubCategoryFilter}
+                />
+
+                {/* 비즈콜(안심번호) 부여 여부 */}
+                <DataToolbarFilters>
+                  {BIZ_CALL_FILTERS.map((f) => {
+                    const isActive = bizCallFilter === f.value;
+                    return (
+                      <button
+                        key={f.value}
+                        type="button"
+                        onClick={() => setBizCallFilter(f.value)}
+                        className={cn(
+                          'inline-flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors',
+                          isActive
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
+                        )}
+                      >
+                        {f.label}
+                        <Badge
+                          variant="secondary"
                           className={cn(
-                            'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
-                            isActive
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
+                            'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
+                            isActive && 'bg-primary-foreground/20 text-primary-foreground'
                           )}
                         >
-                          {cat.categoryName}
-                          <Badge
-                            variant="secondary"
-                            className={cn(
-                              'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
-                              isActive && 'bg-primary-foreground/20 text-primary-foreground'
-                            )}
-                          >
-                            {count}
-                          </Badge>
-                        </button>
-                      );
-                    })}
-                  </DataToolbarFilters>
-                )}
-
-                {/* 서브카테고리 필터 — 카테고리 선택 시 표시 */}
-                {subCategories.length > 0 && (
-                  <DataToolbarFilters>
-                    <button
-                      type="button"
-                      onClick={() => setSubCategoryFilter(null)}
-                      className={cn(
-                        'inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors',
-                        subCategoryFilter === null
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                      )}
-                    >
-                      전체
-                    </button>
-                    {subCategories.map((sub) => {
-                      const isActive = subCategoryFilter === sub.id;
-                      return (
-                        <button
-                          key={sub.id}
-                          type="button"
-                          onClick={() => setSubCategoryFilter(isActive ? null : sub.id)}
-                          className={cn(
-                            'inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors',
-                            isActive
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                          )}
-                        >
-                          {sub.subCategoryName}
-                        </button>
-                      );
-                    })}
-                  </DataToolbarFilters>
-                )}
-
+                          {bizCallCounts[f.value]}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                </DataToolbarFilters>
               </DataToolbar>
             }
             pagination={
@@ -424,15 +488,18 @@ export default function AdApplicationsPage(): React.ReactElement {
                     <TableHead>상호명</TableHead>
                     <TableHead className="text-center">첫광고</TableHead>
                     <TableHead>광고 제목</TableHead>
-                    <TableHead>카테고리</TableHead>
                     <TableHead className="text-center">신청 아파트</TableHead>
                     <TableHead className="text-center">광고 상태</TableHead>
                     <TableHead className="text-center">결제 상태</TableHead>
                     <TableHead className="text-right">금액(월)</TableHead>
                     <TableHead>광고 시작일</TableHead>
+                    <TableHead>광고 종료일</TableHead>
+                    <TableHead>무료체험 종료일</TableHead>
                     <TableHead>영업 담당자</TableHead>
                     <TableHead className="text-center">노출수</TableHead>
                     <TableHead className="text-center">클릭수</TableHead>
+                    <TableHead className="text-center">전화클릭수</TableHead>
+                    <TableHead className="text-center">자동승인</TableHead>
                     <TableHead className="text-center">액션</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -442,6 +509,9 @@ export default function AdApplicationsPage(): React.ReactElement {
                       key={app.id}
                       className="cursor-pointer"
                       onClick={() => handleRowClick(app.id)}
+                      onMouseEnter={() => preview.handleRowEnter(app)}
+                      onMouseMove={preview.handleRowMove}
+                      onMouseLeave={preview.handleRowLeave}
                     >
                       <TableCell className="font-medium">
                         {app.partner_users?.businessName ?? '-'}
@@ -462,15 +532,6 @@ export default function AdApplicationsPage(): React.ReactElement {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {app.ad_categories_v2?.categoryName ?? '-'}
-                        {app.subCategoryNames.length > 0 && (
-                          <>
-                            <span className="mx-1">›</span>
-                            {app.subCategoryNames.join(', ')}
-                          </>
-                        )}
-                      </TableCell>
                       <TableCell className="text-center">
                         <ApartmentTooltip
                           apartments={app.apartments}
@@ -486,10 +547,10 @@ export default function AdApplicationsPage(): React.ReactElement {
                         </ApartmentTooltip>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex flex-wrap items-center justify-center gap-1">
+                        <div className="flex flex-col items-center gap-1">
                           <StatusBadge.Ad status={app.adStatus} />
                           {app.adStatus === 'running' && app.freeMonths > 0 && (
-                            <StatusBadge variant="success">
+                            <StatusBadge variant="free">
                               무료체험
                             </StatusBadge>
                           )}
@@ -536,6 +597,16 @@ export default function AdApplicationsPage(): React.ReactElement {
                           : '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
+                        {app.nextBillingDate
+                          ? new Date(app.nextBillingDate).toLocaleDateString('ko-KR')
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {app.freeEndDate
+                          ? new Date(app.freeEndDate).toLocaleDateString('ko-KR')
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
                         {app.salesRepName ?? '-'}
                       </TableCell>
                       <TableCell className="text-center tabular-nums text-sm">
@@ -543,6 +614,26 @@ export default function AdApplicationsPage(): React.ReactElement {
                       </TableCell>
                       <TableCell className="text-center tabular-nums text-sm">
                         {app.totalClicks > 0 ? app.totalClicks.toLocaleString() : '-'}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-sm">
+                        {app.totalPhoneClicks > 0 ? app.totalPhoneClicks.toLocaleString() : '-'}
+                      </TableCell>
+                      {/* 행 클릭이 상세로 넘어가므로 체크박스 조작은 여기서 막는다 */}
+                      <TableCell
+                        className="text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {app.adStatus === 'running' ? (
+                          <Checkbox
+                            checked={app.autoApproveModification}
+                            aria-label="수정 심사 자동승인"
+                            onCheckedChange={(v) =>
+                              handleToggleAutoApprove(app, v === true)
+                            }
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell
                         className="text-center"
@@ -578,6 +669,33 @@ export default function AdApplicationsPage(): React.ReactElement {
                 </TableBody>
               </Table>
             )}
+
+            {/* 마우스 좌표에 붙는 0x0 앵커 — 카드가 커서 옆에 뜨게 한다 */}
+            <HoverCard open={preview.hovered !== null}>
+              {/* Trigger가 곧 앵커 — 열림 여부는 훅이 제어하므로 자체 hover 동작은 쓰지 않는다 */}
+              <HoverCardTrigger asChild>
+                <span
+                  ref={preview.anchorRef}
+                  aria-hidden
+                  className="pointer-events-none fixed h-0 w-0"
+                />
+              </HoverCardTrigger>
+              <HoverCardContent
+                className="w-[380px]"
+                side="right"
+                align="start"
+                sideOffset={16}
+                onMouseEnter={preview.handleCardEnter}
+                onMouseLeave={preview.handleCardLeave}
+              >
+                {preview.hovered && (
+                  <AdHoverPreview
+                    ad={preview.hovered}
+                    pricePerHousehold={pricePerHousehold}
+                  />
+                )}
+              </HoverCardContent>
+            </HoverCard>
           </DataTableShell>
 
           {/* 결과 개수 안내 */}
