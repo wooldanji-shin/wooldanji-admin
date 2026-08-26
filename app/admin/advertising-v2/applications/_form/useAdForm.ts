@@ -68,6 +68,8 @@ export interface AdFormState {
   bizCallNumber: string;
   grantAnalytics: boolean;
   salesRepId: string | null;
+  /** 카드 등록 없이 바로 광고를 시작한다 (할인율 100%일 때만) */
+  startImmediately: boolean;
 }
 
 const EMPTY_FORM: AdFormState = {
@@ -92,6 +94,7 @@ const EMPTY_FORM: AdFormState = {
   bizCallNumber: '',
   grantAnalytics: false,
   salesRepId: null,
+  startImmediately: false,
 };
 
 /**
@@ -190,6 +193,8 @@ export function useAdForm(adId?: string) {
         bizCallNumber: partner?.bizCallNumber ?? '',
         grantAnalytics: partner?.analyticsEnabled ?? false,
         salesRepId: ad.salesRepId ?? null,
+        // 즉시 개시는 등록 시점에만 쓰는 옵션이라 수정 모드에서는 다시 묻지 않는다
+        startImmediately: false,
       });
     };
 
@@ -497,7 +502,11 @@ export function useAdForm(adId?: string) {
       }
 
       toast.success(
-        adId ? '광고를 수정했습니다.' : '광고를 등록했습니다. 파트너 결제만 남았습니다.'
+        adId
+          ? '광고를 수정했습니다.'
+          : result.startImmediately
+            ? '광고를 등록하고 바로 시작했습니다.'
+            : '광고를 등록했습니다. 파트너 결제만 남았습니다.'
       );
       router.push(
         `/admin/advertising-v2/applications/${adId ?? result.advertisementId}`
