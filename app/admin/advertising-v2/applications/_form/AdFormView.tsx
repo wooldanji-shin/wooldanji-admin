@@ -377,8 +377,9 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
                   />
                 </div>
               )}
-              {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다 */}
-              {!isEdit && benefitsApplied && form.discountRate === 100 && (
+              {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다.
+                  contentOnly(=광고중)는 이미 개시된 상태라 대상이 아니다 */}
+              {!contentOnly && benefitsApplied && form.discountRate === 100 && (
                 <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
                   <Checkbox
                     className="mt-0.5"
@@ -391,7 +392,7 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
                     </span>
                     <span className="block text-xs text-muted-foreground">
                       파트너 결제를 건너뛰고 즉시 노출됩니다. 정기결제는 돌지 않으며
-                      파트너 앱에는 &lsquo;무료체험중&rsquo;으로 표시됩니다.
+                      파트너 앱에는 &lsquo;광고중&rsquo;으로 표시됩니다.
                     </span>
                   </span>
                 </label>

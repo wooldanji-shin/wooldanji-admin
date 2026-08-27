@@ -9,6 +9,11 @@ import {
 import { ctaButtonsError, ctaUrlOfType, type CtaButton } from '@/lib/cta-button';
 import { MAX_AD_IMAGES } from '@/lib/ads/constants';
 import { BIZ_CALL_DUPLICATE_MESSAGE, findBizCallDuplicate } from '@/lib/biz-call';
+import {
+  canStartWithoutCard,
+  insertCardlessSubscription,
+  startedAdColumns,
+} from '@/lib/ads/start-without-card';
 
 interface UpdateBody {
   categoryId: string;
@@ -31,6 +36,7 @@ interface UpdateBody {
   bizCallNumber?: string;
   grantAnalytics?: boolean;
   salesRepId?: string | null;
+  startImmediately?: boolean;
 }
 
 function trimmedOrNull(value: string | undefined): string | null {
@@ -93,7 +99,8 @@ async function replaceSubCategories(
 async function updatePartner(
   admin: ReturnType<typeof createAdminClient>,
   partnerId: string,
-  body: UpdateBody
+  body: UpdateBody,
+  startedWithoutCard: boolean
 ): Promise<void> {
   const partnerUpdate: Record<string, unknown> = {};
   if (body.bizCallNumber !== undefined) {
@@ -101,6 +108,10 @@ async function updatePartner(
   }
   if (body.grantAnalytics !== undefined) {
     partnerUpdate.analyticsEnabled = body.grantAnalytics === true;
+  }
+  // 운영까지 간 광고가 생겼다는 표식 — 남기지 않으면 다음 광고에도 첫 광고 혜택이 또 붙는다
+  if (startedWithoutCard) {
+    partnerUpdate.hasHadRunningAd = true;
   }
   if (Object.keys(partnerUpdate).length === 0) return;
 
@@ -252,7 +263,8 @@ export async function POST(
         return NextResponse.json({ error: subCategoryError }, { status: 500 });
       }
 
-      await updatePartner(admin, existing.partnerId, body);
+      // 광고중 광고는 이미 개시된 상태라 첫 광고 표식을 새로 남길 일이 없다
+      await updatePartner(admin, existing.partnerId, body, false);
 
       return NextResponse.json({ success: true, advertisementId: id });
     }
@@ -291,6 +303,10 @@ export async function POST(
       pricePerHousehold,
       discountRate
     );
+
+    // 결제 전 광고만 카드 없이 개시할 수 있다 — running은 이미 개시된 상태다
+    const startImmediately =
+      isBeforePayment && canStartWithoutCard(body.startImmediately, discountRate);
 
     const { error: updateError } = await admin
       .from('advertisements_v2')
@@ -339,13 +355,69 @@ export async function POST(
       return NextResponse.json({ error: subCategoryError }, { status: 500 });
     }
 
-    await updatePartner(admin, existing.partnerId, body);
+    // 카드 없이 개시 — 파트너 결제를 기다리지 않고 바로 노출을 시작한다.
+    // 구독을 먼저 만든다: 실패해도 광고는 결제 전 상태 그대로 남아 다시 시도할 수 있다.
+    if (startImmediately) {
+      const startedAt = new Date().toISOString();
+
+      const subscriptionError = await insertCardlessSubscription(admin, {
+        advertisementId: id,
+        originalMonthlyAmount: calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0),
+        discountRate,
+        monthlyAmount: approvedMonthlyAmount,
+        startedAt,
+      });
+
+      if (subscriptionError) {
+        return NextResponse.json({ error: subscriptionError }, { status: 500 });
+      }
+
+      const { error: startError } = await admin
+        .from('advertisements_v2')
+        .update(startedAdColumns(startedAt))
+        .eq('id', id);
+
+      // running으로 못 넘겼는데 구독만 남으면 파트너가 결제 시 구독이 두 개가 된다
+      if (startError) {
+        console.error('Failed to start advertisement:', startError);
+        await admin.from('ad_subscriptions_v2').delete().eq('advertisementId', id);
+        return NextResponse.json({ error: 'Failed to start advertisement' }, { status: 500 });
+      }
+    }
+
+    await updatePartner(admin, existing.partnerId, body, startImmediately);
+
+    // 광고 시작 알림 (non-critical: 실패해도 개시는 유지)
+    if (startImmediately) {
+      try {
+        await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-partner-fcm-notification`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({
+              partnerUserId: existing.partnerId,
+              title: '광고 시작 안내',
+              body: '광고가 시작되었습니다. 앱에서 확인해보세요.',
+              type: 'ad_approved',
+              navigationData: { type: 'ad_detail', params: { advertisementId: id } },
+            }),
+          }
+        );
+      } catch (notificationError) {
+        console.error('광고 시작 알림 전송 실패 (non-critical):', notificationError);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       advertisementId: id,
       approvedMonthlyAmount,
       totalHouseholds,
+      startImmediately,
     });
   } catch (error) {
     console.error('Server error:', error);

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { setAutoApproveModification } from '@/lib/ads/auto-approve';
+import { calcMonthlyAmount } from '@/lib/ads/pricing';
+import { exportToCsv } from '@/lib/utils/csv';
 import type { ApartmentOption } from '@/components/apartment-combobox';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
@@ -14,7 +16,7 @@ import { toast } from 'sonner';
 export type AdStatus = 'pending' | 'approved' | 'rejected' | 'running' | 'ended' | 'draft';
 export type ModificationStatus = 'pending' | 'approved' | 'rejected' | null;
 export type PaymentStatus = 'unpaid' | 'paid';
-export type StatusFilter = 'all' | 'free_running' | 'paid_running' | 'pending' | 'modification' | 'ended' | 'rejected';
+export type StatusFilter = 'all' | 'free_running' | 'paid_running' | 'unpaid' | 'pending' | 'modification' | 'ended' | 'rejected' | 'hidden';
 /** 비즈콜(안심번호) 부여 여부 필터 */
 export type BizCallFilter = 'all' | 'used' | 'unused';
 
@@ -49,6 +51,8 @@ export interface AdApplication {
   paymentStatus: PaymentStatus;
   modificationStatus: ModificationStatus;
   autoApproveModification: boolean;
+  /** 숨김 처리한 광고 — 테스트·더미 분리용. 관리자 목록에는 그대로 남고 사용자 앱 노출에서만 빠진다 */
+  isHidden: boolean;
   submittedAt: string | null;
   activatedAt: string | null;
   freeMonths: number;
@@ -88,6 +92,39 @@ function hasBizCall(ad: AdApplication): boolean {
   return (ad.partner_users?.bizCallNumber ?? '').trim() !== '';
 }
 
+/** 승인은 났지만 아직 첫 결제가 이뤄지지 않은 광고 */
+function isUnpaidApproved(ad: AdApplication): boolean {
+  return ad.adStatus === 'approved' && ad.paymentStatus === 'unpaid';
+}
+
+/**
+ * 목록에 표시되는 월 광고료.
+ * approvedMonthlyAmount가 있으면 그것이 확정 금액이고, 없으면 세대수 × 단가에 할인율을 적용한다.
+ */
+function monthlyAmountOf(ad: AdApplication, pricePerHousehold: number): number {
+  if (ad.approvedMonthlyAmount !== null) return ad.approvedMonthlyAmount;
+  const totalHouseholds = ad.apartments.reduce((sum, a) => sum + a.totalHouseholds, 0);
+  return calcMonthlyAmount(totalHouseholds, pricePerHousehold, ad.approvedDiscountRate ?? 0);
+}
+
+const AD_STATUS_LABEL: Record<AdStatus, string> = {
+  pending: '승인대기',
+  approved: '승인됨',
+  rejected: '거절됨',
+  running: '진행중',
+  ended: '종료',
+  draft: '임시저장',
+};
+
+const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
+  paid: '결제완료',
+  unpaid: '미결제',
+};
+
+function toDateText(value: string | null): string {
+  return value ? new Date(value).toLocaleDateString('ko-KR') : '-';
+}
+
 export interface UseApplicationsPageReturn {
   applications: AdApplication[];
   loading: boolean;
@@ -117,6 +154,10 @@ export interface UseApplicationsPageReturn {
   setPage: (page: number) => void;
   totalPages: number;
   filteredCount: number;
+  /** 현재 필터 결과의 월 광고료 합계 */
+  totalMonthlyAmount: number;
+  handleExportCsv: () => void;
+  handleToggleHidden: (ad: AdApplication, next: boolean) => Promise<void>;
   handleRowClick: (id: string) => void;
   // 목록 인라인 승인/거절
   selectedAd: AdApplication | null;
@@ -301,6 +342,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           paymentStatus,
           modificationStatus,
           autoApproveModification,
+          isHidden,
           submittedAt,
           activatedAt,
           freeMonths,
@@ -377,6 +419,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         paymentStatus: row.paymentStatus,
         modificationStatus: row.modificationStatus ?? null,
         autoApproveModification: row.autoApproveModification ?? false,
+        isHidden: row.isHidden ?? false,
         submittedAt: row.submittedAt,
         activatedAt: row.activatedAt ?? null,
         freeMonths: row.freeMonths,
@@ -414,10 +457,9 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     fetchApplications();
   }, [fetchApplications]);
 
-  // 아파트 필터 적용 후 목록 (상태별 개수도 이 기준으로 계산)
-  // 아파트·영업담당자 필터는 상태 카운트에도 반영돼야 하므로 여기서 함께 적용한다
-  const apartmentFilteredApplications = useMemo(() => {
-    let result = applications;
+  // 아파트·영업담당자 필터는 상태 카운트에도 반영돼야 하므로 상태 필터보다 먼저 적용한다
+  const applyScopeFilters = useCallback((list: AdApplication[]): AdApplication[] => {
+    let result = list;
 
     if (apartmentFilter) {
       result = result.filter((a) =>
@@ -432,30 +474,45 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     }
 
     return result;
-  }, [applications, apartmentFilter, salesRepFilter]);
+  }, [apartmentFilter, salesRepFilter]);
+
+  const apartmentFilteredApplications = useMemo(
+    () => applyScopeFilters(applications),
+    [applications, applyScopeFilters]
+  );
+
+  // 숨긴 광고도 다른 탭에 그대로 남는다. '숨김' 탭은 그중 숨긴 것만 모아 보는 용도다
+  const hiddenApplications = useMemo(
+    () => apartmentFilteredApplications.filter((a) => a.isHidden),
+    [apartmentFilteredApplications]
+  );
 
   // 상태 필터 적용 후 목록
   const statusFiltered = useMemo(() => {
+    if (statusFilter === 'hidden') return hiddenApplications;
     if (statusFilter === 'all') return apartmentFilteredApplications;
     if (statusFilter === 'free_running') return apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0);
     if (statusFilter === 'paid_running') return apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0);
+    if (statusFilter === 'unpaid') return apartmentFilteredApplications.filter(isUnpaidApproved);
     if (statusFilter === 'pending') return apartmentFilteredApplications.filter((a) => a.adStatus === 'pending');
     if (statusFilter === 'modification') return apartmentFilteredApplications.filter((a) => a.modificationStatus === 'pending');
     if (statusFilter === 'ended') return apartmentFilteredApplications.filter((a) => a.adStatus === 'ended');
     if (statusFilter === 'rejected') return apartmentFilteredApplications.filter((a) => a.adStatus === 'rejected');
     return apartmentFilteredApplications;
-  }, [apartmentFilteredApplications, statusFilter]);
+  }, [apartmentFilteredApplications, hiddenApplications, statusFilter]);
 
   // 상태별 개수 (아파트 필터 적용 기준)
   const statusCounts = useMemo<Record<StatusFilter, number>>(() => ({
     all: apartmentFilteredApplications.length,
     free_running: apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0).length,
     paid_running: apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0).length,
+    unpaid: apartmentFilteredApplications.filter(isUnpaidApproved).length,
     pending: apartmentFilteredApplications.filter((a) => a.adStatus === 'pending').length,
     modification: apartmentFilteredApplications.filter((a) => a.modificationStatus === 'pending').length,
     ended: apartmentFilteredApplications.filter((a) => a.adStatus === 'ended').length,
     rejected: apartmentFilteredApplications.filter((a) => a.adStatus === 'rejected').length,
-  }), [apartmentFilteredApplications]);
+    hidden: hiddenApplications.length,
+  }), [apartmentFilteredApplications, hiddenApplications]);
 
   // 카테고리별 개수 (상태 필터 후 기준)
   const categoryCounts = useMemo<Record<string, number>>(() => {
@@ -509,6 +566,41 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     return result;
   }, [statusFiltered, categoryFilter, subCategoryFilter, bizCallFilter, debouncedSearchTerm, categories]);
 
+
+  // 필터를 바꾸면 같이 바뀌는 월 광고료 합계
+  const totalMonthlyAmount = useMemo(
+    () => filtered.reduce((sum, a) => sum + monthlyAmountOf(a, pricePerHousehold), 0),
+    [filtered, pricePerHousehold]
+  );
+
+  const handleExportCsv = useCallback(() => {
+    if (filtered.length === 0) {
+      toast.error('내보낼 광고가 없습니다.');
+      return;
+    }
+
+    exportToCsv(`기본광고_${new Date().toLocaleDateString('sv-SE')}.csv`, filtered, [
+      { header: '상호명', accessor: (a) => a.partner_users?.businessName ?? '-' },
+      { header: '광고 제목', accessor: (a) => a.title ?? '-' },
+      { header: '카테고리', accessor: (a) => a.ad_categories_v2?.categoryName ?? '-' },
+      { header: '첫광고', accessor: (a) => (a.isFirstAdApplication ? 'Y' : 'N') },
+      { header: '광고 상태', accessor: (a) => AD_STATUS_LABEL[a.adStatus] ?? a.adStatus },
+      { header: '결제 상태', accessor: (a) => PAYMENT_STATUS_LABEL[a.paymentStatus] ?? a.paymentStatus },
+      { header: '아파트 수', accessor: (a) => a.apartments.length },
+      { header: '총 세대수', accessor: (a) => a.apartments.reduce((s, apt) => s + apt.totalHouseholds, 0) },
+      { header: '월 금액', accessor: (a) => monthlyAmountOf(a, pricePerHousehold) },
+      { header: '할인율(%)', accessor: (a) => a.approvedDiscountRate ?? 0 },
+      { header: '무료 개월', accessor: (a) => a.freeMonths },
+      { header: '광고 시작일', accessor: (a) => toDateText(a.activatedAt) },
+      { header: '광고 종료일', accessor: (a) => toDateText(a.nextBillingDate) },
+      { header: '무료체험 종료일', accessor: (a) => toDateText(a.freeEndDate) },
+      { header: '영업 담당자', accessor: (a) => a.salesRepName ?? '-' },
+      { header: '비즈콜 번호', accessor: (a) => a.partner_users?.bizCallNumber ?? '-' },
+      { header: '노출수', accessor: (a) => a.totalImpressions },
+      { header: '클릭수', accessor: (a) => a.totalClicks },
+      { header: '전화클릭수', accessor: (a) => a.totalPhoneClicks },
+    ]);
+  }, [filtered, pricePerHousehold]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
@@ -593,6 +685,24 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     );
   }, [supabase]);
 
+  const handleToggleHidden = useCallback(async (ad: AdApplication, next: boolean) => {
+    const { error } = await (supabase as any)
+      .from('advertisements_v2')
+      .update({ isHidden: next })
+      .eq('id', ad.id);
+
+    if (error) {
+      console.error('광고 숨김 설정 변경 실패:', error);
+      toast.error('숨김 설정 변경에 실패했습니다.');
+      return;
+    }
+
+    setApplications((prev) =>
+      prev.map((a) => (a.id === ad.id ? { ...a, isHidden: next } : a))
+    );
+    toast.success(next ? '앱 노출에서 숨겼습니다.' : '숨김을 해제했습니다.');
+  }, [supabase]);
+
   const handleOpenReject = useCallback((ad: AdApplication) => {
     setSelectedAd(ad);
     setRejectReason('');
@@ -659,6 +769,9 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     setPage,
     totalPages,
     filteredCount: filtered.length,
+    totalMonthlyAmount,
+    handleExportCsv,
+    handleToggleHidden,
     handleRowClick,
     selectedAd,
     approveDialog,

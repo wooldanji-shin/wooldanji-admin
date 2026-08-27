@@ -10,6 +10,11 @@ import {
 import { ctaButtonsError, ctaUrlOfType, type CtaButton } from '@/lib/cta-button';
 import { MAX_AD_IMAGES } from '@/lib/ads/constants';
 import { BIZ_CALL_DUPLICATE_MESSAGE, findBizCallDuplicate } from '@/lib/biz-call';
+import {
+  canStartWithoutCard,
+  insertCardlessSubscription,
+  startedAdColumns,
+} from '@/lib/ads/start-without-card';
 
 interface CreateBody {
   partnerId: string;
@@ -35,20 +40,6 @@ interface CreateBody {
   salesRepId?: string | null;
   startImmediately?: boolean;
 }
-
-/**
- * 카드 없이 개시한 광고의 다음 결제일 · 무료기간 종료일.
- *
- * inicis-charge-billing은 nextBillingDate가 오늘 이하인 구독만 청구 대상으로 잡는데,
- * 빌링키 유효성 검사가 0원 스킵 분기보다 먼저 돈다. 즉 100% 할인만으로는 배치를 못 비껴가고
- * 카드가 없다는 이유로 광고가 종료된다 — 청구를 막는 장치는 이 날짜 하나뿐이므로 덮어쓰지 않는다.
- *
- * freeEndDate도 같은 값을 쓴다. cancel-subscription이 freeEndDate를 미래로 보면
- * 무료체험 분기를 타 즉시 종료되므로, 파트너가 광고를 중단해도 2099년까지 남지 않는다.
- */
-const NEVER_BILLING_DATE = '2099-01-01T00:00:00.000Z';
-
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 function trimmedOrNull(value: string | undefined): string | null {
   const trimmed = value?.trim();
@@ -179,9 +170,7 @@ export async function POST(request: NextRequest) {
       discountRate
     );
 
-    // 카드 없이 개시하는 건 받을 돈이 0원일 때만 허용한다.
-    // 클라이언트 값은 그대로 믿지 않고 서버가 확정한 할인율로 다시 판정한다.
-    const startImmediately = body.startImmediately === true && discountRate === 100;
+    const startImmediately = canStartWithoutCard(body.startImmediately, discountRate);
 
     const now = new Date().toISOString();
 
@@ -203,9 +192,9 @@ export async function POST(request: NextRequest) {
         baeminUrl: ctaUrlOfType(ctaButtons, 'baemin'),
         coupangEatsUrl: ctaUrlOfType(ctaButtons, 'coupangEats'),
         ctaButtons: ctaButtons.length > 0 ? ctaButtons : null,
-        adStatus: startImmediately ? 'running' : 'approved',
-        paymentStatus: startImmediately ? 'paid' : 'unpaid',
-        activatedAt: startImmediately ? now : null,
+        ...(startImmediately
+          ? startedAdColumns(now)
+          : { adStatus: 'approved', paymentStatus: 'unpaid', activatedAt: null }),
         isFirstAdApplication: isFirstAd,
         freeMonths,
         approvedDiscountRate: discountRate,
@@ -260,30 +249,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 카드 없이 개시 — 파트너 결제를 기다리지 않고 바로 노출을 시작한다.
-    // 주민 앱 노출 조건은 adStatus === 'running' 하나뿐이라 구독만 무료체험 형태로 만들어 두면 된다.
+    // 주민 앱 노출 조건은 adStatus === 'running' 하나뿐이라 구독만 만들어 두면 된다.
     if (startImmediately) {
-      const kstToday = new Date(Date.now() + KST_OFFSET_MS);
-
-      const { error: subscriptionError } = await admin
-        .from('ad_subscriptions_v2')
-        .insert({
-          advertisementId,
-          billingKeyId: null,
-          subscriptionStatus: 'active',
-          originalMonthlyAmount: calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0),
-          discountRate,
-          monthlyAmount: approvedMonthlyAmount,
-          periodStartDate: now,
-          freeEndDate: NEVER_BILLING_DATE,
-          nextBillingDate: NEVER_BILLING_DATE,
-          billingAnchorDay: kstToday.getUTCDate(),
-        });
+      const subscriptionError = await insertCardlessSubscription(admin, {
+        advertisementId,
+        originalMonthlyAmount: calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0),
+        discountRate,
+        monthlyAmount: approvedMonthlyAmount,
+        startedAt: now,
+      });
 
       // 구독이 없으면 running인데 앱에서 중단도 못 하는 광고가 남으므로 광고째로 되돌린다
       if (subscriptionError) {
-        console.error('Failed to create subscription:', subscriptionError);
         await admin.from('advertisements_v2').delete().eq('id', advertisementId);
-        return NextResponse.json({ error: 'Failed to start advertisement' }, { status: 500 });
+        return NextResponse.json({ error: subscriptionError }, { status: 500 });
       }
     }
 

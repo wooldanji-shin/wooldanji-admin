@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertCircle, Check, Inbox, Plus, Search, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Inbox, Plus, Search, X } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
@@ -181,10 +181,12 @@ const STATUS_TABS: { label: string; value: StatusFilter }[] = [
   { label: '전체', value: 'all' },
   { label: '무료진행', value: 'free_running' },
   { label: '유료진행', value: 'paid_running' },
+  { label: '미결제', value: 'unpaid' },
   { label: '승인대기', value: 'pending' },
   { label: '수정심사', value: 'modification' },
   { label: '종료', value: 'ended' },
   { label: '거절', value: 'rejected' },
+  { label: '숨김', value: 'hidden' },
 ];
 
 /** 행에 3초 머물면 뜨는 광고 미리보기 — 앱 노출 모습과 운영 수치를 한 번에 본다 */
@@ -307,6 +309,9 @@ export default function AdApplicationsPage(): React.ReactElement {
     setPage,
     totalPages,
     filteredCount,
+    totalMonthlyAmount,
+    handleExportCsv,
+    handleToggleHidden,
     handleRowClick,
     selectedAd,
     approveDialog,
@@ -364,12 +369,18 @@ export default function AdApplicationsPage(): React.ReactElement {
             title="기본광고 관리"
             description="광고 신청을 검토하고 승인 상태를 관리합니다."
           />
-          <Button asChild>
-            <Link href="/admin/advertising-v2/applications/new">
-              <Plus className="mr-2 h-4 w-4" />
-              광고 대리 등록
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportCsv} disabled={loading}>
+              <Download className="mr-2 h-4 w-4" />
+              CSV 내보내기
+            </Button>
+            <Button asChild>
+              <Link href="/admin/advertising-v2/applications/new">
+                <Plus className="mr-2 h-4 w-4" />
+                광고 대리 등록
+              </Link>
+            </Button>
+          </div>
         </PageHeader>
 
         <PageContent>
@@ -394,7 +405,7 @@ export default function AdApplicationsPage(): React.ReactElement {
           </div>
 
           {/* 상태 탭 — 개수 배지 포함 */}
-          <div className="inline-flex w-full max-w-4xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
+          <div className="inline-flex w-full max-w-5xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
             {STATUS_TABS.map((tab) => {
               const isActive = statusFilter === tab.value;
               const count = statusCounts[tab.value];
@@ -500,6 +511,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                     <TableHead className="text-center">클릭수</TableHead>
                     <TableHead className="text-center">전화클릭수</TableHead>
                     <TableHead className="text-center">자동승인</TableHead>
+                    <TableHead className="text-center">숨김</TableHead>
                     <TableHead className="text-center">액션</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -639,6 +651,16 @@ export default function AdApplicationsPage(): React.ReactElement {
                         className="text-center"
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <Checkbox
+                          checked={app.isHidden}
+                          aria-label="앱 노출에서 숨기기"
+                          onCheckedChange={(v) => handleToggleHidden(app, v === true)}
+                        />
+                      </TableCell>
+                      <TableCell
+                        className="text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center justify-center gap-1">
                           {app.adStatus === 'pending' && (
                             <Button
@@ -698,11 +720,19 @@ export default function AdApplicationsPage(): React.ReactElement {
             </HoverCard>
           </DataTableShell>
 
-          {/* 결과 개수 안내 */}
+          {/* 현재 필터 기준 합계 · 결과 개수 안내 */}
           {!loading && filteredCount > 0 && (
-            <p className="text-right text-xs text-muted-foreground">
-              총 {filteredCount.toLocaleString()}건 · {page}/{totalPages} 페이지
-            </p>
+            <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
+              <span>
+                월 광고료 합계{' '}
+                <strong className="text-sm tabular-nums text-foreground">
+                  {totalMonthlyAmount.toLocaleString()}원
+                </strong>
+              </span>
+              <span>
+                총 {filteredCount.toLocaleString()}건 · {page}/{totalPages} 페이지
+              </span>
+            </div>
           )}
         </PageContent>
       </PageShell>
