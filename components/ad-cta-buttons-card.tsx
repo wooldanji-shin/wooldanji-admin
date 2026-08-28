@@ -15,9 +15,10 @@ import {
   type CtaButtonType,
 } from '@/lib/cta-button';
 
-const DELIVERY_PLACEHOLDER: Record<string, string> = {
+const PRESET_PLACEHOLDER: Record<string, string> = {
   baemin: 'https://baemin.me/...',
   coupangEats: 'https://www.coupangeats.com/...',
+  naver: 'https://naver.me/...',
 };
 
 interface CtaButtonsCardProps {
@@ -41,9 +42,13 @@ export function CtaButtonsCard({
   const presetTypes: CtaButtonType[] = [
     'phone',
     'sms',
+    'naver',
     ...(deliveryAvailable ? (['baemin', 'coupangEats'] as CtaButtonType[]) : []),
   ];
-  const deliveryButtons = buttons.filter(isDeliveryButton);
+  // 링크 입력이 필요한 프리셋 버튼 (배달앱 + 네이버)
+  const linkButtons = buttons.filter(
+    (b) => isDeliveryButton(b) || b.type === 'naver'
+  );
   const customButtons = buttons.filter((b) => b.type === 'custom');
   const isFull = buttons.length >= MAX_CTA_BUTTONS;
 
@@ -99,14 +104,14 @@ export function CtaButtonsCard({
           </p>
         )}
 
-        {deliveryButtons.map((button) => (
+        {linkButtons.map((button) => (
           <div key={button.id} className="space-y-1.5">
             <label className="text-sm font-medium">
               {ctaButtonLabel(button)} 링크 <span className="text-destructive">*</span>
             </label>
             <Input
               value={button.url ?? ''}
-              placeholder={DELIVERY_PLACEHOLDER[button.type]}
+              placeholder={PRESET_PLACEHOLDER[button.type]}
               onChange={(e) => onUpdate(button.id, { url: e.target.value.trim() })}
             />
           </div>

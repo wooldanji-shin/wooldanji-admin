@@ -6,6 +6,7 @@ export type CtaButtonType =
   | 'sms'
   | 'baemin'
   | 'coupangEats'
+  | 'naver'
   | 'custom';
 
 export interface CtaButton {
@@ -18,11 +19,23 @@ export interface CtaButton {
   url?: string | null;
 }
 
+/**
+ * 네이버 버튼 라벨
+ *
+ * 표시용이자 구버전 앱 폴백용이다 — naver 타입을 모르는 구버전 앱은 이 버튼을
+ * custom으로 흡수하는데, 그때 label이 비어 있으면 글자 없는 버튼이 노출된다.
+ */
+export const NAVER_LABEL = '네이버';
+
+/** 네이버 버튼 클릭 집계 키 — extraClickCounts에 이 키로 누적된다 */
+export const NAVER_CLICK_KEY = 'naver';
+
 const PRESET_LABELS: Record<Exclude<CtaButtonType, 'custom'>, string> = {
   phone: '전화문의',
   sms: '문자문의',
   baemin: '배민',
   coupangEats: '쿠팡이츠',
+  naver: NAVER_LABEL,
 };
 
 /** 광고 상세 하단에 노출할 수 있는 버튼 최대 개수 (사용자 앱 kMaxCtaButtons와 동일) */
@@ -62,6 +75,15 @@ export function needsUrl(button: CtaButton): boolean {
 
 export function isDeliveryButton(button: CtaButton): boolean {
   return button.type === 'baemin' || button.type === 'coupangEats';
+}
+
+/** 프리셋 버튼 생성 — 네이버는 구버전 앱 폴백용 라벨을 함께 저장한다 */
+export function createCtaButton(type: CtaButtonType): CtaButton {
+  return {
+    id: newCtaButtonId(),
+    type,
+    ...(type === 'naver' ? { label: NAVER_LABEL } : {}),
+  };
 }
 
 /** 저장 가능한 상태인지 검사 — 문제가 있으면 보여줄 메시지, 없으면 null */

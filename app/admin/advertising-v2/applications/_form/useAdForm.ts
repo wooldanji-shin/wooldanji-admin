@@ -12,6 +12,7 @@ import { deleteFilesFromStorage } from '@/lib/utils/storage';
 import { adImageKey, type AdImageItem } from '@/components/ad-image-picker';
 import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
 import {
+  createCtaButton,
   MAX_CTA_BUTTONS,
   ctaButtonsError,
   isDeliveryButton,
@@ -328,7 +329,7 @@ export function useAdForm(adId?: string) {
       if (prev.ctaButtons.length >= MAX_CTA_BUTTONS) return prev;
       return {
         ...prev,
-        ctaButtons: [...prev.ctaButtons, { id: newCtaButtonId(), type }],
+        ctaButtons: [...prev.ctaButtons, createCtaButton(type)],
       };
     });
   }, []);

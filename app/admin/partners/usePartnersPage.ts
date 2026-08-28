@@ -12,6 +12,7 @@ export interface PartnerUser {
   representativeName: string;
   displayPhoneNumber: string | null;
   phoneNumber: string | null;
+  bizCallNumber: string | null;
   businessAddress: string | null;
   businessDetailAddress: string | null;
   businessRegistrationNumber: string | null;
@@ -156,7 +157,7 @@ export function usePartnersPage(): UsePartnersPageReturn {
       let query = supabase
         .from('partner_users')
         .select(
-          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, directionsInfo, hasHadRunningAd, marketingAgreed, analyticsEnabled, createdAt',
+          'id, userId, businessName, representativeName, displayPhoneNumber, phoneNumber, bizCallNumber, businessAddress, businessDetailAddress, businessRegistrationNumber, businessRegistrationImageUrl, businessHoursNote, parkingInfo, directionsInfo, hasHadRunningAd, marketingAgreed, analyticsEnabled, createdAt',
           { count: 'exact' }
         );
 
@@ -230,6 +231,7 @@ export function usePartnersPage(): UsePartnersPageReturn {
         representativeName: row.representativeName,
         displayPhoneNumber: row.displayPhoneNumber,
         phoneNumber: row.phoneNumber,
+        bizCallNumber: row.bizCallNumber,
         businessAddress: row.businessAddress,
         businessDetailAddress: row.businessDetailAddress,
         businessRegistrationNumber: row.businessRegistrationNumber,

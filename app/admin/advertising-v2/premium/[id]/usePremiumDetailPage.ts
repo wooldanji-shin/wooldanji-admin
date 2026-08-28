@@ -81,6 +81,8 @@ export interface PremiumAdDetail {
     analyticsEnabled: boolean;
     representativeName: string | null;
     displayPhoneNumber: string | null;
+    /** 관리자가 부여한 비즈콜(안심) 번호. 있으면 앱에서 displayPhoneNumber 대신 노출 */
+    bizCallNumber: string | null;
     phoneNumber: string | null;
     businessAddress: string | null;
     businessDetailAddress: string | null;
@@ -270,7 +272,7 @@ export function usePremiumDetailPage(
       const { data: partnerData } = await supabase
         .from('partner_users')
         .select(
-          'id, "businessName", "analyticsEnabled", "representativeName", "displayPhoneNumber", "phoneNumber", "businessAddress", "businessDetailAddress", "parkingInfo", "directionsInfo", "businessHoursNote", "businessRegistrationNumber", "createdAt"'
+          'id, "businessName", "analyticsEnabled", "representativeName", "displayPhoneNumber", "bizCallNumber", "phoneNumber", "businessAddress", "businessDetailAddress", "parkingInfo", "directionsInfo", "businessHoursNote", "businessRegistrationNumber", "createdAt"'
         )
         .eq('userId', row.partnerId)
         .maybeSingle();
@@ -337,6 +339,7 @@ export function usePremiumDetailPage(
               analyticsEnabled: (partnerData as any).analyticsEnabled ?? false,
               representativeName: (partnerData as any).representativeName ?? null,
               displayPhoneNumber: (partnerData as any).displayPhoneNumber ?? null,
+              bizCallNumber: (partnerData as any).bizCallNumber ?? null,
               phoneNumber: (partnerData as any).phoneNumber ?? null,
               businessAddress: (partnerData as any).businessAddress ?? null,
               businessDetailAddress: (partnerData as any).businessDetailAddress ?? null,

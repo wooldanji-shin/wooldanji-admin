@@ -103,7 +103,7 @@ function PartnersContent(): React.ReactElement {
 
         <DataTableShell>
           {page.loading ? (
-            <TableSkeleton rows={8} columns={9} />
+            <TableSkeleton rows={8} columns={10} />
           ) : page.partners.length === 0 ? (
             <EmptyState
               icon={Users}
@@ -119,6 +119,7 @@ function PartnersContent(): React.ReactElement {
                   <TableHead>카테고리</TableHead>
                   <TableHead>주소</TableHead>
                   <TableHead>연락처</TableHead>
+                  <TableHead>비즈콜</TableHead>
                   <TableHead>노출수/클릭수</TableHead>
                   <TableHead>광고 이력</TableHead>
                   <TableHead>분석 권한</TableHead>
@@ -152,6 +153,9 @@ function PartnersContent(): React.ReactElement {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {partner.phoneNumber ?? '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {partner.bizCallNumber ?? '-'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {partner.totalImpressionCount.toLocaleString()} / {partner.totalClickCount.toLocaleString()}

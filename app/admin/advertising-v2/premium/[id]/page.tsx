@@ -43,7 +43,7 @@ import {
 } from '@/components/status-badge';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { usePremiumDetailPage } from './usePremiumDetailPage';
-import { ctaButtonLabel, ctaButtonsSummary, customCtaButtons, parseCtaButtons } from '@/lib/cta-button';
+import { NAVER_CLICK_KEY, ctaButtonLabel, ctaButtonsSummary, customCtaButtons, parseCtaButtons } from '@/lib/cta-button';
 
 const FIELD_LABELS: Record<string, string> = {
   title: '제목',
@@ -479,6 +479,14 @@ export default function PremiumAdDetailPage({
                     { label: '배민 클릭', basic: basic?.baeminClickCount ?? 0, premium: premium?.baeminClickCount ?? 0 },
                     { label: '쿠팡이츠 클릭', basic: basic?.coupangEatsClickCount ?? 0, premium: premium?.coupangEatsClickCount ?? 0 },
                   ] : []),
+                  // 네이버는 전용 집계 컬럼 없이 extraClickCounts에 고정 키로 쌓인다
+                  ...(detail.ctaButtons?.some((b) => b.type === 'naver') ? [
+                    {
+                      label: '네이버 클릭',
+                      basic: basic?.extraClickCounts?.[NAVER_CLICK_KEY] ?? 0,
+                      premium: premium?.extraClickCounts?.[NAVER_CLICK_KEY] ?? 0,
+                    },
+                  ] : []),
                   // 파트너가 직접 추가한 버튼 — 라벨을 그대로 항목명으로 사용
                   ...customCtaButtons(detail.ctaButtons).map((b) => ({
                     label: `${ctaButtonLabel(b)} 클릭`,
@@ -536,6 +544,7 @@ export default function PremiumAdDetailPage({
                 <InfoRow label='광고표시용 전화'>
                   {detail.partner?.displayPhoneNumber ?? '-'}
                 </InfoRow>
+                <InfoRow label='비즈콜 번호'>{detail.partner?.bizCallNumber ?? '-'}</InfoRow>
                 <InfoRow label='연락처'>{detail.partner?.phoneNumber ?? '-'}</InfoRow>
                 <InfoRow label='사업자등록번호'>
                   {detail.partner?.businessRegistrationNumber ?? '-'}

@@ -17,6 +17,7 @@ import {
 import { uploadImageFile } from '@/lib/utils/upload-image';
 import { adImageKey, type AdImageItem } from '@/components/ad-image-picker';
 import {
+  createCtaButton,
   MAX_CTA_BUTTONS,
   ctaButtonsError,
   isDeliveryButton,
@@ -328,7 +329,7 @@ export function usePremiumForm(premiumId?: string) {
         return { ...prev, ctaButtons: prev.ctaButtons.filter((b) => b.type !== type) };
       }
       if (prev.ctaButtons.length >= MAX_CTA_BUTTONS) return prev;
-      return { ...prev, ctaButtons: [...prev.ctaButtons, { id: newCtaButtonId(), type }] };
+      return { ...prev, ctaButtons: [...prev.ctaButtons, createCtaButton(type)] };
     });
   }, []);
 

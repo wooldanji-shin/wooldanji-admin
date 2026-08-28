@@ -47,7 +47,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useApplicationDetailPage } from './useApplicationDetailPage';
-import { ctaButtonLabel, ctaButtonsSummary, customCtaButtons, parseCtaButtons } from '@/lib/cta-button';
+import { NAVER_CLICK_KEY, ctaButtonLabel, ctaButtonsSummary, customCtaButtons, parseCtaButtons } from '@/lib/cta-button';
 
 import { AutoApproveSwitch } from '@/components/auto-approve-switch';
 import { StatusBadge as DomainStatusBadge, type AdStatus, type ModificationStatus } from '@/components/status-badge';
@@ -507,6 +507,16 @@ export default function AdApplicationDetailPage({
                     '-'
                   )}
                 </InfoRow>
+                <InfoRow label='비즈콜 번호'>
+                  {detail.partner?.bizCallNumber ? (
+                    <span className='inline-flex items-center gap-1.5'>
+                      <Phone className='h-3.5 w-3.5 text-muted-foreground' />
+                      {detail.partner.bizCallNumber}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
+                </InfoRow>
                 <InfoRow label='연락처'>
                   {detail.partner?.phoneNumber ? (
                     <span className='inline-flex items-center gap-1.5'>
@@ -605,6 +615,10 @@ export default function AdApplicationDetailPage({
                   ...(isFoodCategory ? [
                     { label: '배민 클릭', value: a?.baeminClickCount ?? 0 },
                     { label: '쿠팡이츠 클릭', value: a?.coupangEatsClickCount ?? 0 },
+                  ] : []),
+                  // 네이버는 전용 집계 컬럼 없이 extraClickCounts에 고정 키로 쌓인다
+                  ...(detail.ctaButtons?.some((b) => b.type === 'naver') ? [
+                    { label: '네이버 클릭', value: a?.extraClickCounts?.[NAVER_CLICK_KEY] ?? 0 },
                   ] : []),
                   // 파트너가 직접 추가한 버튼 — 라벨을 그대로 항목명으로 사용
                   ...customCtaButtons(detail.ctaButtons).map((b) => ({
