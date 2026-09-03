@@ -162,13 +162,23 @@ export default function AdApplicationDetailPage({
                 </span>
                 <div className='flex flex-wrap items-center gap-2'>
                   <ModificationBadge status={detail.modificationStatus} />
-                  {detail.adStatus === 'pending' && detail.isFirstAd && (
+                  {detail.subscriptionStatus === 'cancel_pending' ? (
                     <Badge
                       variant='outline'
-                      className='border-blue-200 bg-blue-100 px-2.5 py-0.5 text-sm font-medium text-blue-800'
+                      className='border-red-200 bg-red-100 px-2.5 py-0.5 text-sm font-medium text-red-800'
                     >
-                      첫광고
+                      광고중단예정
                     </Badge>
+                  ) : (
+                    detail.adStatus === 'pending' &&
+                    detail.isFirstAd && (
+                      <Badge
+                        variant='outline'
+                        className='border-blue-200 bg-blue-100 px-2.5 py-0.5 text-sm font-medium text-blue-800'
+                      >
+                        첫광고
+                      </Badge>
+                    )
                   )}
                 </div>
               </div>
@@ -1015,24 +1025,21 @@ export default function AdApplicationDetailPage({
                 <p className='text-sm text-blue-700/70 pl-6'>승인 시 파트너가 앱에서 광고 통계를 열람할 수 있습니다.</p>
               )}
             </div>
-            {/* 예외 할인 적용 시에만 할인 사유 입력 표시 */}
-            {page.overrideEnabled && (
-              <div className='space-y-1.5'>
-                <label className='text-base font-medium'>
-                  할인 사유 <span className='text-sm font-normal text-muted-foreground'>(파트너에게 표시, 선택)</span>
-                </label>
-                <Textarea
-                  className='min-h-[80px] resize-none'
-                  placeholder='예: 신규 상권 지원 / 장기 계약 협의 완료 등'
-                  maxLength={100}
-                  value={page.discountNote}
-                  onChange={(e) => page.setDiscountNote(e.target.value)}
-                />
-                <p className='text-xs text-muted-foreground text-right'>
-                  {page.discountNote.length}/100
-                </p>
-              </div>
-            )}
+            <div className='space-y-1.5'>
+              <label className='text-base font-medium'>
+                파트너 할인관련 안내 문구 <span className='text-sm font-normal text-muted-foreground'>(파트너에게 표시, 선택)</span>
+              </label>
+              <Textarea
+                className='min-h-[80px] resize-none'
+                placeholder='예: 개업 축하 혜택으로 함께합니다 / 신규 상권 지원 등'
+                maxLength={100}
+                value={page.discountNote}
+                onChange={(e) => page.setDiscountNote(e.target.value)}
+              />
+              <p className='text-xs text-muted-foreground text-right'>
+                {page.discountNote.length}/100
+              </p>
+            </div>
             <div className='space-y-1.5'>
               <label className='text-base font-medium'>
                 비즈콜 번호 <span className='text-sm font-normal text-muted-foreground'>(안심번호, 선택)</span>

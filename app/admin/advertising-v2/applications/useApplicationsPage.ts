@@ -83,9 +83,18 @@ export interface AdApplication {
   nextBillingDate: string | null;
   /** 무료체험 종료일 */
   freeEndDate: string | null;
+  /** 구독 상태 — cancel_pending이면 파트너가 광고 중단을 신청한 상태 */
+  subscriptionStatus: string | null;
 }
 
 const PAGE_SIZE = 20;
+
+/** 목록 '구분' 컬럼 라벨 — 중단예정이 첫광고보다 우선 */
+export function adDivisionLabel(ad: AdApplication): string {
+  if (ad.subscriptionStatus === 'cancel_pending') return '중단예정';
+  if (ad.isFirstAdApplication) return '첫광고';
+  return '-';
+}
 
 /** 관리자가 비즈콜(안심번호)을 부여한 광고인지 */
 function hasBizCall(ad: AdApplication): boolean {
@@ -218,6 +227,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const [allApartments, setAllApartments] = useState<ApartmentOption[]>([]);
   const [pricePerHousehold, setPricePerHousehold] = useState(70);
   const [defaultDiscountRate, setDefaultDiscountRate] = useState(28);
+  const [defaultFreeMonths, setDefaultFreeMonths] = useState(1);
   const page = useMemo(() => {
     const p = parseInt(searchParams.get('page') ?? '1');
     return isNaN(p) || p < 1 ? 1 : p;
@@ -285,13 +295,14 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const fetchPricing = useCallback(async () => {
     const { data } = await supabase
       .from('ad_pricing_v2')
-      .select('pricePerHousehold, defaultDiscountRate')
+      .select('pricePerHousehold, defaultDiscountRate, defaultFreeMonths')
       .order('effectiveFrom', { ascending: false })
       .limit(1)
       .maybeSingle();
     if (data) {
       setPricePerHousehold((data as any).pricePerHousehold ?? 70);
       setDefaultDiscountRate((data as any).defaultDiscountRate ?? 28);
+      setDefaultFreeMonths((data as any).defaultFreeMonths ?? 1);
     }
   }, [supabase]);
 
@@ -376,7 +387,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       const { data: subscriptionRows } = adIds.length > 0
         ? await supabase
             .from('ad_subscriptions_v2')
-            .select('advertisementId, nextBillingDate, freeEndDate, createdAt')
+            .select('advertisementId, nextBillingDate, freeEndDate, subscriptionStatus, createdAt')
             .in('advertisementId', adIds)
             .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
             .order('createdAt', { ascending: false })
@@ -384,13 +395,17 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
 
       // 광고당 가장 최근 구독 1건만 남긴다 (createdAt 내림차순이라 먼저 온 것이 최신)
       const subscriptionMap = (subscriptionRows ?? []).reduce<
-        Record<string, { nextBillingDate: string | null; freeEndDate: string | null }>
+        Record<
+          string,
+          { nextBillingDate: string | null; freeEndDate: string | null; subscriptionStatus: string | null }
+        >
       >((acc, r: any) => {
         const key = r.advertisementId as string;
         if (!acc[key]) {
           acc[key] = {
             nextBillingDate: (r.nextBillingDate as string | null) ?? null,
             freeEndDate: (r.freeEndDate as string | null) ?? null,
+            subscriptionStatus: (r.subscriptionStatus as string | null) ?? null,
           };
         }
         return acc;
@@ -443,6 +458,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         totalPhoneClicks: analyticsMap[row.id]?.phoneClicks ?? 0,
         nextBillingDate: subscriptionMap[row.id]?.nextBillingDate ?? null,
         freeEndDate: subscriptionMap[row.id]?.freeEndDate ?? null,
+        subscriptionStatus: subscriptionMap[row.id]?.subscriptionStatus ?? null,
       }));
 
       setApplications(mapped);
@@ -481,38 +497,44 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     [applications, applyScopeFilters]
   );
 
-  // 숨긴 광고도 다른 탭에 그대로 남는다. '숨김' 탭은 그중 숨긴 것만 모아 보는 용도다
+  // 숨긴 광고는 '숨김' 탭에서만 보인다
   const hiddenApplications = useMemo(
     () => apartmentFilteredApplications.filter((a) => a.isHidden),
+    [apartmentFilteredApplications]
+  );
+
+  // '숨김'을 뺀 나머지 탭이 공통으로 쓰는 목록
+  const visibleApplications = useMemo(
+    () => apartmentFilteredApplications.filter((a) => !a.isHidden),
     [apartmentFilteredApplications]
   );
 
   // 상태 필터 적용 후 목록
   const statusFiltered = useMemo(() => {
     if (statusFilter === 'hidden') return hiddenApplications;
-    if (statusFilter === 'all') return apartmentFilteredApplications;
-    if (statusFilter === 'free_running') return apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0);
-    if (statusFilter === 'paid_running') return apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0);
-    if (statusFilter === 'unpaid') return apartmentFilteredApplications.filter(isUnpaidApproved);
-    if (statusFilter === 'pending') return apartmentFilteredApplications.filter((a) => a.adStatus === 'pending');
-    if (statusFilter === 'modification') return apartmentFilteredApplications.filter((a) => a.modificationStatus === 'pending');
-    if (statusFilter === 'ended') return apartmentFilteredApplications.filter((a) => a.adStatus === 'ended');
-    if (statusFilter === 'rejected') return apartmentFilteredApplications.filter((a) => a.adStatus === 'rejected');
-    return apartmentFilteredApplications;
-  }, [apartmentFilteredApplications, hiddenApplications, statusFilter]);
+    if (statusFilter === 'all') return visibleApplications;
+    if (statusFilter === 'free_running') return visibleApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0);
+    if (statusFilter === 'paid_running') return visibleApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0);
+    if (statusFilter === 'unpaid') return visibleApplications.filter(isUnpaidApproved);
+    if (statusFilter === 'pending') return visibleApplications.filter((a) => a.adStatus === 'pending');
+    if (statusFilter === 'modification') return visibleApplications.filter((a) => a.modificationStatus === 'pending');
+    if (statusFilter === 'ended') return visibleApplications.filter((a) => a.adStatus === 'ended');
+    if (statusFilter === 'rejected') return visibleApplications.filter((a) => a.adStatus === 'rejected');
+    return visibleApplications;
+  }, [visibleApplications, hiddenApplications, statusFilter]);
 
-  // 상태별 개수 (아파트 필터 적용 기준)
+  // 상태별 개수 (아파트 필터 적용 기준 · 숨김 제외)
   const statusCounts = useMemo<Record<StatusFilter, number>>(() => ({
-    all: apartmentFilteredApplications.length,
-    free_running: apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0).length,
-    paid_running: apartmentFilteredApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0).length,
-    unpaid: apartmentFilteredApplications.filter(isUnpaidApproved).length,
-    pending: apartmentFilteredApplications.filter((a) => a.adStatus === 'pending').length,
-    modification: apartmentFilteredApplications.filter((a) => a.modificationStatus === 'pending').length,
-    ended: apartmentFilteredApplications.filter((a) => a.adStatus === 'ended').length,
-    rejected: apartmentFilteredApplications.filter((a) => a.adStatus === 'rejected').length,
+    all: visibleApplications.length,
+    free_running: visibleApplications.filter((a) => a.adStatus === 'running' && a.freeMonths > 0).length,
+    paid_running: visibleApplications.filter((a) => a.adStatus === 'running' && a.freeMonths === 0).length,
+    unpaid: visibleApplications.filter(isUnpaidApproved).length,
+    pending: visibleApplications.filter((a) => a.adStatus === 'pending').length,
+    modification: visibleApplications.filter((a) => a.modificationStatus === 'pending').length,
+    ended: visibleApplications.filter((a) => a.adStatus === 'ended').length,
+    rejected: visibleApplications.filter((a) => a.adStatus === 'rejected').length,
     hidden: hiddenApplications.length,
-  }), [apartmentFilteredApplications, hiddenApplications]);
+  }), [visibleApplications, hiddenApplications]);
 
   // 카테고리별 개수 (상태 필터 후 기준)
   const categoryCounts = useMemo<Record<string, number>>(() => {
@@ -583,7 +605,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       { header: '상호명', accessor: (a) => a.partner_users?.businessName ?? '-' },
       { header: '광고 제목', accessor: (a) => a.title ?? '-' },
       { header: '카테고리', accessor: (a) => a.ad_categories_v2?.categoryName ?? '-' },
-      { header: '첫광고', accessor: (a) => (a.isFirstAdApplication ? 'Y' : 'N') },
+      { header: '구분', accessor: (a) => adDivisionLabel(a) },
       { header: '광고 상태', accessor: (a) => AD_STATUS_LABEL[a.adStatus] ?? a.adStatus },
       { header: '결제 상태', accessor: (a) => PAYMENT_STATUS_LABEL[a.paymentStatus] ?? a.paymentStatus },
       { header: '아파트 수', accessor: (a) => a.apartments.length },
@@ -621,7 +643,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const handleOpenApprove = useCallback((ad: AdApplication) => {
     const isFirstAd = ad.isFirstAdApplication && !ad.partner_users?.hasHadRunningAd;
     setSelectedAd(ad);
-    setFreeMonths(isFirstAd ? 1 : 0);
+    setFreeMonths(isFirstAd ? defaultFreeMonths : 0);
     setOverrideEnabled(false);
     setDiscountRate(isFirstAd ? defaultDiscountRate : 0);
     setDiscountNote('');
@@ -633,7 +655,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     setApproveCategory(ad.categoryId);
     setApproveSubCategoryIds(ad.subCategoryIds);
     setApproveDialog(true);
-  }, [defaultDiscountRate]);
+  }, [defaultDiscountRate, defaultFreeMonths]);
 
   const handleApprove = useCallback(async () => {
     if (!selectedAd) return;

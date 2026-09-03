@@ -360,23 +360,21 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
                   />
                 </div>
               </div>
-              {form.overrideEnabled && (
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    할인 사유{' '}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      (파트너에게 표시)
-                    </span>
-                  </label>
-                  <Textarea
-                    className="min-h-[80px] resize-none"
-                    maxLength={100}
-                    placeholder="예: 신규 상권 지원 / 장기 계약 협의 완료 등"
-                    value={form.discountNote}
-                    onChange={(e) => patch({ discountNote: e.target.value })}
-                  />
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  파트너 할인관련 안내 문구{' '}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (파트너에게 표시)
+                  </span>
+                </label>
+                <Textarea
+                  className="min-h-[80px] resize-none"
+                  maxLength={100}
+                  placeholder="예: 개업 축하 혜택으로 함께합니다 / 신규 상권 지원 등"
+                  value={form.discountNote}
+                  onChange={(e) => patch({ discountNote: e.target.value })}
+                />
+              </div>
               {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다.
                   contentOnly(=광고중)는 이미 개시된 상태라 대상이 아니다 */}
               {!contentOnly && benefitsApplied && form.discountRate === 100 && (

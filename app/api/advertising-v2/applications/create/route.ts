@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
         submittedAt: now,
         approvedAt: now,
         updatedAt: now,
-        discountNote: overrideEnabled === true ? trimmedOrNull(body.discountNote) : null,
+        discountNote: trimmedOrNull(body.discountNote),
         adminMemo: trimmedOrNull(body.adminMemo),
         salesRepId: body.salesRepId || null,
       })

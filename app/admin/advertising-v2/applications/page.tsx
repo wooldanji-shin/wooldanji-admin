@@ -404,35 +404,48 @@ export default function AdApplicationsPage(): React.ReactElement {
             <SalesRepFilter value={salesRepFilter} onChange={setSalesRepFilter} />
           </div>
 
-          {/* 상태 탭 — 개수 배지 포함 */}
-          <div className="inline-flex w-full max-w-5xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
-            {STATUS_TABS.map((tab) => {
-              const isActive = statusFilter === tab.value;
-              const count = statusCounts[tab.value];
-              return (
-                <button
-                  key={tab.value}
-                  onClick={() => setStatusFilter(tab.value)}
-                  className={cn(
-                    'inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-md px-2 text-sm font-medium transition-all whitespace-nowrap',
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-card'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                  )}
-                >
-                  {tab.label}
-                  <Badge
-                    variant="secondary"
+          {/* 상태 탭 — 개수 배지 포함 · 우측 월 광고료 합계 */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex w-full max-w-5xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
+              {STATUS_TABS.map((tab) => {
+                const isActive = statusFilter === tab.value;
+                const count = statusCounts[tab.value];
+                return (
+                  <button
+                    key={tab.value}
+                    onClick={() => setStatusFilter(tab.value)}
                     className={cn(
-                      'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
-                      isActive && 'bg-primary-foreground/20 text-primary-foreground'
+                      'inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-md px-2 text-sm font-medium transition-all whitespace-nowrap',
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-card'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                     )}
                   >
-                    {count}
-                  </Badge>
-                </button>
-              );
-            })}
+                    {tab.label}
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
+                        isActive && 'bg-primary-foreground/20 text-primary-foreground'
+                      )}
+                    >
+                      {count}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+
+            {!loading && filteredCount > 0 && (
+              <div className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 shadow-card">
+                <span className="text-xs font-medium text-muted-foreground">
+                  월 광고료 합계
+                </span>
+                <strong className="text-base font-bold tabular-nums text-primary">
+                  {totalMonthlyAmount.toLocaleString()}원
+                </strong>
+              </div>
+            )}
           </div>
 
           <DataTableShell
@@ -497,7 +510,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                 <TableHeader>
                   <TableRow>
                     <TableHead>상호명</TableHead>
-                    <TableHead className="text-center">첫광고</TableHead>
+                    <TableHead className="text-center">구분</TableHead>
                     <TableHead>광고 제목</TableHead>
                     <TableHead className="text-center">신청 아파트</TableHead>
                     <TableHead className="text-center">광고 상태</TableHead>
@@ -510,7 +523,20 @@ export default function AdApplicationsPage(): React.ReactElement {
                     <TableHead className="text-center">노출수</TableHead>
                     <TableHead className="text-center">클릭수</TableHead>
                     <TableHead className="text-center">전화클릭수</TableHead>
-                    <TableHead className="text-center">자동승인</TableHead>
+                    <TableHead className="text-center">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default underline decoration-dashed underline-offset-2">
+                            자동승인
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          켜면 파트너 수정 요청을 10분마다 자동승인합니다.
+                          <br />
+                          꺼두어도 매일 저녁 7시에 남은 수정 요청이 일괄 자동승인됩니다.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
                     <TableHead className="text-center">숨김</TableHead>
                     <TableHead className="text-center">액션</TableHead>
                   </TableRow>
@@ -529,7 +555,11 @@ export default function AdApplicationsPage(): React.ReactElement {
                         {app.partner_users?.businessName ?? '-'}
                       </TableCell>
                       <TableCell className="text-center">
-                        {app.isFirstAdApplication ? (
+                        {app.subscriptionStatus === 'cancel_pending' ? (
+                          <StatusBadge variant="error" size="sm" withDot={false}>
+                            중단예정
+                          </StatusBadge>
+                        ) : app.isFirstAdApplication ? (
                           <StatusBadge variant="info" size="sm" withDot={false}>
                             첫광고
                           </StatusBadge>
@@ -720,15 +750,9 @@ export default function AdApplicationsPage(): React.ReactElement {
             </HoverCard>
           </DataTableShell>
 
-          {/* 현재 필터 기준 합계 · 결과 개수 안내 */}
+          {/* 결과 개수 안내 (합계는 테이블 우측 상단으로 이동) */}
           {!loading && filteredCount > 0 && (
-            <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
-              <span>
-                월 광고료 합계{' '}
-                <strong className="text-sm tabular-nums text-foreground">
-                  {totalMonthlyAmount.toLocaleString()}원
-                </strong>
-              </span>
+            <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground">
               <span>
                 총 {filteredCount.toLocaleString()}건 · {page}/{totalPages} 페이지
               </span>
@@ -889,26 +913,24 @@ export default function AdApplicationsPage(): React.ReactElement {
                 </p>
               )}
             </div>
-            {overrideEnabled && (
-              <div className="space-y-1.5">
-                <label className="text-base font-medium">
-                  할인 사유{' '}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    (파트너에게 표시, 선택)
-                  </span>
-                </label>
-                <Textarea
-                  className="min-h-[80px] resize-none"
-                  placeholder="예: 신규 상권 지원 / 장기 계약 협의 완료 등"
-                  maxLength={100}
-                  value={discountNote}
-                  onChange={(e) => setDiscountNote(e.target.value)}
-                />
-                <p className="text-right text-xs text-muted-foreground">
-                  {discountNote.length}/100
-                </p>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <label className="text-base font-medium">
+                파트너 할인관련 안내 문구{' '}
+                <span className="text-sm font-normal text-muted-foreground">
+                  (파트너에게 표시, 선택)
+                </span>
+              </label>
+              <Textarea
+                className="min-h-[80px] resize-none"
+                placeholder="예: 개업 축하 혜택으로 함께합니다 / 신규 상권 지원 등"
+                maxLength={100}
+                value={discountNote}
+                onChange={(e) => setDiscountNote(e.target.value)}
+              />
+              <p className="text-right text-xs text-muted-foreground">
+                {discountNote.length}/100
+              </p>
+            </div>
           </div>
             <div className="space-y-1.5">
               <label className="text-base font-medium">

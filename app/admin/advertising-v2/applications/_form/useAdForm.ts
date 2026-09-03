@@ -215,7 +215,7 @@ export function useAdForm(adId?: string) {
           .order('orderIndex'),
         supabase
           .from('ad_pricing_v2')
-          .select('pricePerHousehold, defaultDiscountRate')
+          .select('pricePerHousehold, defaultDiscountRate, defaultFreeMonths')
           .order('effectiveFrom', { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -247,13 +247,17 @@ export function useAdForm(adId?: string) {
       );
 
       const pricing = pricingRes.data as
-        { pricePerHousehold?: number; defaultDiscountRate?: number } | null;
+        { pricePerHousehold?: number; defaultDiscountRate?: number; defaultFreeMonths?: number } | null;
       setPricePerHousehold(pricing?.pricePerHousehold ?? 70);
 
       if (adId) {
         await loadExistingAd(adId, partnerList);
       } else {
-        setForm((prev) => ({ ...prev, discountRate: pricing?.defaultDiscountRate ?? 0 }));
+        setForm((prev) => ({
+          ...prev,
+          discountRate: pricing?.defaultDiscountRate ?? 0,
+          freeMonths: pricing?.defaultFreeMonths ?? 0,
+        }));
       }
 
       setLoading(false);

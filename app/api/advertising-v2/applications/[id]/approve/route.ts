@@ -147,8 +147,8 @@ export async function POST(
         approvedDiscountRate: effectiveDiscountRate,
         approvedMonthlyAmount,
         approvedAt: new Date().toISOString(),
-        // overrideEnabled가 아닌 경우 항상 null로 저장 (예외 할인 아닌 승인에는 사유 불필요)
-        discountNote: overrideEnabled === true ? (discountNote?.trim() || null) : null,
+        // 파트너에게 표시되는 안내 문구 — 입력됐을 때만 앱에 노출된다
+        discountNote: discountNote?.trim() || null,
         adminMemo: adminMemo?.trim() || null,
         // 영업 담당자는 선택 항목 — 미지정이면 null로 비운다
         ...(salesRepId !== undefined ? { salesRepId: salesRepId || null } : {}),

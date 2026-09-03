@@ -104,6 +104,8 @@ export interface AdApplicationDetail {
   // 구독 정보 (running 상태일 때)
   freeEndDate: string | null;
   nextBillingDate: string | null;
+  /** 구독 상태 — cancel_pending이면 파트너가 광고 중단을 신청한 상태 */
+  subscriptionStatus: string | null;
   approvedDiscountRate: number | null;
   approvedMonthlyAmount: number | null;
   isFirstAd: boolean;
@@ -312,7 +314,7 @@ export function useApplicationDetailPage(
           .single(),
         supabase
           .from('ad_pricing_v2')
-          .select('pricePerHousehold, defaultDiscountRate')
+          .select('pricePerHousehold, defaultDiscountRate, defaultFreeMonths')
           .order('effectiveFrom', { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -348,11 +350,12 @@ export function useApplicationDetailPage(
       const effectiveDiscountRate = isFirstAd ? (pricing?.defaultDiscountRate ?? 28) : 0;
 
       // 활성 구독 정보 조회 (running 상태일 때 무료종료일, 다음결제일 표시용)
+      // cancel_pending도 포함 — 중단예정 뱃지와 종료 예정일(다음결제일) 노출에 필요
       const { data: subscription } = await supabase
         .from('ad_subscriptions_v2')
-        .select('freeEndDate, nextBillingDate')
+        .select('freeEndDate, nextBillingDate, subscriptionStatus')
         .eq('advertisementId', adId)
-        .eq('subscriptionStatus', 'active')
+        .in('subscriptionStatus', ['active', 'cancel_pending'])
         .order('createdAt', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -450,6 +453,7 @@ export function useApplicationDetailPage(
         approvedMonthlyAmount: row.approvedMonthlyAmount ?? null,
         freeEndDate: (subscription as any)?.freeEndDate ?? null,
         nextBillingDate: (subscription as any)?.nextBillingDate ?? null,
+        subscriptionStatus: (subscription as any)?.subscriptionStatus ?? null,
         isFirstAd,
         apartmentChangeStatus: row.apartmentChangeStatus ?? null,
         partnerDbId: row.partnerId,
@@ -461,8 +465,8 @@ export function useApplicationDetailPage(
       setDetail(mapped);
       setGrantAnalytics((partnerData as any)?.analyticsEnabled ?? false);
       // 다이얼로그 열릴 때 매번 초기화
-      // 첫광고이면 무료기간 기본 1개월, 아니면 0
-      setFreeMonths(isFirstAd ? 1 : 0);
+      // 첫광고이면 시스템 기본 무료 개월수(ad_pricing_v2), 아니면 0
+      setFreeMonths(isFirstAd ? (pricing?.defaultFreeMonths ?? 1) : 0);
       setOverrideEnabled(false);
       setDiscountRate(isFirstAd ? mapped.defaultDiscountRate : 0);
       setDiscountNote('');

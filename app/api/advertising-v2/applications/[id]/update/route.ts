@@ -315,7 +315,7 @@ export async function POST(
         freeMonths,
         approvedDiscountRate: discountRate,
         approvedMonthlyAmount,
-        discountNote: overrideEnabled === true ? trimmedOrNull(body.discountNote) : null,
+        discountNote: trimmedOrNull(body.discountNote),
       })
       .eq('id', id);
 

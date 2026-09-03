@@ -14,6 +14,7 @@ interface AdPricingV2 {
   id: string;
   pricePerHousehold: number;
   defaultDiscountRate: number;
+  defaultFreeMonths: number;
   premiumPricePerHouseholdPerWeek: number;
 }
 
@@ -26,6 +27,7 @@ export default function AdPricingPage() {
   const [form, setForm] = useState({
     pricePerHousehold: '',
     defaultDiscountRate: '',
+    defaultFreeMonths: '',
     premiumPricePerHouseholdPerWeek: '',
   });
 
@@ -34,13 +36,14 @@ export default function AdPricingPage() {
     try {
       const { data, error } = await (supabase as any)
         .from('ad_pricing_v2')
-        .select('id, pricePerHousehold, defaultDiscountRate, premiumPricePerHouseholdPerWeek')
+        .select('id, pricePerHousehold, defaultDiscountRate, defaultFreeMonths, premiumPricePerHouseholdPerWeek')
         .single();
       if (error) throw error;
       setPricing(data);
       setForm({
         pricePerHousehold: String(data.pricePerHousehold),
         defaultDiscountRate: String(data.defaultDiscountRate),
+        defaultFreeMonths: String(data.defaultFreeMonths),
         premiumPricePerHouseholdPerWeek: String(data.premiumPricePerHouseholdPerWeek),
       });
     } catch (err) {
@@ -60,6 +63,7 @@ export default function AdPricingPage() {
 
     const pricePerHousehold = parseInt(form.pricePerHousehold);
     const defaultDiscountRate = parseInt(form.defaultDiscountRate);
+    const defaultFreeMonths = parseInt(form.defaultFreeMonths);
     const premiumPricePerHouseholdPerWeek = parseInt(form.premiumPricePerHouseholdPerWeek);
 
     if (isNaN(pricePerHousehold) || pricePerHousehold < 0) {
@@ -68,6 +72,10 @@ export default function AdPricingPage() {
     }
     if (isNaN(defaultDiscountRate) || defaultDiscountRate < 0 || defaultDiscountRate > 100) {
       toast.error('기본 할인율은 0~100 사이 값을 입력해주세요.');
+      return;
+    }
+    if (isNaN(defaultFreeMonths) || defaultFreeMonths < 0) {
+      toast.error('첫 광고 기본 무료 개월수를 올바르게 입력해주세요.');
       return;
     }
     if (isNaN(premiumPricePerHouseholdPerWeek) || premiumPricePerHouseholdPerWeek < 0) {
@@ -82,6 +90,7 @@ export default function AdPricingPage() {
         .update({
           pricePerHousehold,
           defaultDiscountRate,
+          defaultFreeMonths,
           premiumPricePerHouseholdPerWeek,
         })
         .eq('id', pricing.id);
@@ -144,6 +153,21 @@ export default function AdPricingPage() {
                 onChange={(e) => setForm((prev) => ({ ...prev, defaultDiscountRate: e.target.value }))}
                 placeholder="예: 20"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="defaultFreeMonths">첫 광고 기본 무료 개월수</Label>
+              <Input
+                id="defaultFreeMonths"
+                type="number"
+                min={0}
+                value={form.defaultFreeMonths}
+                onChange={(e) => setForm((prev) => ({ ...prev, defaultFreeMonths: e.target.value }))}
+                placeholder="예: 1"
+              />
+              <p className="text-muted-foreground text-xs">
+                광고 승인 화면의 무료 개월수 기본값입니다. 승인 시 건별로 변경할 수 있습니다.
+              </p>
             </div>
 
             <div className="space-y-2">
