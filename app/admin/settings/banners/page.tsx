@@ -82,6 +82,7 @@ interface Banner {
   clickCount: number;
   adClickCount: number;
   description: string | null;
+  isDirectLink: boolean;
   user?: {
     id: string;
     name: string;
@@ -97,6 +98,7 @@ interface Banner {
 
 interface BannerForm {
   linkUrl: string;
+  isDirectLink: boolean;
   imageUrl: string;
   additionalImageUrl: string;
   isActive: boolean;
@@ -323,6 +325,7 @@ export default function BannersPage() {
   const [apartmentSearch, setApartmentSearch] = useState('');
   const [form, setForm] = useState<BannerForm>({
     linkUrl: '',
+    isDirectLink: false,
     imageUrl: '',
     additionalImageUrl: '',
     isActive: true,
@@ -515,6 +518,7 @@ export default function BannersPage() {
     setApartmentSearch('');
     setForm({
       linkUrl: '',
+      isDirectLink: false,
       imageUrl: '',
       additionalImageUrl: '',
       isActive: true,
@@ -545,6 +549,7 @@ export default function BannersPage() {
     setApartmentSearch('');
     setForm({
       linkUrl: banner.linkUrl || '',
+      isDirectLink: banner.isDirectLink ?? false,
       imageUrl: banner.imageUrl,
       additionalImageUrl: banner.additionalImageUrl || '',
       isActive: banner.isActive,
@@ -585,10 +590,14 @@ export default function BannersPage() {
         return;
       }
 
+      const linkUrl = form.linkUrl.trim() || null;
+
       const bannerData = {
         imageUrl: form.imageUrl,
         additionalImageUrl: form.additionalImageUrl.trim() || null,
-        linkUrl: form.linkUrl.trim() || null,
+        linkUrl,
+        // 링크가 없으면 바로 이동 옵션은 의미가 없으므로 강제로 해제
+        isDirectLink: linkUrl ? form.isDirectLink : false,
         isActive: form.isActive,
         isGlobal: form.isGlobal,
         createdBy: editingBanner ? editingBanner.createdBy : currentUserId,
@@ -725,6 +734,7 @@ export default function BannersPage() {
   const resetForm = () => {
     setForm({
       linkUrl: '',
+      isDirectLink: false,
       imageUrl: '',
       additionalImageUrl: '',
       isActive: true,
@@ -885,6 +895,24 @@ export default function BannersPage() {
                 <p className='text-xs text-muted-foreground'>
                   배너 클릭 시 이동할 URL을 입력하세요.
                 </p>
+              </div>
+
+              {/* isDirectLink Switch - 링크 URL이 있을 때만 의미 있음 */}
+              <div className='flex items-center justify-between p-4 border rounded-lg'>
+                <div className='space-y-1'>
+                  <Label htmlFor='isDirectLink' className='text-sm font-medium'>
+                    링크로 바로 이동
+                  </Label>
+                  <p className='text-xs text-muted-foreground'>
+                    활성화하면 배너 상세 화면 없이 링크 URL이 바로 열립니다.
+                  </p>
+                </div>
+                <Switch
+                  id='isDirectLink'
+                  checked={form.isDirectLink}
+                  onCheckedChange={(checked) => setForm((prev) => ({ ...prev, isDirectLink: checked }))}
+                  disabled={!form.linkUrl.trim()}
+                />
               </div>
 
               {/* isGlobal Switch - 매니저는 사용 불가 */}
