@@ -628,7 +628,7 @@ export default function AdApplicationDetailPage({
                   ] : []),
                   // 네이버는 전용 집계 컬럼 없이 extraClickCounts에 고정 키로 쌓인다
                   ...(detail.ctaButtons?.some((b) => b.type === 'naver') ? [
-                    { label: '네이버 클릭', value: a?.extraClickCounts?.[NAVER_CLICK_KEY] ?? 0 },
+                    { label: 'N예약 클릭', value: a?.extraClickCounts?.[NAVER_CLICK_KEY] ?? 0 },
                   ] : []),
                   // 파트너가 직접 추가한 버튼 — 라벨을 그대로 항목명으로 사용
                   ...customCtaButtons(detail.ctaButtons).map((b) => ({

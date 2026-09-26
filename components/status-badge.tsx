@@ -90,6 +90,7 @@ export type PremiumStatus =
   | 'modification_pending';
 export type UserStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 export type SettlementPaymentStatus = 'paid' | 'freeTrial' | 'failed' | 'success';
+export type EventStatus = 'pending' | 'approved' | 'rejected' | 'ended';
 
 const AD_PRESET: Record<AdStatus, { label: string; variant: StatusBadgeVariant }> = {
   pending: { label: '승인대기', variant: 'pending' },
@@ -153,6 +154,13 @@ const SETTLEMENT_PRESET: Record<
   failed: { label: '결제실패', variant: 'error' },
 };
 
+const EVENT_PRESET: Record<EventStatus, { label: string; variant: StatusBadgeVariant }> = {
+  pending: { label: '승인대기', variant: 'pending' },
+  approved: { label: '승인됨', variant: 'success' },
+  rejected: { label: '거절됨', variant: 'error' },
+  ended: { label: '종료', variant: 'inactive' },
+};
+
 interface DomainStatusBadgeProps {
   size?: StatusBadgeSize;
   withDot?: boolean;
@@ -189,6 +197,10 @@ interface UserProps extends DomainStatusBadgeProps {
 
 interface SettlementProps extends DomainStatusBadgeProps {
   status: SettlementPaymentStatus;
+}
+
+interface EventProps extends DomainStatusBadgeProps {
+  status: EventStatus;
 }
 
 const FALLBACK = { label: '', variant: 'inactive' as StatusBadgeVariant };
@@ -266,6 +278,15 @@ function Settlement({ status, ...rest }: SettlementProps): React.ReactElement {
   );
 }
 
+function Event({ status, ...rest }: EventProps): React.ReactElement {
+  const { label, variant } = EVENT_PRESET[status] ?? { ...FALLBACK, label: String(status) };
+  return (
+    <BaseStatusBadge variant={variant} {...rest}>
+      {label}
+    </BaseStatusBadge>
+  );
+}
+
 export const StatusBadge = Object.assign(BaseStatusBadge, {
   Ad,
   Modification,
@@ -275,4 +296,5 @@ export const StatusBadge = Object.assign(BaseStatusBadge, {
   Premium,
   User,
   Settlement,
+  Event,
 });

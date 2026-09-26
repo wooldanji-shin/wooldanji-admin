@@ -25,7 +25,7 @@ export interface CtaButton {
  * 표시용이자 구버전 앱 폴백용이다 — naver 타입을 모르는 구버전 앱은 이 버튼을
  * custom으로 흡수하는데, 그때 label이 비어 있으면 글자 없는 버튼이 노출된다.
  */
-export const NAVER_LABEL = '네이버';
+export const NAVER_LABEL = 'N예약';
 
 /** 네이버 버튼 클릭 집계 키 — extraClickCounts에 이 키로 누적된다 */
 export const NAVER_CLICK_KEY = 'naver';

@@ -482,7 +482,7 @@ export default function PremiumAdDetailPage({
                   // 네이버는 전용 집계 컬럼 없이 extraClickCounts에 고정 키로 쌓인다
                   ...(detail.ctaButtons?.some((b) => b.type === 'naver') ? [
                     {
-                      label: '네이버 클릭',
+                      label: 'N예약 클릭',
                       basic: basic?.extraClickCounts?.[NAVER_CLICK_KEY] ?? 0,
                       premium: premium?.extraClickCounts?.[NAVER_CLICK_KEY] ?? 0,
                     },

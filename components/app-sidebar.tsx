@@ -35,6 +35,7 @@ import {
   TrendingUp,
   Receipt,
   BookText,
+  PartyPopper,
   type LucideIcon,
 } from 'lucide-react';
 import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
@@ -50,6 +51,7 @@ const BADGE_KEYS: Record<string, string> = {
   '/admin/managers': 'managers',
   '/admin/advertising-v2/applications': 'ad_applications',
   '/admin/advertising-v2/premium': 'premium_applications',
+  '/admin/partner-events': 'partner_events',
 };
 
 const LAST_READ_PREFIX = 'lastRead_';
@@ -143,6 +145,12 @@ const partnerItems: MenuItem[] = [
     name: '상호명 관리',
     href: '/admin/business-names',
     icon: BookText,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '이벤트 관리',
+    href: '/admin/partner-events',
+    icon: PartyPopper,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
 ];
@@ -242,6 +250,7 @@ interface NewCounts {
   managers: number;
   ad_applications: number;
   premium_applications: number;
+  partner_events: number;
 }
 
 const INITIAL_COUNTS: NewCounts = {
@@ -251,6 +260,7 @@ const INITIAL_COUNTS: NewCounts = {
   managers: 0,
   ad_applications: 0,
   premium_applications: 0,
+  partner_events: 0,
 };
 
 interface SidebarUser {
@@ -286,6 +296,7 @@ export function AppSidebar(): React.ReactElement {
         menuCountsResult,
         adApplicationsResult,
         premiumApplicationsResult,
+        partnerEventsResult,
       ] = await Promise.all([
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase.rpc as any)('get_menu_new_counts', {
@@ -302,6 +313,11 @@ export function AppSidebar(): React.ReactElement {
           .from('premium_advertisements_v2')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'pending'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('partner_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
       ]);
 
       if (menuCountsResult.error) {
@@ -314,6 +330,7 @@ export function AppSidebar(): React.ReactElement {
           ...(menuCountsResult.data as NewCounts),
           ad_applications: adApplicationsResult.count ?? 0,
           premium_applications: premiumApplicationsResult.count ?? 0,
+          partner_events: partnerEventsResult.count ?? 0,
         });
       }
     } catch (err) {
