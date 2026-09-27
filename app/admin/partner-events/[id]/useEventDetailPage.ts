@@ -35,6 +35,8 @@ export interface EventDetail {
   bannerImageUrl: string | null;
   /** 홈 배너 표시 방식: template(기본 배너 — 앱이 텍스트+1:1 썸네일) | image(이미지로만, 약 2.1:1) */
   bannerType: 'template' | 'image';
+  /** 기본 배너 테마 키 (eventBannerThemes.ts) — 'image' 배너에서는 쓰지 않는다 */
+  bannerTheme: string;
   /** 상세 소개 이미지 (최대 3장, 순서 = 앱 표시 순서) — 관리자 화면에선 조회만 */
   detailImageUrls: string[];
   drawnAt: string | null;
@@ -148,17 +150,32 @@ export function couponBenefitText(
 }
 
 /** 배너 미리보기 데이터 — 수정 중이면 입력 중인 값으로 바로 보여준다 */
+/** 배너 금액 줄 — ('1,000원', ' 할인') / ('10%', ' 할인') / ('증정', ''), 할인 값이 없으면 null (앱 eventDiscountParts 와 같음) */
+function discountParts(
+  discountType: CouponDiscountType,
+  discountValue: number | null,
+): { amount: string; suffix: string } | null {
+  if (discountType === 'gift') return { amount: '증정', suffix: '' };
+  if (discountValue == null) return null;
+  const amount = discountType === 'percent' ? `${discountValue}%` : `${discountValue.toLocaleString()}원`;
+  return { amount, suffix: ' 할인' };
+}
+
 export function bannerPreviewOf(detail: EventDetail, form: EventEditForm | null): EventBannerPreviewData {
   const source = form ?? detail;
   const entryEnd = new Date(source.entryEndAt);
+  const parts = discountParts(source.couponDiscountType, source.couponDiscountValue);
   return {
     businessName: detail.businessName,
     title: source.title,
     bannerType: detail.bannerType,
+    bannerTheme: detail.bannerTheme,
     bannerImageUrl: detail.bannerImageUrl,
     winnerCount: source.winnerCount,
     participationType: source.participationType,
-    benefitText: couponBenefitText(source.couponTitle, source.couponDiscountType, source.couponDiscountValue),
+    target: source.couponTitle.trim(),
+    amount: parts?.amount ?? null,
+    amountSuffix: parts?.suffix ?? '',
     entryStartAt: new Date(source.entryStartAt),
     announceAt: form ? new Date(entryEnd.getTime() + ANNOUNCE_DELAY_MS) : new Date(detail.announceAt),
   };
@@ -272,6 +289,7 @@ export function useEventDetailPage(
         endAt: data.endAt,
         bannerImageUrl: data.bannerImageUrl,
         bannerType: data.bannerType ?? 'template',
+        bannerTheme: data.bannerTheme ?? 'warm',
         detailImageUrls: data.detailImageUrls ?? [],
         drawnAt: data.drawnAt,
         createdAt: data.createdAt,

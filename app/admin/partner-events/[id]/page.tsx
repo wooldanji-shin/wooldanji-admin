@@ -37,6 +37,7 @@ import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/im
 import { cn } from '@/lib/utils';
 import { PARTICIPATION_TYPE_LABEL } from '../usePartnerEventsPage';
 import { EventBannerPreview } from './EventBannerPreview';
+import { eventBannerThemeOf } from './eventBannerThemes';
 import {
   useEventDetailPage,
   bannerPreviewOf,
@@ -323,7 +324,7 @@ function BannerMockup({
     <div className="w-full space-y-5 rounded-[28px] bg-[#16181a] p-6 sm:w-auto md:p-8">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-white">홈 배너</span>
-        <span className="text-[13px] text-white/72">{detail.bannerType === 'image' ? '이미지로만' : '기본 배너'}</span>
+        <span className="text-[13px] text-white/72">{detail.bannerType === 'image' ? '이미지로만' : `기본 배너 · ${eventBannerThemeOf(detail.bannerTheme).label} 테마`}</span>
       </div>
       <div className="overflow-x-auto">
         <EventBannerPreview data={bannerPreviewOf(detail, form)} onImageClick={onOpenBanner} />
