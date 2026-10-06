@@ -7,7 +7,7 @@ import type { createAdminClient } from '@/lib/supabase/server';
  * 빌링키 유효성 검사가 0원 스킵 분기보다 먼저 돈다. 즉 100% 할인만으로는 배치를 못 비껴가고
  * 카드가 없다는 이유로 광고가 종료된다 — 청구를 막는 장치는 이 날짜 하나뿐이므로 덮어쓰지 않는다.
  */
-const NEVER_BILLING_DATE = '2099-01-01T00:00:00.000Z';
+export const NEVER_BILLING_DATE = '2099-01-01T00:00:00.000Z';
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 

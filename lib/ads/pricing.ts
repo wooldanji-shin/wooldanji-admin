@@ -5,23 +5,33 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-/** ad_pricing_v2 조회 실패 시 사용하는 세대당 기본 단가 */
-const FALLBACK_PRICE_PER_HOUSEHOLD = 70;
+export const PRICE_LOOKUP_FAILED_MESSAGE =
+  '세대당 단가를 조회할 수 없습니다. 잠시 후 다시 시도해주세요.';
 
-/** 가장 최근에 적용된 세대당 단가 */
+/**
+ * 가장 최근에 적용된 세대당 단가.
+ * 조회에 실패하면 throw — 임의의 기본 단가로 금액을 계산해 저장하면 안 된다.
+ */
 export async function fetchPricePerHousehold(
   supabase: SupabaseClient
 ): Promise<number> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('ad_pricing_v2')
     .select('pricePerHousehold')
     .order('effectiveFrom', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  return (data as { pricePerHousehold?: number } | null)?.pricePerHousehold
-    ?? FALLBACK_PRICE_PER_HOUSEHOLD;
+  const price = (data as { pricePerHousehold?: number } | null)?.pricePerHousehold;
+  if (error || typeof price !== 'number' || price <= 0) {
+    console.error('Failed to fetch pricePerHousehold:', error ?? data);
+    throw new Error(PRICE_LOOKUP_FAILED_MESSAGE);
+  }
+  return price;
 }
+
+export const ZERO_HOUSEHOLDS_MESSAGE =
+  '노출 아파트의 세대수 합계가 0입니다. 아파트 동·세대수 정보를 확인해주세요.';
 
 /** 월 광고료 = 총 세대수 × 세대당 단가 × (1 - 할인율), 10원 단위 반올림 */
 export function calcMonthlyAmount(

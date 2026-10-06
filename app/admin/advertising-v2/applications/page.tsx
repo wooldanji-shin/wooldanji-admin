@@ -312,6 +312,7 @@ export default function AdApplicationsPage(): React.ReactElement {
     totalMonthlyAmount,
     handleExportCsv,
     handleToggleHidden,
+    handleToggleDoorPopup,
     handleRowClick,
     selectedAd,
     approveDialog,
@@ -324,6 +325,8 @@ export default function AdApplicationsPage(): React.ReactElement {
     setOverrideEnabled,
     discountRate,
     setDiscountRate,
+    startImmediately,
+    setStartImmediately,
     discountNote,
     setDiscountNote,
     adminMemo,
@@ -538,6 +541,18 @@ export default function AdApplicationsPage(): React.ReactElement {
                       </Tooltip>
                     </TableHead>
                     <TableHead className="text-center">숨김</TableHead>
+                    <TableHead className="text-center">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help underline decoration-dotted">팝업 우선</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          체크한 광고가 하나라도 있으면 문열림 광고 팝업은 체크한 광고 중에서만 나옵니다.
+                          <br />
+                          전부 해제하면 운영 중 광고 전체에서 무작위로 나옵니다.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
                     <TableHead className="text-center">액션</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -685,6 +700,17 @@ export default function AdApplicationsPage(): React.ReactElement {
                           checked={app.isHidden}
                           aria-label="앱 노출에서 숨기기"
                           onCheckedChange={(v) => handleToggleHidden(app, v === true)}
+                        />
+                      </TableCell>
+                      <TableCell
+                        className="text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={app.showInDoorPopup}
+                          aria-label="문열림 팝업 우선 노출"
+                          disabled={app.adStatus !== 'running'}
+                          onCheckedChange={(v) => handleToggleDoorPopup(app, v === true)}
                         />
                       </TableCell>
                       <TableCell
@@ -913,6 +939,22 @@ export default function AdApplicationsPage(): React.ReactElement {
                 </p>
               )}
             </div>
+            {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다 — 등록·수정 폼과 같은 조건 */}
+            {(selectedAdIsFirstAd || overrideEnabled) && discountRate === 100 && (
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
+                <Checkbox
+                  className="mt-0.5"
+                  checked={startImmediately}
+                  onCheckedChange={(checked) => setStartImmediately(checked === true)}
+                />
+                <span className="space-y-1 text-sm">
+                  <span className="block font-medium">카드 등록 없이 바로 광고 시작</span>
+                  <span className="block text-xs text-muted-foreground">
+                    승인과 동시에 노출됩니다. 파트너 결제를 건너뛰고 정기결제는 돌지 않습니다.
+                  </span>
+                </span>
+              </label>
+            )}
             <div className="space-y-1.5">
               <label className="text-base font-medium">
                 파트너 할인관련 안내 문구{' '}

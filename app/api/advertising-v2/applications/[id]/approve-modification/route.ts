@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { PRICE_LOOKUP_FAILED_MESSAGE, fetchPricePerHousehold } from '@/lib/ads/pricing';
 
 async function applyApartmentChanges(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -88,21 +89,26 @@ export async function POST(
       // 아파트 변경 포함 — 4가지 케이스 분기
       const aptList = pendingApartments as { apartmentId: string; totalHouseholds: number }[];
 
-      // 현재 아파트 조회 (ID + 세대수)
-      const { data: currentApts } = await supabase
+      // 현재 아파트 조회 (ID + 세대수) — 실패를 무시하면 현재 요금이 0원으로 계산되어 차액이 부풀려진다
+      const { data: currentApts, error: currentAptsError } = await supabase
         .from('advertisement_apartments_v2')
         .select('"apartmentId", "totalHouseholds"')
         .eq('advertisementId', id);
 
-      // 단가 조회
-      const { data: pricing } = await supabase
-        .from('ad_pricing_v2')
-        .select('"pricePerHousehold"')
-        .order('effectiveFrom', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      if (currentAptsError) {
+        console.error('Failed to fetch current apartments:', currentAptsError);
+        return NextResponse.json(
+          { error: '현재 노출 아파트를 조회할 수 없습니다. 잠시 후 다시 시도해주세요.' },
+          { status: 500 }
+        );
+      }
 
-      const pricePerHousehold: number = (pricing as any)?.pricePerHousehold ?? 70;
+      let pricePerHousehold: number;
+      try {
+        pricePerHousehold = await fetchPricePerHousehold(supabase);
+      } catch {
+        return NextResponse.json({ error: PRICE_LOOKUP_FAILED_MESSAGE }, { status: 500 });
+      }
 
       const calcFee = (apts: { totalHouseholds: number }[]): number => {
         const adRow = ad as any;
@@ -115,6 +121,9 @@ export async function POST(
       const currentFee = (ad as any).approvedMonthlyAmount ??
         calcFee((currentApts ?? []) as { totalHouseholds: number }[]);
       const newFee = calcFee(aptList);
+      // 구독에 기록하는 할인 전 정상가 — 아파트가 바뀌면 청구액과 함께 갱신해야 앱의 정상가 표시와 어긋나지 않는다
+      const newOriginalMonthlyAmount =
+        Math.round((aptList.reduce((s, a) => s + a.totalHouseholds, 0) * pricePerHousehold) / 10) * 10;
       // 관리자 직접 입력 금액 우선, 없으면 자동계산
       const actualNewFee = adminMonthlyAmount ?? newFee;
 
@@ -215,6 +224,7 @@ export async function POST(
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
               monthlyAmount: actualNewFee,
+              originalMonthlyAmount: newOriginalMonthlyAmount,
             }).eq('id', (subscription as any).id);
           }
         } else {
@@ -250,6 +260,7 @@ export async function POST(
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
               monthlyAmount: actualNewFee,
+              originalMonthlyAmount: newOriginalMonthlyAmount,
             }).eq('id', (subscription as any).id);
           }
         } else {
@@ -267,6 +278,7 @@ export async function POST(
           if ((subscription as any)?.id) {
             await adminSupabase.from('ad_subscriptions_v2').update({
               monthlyAmount: actualNewFee,
+              originalMonthlyAmount: newOriginalMonthlyAmount,
             }).eq('id', (subscription as any).id);
           }
         }

@@ -588,7 +588,11 @@ export default function PremiumAdDetailPage({
                   <InfoRow label='오시는길'>{detail.partner?.directionsInfo ?? '-'}</InfoRow>
                 </div>
                 <InfoRow label='기본 광고 ID'>
-                  <span className='font-mono text-sm'>{detail.baseAdId.slice(0, 8)}…</span>
+                  {detail.baseAdId ? (
+                    <span className='font-mono text-sm'>{detail.baseAdId.slice(0, 8)}…</span>
+                  ) : (
+                    <span className='text-sm text-muted-foreground'>삭제된 기본 광고</span>
+                  )}
                 </InfoRow>
                 <InfoRow label='영업 담당자'>{detail.salesRepName ?? '지정 안 함'}</InfoRow>
               </div>

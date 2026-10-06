@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import {
+  PRICE_LOOKUP_FAILED_MESSAGE,
+  ZERO_HOUSEHOLDS_MESSAGE,
   calcMonthlyAmount,
   fetchApartmentHouseholds,
   fetchPricePerHousehold,
@@ -287,6 +289,11 @@ export async function POST(
 
     const totalHouseholds = [...households.values()].reduce((sum, n) => sum + n, 0);
 
+    // 동 정보는 있지만 세대수가 비어 있으면 합계 0 → 월 금액 0원이 저장된다. 여기서 막는다.
+    if (totalHouseholds <= 0) {
+      return NextResponse.json({ error: ZERO_HOUSEHOLDS_MESSAGE }, { status: 400 });
+    }
+
     // 첫 광고 여부는 등록 시점에 확정된 값을 그대로 쓴다.
     // 지금 다시 판정하면 자기 자신이 걸려 항상 false가 된다.
     const isFirstAd = existing.isFirstAdApplication === true;
@@ -297,7 +304,12 @@ export async function POST(
       freeMonths: body.freeMonths,
     });
 
-    const pricePerHousehold = await fetchPricePerHousehold(admin);
+    let pricePerHousehold: number;
+    try {
+      pricePerHousehold = await fetchPricePerHousehold(admin);
+    } catch {
+      return NextResponse.json({ error: PRICE_LOOKUP_FAILED_MESSAGE }, { status: 500 });
+    }
     const approvedMonthlyAmount = calcMonthlyAmount(
       totalHouseholds,
       pricePerHousehold,

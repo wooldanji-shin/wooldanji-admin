@@ -83,6 +83,9 @@ interface Banner {
   adClickCount: number;
   description: string | null;
   isDirectLink: boolean;
+  /** normal(기본) / ajl(아정당 — 링크 2개 중 선택 후 인앱 웹뷰) */
+  bannerType: 'normal' | 'ajl';
+  secondLinkUrl: string | null;
   user?: {
     id: string;
     name: string;
@@ -99,6 +102,8 @@ interface Banner {
 interface BannerForm {
   linkUrl: string;
   isDirectLink: boolean;
+  isAjl: boolean;
+  secondLinkUrl: string;
   imageUrl: string;
   additionalImageUrl: string;
   isActive: boolean;
@@ -326,6 +331,8 @@ export default function BannersPage() {
   const [form, setForm] = useState<BannerForm>({
     linkUrl: '',
     isDirectLink: false,
+    isAjl: false,
+    secondLinkUrl: '',
     imageUrl: '',
     additionalImageUrl: '',
     isActive: true,
@@ -519,6 +526,8 @@ export default function BannersPage() {
     setForm({
       linkUrl: '',
       isDirectLink: false,
+      isAjl: false,
+      secondLinkUrl: '',
       imageUrl: '',
       additionalImageUrl: '',
       isActive: true,
@@ -550,6 +559,8 @@ export default function BannersPage() {
     setForm({
       linkUrl: banner.linkUrl || '',
       isDirectLink: banner.isDirectLink ?? false,
+      isAjl: banner.bannerType === 'ajl',
+      secondLinkUrl: banner.secondLinkUrl || '',
       imageUrl: banner.imageUrl,
       additionalImageUrl: banner.additionalImageUrl || '',
       isActive: banner.isActive,
@@ -591,13 +602,22 @@ export default function BannersPage() {
       }
 
       const linkUrl = form.linkUrl.trim() || null;
+      const secondLinkUrl = form.secondLinkUrl.trim() || null;
+
+      // 아정당 배너는 두 상담 링크가 모두 있어야 앱에서 선택지가 성립한다
+      if (form.isAjl && (!linkUrl || !secondLinkUrl)) {
+        toast.error('아정당 배너는 인터넷 가입 상담·가전 렌탈 상담 링크를 모두 입력해야 합니다.');
+        return;
+      }
 
       const bannerData = {
         imageUrl: form.imageUrl,
         additionalImageUrl: form.additionalImageUrl.trim() || null,
         linkUrl,
-        // 링크가 없으면 바로 이동 옵션은 의미가 없으므로 강제로 해제
-        isDirectLink: linkUrl ? form.isDirectLink : false,
+        // 아정당 배너는 앱이 자체 선택 화면을 띄우므로 바로 이동 옵션과 함께 쓰지 않는다
+        isDirectLink: linkUrl && !form.isAjl ? form.isDirectLink : false,
+        bannerType: form.isAjl ? 'ajl' : 'normal',
+        secondLinkUrl: form.isAjl ? secondLinkUrl : null,
         isActive: form.isActive,
         isGlobal: form.isGlobal,
         createdBy: editingBanner ? editingBanner.createdBy : currentUserId,
@@ -735,6 +755,8 @@ export default function BannersPage() {
     setForm({
       linkUrl: '',
       isDirectLink: false,
+      isAjl: false,
+      secondLinkUrl: '',
       imageUrl: '',
       additionalImageUrl: '',
       isActive: true,
@@ -897,7 +919,41 @@ export default function BannersPage() {
                 </p>
               </div>
 
-              {/* isDirectLink Switch - 링크 URL이 있을 때만 의미 있음 */}
+              {/* 아정당 배너 — 탭하면 앱이 인터넷 가입 상담 / 가전 렌탈 상담 중 하나를 고르게 하고 인앱 웹뷰로 연다 */}
+              <div className='flex items-center justify-between p-4 border rounded-lg'>
+                <div className='space-y-1'>
+                  <Label htmlFor='isAjl' className='text-sm font-medium'>
+                    아정당 배너
+                  </Label>
+                  <p className='text-xs text-muted-foreground'>
+                    활성화하면 링크 URL은 인터넷 가입 상담, 아래 두 번째 링크는 가전 렌탈 상담으로 쓰입니다.
+                  </p>
+                </div>
+                <Switch
+                  id='isAjl'
+                  checked={form.isAjl}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, isAjl: checked, isDirectLink: checked ? false : prev.isDirectLink }))
+                  }
+                />
+              </div>
+
+              {form.isAjl && (
+                <div className='space-y-2'>
+                  <Label htmlFor='secondLinkUrl' className='text-sm font-medium'>
+                    가전 렌탈 상담 링크 URL
+                  </Label>
+                  <Input
+                    id='secondLinkUrl'
+                    type='url'
+                    value={form.secondLinkUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, secondLinkUrl: e.target.value }))}
+                    placeholder='https://biz.ajl.to/lead/rental?companyId=...'
+                  />
+                </div>
+              )}
+
+              {/* isDirectLink Switch - 링크 URL이 있을 때만 의미 있음. 아정당 배너는 자체 선택 화면이 있어 사용 불가 */}
               <div className='flex items-center justify-between p-4 border rounded-lg'>
                 <div className='space-y-1'>
                   <Label htmlFor='isDirectLink' className='text-sm font-medium'>
@@ -911,7 +967,7 @@ export default function BannersPage() {
                   id='isDirectLink'
                   checked={form.isDirectLink}
                   onCheckedChange={(checked) => setForm((prev) => ({ ...prev, isDirectLink: checked }))}
-                  disabled={!form.linkUrl.trim()}
+                  disabled={!form.linkUrl.trim() || form.isAjl}
                 />
               </div>
 

@@ -13,7 +13,8 @@ import { toast } from 'sonner';
 export interface PremiumAd {
   id: string;
   partnerId: string;
-  baseAdId: string;
+  /** 기본 광고가 삭제되면 null */
+  baseAdId: string | null;
   title: string | null;
   weeks: number;
   status: PremiumStatus;

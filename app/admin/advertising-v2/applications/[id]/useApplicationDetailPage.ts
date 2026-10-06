@@ -183,6 +183,8 @@ export interface UseApplicationDetailPageReturn {
   setOverrideEnabled: (v: boolean) => void;
   discountRate: number;
   setDiscountRate: (v: number) => void;
+  startImmediately: boolean;
+  setStartImmediately: (v: boolean) => void;
   discountNote: string;
   setDiscountNote: (v: string) => void;
   adminMemo: string;
@@ -199,6 +201,13 @@ export interface UseApplicationDetailPageReturn {
   handleApprove: () => Promise<void>;
   handleReject: () => Promise<void>;
   handleUpdateMemo: () => Promise<void>;
+  // 무료 전환 · 삭제 (광고중/종료 광고)
+  convertFreeDialog: boolean;
+  setConvertFreeDialog: (open: boolean) => void;
+  handleConvertFree: () => Promise<void>;
+  deleteDialog: boolean;
+  setDeleteDialog: (open: boolean) => void;
+  handleDelete: () => Promise<void>;
   // 수정 심사
   modificationRejectDialog: boolean;
   setModificationRejectDialog: (open: boolean) => void;
@@ -239,6 +248,8 @@ export function useApplicationDetailPage(
   const [freeMonths, setFreeMonths] = useState(0);
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [discountRate, setDiscountRate] = useState(28);
+  // 카드 등록 없이 바로 개시 — 할인율 100%일 때만 의미가 있고 서버가 다시 검사한다
+  const [startImmediately, setStartImmediately] = useState(false);
   const [discountNote, setDiscountNote] = useState('');
   const [adminMemo, setAdminMemo] = useState('');
   const [bizCallNumber, setBizCallNumber] = useState('');
@@ -247,6 +258,8 @@ export function useApplicationDetailPage(
   const [processing, setProcessing] = useState(false);
 
   const [modificationRejectDialog, setModificationRejectDialog] = useState(false);
+  const [convertFreeDialog, setConvertFreeDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const [modificationRejectReason, setModificationRejectReason] = useState('');
   const [grantAnalytics, setGrantAnalytics] = useState(false);
   const [allCategories, setAllCategories] = useState<AdCategoryWithSubs[]>([]);
@@ -521,7 +534,7 @@ export function useApplicationDetailPage(
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, bizCallNumber, salesRepId, categoryId: approveCategory, subCategoryIds: approveSubCategoryIds }),
+          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, startImmediately, discountNote, adminMemo, bizCallNumber, salesRepId, categoryId: approveCategory, subCategoryIds: approveSubCategoryIds }),
         }
       );
       if (!response.ok) {
@@ -533,18 +546,69 @@ export function useApplicationDetailPage(
         }
         throw new Error(err.error || 'Failed to approve');
       }
+      const result = await response.json();
       if (grantAnalytics && !detail.partnerAnalyticsEnabled) {
         await (supabase as any)
           .from('partner_users')
           .update({ analyticsEnabled: true })
           .eq('id', detail.partnerDbId);
       }
-      toast.success('광고 신청이 승인되었습니다.');
+      toast.success(result.startImmediately ? '광고를 승인하고 바로 시작했습니다.' : '광고 신청이 승인되었습니다.');
       setApproveDialog(false);
       router.push('/admin/advertising-v2/applications');
     } catch (err) {
       console.error('Failed to approve:', err);
       toast.error('광고 승인에 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // 광고중 → 청구 0원·정기결제 중단, 종료됨 → 카드 없이 무료 재시작. 파트너 알림 없음
+  const handleConvertFree = async () => {
+    if (!detail) return;
+    setProcessing(true);
+    try {
+      const response = await fetch(
+        `/api/advertising-v2/applications/${detail.id}/convert-free`,
+        { method: 'POST' }
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        toast.error(result.error || '무료 전환에 실패했습니다.');
+        return;
+      }
+      toast.success(result.restarted ? '무료 광고로 다시 시작했습니다.' : '무료 광고로 전환했습니다.');
+      setConvertFreeDialog(false);
+      fetchDetail();
+    } catch (err) {
+      console.error('Failed to convert to free:', err);
+      toast.error('무료 전환에 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // 종료된 광고만 삭제 가능 — 연결된 구독·결제 이력도 함께 지워진다
+  const handleDelete = async () => {
+    if (!detail) return;
+    setProcessing(true);
+    try {
+      const response = await fetch(
+        `/api/advertising-v2/applications/${detail.id}/delete`,
+        { method: 'POST' }
+      );
+      if (!response.ok) {
+        const err = await response.json();
+        toast.error(err.error || '광고 삭제에 실패했습니다.');
+        return;
+      }
+      toast.success('광고를 삭제했습니다.');
+      setDeleteDialog(false);
+      router.push('/admin/advertising-v2/applications');
+    } catch (err) {
+      console.error('Failed to delete advertisement:', err);
+      toast.error('광고 삭제에 실패했습니다.');
     } finally {
       setProcessing(false);
     }
@@ -712,6 +776,8 @@ export function useApplicationDetailPage(
     setOverrideEnabled,
     discountRate,
     setDiscountRate,
+    startImmediately,
+    setStartImmediately,
     discountNote,
     setDiscountNote,
     adminMemo,
@@ -727,6 +793,12 @@ export function useApplicationDetailPage(
     handleApprove,
     handleReject,
     handleUpdateMemo,
+    convertFreeDialog,
+    setConvertFreeDialog,
+    handleConvertFree,
+    deleteDialog,
+    setDeleteDialog,
+    handleDelete,
     modificationRejectDialog,
     setModificationRejectDialog,
     modificationRejectReason,

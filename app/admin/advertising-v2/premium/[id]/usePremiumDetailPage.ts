@@ -46,7 +46,8 @@ export interface ExtensionRow {
 export interface PremiumAdDetail {
   id: string;
   partnerId: string;
-  baseAdId: string;
+  /** 기본 광고가 삭제되면 null (FK ON DELETE SET NULL) */
+  baseAdId: string | null;
   title: string | null;
   content: string | null;
   imageUrls: string[];
@@ -277,15 +278,17 @@ export function usePremiumDetailPage(
         .eq('userId', row.partnerId)
         .maybeSingle();
 
-      // 카테고리는 기본 광고(advertisements_v2)에서 baseAdId로 조회
-      const baseAdId = row.baseAdId as string;
-      const { data: baseAdData } = await supabase
-        .from('advertisements_v2')
-        .select(
-          'categoryId, ad_categories_v2:categoryId(categoryName), advertisement_sub_categories_v2(ad_sub_categories_v2(subCategoryName))'
-        )
-        .eq('id', baseAdId)
-        .maybeSingle();
+      // 카테고리는 기본 광고(advertisements_v2)에서 baseAdId로 조회 — 기본 광고가 삭제됐으면 null
+      const baseAdId = (row.baseAdId as string | null) ?? null;
+      const { data: baseAdData } = baseAdId
+        ? await supabase
+            .from('advertisements_v2')
+            .select(
+              'categoryId, ad_categories_v2:categoryId(categoryName), advertisement_sub_categories_v2(ad_sub_categories_v2(subCategoryName))'
+            )
+            .eq('id', baseAdId)
+            .maybeSingle()
+        : { data: null };
 
       const baseAd = baseAdData as
         | {
@@ -304,7 +307,7 @@ export function usePremiumDetailPage(
       const mapped: PremiumAdDetail = {
         id: row.id as string,
         partnerId: row.partnerId,
-        baseAdId: row.baseAdId as string,
+        baseAdId,
         title: (row.title as string | null) ?? null,
         content: (row.content as string | null) ?? null,
         imageUrls: (row.imageUrls as string[]) ?? [],
@@ -384,10 +387,13 @@ export function usePremiumDetailPage(
           .from('premium_ad_analytics_v2')
           .select(`${analyticsSelect}, homePremiumImpressionCount`)
           .eq('premiumAdId', adId),
-        supabase
-          .from('ad_analytics_v2')
-          .select(`${analyticsSelect}, homeImpressionCount`)
-          .eq('baseAdId', baseAdId),
+        // 기본 광고가 삭제됐으면 기본광고 통계는 없다
+        baseAdId
+          ? supabase
+              .from('ad_analytics_v2')
+              .select(`${analyticsSelect}, homeImpressionCount`)
+              .eq('baseAdId', baseAdId)
+          : Promise.resolve({ data: [] }),
       ]);
 
       const sum = (paidRows ?? []).reduce(

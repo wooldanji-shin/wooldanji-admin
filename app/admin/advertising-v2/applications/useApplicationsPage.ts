@@ -53,6 +53,8 @@ export interface AdApplication {
   autoApproveModification: boolean;
   /** 숨김 처리한 광고 — 테스트·더미 분리용. 관리자 목록에는 그대로 남고 사용자 앱 노출에서만 빠진다 */
   isHidden: boolean;
+  /** 문열림 광고 팝업 우선 노출 — true인 광고가 하나라도 있으면 팝업은 그중에서만 고른다 */
+  showInDoorPopup: boolean;
   submittedAt: string | null;
   activatedAt: string | null;
   freeMonths: number;
@@ -167,6 +169,7 @@ export interface UseApplicationsPageReturn {
   totalMonthlyAmount: number;
   handleExportCsv: () => void;
   handleToggleHidden: (ad: AdApplication, next: boolean) => Promise<void>;
+  handleToggleDoorPopup: (ad: AdApplication, next: boolean) => Promise<void>;
   handleRowClick: (id: string) => void;
   // 목록 인라인 승인/거절
   selectedAd: AdApplication | null;
@@ -180,6 +183,8 @@ export interface UseApplicationsPageReturn {
   setOverrideEnabled: (v: boolean) => void;
   discountRate: number;
   setDiscountRate: (v: number) => void;
+  startImmediately: boolean;
+  setStartImmediately: (v: boolean) => void;
   discountNote: string;
   setDiscountNote: (v: string) => void;
   adminMemo: string;
@@ -259,6 +264,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const [freeMonths, setFreeMonths] = useState(0);
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [discountRate, setDiscountRate] = useState(0);
+  // 카드 등록 없이 바로 개시 — 할인율 100%일 때만 의미가 있고 서버가 다시 검사한다
+  const [startImmediately, setStartImmediately] = useState(false);
   const [discountNote, setDiscountNote] = useState('');
   const [adminMemo, setAdminMemo] = useState('');
   const [bizCallNumber, setBizCallNumber] = useState('');
@@ -354,6 +361,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
           modificationStatus,
           autoApproveModification,
           isHidden,
+          showInDoorPopup,
           submittedAt,
           activatedAt,
           freeMonths,
@@ -435,6 +443,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         modificationStatus: row.modificationStatus ?? null,
         autoApproveModification: row.autoApproveModification ?? false,
         isHidden: row.isHidden ?? false,
+        showInDoorPopup: row.showInDoorPopup ?? false,
         submittedAt: row.submittedAt,
         activatedAt: row.activatedAt ?? null,
         freeMonths: row.freeMonths,
@@ -646,6 +655,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     setFreeMonths(isFirstAd ? defaultFreeMonths : 0);
     setOverrideEnabled(false);
     setDiscountRate(isFirstAd ? defaultDiscountRate : 0);
+    setStartImmediately(false);
     setDiscountNote('');
     setAdminMemo('');
     // 이미 부여된 비즈콜이 있으면 그대로 노출 (재승인 시 실수로 지워지는 것 방지)
@@ -670,7 +680,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, bizCallNumber, salesRepId, categoryId: approveCategory, subCategoryIds: approveSubCategoryIds }),
+          body: JSON.stringify({ freeMonths, discountRate, overrideEnabled, startImmediately, discountNote, adminMemo, bizCallNumber, salesRepId, categoryId: approveCategory, subCategoryIds: approveSubCategoryIds }),
         }
       );
       if (!response.ok) {
@@ -682,13 +692,14 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         }
         throw new Error(err.error || 'Failed to approve');
       }
+      const result = await response.json();
       if (grantAnalytics && !selectedAd.partner_users?.analyticsEnabled && selectedAd.partner_users?.id) {
         await (supabase as any)
           .from('partner_users')
           .update({ analyticsEnabled: true })
           .eq('id', selectedAd.partner_users.id);
       }
-      toast.success('광고 신청이 승인되었습니다.');
+      toast.success(result.startImmediately ? '광고를 승인하고 바로 시작했습니다.' : '광고 신청이 승인되었습니다.');
       setApproveDialog(false);
       fetchApplications();
     } catch (err) {
@@ -697,7 +708,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     } finally {
       setProcessing(false);
     }
-  }, [selectedAd, freeMonths, discountRate, overrideEnabled, discountNote, adminMemo, bizCallNumber, bizCallDuplicateName, salesRepId, approveCategory, approveSubCategoryIds, grantAnalytics, supabase, fetchApplications]);
+  }, [selectedAd, freeMonths, discountRate, overrideEnabled, startImmediately, discountNote, adminMemo, bizCallNumber, bizCallDuplicateName, salesRepId, approveCategory, approveSubCategoryIds, grantAnalytics, supabase, fetchApplications]);
 
   const handleToggleAutoApprove = useCallback(async (ad: AdApplication, next: boolean) => {
     const ok = await setAutoApproveModification(supabase, 'advertisements_v2', ad.id, next);
@@ -723,6 +734,25 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       prev.map((a) => (a.id === ad.id ? { ...a, isHidden: next } : a))
     );
     toast.success(next ? '앱 노출에서 숨겼습니다.' : '숨김을 해제했습니다.');
+  }, [supabase]);
+
+  // 팝업 우선 토글 — 선택 로직은 DB 함수(get_random_dialog_ad)에 있어 앱 릴리스 없이 즉시 반영된다
+  const handleToggleDoorPopup = useCallback(async (ad: AdApplication, next: boolean) => {
+    const { error } = await (supabase as any)
+      .from('advertisements_v2')
+      .update({ showInDoorPopup: next })
+      .eq('id', ad.id);
+
+    if (error) {
+      console.error('팝업 우선 설정 변경 실패:', error);
+      toast.error('팝업 우선 설정 변경에 실패했습니다.');
+      return;
+    }
+
+    setApplications((prev) =>
+      prev.map((a) => (a.id === ad.id ? { ...a, showInDoorPopup: next } : a))
+    );
+    toast.success(next ? '문열림 팝업에 우선 노출합니다.' : '팝업 우선 노출을 해제했습니다.');
   }, [supabase]);
 
   const handleOpenReject = useCallback((ad: AdApplication) => {
@@ -794,6 +824,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     totalMonthlyAmount,
     handleExportCsv,
     handleToggleHidden,
+    handleToggleDoorPopup,
     handleRowClick,
     selectedAd,
     approveDialog,
@@ -806,6 +837,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     setOverrideEnabled,
     discountRate,
     setDiscountRate,
+    startImmediately,
+    setStartImmediately,
     discountNote,
     setDiscountNote,
     adminMemo,

@@ -824,6 +824,38 @@ export default function AdApplicationDetailPage({
               </Card>
             )}
 
+            {/* 무료 전환 · 삭제 — 광고중은 무료 전환만, 종료됨은 둘 다 */}
+            {(detail.adStatus === 'running' || detail.adStatus === 'ended') && (
+              <Card>
+                <CardContent className='space-y-2 px-6 py-4'>
+                  {!(detail.adStatus === 'running' && detail.approvedDiscountRate === 100) && (
+                    <Button
+                      variant='outline'
+                      size='lg'
+                      onClick={() => page.setConvertFreeDialog(true)}
+                      disabled={page.processing}
+                      className='w-full gap-2'
+                    >
+                      <Tag className='h-4 w-4' />
+                      {detail.adStatus === 'ended' ? '무료 광고로 다시 시작' : '무료 광고로 전환'}
+                    </Button>
+                  )}
+                  {detail.adStatus === 'ended' && (
+                    <Button
+                      variant='outline'
+                      size='lg'
+                      onClick={() => page.setDeleteDialog(true)}
+                      disabled={page.processing}
+                      className='w-full gap-2 text-red-600 hover:text-red-700'
+                    >
+                      <X className='h-4 w-4' />
+                      광고 삭제
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* 수정 심사 액션 */}
             {detail.modificationStatus === 'pending' && (
               <Card>
@@ -1008,6 +1040,22 @@ export default function AdApplicationDetailPage({
                 </p>
               )}
             </div>
+            {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다 — 등록·수정 폼과 같은 조건 */}
+            {(detail.isFirstAd || page.overrideEnabled) && page.discountRate === 100 && (
+              <label className='flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/40 p-3'>
+                <Checkbox
+                  className='mt-0.5'
+                  checked={page.startImmediately}
+                  onCheckedChange={(checked) => page.setStartImmediately(checked === true)}
+                />
+                <span className='space-y-1 text-sm'>
+                  <span className='block font-medium'>카드 등록 없이 바로 광고 시작</span>
+                  <span className='block text-xs text-muted-foreground'>
+                    승인과 동시에 노출됩니다. 파트너 결제를 건너뛰고 정기결제는 돌지 않습니다.
+                  </span>
+                </span>
+              </label>
+            )}
             {/* 광고 분석 열람 권한 부여 */}
             <div className='rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1.5'>
               <label className='flex items-center gap-2 cursor-pointer'>
@@ -1138,6 +1186,62 @@ export default function AdApplicationDetailPage({
 
       <ImageLightbox {...adImgLb.props} />
       <ImageLightbox {...pendingImgLb.props} />
+
+      {/* 무료 전환 확인 */}
+      <Dialog open={page.convertFreeDialog} onOpenChange={page.setConvertFreeDialog}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>
+              {detail.adStatus === 'ended' ? '무료 광고로 다시 시작' : '무료 광고로 전환'}
+            </DialogTitle>
+            <DialogDescription>
+              {detail.adStatus === 'ended'
+                ? '종료된 광고를 100% 할인으로 다시 시작합니다. 파트너 결제 없이 바로 노출되고 정기결제는 돌지 않습니다.'
+                : '이 광고를 100% 할인으로 전환합니다. 다음 결제일부터 청구되지 않습니다.'}
+              {detail.subscriptionStatus === 'cancel_pending' && ' 해지 예약은 그대로 유지됩니다.'}
+              {' '}파트너에게 알림은 가지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => page.setConvertFreeDialog(false)}
+              disabled={page.processing}
+            >
+              취소
+            </Button>
+            <Button onClick={page.handleConvertFree} disabled={page.processing}>
+              {page.processing ? '처리 중...' : '전환'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 */}
+      <Dialog open={page.deleteDialog} onOpenChange={page.setDeleteDialog}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>광고 삭제</DialogTitle>
+            <DialogDescription>
+              이 광고를 삭제합니다. 연결된 노출 아파트, 구독, 결제 이력이 함께 삭제되며 되돌릴 수 없습니다.
+              프리미엄 광고는 남지만 기본 광고와의 연결이 끊어져 파트너 앱에서는 보이지 않습니다. 파트너에게 알림은
+              가지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => page.setDeleteDialog(false)}
+              disabled={page.processing}
+            >
+              취소
+            </Button>
+            <Button variant='destructive' onClick={page.handleDelete} disabled={page.processing}>
+              {page.processing ? '처리 중...' : '삭제'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 수정 거절 다이얼로그 */}
       <Dialog open={page.modificationRejectDialog} onOpenChange={page.setModificationRejectDialog}>
