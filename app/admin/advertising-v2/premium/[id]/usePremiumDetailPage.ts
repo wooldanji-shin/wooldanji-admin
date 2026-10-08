@@ -211,6 +211,13 @@ export interface UsePremiumDetailPageReturn {
   autoApproveToggling: boolean;
   handleToggleAutoApprove: (next: boolean) => Promise<void>;
   handleUpdateMemo: () => Promise<void>;
+  // 삭제 — 되돌릴 수 없어 두 번 확인받는다
+  deleteDialog: boolean;
+  setDeleteDialog: (open: boolean) => void;
+  deleteFinalDialog: boolean;
+  setDeleteFinalDialog: (open: boolean) => void;
+  confirmDeleteFirstStep: () => void;
+  handleDelete: () => Promise<void>;
 }
 
 export function usePremiumDetailPage(
@@ -239,6 +246,8 @@ export function usePremiumDetailPage(
   const [modificationRejectDialog, setModificationRejectDialog] = useState<boolean>(false);
   const [modificationRejectReason, setModificationRejectReason] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
+  const [deleteDialog, setDeleteDialog] = useState<boolean>(false);
+  const [deleteFinalDialog, setDeleteFinalDialog] = useState<boolean>(false);
 
   useEffect(() => {
     params.then((p) => setAdId(p.id));
@@ -521,6 +530,33 @@ export function usePremiumDetailPage(
     }
   };
 
+  const confirmDeleteFirstStep = (): void => {
+    setDeleteDialog(false);
+    setDeleteFinalDialog(true);
+  };
+
+  // 프리미엄 결제 이력·분석 데이터도 함께 지워진다
+  const handleDelete = async (): Promise<void> => {
+    if (!detail) return;
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/advertising-v2/premium/${detail.id}/delete`, { method: 'POST' });
+      if (!res.ok) {
+        const result = await res.json();
+        toast.error(result.error ?? '프리미엄 광고 삭제에 실패했습니다.');
+        return;
+      }
+      toast.success('프리미엄 광고를 삭제했습니다.');
+      setDeleteFinalDialog(false);
+      router.push('/admin/advertising-v2/premium');
+    } catch (err) {
+      console.error('프리미엄 광고 삭제 실패:', err);
+      toast.error('프리미엄 광고 삭제에 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleUpdateMemo = async (): Promise<void> => {
     if (!detail) return;
     setProcessing(true);
@@ -669,5 +705,11 @@ export function usePremiumDetailPage(
     autoApproveToggling,
     handleToggleAutoApprove,
     handleUpdateMemo,
+    deleteDialog,
+    setDeleteDialog,
+    deleteFinalDialog,
+    setDeleteFinalDialog,
+    confirmDeleteFirstStep,
+    handleDelete,
   };
 }

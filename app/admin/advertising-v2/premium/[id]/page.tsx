@@ -834,6 +834,24 @@ export default function PremiumAdDetailPage({
               </Card>
             )}
 
+            {/* 삭제 — 임시저장을 뺀 모든 상태 (기본 광고를 지우려면 프리미엄부터 지워야 한다) */}
+            {detail.status !== 'draft' && (
+              <Card>
+                <CardContent className='px-6 py-4'>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() => page.setDeleteDialog(true)}
+                    disabled={page.processing}
+                    className='w-full gap-2 text-red-600 hover:text-red-700'
+                  >
+                    <X className='h-4 w-4' />
+                    프리미엄 광고 삭제
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 관리 메모 */}
             <Card>
               <CardHeader className='pb-3'>
@@ -864,6 +882,50 @@ export default function PremiumAdDetailPage({
           </div>
         </aside>
       </div>
+
+      {/* 삭제 확인 */}
+      <Dialog open={page.deleteDialog} onOpenChange={page.setDeleteDialog}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>프리미엄 광고 삭제</DialogTitle>
+            <DialogDescription>
+              이 프리미엄 광고를 삭제합니다. 프리미엄 결제 이력과 분석 데이터가 함께 삭제되며 되돌릴 수 없습니다.
+              {detail.status === 'running' &&
+                ' 진행 중인 광고라 앱 노출이 즉시 중단되며, 이미 결제한 금액은 환불되지 않습니다.'}
+              {' '}파트너에게 알림은 가지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => page.setDeleteDialog(false)} disabled={page.processing}>
+              취소
+            </Button>
+            <Button variant='destructive' onClick={page.confirmDeleteFirstStep} disabled={page.processing}>
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 최종 확인 — 되돌릴 수 없어 한 번 더 묻는다 */}
+      <Dialog open={page.deleteFinalDialog} onOpenChange={page.setDeleteFinalDialog}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>정말 삭제할까요?</DialogTitle>
+            <DialogDescription>
+              &lsquo;{detail.title || '제목 없음'}&rsquo; 프리미엄 광고와 결제 이력이 영구 삭제됩니다.
+              삭제한 뒤에는 복구할 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => page.setDeleteFinalDialog(false)} disabled={page.processing}>
+              취소
+            </Button>
+            <Button variant='destructive' onClick={page.handleDelete} disabled={page.processing}>
+              {page.processing ? '처리 중...' : '영구 삭제'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 거절 다이얼로그 */}
       <Dialog open={page.rejectDialog} onOpenChange={page.setRejectDialog}>

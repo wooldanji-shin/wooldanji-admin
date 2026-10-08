@@ -824,7 +824,7 @@ export default function AdApplicationDetailPage({
               </Card>
             )}
 
-            {/* 무료 전환 · 삭제 — 광고중은 무료 전환만, 종료됨은 둘 다 */}
+            {/* 무료 전환 · 삭제 — 광고중·종료됨 모두 */}
             {(detail.adStatus === 'running' || detail.adStatus === 'ended') && (
               <Card>
                 <CardContent className='space-y-2 px-6 py-4'>
@@ -840,17 +840,31 @@ export default function AdApplicationDetailPage({
                       {detail.adStatus === 'ended' ? '무료 광고로 다시 시작' : '무료 광고로 전환'}
                     </Button>
                   )}
-                  {detail.adStatus === 'ended' && (
-                    <Button
-                      variant='outline'
-                      size='lg'
-                      onClick={() => page.setDeleteDialog(true)}
-                      disabled={page.processing}
-                      className='w-full gap-2 text-red-600 hover:text-red-700'
-                    >
-                      <X className='h-4 w-4' />
-                      광고 삭제
-                    </Button>
+                  <Button
+                    variant='outline'
+                    size='lg'
+                    onClick={() => page.setDeleteDialog(true)}
+                    disabled={page.processing || page.linkedPremiums.length > 0}
+                    className='w-full gap-2 text-red-600 hover:text-red-700'
+                  >
+                    <X className='h-4 w-4' />
+                    광고 삭제
+                  </Button>
+                  {/* 프리미엄은 노출 아파트·카테고리를 기본 광고에서 가져오므로 프리미엄부터 지워야 한다 */}
+                  {page.linkedPremiums.length > 0 && (
+                    <div className='space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm'>
+                      <p>연결된 프리미엄 광고를 먼저 삭제해야 합니다.</p>
+                      {page.linkedPremiums.map((premium) => (
+                        <button
+                          key={premium.id}
+                          type='button'
+                          onClick={() => router.push(`/admin/advertising-v2/premium/${premium.id}`)}
+                          className='block text-left text-primary underline-offset-2 hover:underline'
+                        >
+                          {premium.title || '제목 없음'} 프리미엄 광고로 이동
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -1224,8 +1238,9 @@ export default function AdApplicationDetailPage({
             <DialogTitle>광고 삭제</DialogTitle>
             <DialogDescription>
               이 광고를 삭제합니다. 연결된 노출 아파트, 구독, 결제 이력이 함께 삭제되며 되돌릴 수 없습니다.
-              프리미엄 광고는 남지만 기본 광고와의 연결이 끊어져 파트너 앱에서는 보이지 않습니다. 파트너에게 알림은
-              가지 않습니다.
+              {detail.adStatus === 'running' &&
+                ' 광고중인 광고라 앱 노출과 정기결제가 즉시 중단되며, 이미 결제한 금액은 환불되지 않습니다.'}
+              {' '}파트너에게 알림은 가지 않습니다.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1236,8 +1251,33 @@ export default function AdApplicationDetailPage({
             >
               취소
             </Button>
+            <Button variant='destructive' onClick={page.confirmDeleteFirstStep} disabled={page.processing}>
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 최종 확인 — 되돌릴 수 없어 한 번 더 묻는다 */}
+      <Dialog open={page.deleteFinalDialog} onOpenChange={page.setDeleteFinalDialog}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>정말 삭제할까요?</DialogTitle>
+            <DialogDescription>
+              &lsquo;{detail.title || '제목 없음'}&rsquo; 광고와 구독·결제 이력이 영구 삭제됩니다.
+              삭제한 뒤에는 복구할 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => page.setDeleteFinalDialog(false)}
+              disabled={page.processing}
+            >
+              취소
+            </Button>
             <Button variant='destructive' onClick={page.handleDelete} disabled={page.processing}>
-              {page.processing ? '처리 중...' : '삭제'}
+              {page.processing ? '처리 중...' : '영구 삭제'}
             </Button>
           </DialogFooter>
         </DialogContent>

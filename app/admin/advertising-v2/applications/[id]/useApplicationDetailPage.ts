@@ -164,6 +164,12 @@ function sumAnalyticsRows(rows: any[]): AdAnalyticsSummary {
   return sum;
 }
 
+export interface LinkedPremium {
+  id: string;
+  title: string | null;
+  status: string;
+}
+
 export interface UseApplicationDetailPageReturn {
   detail: AdApplicationDetail | null;
   loading: boolean;
@@ -206,6 +212,11 @@ export interface UseApplicationDetailPageReturn {
   setConvertFreeDialog: (open: boolean) => void;
   handleConvertFree: () => Promise<void>;
   deleteDialog: boolean;
+  /** 이 광고에 연결된 프리미엄 (임시저장 제외) — 있으면 기본 광고를 삭제할 수 없다 */
+  linkedPremiums: LinkedPremium[];
+  deleteFinalDialog: boolean;
+  setDeleteFinalDialog: (open: boolean) => void;
+  confirmDeleteFirstStep: () => void;
   setDeleteDialog: (open: boolean) => void;
   handleDelete: () => Promise<void>;
   // 수정 심사
@@ -238,6 +249,7 @@ export function useApplicationDetailPage(
 
   const [adId, setAdId] = useState<string>('');
   const [detail, setDetail] = useState<AdApplicationDetail | null>(null);
+  const [linkedPremiums, setLinkedPremiums] = useState<LinkedPremium[]>([]);
   // 파트너 영업시간·쿠폰은 공용 훅으로 분리 (partner_users.id 기준)
   // 일별 통계 원본 — 기간 필터는 클라이언트에서 적용한다
   const [analyticsRows, setAnalyticsRows] = useState<any[]>([]);
@@ -260,6 +272,8 @@ export function useApplicationDetailPage(
   const [modificationRejectDialog, setModificationRejectDialog] = useState(false);
   const [convertFreeDialog, setConvertFreeDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
+  // 되돌릴 수 없는 삭제라 한 번 더 확인받는다
+  const [deleteFinalDialog, setDeleteFinalDialog] = useState(false);
   const [modificationRejectReason, setModificationRejectReason] = useState('');
   const [grantAnalytics, setGrantAnalytics] = useState(false);
   const [allCategories, setAllCategories] = useState<AdCategoryWithSubs[]>([]);
@@ -589,7 +603,24 @@ export function useApplicationDetailPage(
     }
   };
 
-  // 종료된 광고만 삭제 가능 — 연결된 구독·결제 이력도 함께 지워진다
+  useEffect(() => {
+    const adId = detail?.id;
+    if (!adId) return;
+    supabase
+      .from('premium_advertisements_v2')
+      .select('id, title, status')
+      .eq('baseAdId', adId)
+      .neq('status', 'draft')
+      .order('createdAt', { ascending: false })
+      .then(({ data }) => setLinkedPremiums((data ?? []) as LinkedPremium[]));
+  }, [detail?.id, supabase]);
+
+  const confirmDeleteFirstStep = () => {
+    setDeleteDialog(false);
+    setDeleteFinalDialog(true);
+  };
+
+  // 광고중·종료된 광고 삭제 — 연결된 구독·결제 이력도 함께 지워진다
   const handleDelete = async () => {
     if (!detail) return;
     setProcessing(true);
@@ -604,7 +635,7 @@ export function useApplicationDetailPage(
         return;
       }
       toast.success('광고를 삭제했습니다.');
-      setDeleteDialog(false);
+      setDeleteFinalDialog(false);
       router.push('/admin/advertising-v2/applications');
     } catch (err) {
       console.error('Failed to delete advertisement:', err);
@@ -797,6 +828,10 @@ export function useApplicationDetailPage(
     setConvertFreeDialog,
     handleConvertFree,
     deleteDialog,
+    linkedPremiums,
+    deleteFinalDialog,
+    setDeleteFinalDialog,
+    confirmDeleteFirstStep,
     setDeleteDialog,
     handleDelete,
     modificationRejectDialog,
