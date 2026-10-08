@@ -42,6 +42,9 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
   const {
     isEdit,
     contentOnly,
+    apartmentsEditable,
+    apartmentLockReason,
+    runningAmounts,
     loadError,
     form,
     patch,
@@ -254,14 +257,14 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
         <CardHeader>
           <CardTitle>
             노출 아파트{' '}
-            {contentOnly
-              ? <span className="text-sm font-normal text-muted-foreground">(수정 불가)</span>
-              : <span className="text-destructive">*</span>}
+            {apartmentsEditable
+              ? <span className="text-destructive">*</span>
+              : <span className="text-sm font-normal text-muted-foreground">(수정 불가)</span>}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* 광고중에는 아파트가 곧 월 광고료의 근거라 여기서 바꾸지 않는다 */}
-          {contentOnly ? (
+          {/* 광고중 광고는 구독 상태상 금액을 안전하게 바꿀 수 있을 때만 아파트를 연다 */}
+          {!apartmentsEditable ? (
             <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
               <p className="text-muted-foreground">
                 {apartments
@@ -269,11 +272,16 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
                   .map((apt) => apt.name)
                   .join(', ') || '-'}
               </p>
-              <p>
-                노출 아파트를 바꾸려면 파트너의 수정 요청을 받아 심사해야 합니다.
-              </p>
+              <p>{apartmentLockReason}</p>
             </div>
           ) : (
+            <>
+            {contentOnly && (
+              <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p>노출 아파트를 바꾸면 저장 즉시 앱 노출이 바뀌고, 월 광고료는 다음 정기결제부터 새 금액으로 청구됩니다.</p>
+                <p>할인율·무료기간·다음 결제일은 그대로이며, 진행 중인 프리미엄 광고도 바뀐 아파트에 노출됩니다. 파트너에게 알림은 가지 않습니다.</p>
+              </div>
+            )}
             <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
               {apartments.map((apt) => (
                 <label
@@ -291,6 +299,7 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
                 </label>
               ))}
             </div>
+            </>
           )}
           <p className="text-sm">
             선택 {form.apartmentIds.length}곳 · 총{' '}
@@ -458,21 +467,26 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
       <Card>
         <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
           <div className="text-sm">
-            <p>
-              {contentOnly ? '현재 월 광고료' : '예상 월 광고료'}{' '}
-              <strong className="text-base">
-                {estimatedMonthlyAmount.toLocaleString()}원
-              </strong>
-              {contentOnly && (
-                <span className="ml-2 text-muted-foreground">변동 없음</span>
-              )}
-            </p>
-            <p className="text-muted-foreground">
-              {totalHouseholds.toLocaleString()}세대 ×{' '}
-              {page.pricePerHousehold.toLocaleString()}원
-              {benefitsApplied && form.discountRate > 0 && ` · ${form.discountRate}% 할인`}
-              {benefitsApplied && form.freeMonths > 0 && ` · ${form.freeMonths}개월 무료`}
-            </p>
+            {runningAmounts ? (
+              <RunningAmountSummary amounts={runningAmounts} />
+            ) : contentOnly ? (
+              <p className="text-muted-foreground">현재 월 광고료 변동 없음</p>
+            ) : (
+              <>
+                <p>
+                  예상 월 광고료{' '}
+                  <strong className="text-base">
+                    {estimatedMonthlyAmount.toLocaleString()}원
+                  </strong>
+                </p>
+                <p className="text-muted-foreground">
+                  {totalHouseholds.toLocaleString()}세대 ×{' '}
+                  {page.pricePerHousehold.toLocaleString()}원
+                  {benefitsApplied && form.discountRate > 0 && ` · ${form.discountRate}% 할인`}
+                  {benefitsApplied && form.freeMonths > 0 && ` · ${form.freeMonths}개월 무료`}
+                </p>
+              </>
+            )}
             {page.ctaError && (
               <p className="mt-1 text-destructive">{page.ctaError}</p>
             )}
@@ -485,5 +499,36 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
         </CardContent>
       </Card>
     </PageShell>
+  );
+}
+
+/** 광고중 광고의 월 광고료 — 실제 청구액과, 아파트를 바꿨다면 다음 결제부터의 금액 */
+function RunningAmountSummary({
+  amounts,
+}: {
+  amounts: NonNullable<ReturnType<typeof useAdForm>['runningAmounts']>;
+}) {
+  const { currentMonthlyAmount, next } = amounts;
+  return (
+    <>
+      <p>
+        현재 월 광고료{' '}
+        <strong className="text-base">{currentMonthlyAmount.toLocaleString()}원</strong>
+        {next && (
+          <>
+            {' → '}
+            <strong className="text-base text-primary">
+              {next.monthlyAmount.toLocaleString()}원
+            </strong>
+          </>
+        )}
+      </p>
+      <p className="text-muted-foreground">
+        {next
+          ? `다음 정기결제부터 청구 · 정상가 ${next.originalMonthlyAmount.toLocaleString()}원` +
+            (next.method === 'proportional' ? ' · 기존 단가 유지(세대수 비율 조정)' : '')
+          : '노출 아파트를 바꾸지 않으면 변동 없음'}
+      </p>
+    </>
   );
 }

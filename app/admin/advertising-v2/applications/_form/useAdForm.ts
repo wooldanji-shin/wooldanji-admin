@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { arrayMove } from '@dnd-kit/sortable';
 import { createClient } from '@/lib/supabase/client';
-import { calcMonthlyAmount } from '@/lib/ads/pricing';
+import { calcMonthlyAmount, repriceRunningAd, type RunningAdBilling } from '@/lib/ads/pricing';
 import { MAX_AD_IMAGES } from '@/lib/ads/constants';
 import { uploadImageFile } from '@/lib/utils/upload-image';
 import { deleteFilesFromStorage } from '@/lib/utils/storage';
@@ -102,8 +102,9 @@ const EMPTY_FORM: AdFormState = {
  * 광고 대리 등록/수정 폼 상태
  *
  * [adId]를 주면 기존 광고를 불러와 수정 모드로 동작한다. 파트너는 바꿀 수 없다.
- * 광고중(running)이면 내용·카테고리만 고치는 모드(contentOnly) — 아파트·할인·무료기간은
- * 돌고 있는 구독 청구액의 근거라 잠근다.
+ * 광고중(running)이면 할인·무료기간을 잠그는 모드(contentOnly). 노출 아파트는 바꿀 수 있고,
+ * 바꾸면 서버가 청구액을 다시 계산해 다음 정기결제부터 적용한다. 단, 구독 상태상 금액을
+ * 안전하게 바꿀 수 없으면 아파트도 잠근다(apartmentLockReason).
  */
 export function useAdForm(adId?: string) {
   const router = useRouter();
@@ -120,6 +121,10 @@ export function useAdForm(adId?: string) {
   const [originalImageUrls, setOriginalImageUrls] = useState<string[]>([]);
   // 광고중 수정 — 금액의 근거가 되는 입력을 잠근다
   const [contentOnly, setContentOnly] = useState(false);
+  // 광고중 광고의 현재 청구 조건 — 아파트를 바꿨을 때 새 금액 미리보기의 기준
+  const [runningBilling, setRunningBilling] = useState<RunningAdBilling | null>(null);
+  const [apartmentLockReason, setApartmentLockReason] = useState<string | null>(null);
+  const [originalApartmentIds, setOriginalApartmentIds] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -138,7 +143,7 @@ export function useAdForm(adId?: string) {
           .maybeSingle(),
         supabase
           .from('advertisement_apartments_v2')
-          .select('apartmentId')
+          .select('apartmentId, totalHouseholds')
           .eq('advertisementId', id),
         supabase
           .from('advertisement_sub_categories_v2')
@@ -162,9 +167,11 @@ export function useAdForm(adId?: string) {
         return;
       }
       setContentOnly(isRunning);
+      if (isRunning) await loadRunningBilling(ad, (aptRes.data ?? []) as any[]);
 
       const partner = partnerList.find((p) => p.id === ad.partnerId);
 
+      setOriginalApartmentIds(((aptRes.data ?? []) as any[]).map((a) => a.apartmentId));
       setExistingIsFirstAd(ad.isFirstAdApplication === true);
       // 저장 시 제거된 이미지를 가려내기 위해 원본 목록을 남겨둔다
       setOriginalImageUrls((ad.imageUrls ?? []) as string[]);
@@ -196,6 +203,56 @@ export function useAdForm(adId?: string) {
         salesRepId: ad.salesRepId ?? null,
         // 이미 개시된 광고를 다시 개시할 수는 없으므로 항상 꺼진 상태로 연다
         startImmediately: false,
+      });
+    };
+
+    // 서버(update API)와 같은 조건으로 잠근다 — 화면에서 미리 막아 저장 실패를 줄인다
+    const loadRunningBilling = async (ad: any, currentApartments: any[]) => {
+      if (ad.apartmentChangeStatus) {
+        setApartmentLockReason('파트너의 아파트 변경이 대기 중이라 노출 아파트를 바꿀 수 없습니다.');
+        return;
+      }
+
+      const { data } = await supabase
+        .from('ad_subscriptions_v2')
+        .select('subscriptionStatus, monthlyAmount, originalMonthlyAmount, discountRate')
+        .eq('advertisementId', ad.id)
+        .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
+        .order('createdAt', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const sub = data as {
+        subscriptionStatus: string;
+        monthlyAmount: number | null;
+        originalMonthlyAmount: number | null;
+        discountRate: number | null;
+      } | null;
+
+      if (!sub) {
+        setApartmentLockReason('진행 중인 구독이 없어 노출 아파트를 바꿀 수 없습니다.');
+        return;
+      }
+      if (sub.subscriptionStatus === 'grace_period') {
+        setApartmentLockReason('결제 실패로 재시도 중인 광고는 노출 아파트를 바꿀 수 없습니다.');
+        return;
+      }
+
+      const discountRate = ad.approvedDiscountRate ?? 0;
+      if (
+        sub.monthlyAmount == null ||
+        sub.originalMonthlyAmount == null ||
+        sub.monthlyAmount !== ad.approvedMonthlyAmount ||
+        (sub.discountRate ?? 0) !== discountRate
+      ) {
+        setApartmentLockReason('광고와 구독의 금액 정보가 일치하지 않아 노출 아파트를 바꿀 수 없습니다.');
+        return;
+      }
+
+      setRunningBilling({
+        totalHouseholds: currentApartments.reduce((sum, a) => sum + (a.totalHouseholds ?? 0), 0),
+        monthlyAmount: sub.monthlyAmount,
+        originalMonthlyAmount: sub.originalMonthlyAmount,
+        discountRate,
       });
     };
 
@@ -449,6 +506,20 @@ export function useAdForm(adId?: string) {
     benefitsApplied ? form.discountRate : 0
   );
 
+  const apartmentsEditable = !contentOnly || runningBilling !== null;
+  const apartmentsChanged =
+    form.apartmentIds.length !== originalApartmentIds.length ||
+    form.apartmentIds.some((id) => !originalApartmentIds.includes(id));
+  // 광고중 광고의 금액 — 현재 단가로 다시 계산하면 예전 단가 광고의 실제 청구액과 달라진다.
+  // 실제 청구액을 보여주고, 아파트를 바꾸면 서버와 같은 함수로 새 금액을 미리 계산한다.
+  const runningAmounts = useMemo(() => {
+    if (!contentOnly || !runningBilling) return null;
+    const next = apartmentsChanged && totalHouseholds > 0
+      ? repriceRunningAd(runningBilling, totalHouseholds, pricePerHousehold)
+      : null;
+    return { currentMonthlyAmount: runningBilling.monthlyAmount, next };
+  }, [contentOnly, runningBilling, apartmentsChanged, totalHouseholds, pricePerHousehold]);
+
   const canSubmit =
     !!form.partnerId &&
     !!form.categoryId &&
@@ -528,6 +599,10 @@ export function useAdForm(adId?: string) {
   return {
     isEdit,
     contentOnly,
+    apartmentsEditable,
+    apartmentLockReason,
+    apartmentsChanged,
+    runningAmounts,
     loadError,
     form,
     patch,

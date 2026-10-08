@@ -6,6 +6,7 @@ import {
   calcMonthlyAmount,
   fetchApartmentHouseholds,
   fetchPricePerHousehold,
+  repriceRunningAd,
   resolveBenefits,
 } from '@/lib/ads/pricing';
 import { ctaButtonsError, ctaUrlOfType, type CtaButton } from '@/lib/cta-button';
@@ -125,12 +126,179 @@ async function updatePartner(
   if (error) console.error('Failed to update partner:', error);
 }
 
+interface ApartmentRow {
+  apartmentId: string;
+  totalHouseholds: number;
+}
+
+function sameApartments(current: ApartmentRow[], nextIds: string[]): boolean {
+  const currentIds = new Set(current.map((a) => a.apartmentId));
+  return currentIds.size === nextIds.length && nextIds.every((aptId) => currentIds.has(aptId));
+}
+
+async function replaceApartments(
+  admin: ReturnType<typeof createAdminClient>,
+  advertisementId: string,
+  rows: ApartmentRow[]
+): Promise<boolean> {
+  const { error: deleteError } = await admin
+    .from('advertisement_apartments_v2')
+    .delete()
+    .eq('advertisementId', advertisementId);
+  if (deleteError) {
+    console.error('Failed to clear apartments:', deleteError);
+    return false;
+  }
+
+  const { error: insertError } = await admin
+    .from('advertisement_apartments_v2')
+    .insert(rows.map((row) => ({ advertisementId, ...row })));
+  if (insertError) {
+    console.error('Failed to insert apartments:', insertError);
+    return false;
+  }
+  return true;
+}
+
+type ChangeResult = { ok: true } | { ok: false; status: number; error: string };
+
+/**
+ * 광고중 광고의 노출 아파트를 관리자가 바꾼다.
+ *
+ * 아파트는 즉시 교체하고, 새 금액은 구독 청구액에 넣어 다음 정기결제부터 청구된다.
+ * 할인율·무료기간·다음 결제일은 그대로 둔다. 차액 결제·환불·파트너 알림은 없다.
+ */
+async function changeRunningApartments(
+  admin: ReturnType<typeof createAdminClient>,
+  ad: { id: string; apartmentChangeStatus: string | null; approvedMonthlyAmount: number | null; approvedDiscountRate: number | null },
+  currentApartments: ApartmentRow[],
+  nextApartmentIds: string[]
+): Promise<ChangeResult> {
+  // 결제일·차액결제 시점에 대기 중인 아파트가 관리자가 바꾼 아파트를 덮어쓴다
+  if (ad.apartmentChangeStatus) {
+    return { ok: false, status: 409, error: '파트너의 아파트 변경이 대기 중입니다. 변경이 끝난 뒤 다시 시도해주세요.' };
+  }
+
+  const { data: subscription } = await admin
+    .from('ad_subscriptions_v2')
+    .select('id, subscriptionStatus, monthlyAmount, originalMonthlyAmount, discountRate')
+    .eq('advertisementId', ad.id)
+    .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const sub = subscription as {
+    id: string;
+    subscriptionStatus: string;
+    monthlyAmount: number | null;
+    originalMonthlyAmount: number | null;
+    discountRate: number | null;
+  } | null;
+
+  if (!sub) {
+    return { ok: false, status: 409, error: '진행 중인 구독이 없어 아파트를 변경할 수 없습니다.' };
+  }
+  // 재시도는 지난 주기를 청구하는데, 구독 금액을 바꾸면 새 금액으로 청구된다
+  if (sub.subscriptionStatus === 'grace_period') {
+    return { ok: false, status: 409, error: '결제 실패로 재시도 중인 광고는 아파트를 변경할 수 없습니다.' };
+  }
+
+  const discountRate = ad.approvedDiscountRate ?? 0;
+  // 광고와 구독의 금액 근거가 어긋나 있으면 어느 쪽을 기준으로 할지 알 수 없다 — 계산하지 않는다
+  if (
+    sub.monthlyAmount == null ||
+    sub.originalMonthlyAmount == null ||
+    sub.monthlyAmount !== ad.approvedMonthlyAmount ||
+    (sub.discountRate ?? 0) !== discountRate
+  ) {
+    return { ok: false, status: 409, error: '광고와 구독의 금액 정보가 일치하지 않아 변경할 수 없습니다. 개발팀에 문의해주세요.' };
+  }
+
+  const currentHouseholds = currentApartments.reduce((sum, a) => sum + (a.totalHouseholds ?? 0), 0);
+  if (currentHouseholds <= 0) {
+    return { ok: false, status: 409, error: '현재 노출 아파트의 세대수 정보가 없어 금액을 계산할 수 없습니다.' };
+  }
+
+  const households = await fetchApartmentHouseholds(admin, nextApartmentIds);
+  if (nextApartmentIds.some((aptId) => !households.has(aptId))) {
+    return { ok: false, status: 400, error: '세대수 정보가 없는 아파트가 있습니다. 아파트 동 정보를 먼저 등록해주세요.' };
+  }
+  const nextRows = nextApartmentIds.map((apartmentId) => ({
+    apartmentId,
+    totalHouseholds: households.get(apartmentId) ?? 0,
+  }));
+  const nextHouseholds = nextRows.reduce((sum, a) => sum + a.totalHouseholds, 0);
+  if (nextHouseholds <= 0) {
+    return { ok: false, status: 400, error: ZERO_HOUSEHOLDS_MESSAGE };
+  }
+
+  let pricePerHousehold: number;
+  try {
+    pricePerHousehold = await fetchPricePerHousehold(admin);
+  } catch {
+    return { ok: false, status: 500, error: PRICE_LOOKUP_FAILED_MESSAGE };
+  }
+
+  const repriced = repriceRunningAd(
+    {
+      totalHouseholds: currentHouseholds,
+      monthlyAmount: sub.monthlyAmount,
+      originalMonthlyAmount: sub.originalMonthlyAmount,
+      discountRate,
+    },
+    nextHouseholds,
+    pricePerHousehold
+  );
+
+  // 구독 청구액을 마지막에 바꾼다 — 앞 단계가 실패해도 청구액은 원래 그대로 남는다
+  if (!(await replaceApartments(admin, ad.id, nextRows))) {
+    // 지우기만 되고 넣기가 실패했을 수 있으니 원래 아파트로 되돌린다
+    await replaceApartments(admin, ad.id, currentApartments);
+    return { ok: false, status: 500, error: 'Failed to update apartments' };
+  }
+
+  const { error: adError } = await admin
+    .from('advertisements_v2')
+    .update({ approvedMonthlyAmount: repriced.monthlyAmount })
+    .eq('id', ad.id);
+  if (adError) {
+    console.error('Failed to update approvedMonthlyAmount:', adError);
+    await replaceApartments(admin, ad.id, currentApartments);
+    return { ok: false, status: 500, error: 'Failed to update advertisement' };
+  }
+
+  const { error: subError } = await admin
+    .from('ad_subscriptions_v2')
+    .update({
+      monthlyAmount: repriced.monthlyAmount,
+      originalMonthlyAmount: repriced.originalMonthlyAmount,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', sub.id);
+  if (subError) {
+    console.error('Failed to update subscription amount:', subError);
+    await admin
+      .from('advertisements_v2')
+      .update({ approvedMonthlyAmount: ad.approvedMonthlyAmount })
+      .eq('id', ad.id);
+    await replaceApartments(admin, ad.id, currentApartments);
+    return { ok: false, status: 500, error: 'Failed to update subscription' };
+  }
+
+  console.log(
+    `[admin-apartment-change] ad=${ad.id} method=${repriced.method} households=${currentHouseholds}->${nextHouseholds} ` +
+    `monthly=${sub.monthlyAmount}->${repriced.monthlyAmount} original=${sub.originalMonthlyAmount}->${repriced.originalMonthlyAmount}`
+  );
+  return { ok: true };
+}
+
 /**
  * 관리자가 광고를 고친다.
  *
  * 결제 전(approved + unpaid)은 전부 고칠 수 있다 — 청구가 아직 없으므로 금액이 바뀌어도 된다.
- * 광고중(running)은 카테고리·내용·이미지·링크·CTA·비즈콜만 고친다. 아파트·할인·무료기간은
- * 이미 돌고 있는 구독 청구액의 근거라, 바꾸려면 파트너의 수정 심사 흐름을 따라야 한다.
+ * 광고중(running)은 내용과 노출 아파트를 고친다. 아파트가 바뀌면 청구액을 다시 계산해
+ * 다음 정기결제부터 적용한다(changeRunningApartments). 할인·무료기간은 바꾸지 않는다.
  *
  * 파트너는 바꿀 수 없다 — 다른 파트너의 광고는 새로 등록하는 것과 같다.
  */
@@ -200,7 +368,7 @@ export async function POST(
 
     const { data: ad } = await admin
       .from('advertisements_v2')
-      .select('id, partnerId, adStatus, paymentStatus, modificationStatus, isFirstAdApplication')
+      .select('id, partnerId, adStatus, paymentStatus, modificationStatus, isFirstAdApplication, apartmentChangeStatus, approvedMonthlyAmount, approvedDiscountRate')
       .eq('id', id)
       .maybeSingle();
 
@@ -214,6 +382,9 @@ export async function POST(
       paymentStatus: string;
       modificationStatus: string | null;
       isFirstAdApplication: boolean | null;
+      apartmentChangeStatus: string | null;
+      approvedMonthlyAmount: number | null;
+      approvedDiscountRate: number | null;
     };
 
     const isRunning = existing.adStatus === 'running';
@@ -248,8 +419,42 @@ export async function POST(
       );
     }
 
-    // 광고중이면 금액의 근거는 그대로 두고 내용만 바꾼다
+    // 광고중 — 아파트가 바뀌었으면 먼저 교체·재계산하고(실패하면 아무것도 바꾸지 않음), 내용을 고친다
     if (isRunning) {
+      if (uniqueApartmentIds.length === 0) {
+        return NextResponse.json(
+          { error: '노출할 아파트를 1곳 이상 선택해주세요.' },
+          { status: 400 }
+        );
+      }
+
+      const { data: currentAptData, error: currentAptError } = await admin
+        .from('advertisement_apartments_v2')
+        .select('apartmentId, totalHouseholds')
+        .eq('advertisementId', id);
+      if (currentAptError) {
+        console.error('Failed to fetch current apartments:', currentAptError);
+        return NextResponse.json({ error: 'Failed to fetch apartments' }, { status: 500 });
+      }
+      const currentApartments = (currentAptData ?? []) as ApartmentRow[];
+
+      if (!sameApartments(currentApartments, uniqueApartmentIds)) {
+        const changed = await changeRunningApartments(
+          admin,
+          {
+            id,
+            apartmentChangeStatus: existing.apartmentChangeStatus,
+            approvedMonthlyAmount: existing.approvedMonthlyAmount,
+            approvedDiscountRate: existing.approvedDiscountRate,
+          },
+          currentApartments,
+          uniqueApartmentIds
+        );
+        if (!changed.ok) {
+          return NextResponse.json({ error: changed.error }, { status: changed.status });
+        }
+      }
+
       const { error: runningUpdateError } = await admin
         .from('advertisements_v2')
         .update(contentColumns(body, ctaButtons))

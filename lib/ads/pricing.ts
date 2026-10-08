@@ -44,6 +44,77 @@ export function calcMonthlyAmount(
   ) * 10;
 }
 
+/** 광고중 광고의 아파트를 바꿀 때 기준이 되는 현재 청구 조건 */
+export interface RunningAdBilling {
+  /** 지금 금액을 계산할 때 쓴 세대수 합계 (advertisement_apartments_v2.totalHouseholds 합) */
+  totalHouseholds: number;
+  /** 현재 청구액 (할인 후) */
+  monthlyAmount: number;
+  /** 현재 정상가 (할인 전) */
+  originalMonthlyAmount: number;
+  discountRate: number;
+}
+
+export interface RepricedAmounts {
+  monthlyAmount: number;
+  originalMonthlyAmount: number;
+  /** standard: 현재 단가로 새로 계산 / proportional: 기존 단가를 유지한 채 세대수 비율로 조정 */
+  method: 'standard' | 'proportional';
+}
+
+/**
+ * amount × (newHouseholds / oldHouseholds)를 10원 단위로 반올림한다.
+ * 예전 단가는 69.9원처럼 딱 떨어지지 않아 세대당 단가를 먼저 구해 반올림하면 오차가 쌓인다.
+ * 정수 연산만으로 한 번에 계산해 부동소수 오차를 피한다.
+ */
+export function scaleByHouseholds(
+  amount: number,
+  oldHouseholds: number,
+  newHouseholds: number
+): number {
+  // floor(amount × new / old / 10 + 0.5) × 10 을 정수 나눗셈으로 옮긴 식
+  return Math.floor(
+    (2 * amount * newHouseholds + 10 * oldHouseholds) / (20 * oldHouseholds)
+  ) * 10;
+}
+
+/**
+ * 광고중 광고의 노출 아파트가 바뀔 때 새 청구액·정상가를 계산한다.
+ *
+ * 현재 단가로 청구 중인 광고는 다른 흐름(승인·수정 승인)과 같은 산식으로 새로 계산한다.
+ * 예전 단가로 청구 중인 광고는 그 단가와 할인 조건을 그대로 둔 채 세대수 비율만큼만 조정한다
+ * — 현재 단가로 다시 계산하면 아파트를 조금만 바꿔도 단가 차이만큼 금액이 뛴다.
+ */
+export function repriceRunningAd(
+  current: RunningAdBilling,
+  newTotalHouseholds: number,
+  pricePerHousehold: number
+): RepricedAmounts {
+  const { totalHouseholds, monthlyAmount, originalMonthlyAmount, discountRate } = current;
+
+  const billedAtCurrentPrice =
+    originalMonthlyAmount === calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0) &&
+    monthlyAmount === calcMonthlyAmount(totalHouseholds, pricePerHousehold, discountRate);
+
+  if (billedAtCurrentPrice) {
+    return {
+      monthlyAmount: calcMonthlyAmount(newTotalHouseholds, pricePerHousehold, discountRate),
+      originalMonthlyAmount: calcMonthlyAmount(newTotalHouseholds, pricePerHousehold, 0),
+      method: 'standard',
+    };
+  }
+
+  return {
+    monthlyAmount: scaleByHouseholds(monthlyAmount, totalHouseholds, newTotalHouseholds),
+    originalMonthlyAmount: scaleByHouseholds(
+      originalMonthlyAmount,
+      totalHouseholds,
+      newTotalHouseholds
+    ),
+    method: 'proportional',
+  };
+}
+
 /** ad_pricing_v2 조회 실패 시 사용하는 프리미엄 세대당 주간 단가 */
 const FALLBACK_PREMIUM_PRICE_PER_WEEK = 20;
 
