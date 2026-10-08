@@ -7,6 +7,7 @@ import {
   PageShell,
 } from '@/components/page-shell';
 import { InlineLoadingSkeleton } from '@/components/skeletons';
+import { LinkedAdPicker, type LinkableAd } from './LinkedAdPicker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,9 +84,11 @@ interface Banner {
   adClickCount: number;
   description: string | null;
   isDirectLink: boolean;
-  /** normal(기본) / ajl(아정당 — 링크 2개 중 선택 후 인앱 웹뷰) */
-  bannerType: 'normal' | 'ajl';
+  /** normal(기본) / ajl(아정당 — 링크 2개 중 선택 후 인앱 웹뷰) / ad(연결된 광고 상세로 이동) */
+  bannerType: 'normal' | 'ajl' | 'ad';
   secondLinkUrl: string | null;
+  linkedAdId: string | null;
+  linkedPremiumAdId: string | null;
   user?: {
     id: string;
     name: string;
@@ -104,6 +107,10 @@ interface BannerForm {
   isDirectLink: boolean;
   isAjl: boolean;
   secondLinkUrl: string;
+  /** 광고 연결 배너 — 탭하면 앱이 연결된 광고 상세로 바로 이동 */
+  isAdLink: boolean;
+  linkedAdId: string | null;
+  linkedPremiumAdId: string | null;
   imageUrl: string;
   additionalImageUrl: string;
   isActive: boolean;
@@ -328,11 +335,16 @@ export default function BannersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [apartmentSearch, setApartmentSearch] = useState('');
+  // 연결한 광고 — 배너 대상 아파트를 이 광고의 노출 아파트 안으로 제한한다
+  const [linkedAd, setLinkedAd] = useState<LinkableAd | null>(null);
   const [form, setForm] = useState<BannerForm>({
     linkUrl: '',
     isDirectLink: false,
     isAjl: false,
     secondLinkUrl: '',
+    isAdLink: false,
+    linkedAdId: null,
+    linkedPremiumAdId: null,
     imageUrl: '',
     additionalImageUrl: '',
     isActive: true,
@@ -523,11 +535,15 @@ export default function BannersPage() {
   const handleAddNew = () => {
     setEditingBanner(null);
     setApartmentSearch('');
+    setLinkedAd(null);
     setForm({
       linkUrl: '',
       isDirectLink: false,
       isAjl: false,
       secondLinkUrl: '',
+      isAdLink: false,
+      linkedAdId: null,
+      linkedPremiumAdId: null,
       imageUrl: '',
       additionalImageUrl: '',
       isActive: true,
@@ -556,11 +572,15 @@ export default function BannersPage() {
 
     setEditingBanner(banner);
     setApartmentSearch('');
+    setLinkedAd(null);
     setForm({
       linkUrl: banner.linkUrl || '',
       isDirectLink: banner.isDirectLink ?? false,
       isAjl: banner.bannerType === 'ajl',
       secondLinkUrl: banner.secondLinkUrl || '',
+      isAdLink: banner.bannerType === 'ad',
+      linkedAdId: banner.linkedAdId ?? null,
+      linkedPremiumAdId: banner.linkedPremiumAdId ?? null,
       imageUrl: banner.imageUrl,
       additionalImageUrl: banner.additionalImageUrl || '',
       isActive: banner.isActive,
@@ -572,6 +592,64 @@ export default function BannersPage() {
     });
     setDialogOpen(true);
   };
+
+  /**
+   * 광고 연결 배너 검증 — 문제가 있으면 메시지, 없으면 null.
+   * 노출 아파트는 저장 시점에 DB에서 다시 읽는다 (폼을 연 뒤 광고의 아파트가 바뀌었을 수 있다).
+   */
+  const validateAdLink = async (): Promise<string | null> => {
+    if (!form.linkedAdId && !form.linkedPremiumAdId) {
+      return '연결할 광고를 선택해주세요.';
+    }
+    if (form.isGlobal) {
+      return '광고 연결 배너는 전체 대상으로 등록할 수 없습니다. 광고가 노출 중인 아파트를 선택해주세요.';
+    }
+    // 내린 배너는 연결 광고가 종료됐어도 저장할 수 있어야 한다
+    if (!form.isActive) return null;
+    if (!linkedAd) {
+      return '연결된 광고가 노출 중이 아닙니다. 다른 광고를 연결하거나 배너를 비활성화해주세요.';
+    }
+
+    const baseAdId = form.linkedAdId ?? (await fetchPremiumBaseAdId(form.linkedPremiumAdId!));
+    if (!baseAdId) return '연결한 프리미엄 광고의 기본 광고를 찾을 수 없습니다.';
+
+    const { data: adApartments } = await supabase
+      .from('advertisement_apartments_v2')
+      .select('apartmentId')
+      .eq('advertisementId', baseAdId);
+    const exposed = new Set((adApartments ?? []).map((a: { apartmentId: string }) => a.apartmentId));
+    const outside = form.selectedApartments.filter((aptId) => !exposed.has(aptId));
+    if (outside.length > 0) {
+      return `광고가 노출되지 않는 아파트 ${outside.length}곳이 선택되어 있습니다. 광고 노출 아파트 안에서만 선택해주세요.`;
+    }
+    return null;
+  };
+
+  const fetchPremiumBaseAdId = async (premiumAdId: string): Promise<string | null> => {
+    const { data } = await supabase
+      .from('premium_advertisements_v2')
+      .select('baseAdId')
+      .eq('id', premiumAdId)
+      .maybeSingle();
+    return (data as { baseAdId: string | null } | null)?.baseAdId ?? null;
+  };
+
+  // 광고를 고르면 배너 대상 아파트에서 그 광고가 노출되지 않는 곳을 뺀다
+  const handleSelectLinkedAd = (ad: LinkableAd | null) => {
+    setLinkedAd(ad);
+    if (!ad) return;
+    setForm((prev) => ({
+      ...prev,
+      linkedAdId: ad.kind === 'base' ? ad.id : null,
+      linkedPremiumAdId: ad.kind === 'premium' ? ad.id : null,
+      selectedApartments: prev.selectedApartments.filter((aptId) => ad.apartmentIds.includes(aptId)),
+    }));
+  };
+
+  // 광고 연결 배너는 연결 광고의 노출 아파트만 대상 후보로 보여준다
+  const selectableApartments = form.isAdLink
+    ? apartments.filter((apt) => linkedAd?.apartmentIds.includes(apt.id))
+    : apartments;
 
   const handleSave = async () => {
     try {
@@ -610,14 +688,24 @@ export default function BannersPage() {
         return;
       }
 
+      if (form.isAdLink) {
+        const adLinkError = await validateAdLink();
+        if (adLinkError) {
+          toast.error(adLinkError);
+          return;
+        }
+      }
+
       const bannerData = {
         imageUrl: form.imageUrl,
         additionalImageUrl: form.additionalImageUrl.trim() || null,
         linkUrl,
-        // 아정당 배너는 앱이 자체 선택 화면을 띄우므로 바로 이동 옵션과 함께 쓰지 않는다
-        isDirectLink: linkUrl && !form.isAjl ? form.isDirectLink : false,
-        bannerType: form.isAjl ? 'ajl' : 'normal',
+        // 아정당·광고 연결 배너는 앱이 자체 동작을 하므로 바로 이동 옵션과 함께 쓰지 않는다
+        isDirectLink: linkUrl && !form.isAjl && !form.isAdLink ? form.isDirectLink : false,
+        bannerType: form.isAjl ? 'ajl' : form.isAdLink ? 'ad' : 'normal',
         secondLinkUrl: form.isAjl ? secondLinkUrl : null,
+        linkedAdId: form.isAdLink ? form.linkedAdId : null,
+        linkedPremiumAdId: form.isAdLink ? form.linkedPremiumAdId : null,
         isActive: form.isActive,
         isGlobal: form.isGlobal,
         createdBy: editingBanner ? editingBanner.createdBy : currentUserId,
@@ -757,6 +845,9 @@ export default function BannersPage() {
       isDirectLink: false,
       isAjl: false,
       secondLinkUrl: '',
+      isAdLink: false,
+      linkedAdId: null,
+      linkedPremiumAdId: null,
       imageUrl: '',
       additionalImageUrl: '',
       isActive: true,
@@ -768,6 +859,7 @@ export default function BannersPage() {
     });
     setEditingBanner(null);
     setApartmentSearch('');
+    setLinkedAd(null);
   };
 
   if (loading) {
@@ -933,7 +1025,12 @@ export default function BannersPage() {
                   id='isAjl'
                   checked={form.isAjl}
                   onCheckedChange={(checked) =>
-                    setForm((prev) => ({ ...prev, isAjl: checked, isDirectLink: checked ? false : prev.isDirectLink }))
+                    setForm((prev) => ({
+                      ...prev,
+                      isAjl: checked,
+                      isDirectLink: checked ? false : prev.isDirectLink,
+                      isAdLink: checked ? false : prev.isAdLink,
+                    }))
                   }
                 />
               </div>
@@ -953,6 +1050,43 @@ export default function BannersPage() {
                 </div>
               )}
 
+              {/* 광고 연결 배너 — 탭하면 앱이 연결된 광고 상세로 바로 이동한다. 대상 아파트는 광고 노출 아파트 안에서만 */}
+              <div className='flex items-center justify-between p-4 border rounded-lg'>
+                <div className='space-y-1'>
+                  <Label htmlFor='isAdLink' className='text-sm font-medium'>
+                    광고 연결 배너
+                  </Label>
+                  <p className='text-xs text-muted-foreground'>
+                    활성화하면 배너를 눌렀을 때 연결한 광고의 상세 화면으로 바로 이동합니다. 전체 대상으로는 쓸 수 없습니다.
+                  </p>
+                </div>
+                <Switch
+                  id='isAdLink'
+                  checked={form.isAdLink}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      isAdLink: checked,
+                      isAjl: checked ? false : prev.isAjl,
+                      isDirectLink: checked ? false : prev.isDirectLink,
+                      isGlobal: checked ? false : prev.isGlobal,
+                    }))
+                  }
+                />
+              </div>
+
+              {form.isAdLink && (
+                <div className='space-y-2'>
+                  <Label className='text-sm font-medium'>
+                    연결할 광고 <span className='text-destructive'>*</span>
+                  </Label>
+                  <LinkedAdPicker
+                    value={{ linkedAdId: form.linkedAdId, linkedPremiumAdId: form.linkedPremiumAdId }}
+                    onChange={handleSelectLinkedAd}
+                  />
+                </div>
+              )}
+
               {/* isDirectLink Switch - 링크 URL이 있을 때만 의미 있음. 아정당 배너는 자체 선택 화면이 있어 사용 불가 */}
               <div className='flex items-center justify-between p-4 border rounded-lg'>
                 <div className='space-y-1'>
@@ -967,12 +1101,12 @@ export default function BannersPage() {
                   id='isDirectLink'
                   checked={form.isDirectLink}
                   onCheckedChange={(checked) => setForm((prev) => ({ ...prev, isDirectLink: checked }))}
-                  disabled={!form.linkUrl.trim() || form.isAjl}
+                  disabled={!form.linkUrl.trim() || form.isAjl || form.isAdLink}
                 />
               </div>
 
-              {/* isGlobal Switch - 매니저는 사용 불가 */}
-              {isSuperAdmin && (
+              {/* isGlobal Switch - 매니저·광고 연결 배너는 사용 불가 */}
+              {isSuperAdmin && !form.isAdLink && (
                 <div className='flex items-center justify-between p-4 border rounded-lg'>
                   <div className='space-y-1'>
                     <Label htmlFor='isGlobal' className='text-sm font-medium flex items-center gap-2'>
@@ -1087,7 +1221,7 @@ export default function BannersPage() {
                         type='button'
                         variant='ghost'
                         size='sm'
-                        onClick={() => setForm({ ...form, selectedApartments: apartments.map(a => a.id) })}
+                        onClick={() => setForm({ ...form, selectedApartments: selectableApartments.map(a => a.id) })}
                       >
                         전체 선택
                       </Button>
@@ -1119,15 +1253,15 @@ export default function BannersPage() {
                     <div className='h-[200px] overflow-y-auto'>
                       <div className='p-3 space-y-2'>
                         {(() => {
-                          const filteredApartments = apartments.filter(apt =>
+                          const filteredApartments = selectableApartments.filter(apt =>
                             apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
                             apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
                           );
 
-                          if (apartments.length === 0) {
+                          if (selectableApartments.length === 0) {
                             return (
                               <p className='text-sm text-muted-foreground text-center py-4'>
-                                선택 가능한 아파트가 없습니다.
+                                {form.isAdLink ? '먼저 연결할 광고를 선택해주세요.' : '선택 가능한 아파트가 없습니다.'}
                               </p>
                             );
                           }
