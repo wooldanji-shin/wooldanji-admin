@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/server';
+import { calcDiscountedTotalAmount } from '@/lib/ads/pricing';
+import {
+  buildSoloContent,
+  computeSoloAmounts,
+  dbErrorMessage,
+  notifyPartner,
+  requireAdmin,
+  SoloInputError,
+  type SoloWriteBody,
+} from '@/lib/ads/solo-popup-server';
+
+/**
+ * 관리자가 파트너를 대신해 단독 팝업 광고를 등록한다 (approved + unpaid → 파트너 결제만 남음).
+ * 기본 광고가 운영 중(running + paid)이어야 한다. weeks·스냅샷·금액은 DB 함수로 서버 계산.
+ * 쓰기는 service_role (관리자 확인 후).
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
+    const body = (await request.json()) as SoloWriteBody;
+    const { partnerId, baseAdId } = body;
+    if (!partnerId || !baseAdId) {
+      return NextResponse.json({ error: '파트너와 기본 광고를 선택해주세요.' }, { status: 400 });
+    }
+
+    const admin = createAdminClient() as any;
+    const { data: baseAd } = await admin
+      .from('advertisements_v2')
+      .select('id, partnerId, adStatus, paymentStatus')
+      .eq('id', baseAdId)
+      .maybeSingle();
+    if (!baseAd) return NextResponse.json({ error: '기본 광고를 찾을 수 없습니다.' }, { status: 404 });
+    if (baseAd.partnerId !== partnerId) {
+      return NextResponse.json({ error: '선택한 파트너의 광고가 아닙니다.' }, { status: 400 });
+    }
+    if (baseAd.adStatus !== 'running' || baseAd.paymentStatus !== 'paid') {
+      return NextResponse.json(
+        { error: '운영 중(결제 완료)인 기본 광고에만 단독 팝업을 등록할 수 있습니다.' },
+        { status: 400 }
+      );
+    }
+
+    const content = await buildSoloContent(admin, body);
+    const amounts = await computeSoloAmounts(admin, baseAdId, body.periodUnit!, body.periodCount!);
+    const rate = Math.min(100, Math.max(0, Number(body.discountRate) || 0));
+
+    const { data: inserted, error: insertError } = await admin
+      .from('solo_popup_ads_v2')
+      .insert({
+        partnerId,
+        baseAdId,
+        ...content,
+        periodUnit: body.periodUnit,
+        periodCount: body.periodCount,
+        weeks: amounts.weeks,
+        status: 'approved',
+        paymentStatus: 'unpaid',
+        totalAmount: amounts.totalAmount,
+        approvedDiscountRate: rate > 0 ? rate : null,
+        discountedTotalAmount: calcDiscountedTotalAmount(amounts.totalAmount, rate),
+        snapshotApartments: amounts.snapshot,
+        adminMemo: body.adminMemo?.trim() || null,
+        salesRepId: body.salesRepId || null,
+      })
+      .select('id')
+      .single();
+    if (insertError || !inserted) {
+      console.error('Failed to create solo popup ad:', insertError);
+      const status = insertError?.code === '23505' ? 409 : 500;
+      return NextResponse.json({ error: dbErrorMessage(insertError ?? {}) }, { status });
+    }
+
+    await notifyPartner({
+      partnerUserId: partnerId,
+      soloPopupAdId: inserted.id,
+      baseAdId,
+      title: '단독 팝업 광고 등록 안내',
+      body: '단독 팝업 광고가 등록되었습니다. 앱에서 결제 후 광고를 시작해보세요.',
+      type: 'solo_popup_ad_approved',
+    });
+
+    return NextResponse.json({
+      success: true,
+      soloPopupAdId: inserted.id,
+      totalAmount: amounts.totalAmount,
+      discountedTotalAmount: calcDiscountedTotalAmount(amounts.totalAmount, rate),
+    });
+  } catch (err) {
+    if (err instanceof SoloInputError) return NextResponse.json({ error: err.message }, { status: 400 });
+    console.error('Server error:', err);
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
+  }
+}

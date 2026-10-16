@@ -20,6 +20,7 @@ import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/im
 import { createClient } from '@/lib/supabase/client';
 import { getUserRoles } from '@/lib/auth';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 
 type UserReconfirmDetails = {
   id: string;
@@ -147,15 +148,15 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to approve reconfirm');
+        toast.error((await readApiErrorMessage(response)) ?? '재신청 승인 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
 
       toast.success('재신청이 승인되었습니다.');
       router.push('/admin/user-reconfirm');
     } catch (err) {
       console.error('Failed to approve reconfirm:', err);
-      toast.error('재신청 승인에 실패했습니다.');
+      toast.error(networkFailedMessage('재신청을 승인하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -181,15 +182,15 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to reject reconfirm');
+        toast.error((await readApiErrorMessage(response)) ?? '재신청 보류 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
 
       toast.success('재신청이 보류 처리되었습니다.');
       router.push('/admin/user-reconfirm');
     } catch (err) {
       console.error('Failed to reject reconfirm:', err);
-      toast.error('재신청 보류 처리에 실패했습니다.');
+      toast.error(networkFailedMessage('재신청을 보류 처리하지 못했습니다.'));
     } finally {
       setProcessing(false);
       setRejectDialog(false);

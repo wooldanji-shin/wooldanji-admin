@@ -10,6 +10,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server';
  * 프리미엄 광고가 연결돼 있으면 막는다 — 프리미엄은 노출 아파트·카테고리를 기본 광고에서 가져오므로
  * 기본 광고 없이 남은 프리미엄은 앱에 노출되지 못한다. 프리미엄부터 삭제하게 한다.
  * 임시저장 프리미엄은 결제 전 초안이라 막지 않고 함께 지운다.
+ * 단독 팝업 광고는 연결된 건이 있으면(모든 상태, 솔로엔 draft가 없다) 같은 이유로 막는다.
  * 프리미엄 광고와 그 분석 데이터는 남고 baseAdId만 NULL이 된다(ON DELETE SET NULL, 2026-10-06 dev 반영).
  */
 export async function POST(
@@ -22,7 +23,7 @@ export async function POST(
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -32,7 +33,7 @@ export async function POST(
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const admin = createAdminClient();
@@ -69,6 +70,23 @@ export async function POST(
       );
     }
 
+    // 단독 팝업 광고도 기본 광고의 아파트·카테고리에 의존해 노출되므로, (모든 상태) 연결된 건이 있으면 막는다
+    const { count: soloCount, error: soloError } = await admin
+      .from('solo_popup_ads_v2' as never)
+      .select('id', { count: 'exact', head: true })
+      .eq('baseAdId', id);
+
+    if (soloError) {
+      console.error('Failed to check solo popup ads:', soloError);
+      return NextResponse.json({ error: '연결된 단독 팝업 광고를 확인하지 못했습니다.' }, { status: 500 });
+    }
+    if ((soloCount ?? 0) > 0) {
+      return NextResponse.json(
+        { error: '연결된 단독 팝업 광고를 먼저 삭제해주세요.' },
+        { status: 409 }
+      );
+    }
+
     const { error: draftDeleteError } = await admin
       .from('premium_advertisements_v2')
       .delete()
@@ -93,6 +111,6 @@ export async function POST(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }

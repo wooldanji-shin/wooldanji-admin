@@ -1,11 +1,29 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 관리자만 호출할 수 있다 — 아래에서 서비스 롤로 계정을 삭제하므로 세션부터 확인한다
+    const authClient = await createClient();
+    const { data: { user: currentUser } } = await authClient.auth.getUser();
+
+    if (!currentUser) {
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
+    }
+
+    const { data: roles } = await authClient
+      .from('user_roles')
+      .select('role')
+      .eq('userId', currentUser.id);
+
+    const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
+    if (!isAdmin) {
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
+    }
+
     const supabase = createAdminClient();
     const { id: managerId } = await params;
 

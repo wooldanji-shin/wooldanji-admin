@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const status = request.nextUrl.searchParams.get('status') ?? 'pending';
@@ -36,6 +36,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }

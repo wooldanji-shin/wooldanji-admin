@@ -21,7 +21,7 @@ export async function GET(
     } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -31,7 +31,7 @@ export async function GET(
 
     const isAdmin = roles?.some((r) => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const { partnerId } = await params;

@@ -13,7 +13,7 @@ export async function POST(
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -23,7 +23,7 @@ export async function POST(
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -40,11 +40,11 @@ export async function POST(
       .single();
 
     if (fetchError || !ad) {
-      return NextResponse.json({ error: 'Advertisement not found' }, { status: 404 });
+      return NextResponse.json({ error: '광고를 찾을 수 없습니다. 삭제되었을 수 있으니 목록을 새로고침해 주세요.' }, { status: 404 });
     }
 
     if (ad.modificationStatus !== 'pending') {
-      return NextResponse.json({ error: 'No pending modification to reject' }, { status: 400 });
+      return NextResponse.json({ error: '심사 중인 수정 요청이 없습니다. 이미 처리됐을 수 있으니 화면을 새로고침해 주세요.' }, { status: 400 });
     }
 
     const { error: updateError } = await supabase
@@ -59,7 +59,7 @@ export async function POST(
 
     if (updateError) {
       console.error('Failed to reject modification:', updateError);
-      return NextResponse.json({ error: 'Failed to reject modification' }, { status: 500 });
+      return NextResponse.json({ error: '수정 요청을 거절하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
     }
 
     // 수정 거절 FCM 알림 전송 (non-critical: 실패해도 거절 처리는 유지)
@@ -91,6 +91,6 @@ export async function POST(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import type { EventBannerPreviewData } from './EventBannerPreview';
 
 export type EventParticipationType = 'draw' | 'first_come';
@@ -381,8 +382,8 @@ export function useEventDetailPage(
         }),
       });
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to update event');
+        toast.error((await readApiErrorMessage(response)) ?? '이벤트 수정 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('이벤트 정보가 수정되었습니다.');
       setEditing(false);
@@ -390,7 +391,7 @@ export function useEventDetailPage(
       await fetchDetail();
     } catch (err) {
       console.error('Failed to update event:', err);
-      toast.error(err instanceof Error ? err.message : '이벤트 수정에 실패했습니다.');
+      toast.error(networkFailedMessage('이벤트를 수정하지 못했습니다.'));
     } finally {
       setSaving(false);
     }
@@ -401,15 +402,14 @@ export function useEventDetailPage(
     try {
       const response = await fetch(`/api/partner-events/${id}/approve`, { method: 'POST' });
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to approve event');
+        toast.error((await readApiErrorMessage(response)) ?? '이벤트 승인 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('이벤트가 승인되었습니다.');
       await fetchDetail();
     } catch (err) {
       console.error('Failed to approve event:', err);
-      // 서버가 막은 사유(예: 응모 시작 경과)를 그대로 보여준다
-      toast.error(err instanceof Error ? err.message : '이벤트 승인에 실패했습니다.');
+      toast.error(networkFailedMessage('이벤트를 승인하지 못했습니다.'));
     } finally {
       setApproving(false);
     }
@@ -428,8 +428,8 @@ export function useEventDetailPage(
         body: JSON.stringify({ rejectionReason: rejectReason.trim() }),
       });
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to reject event');
+        toast.error((await readApiErrorMessage(response)) ?? '이벤트 거절 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('이벤트가 거절되었습니다.');
       setRejectDialog(false);
@@ -437,7 +437,7 @@ export function useEventDetailPage(
       await fetchDetail();
     } catch (err) {
       console.error('Failed to reject event:', err);
-      toast.error('이벤트 거절에 실패했습니다.');
+      toast.error(networkFailedMessage('이벤트를 거절하지 못했습니다.'));
     } finally {
       setRejecting(false);
     }
@@ -448,15 +448,15 @@ export function useEventDetailPage(
     try {
       const response = await fetch(`/api/partner-events/${id}/end`, { method: 'POST' });
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to end event');
+        toast.error((await readApiErrorMessage(response)) ?? '이벤트 종료 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('이벤트가 종료되었습니다.');
       setEndDialog(false);
       await fetchDetail();
     } catch (err) {
       console.error('Failed to end event:', err);
-      toast.error('이벤트 강제 종료에 실패했습니다.');
+      toast.error(networkFailedMessage('이벤트를 종료하지 못했습니다.'));
     } finally {
       setEnding(false);
     }

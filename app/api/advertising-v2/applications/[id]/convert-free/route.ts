@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { calcMonthlyAmount, fetchPricePerHousehold, PRICE_LOOKUP_FAILED_MESSAGE } from '@/lib/ads/pricing';
 import {
   NEVER_BILLING_DATE,
+  checkNoLiveSubscription,
   insertCardlessSubscription,
   startedAdColumns,
 } from '@/lib/ads/start-without-card';
@@ -32,7 +33,7 @@ export async function POST(
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -42,7 +43,7 @@ export async function POST(
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const admin = createAdminClient();
@@ -84,6 +85,15 @@ export async function POST(
       return NextResponse.json({ error: '이미 무료 광고입니다.' }, { status: 400 });
     }
 
+    // 종료된 광고는 0원 구독을 새로 만든다 — 살아 있는 구독이 남아 있으면 INSERT가 실패하는데,
+    // 그 전에 바꾼 승인값은 남으므로 쓰기 전에 막는다
+    if (existing.adStatus === 'ended') {
+      const blocked = await checkNoLiveSubscription(admin, id);
+      if (blocked) {
+        return NextResponse.json({ error: blocked.error }, { status: blocked.status });
+      }
+    }
+
     const { error: adUpdateError } = await admin
       .from('advertisements_v2')
       .update(FREE_AD_COLUMNS)
@@ -100,7 +110,7 @@ export async function POST(
     return restartEndedAdForFree(admin, id, existing.partnerId);
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }
 
@@ -179,7 +189,7 @@ async function restartEndedAdForFree(
   }
 
   const startedAt = new Date().toISOString();
-  const subscriptionError = await insertCardlessSubscription(admin, {
+  const { subscriptionId, error: subscriptionError } = await insertCardlessSubscription(admin, {
     advertisementId,
     originalMonthlyAmount: calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0),
     discountRate: 100,
@@ -199,11 +209,7 @@ async function restartEndedAdForFree(
   // running으로 못 넘겼는데 구독만 남으면 종료된 광고에 살아 있는 구독이 붙는다
   if (startError) {
     console.error('Failed to restart ended ad for free:', startError);
-    await admin
-      .from('ad_subscriptions_v2')
-      .delete()
-      .eq('advertisementId', advertisementId)
-      .eq('periodStartDate', startedAt);
+    await admin.from('ad_subscriptions_v2').delete().eq('id', subscriptionId);
     return NextResponse.json({ error: '광고 재시작에 실패했습니다.' }, { status: 500 });
   }
 

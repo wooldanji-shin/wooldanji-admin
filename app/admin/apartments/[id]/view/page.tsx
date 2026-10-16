@@ -57,6 +57,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/lib/supabase/types';
 
@@ -409,14 +410,14 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update approval status');
+        toast.error((await readApiErrorMessage(response)) ?? '승인 상태 변경 처리 중 문제가 생겼습니다. 목록을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
 
       fetchUsers();
     } catch (err) {
       console.error('Failed to update approval status:', err);
-      toast.error('승인 상태 변경에 실패했습니다.');
+      toast.error(networkFailedMessage('승인 상태를 바꾸지 못했습니다.'));
     }
   };
 

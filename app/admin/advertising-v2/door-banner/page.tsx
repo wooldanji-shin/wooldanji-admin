@@ -9,7 +9,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { createClient } from '@/lib/supabase/client';
 
 // door_popup_settings 에서 관리하는 모드 타입
-type PopupMode = 'ad' | 'category' | 'none';
+type PopupMode = 'ad' | 'category' | 'solo_popup' | 'none';
+
+const MODE_LABELS = {
+  ad: '광고 팝업',
+  category: '카테고리 팝업',
+  solo_popup: '단독 팝업',
+} as const;
 
 interface DoorPopupSettings {
   id: string;
@@ -53,7 +59,7 @@ export default function DoorBannerPage() {
    * 둘 다 OFF 하면 mode = 'none'.
    */
   const handleToggle = async (
-    targetMode: 'ad' | 'category',
+    targetMode: 'ad' | 'category' | 'solo_popup',
     checked: boolean
   ) => {
     if (!settings || saving) return;
@@ -73,7 +79,7 @@ export default function DoorBannerPage() {
 
       toast.success(
         checked
-          ? `${targetMode === 'ad' ? '광고 팝업' : '카테고리 팝업'} 모드가 활성화되었습니다.`
+          ? `${MODE_LABELS[targetMode]} 모드가 활성화되었습니다.`
           : '팝업 모드가 비활성화되었습니다.'
       );
     } catch (err: any) {
@@ -147,6 +153,31 @@ export default function DoorBannerPage() {
                 현재 상태:{' '}
                 <span className={settings?.mode === 'category' ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
                   {settings?.mode === 'category' ? 'ON' : 'OFF'}
+                </span>
+              </p>
+            </CardContent>
+          </Card>
+          {/* 단독 팝업 카드 */}
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="space-y-1">
+                <CardTitle className="text-base font-semibold">단독 팝업</CardTitle>
+                <CardDescription>
+                  파트너가 신청한 단독 팝업 광고를 최대 5장 캐러셀로 노출합니다.
+                </CardDescription>
+              </div>
+              <Switch
+                checked={settings?.mode === 'solo_popup'}
+                onCheckedChange={(checked) => handleToggle('solo_popup', checked)}
+                disabled={saving}
+                aria-label="단독 팝업 모드 토글"
+              />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                현재 상태:{' '}
+                <span className={settings?.mode === 'solo_popup' ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
+                  {settings?.mode === 'solo_popup' ? 'ON' : 'OFF'}
                 </span>
               </p>
             </CardContent>

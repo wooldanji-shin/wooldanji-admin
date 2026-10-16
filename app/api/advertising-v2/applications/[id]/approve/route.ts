@@ -9,6 +9,7 @@ import {
 } from '@/lib/ads/pricing';
 import {
   canStartWithoutCard,
+  checkNoLiveSubscription,
   insertCardlessSubscription,
   startedAdColumns,
 } from '@/lib/ads/start-without-card';
@@ -24,7 +25,7 @@ export async function POST(
 
     if (!currentUser) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' },
         { status: 401 }
       );
     }
@@ -40,7 +41,7 @@ export async function POST(
 
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
+        { error: '이 작업을 할 권한이 없습니다.' },
         { status: 403 }
       );
     }
@@ -68,14 +69,14 @@ export async function POST(
 
     if (fetchError || !ad) {
       return NextResponse.json(
-        { error: 'Advertisement not found' },
+        { error: '광고를 찾을 수 없습니다. 삭제되었을 수 있으니 목록을 새로고침해 주세요.' },
         { status: 404 }
       );
     }
 
     if (ad.adStatus !== 'pending') {
       return NextResponse.json(
-        { error: 'Advertisement is not pending' },
+        { error: '이미 심사가 끝난 광고입니다. 목록을 새로고침한 뒤 다시 확인해 주세요.' },
         { status: 400 }
       );
     }
@@ -144,6 +145,14 @@ export async function POST(
     // 받을 돈이 0원(100% 할인)일 때만 파트너 결제 없이 바로 개시할 수 있다 — 등록·수정 폼과 같은 규칙
     const startImmediately = canStartWithoutCard(requestedStart, effectiveDiscountRate);
 
+    // 살아 있는 구독이 있으면 구독 INSERT가 실패하는데, 그 전에 쓴 승인·서브카테고리는 남는다 — 쓰기 전에 막는다
+    if (startImmediately) {
+      const blocked = await checkNoLiveSubscription(createAdminClient(), id);
+      if (blocked) {
+        return NextResponse.json({ error: blocked.error }, { status: blocked.status });
+      }
+    }
+
     // 비즈콜(안심번호)은 파트너 단위 속성이라 partner_users에 저장.
     // 광고 상태 변경 전에 처리해야 실패 시 pending으로 남아 재시도할 수 있다.
     if (bizCallNumber !== undefined) {
@@ -164,7 +173,7 @@ export async function POST(
       if (bizCallError) {
         console.error('Failed to update bizCallNumber:', bizCallError);
         return NextResponse.json(
-          { error: 'Failed to update biz call number' },
+          { error: '비즈콜 번호를 저장하지 못해 승인하지 않았습니다. 잠시 후 다시 시도해 주세요.' },
           { status: 500 }
         );
       }
@@ -190,7 +199,7 @@ export async function POST(
     if (updateError) {
       console.error('Failed to approve advertisement:', updateError);
       return NextResponse.json(
-        { error: 'Failed to approve advertisement' },
+        { error: '광고를 승인하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
         { status: 500 }
       );
     }
@@ -204,7 +213,7 @@ export async function POST(
 
       if (deleteError) {
         console.error('Failed to delete sub categories:', deleteError);
-        return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+        return NextResponse.json({ error: '광고 승인은 완료됐지만 서브카테고리를 저장하지 못했습니다. 광고 수정 화면에서 서브카테고리를 다시 지정해 주세요.' }, { status: 500 });
       }
 
       if (subCategoryIds.length > 0) {
@@ -214,7 +223,7 @@ export async function POST(
 
         if (insertError) {
           console.error('Failed to insert sub categories:', insertError);
-          return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+          return NextResponse.json({ error: '광고 승인은 완료됐지만 서브카테고리를 저장하지 못했습니다. 광고 수정 화면에서 서브카테고리를 다시 지정해 주세요.' }, { status: 500 });
         }
       }
     }
@@ -224,7 +233,7 @@ export async function POST(
       const admin = createAdminClient();
       const startedAt = new Date().toISOString();
 
-      const subscriptionError = await insertCardlessSubscription(admin, {
+      const { subscriptionId, error: subscriptionError } = await insertCardlessSubscription(admin, {
         advertisementId: id,
         originalMonthlyAmount: calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0),
         discountRate: effectiveDiscountRate,
@@ -234,7 +243,7 @@ export async function POST(
 
       if (subscriptionError) {
         return NextResponse.json(
-          { error: '승인은 됐지만 바로 개시하지 못했습니다. 수정 화면에서 다시 시도해주세요.' },
+          { error: '광고 승인은 완료됐지만 바로 시작하지는 못했습니다. 광고 수정 화면에서 \'카드 등록 없이 바로 광고 시작\'을 체크해 다시 저장해 주세요.' },
           { status: 500 }
         );
       }
@@ -247,9 +256,9 @@ export async function POST(
       // running으로 못 넘겼는데 구독만 남으면 파트너가 결제 시 구독이 두 개가 된다
       if (startError) {
         console.error('Failed to start advertisement on approval:', startError);
-        await admin.from('ad_subscriptions_v2').delete().eq('advertisementId', id);
+        await admin.from('ad_subscriptions_v2').delete().eq('id', subscriptionId);
         return NextResponse.json(
-          { error: '승인은 됐지만 바로 개시하지 못했습니다. 수정 화면에서 다시 시도해주세요.' },
+          { error: '광고 승인은 완료됐지만 바로 시작하지는 못했습니다. 광고 수정 화면에서 \'카드 등록 없이 바로 광고 시작\'을 체크해 다시 저장해 주세요.' },
           { status: 500 }
         );
       }
@@ -296,7 +305,7 @@ export async function POST(
   } catch (error) {
     console.error('Server error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' },
       { status: 500 }
     );
   }

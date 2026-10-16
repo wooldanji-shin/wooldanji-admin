@@ -12,7 +12,7 @@ export async function PUT(
 
     if (!currentUser) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' },
         { status: 401 }
       );
     }
@@ -29,7 +29,7 @@ export async function PUT(
 
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
+        { error: '이 작업을 할 권한이 없습니다.' },
         { status: 403 }
       );
     }
@@ -39,7 +39,7 @@ export async function PUT(
 
     if (!suspensionReason || !suspensionReason.trim()) {
       return NextResponse.json(
-        { error: 'Suspension reason is required' },
+        { error: '보류 사유를 입력해 주세요.' },
         { status: 400 }
       );
     }
@@ -58,7 +58,7 @@ export async function PUT(
     if (error) {
       console.error('Failed to suspend user:', error);
       return NextResponse.json(
-        { error: 'Failed to suspend user' },
+        { error: '승인 보류 처리를 하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
         { status: 500 }
       );
     }
@@ -72,7 +72,7 @@ export async function PUT(
   } catch (error) {
     console.error('Server error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' },
       { status: 500 }
     );
   }

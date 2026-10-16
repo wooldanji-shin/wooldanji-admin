@@ -12,12 +12,17 @@ import {
   type AnalyticsPeriod,
 } from '@/lib/ad-analytics-period';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import {
   usePartnerExtraInfo,
   type UsePartnerExtraInfoReturn,
 } from '@/lib/hooks/usePartnerExtraInfo';
 import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
 import { BIZ_CALL_DUPLICATE_MESSAGE } from '@/lib/biz-call';
+
+/** 서버가 이유를 알려주지 않은 승인 실패 — 일부만 처리됐을 수 있어 상태 확인을 안내한다 */
+const APPROVE_UNKNOWN_RESULT_MESSAGE =
+  '광고 승인 처리 중 문제가 생겼습니다. 화면을 새로고침해 승인 여부를 확인한 뒤 다시 시도해 주세요.';
 
 export interface ApartmentInfo {
   apartmentId: string;
@@ -552,13 +557,9 @@ export function useApplicationDetailPage(
         }
       );
       if (!response.ok) {
-        const err = await response.json();
-        // 비즈콜 중복(409)은 관리자가 바로 고칠 수 있도록 서버 메시지를 그대로 보여준다
-        if (response.status === 409) {
-          toast.error(err.error);
-          return;
-        }
-        throw new Error(err.error || 'Failed to approve');
+        // 서버 메시지가 무엇이 완료됐고 무엇이 안 됐는지 알려주므로 상태코드와 무관하게 그대로 보여준다
+        toast.error((await readApiErrorMessage(response)) ?? APPROVE_UNKNOWN_RESULT_MESSAGE);
+        return;
       }
       const result = await response.json();
       if (grantAnalytics && !detail.partnerAnalyticsEnabled) {
@@ -572,7 +573,7 @@ export function useApplicationDetailPage(
       router.push('/admin/advertising-v2/applications');
     } catch (err) {
       console.error('Failed to approve:', err);
-      toast.error('광고 승인에 실패했습니다.');
+      toast.error(networkFailedMessage('광고를 승인하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -587,17 +588,17 @@ export function useApplicationDetailPage(
         `/api/advertising-v2/applications/${detail.id}/convert-free`,
         { method: 'POST' }
       );
-      const result = await response.json();
       if (!response.ok) {
-        toast.error(result.error || '무료 전환에 실패했습니다.');
+        toast.error((await readApiErrorMessage(response)) ?? '무료 전환 처리 중 문제가 생겼습니다. 새로고침해 광고 상태를 확인한 뒤 다시 시도해 주세요.');
         return;
       }
+      const result = await response.json();
       toast.success(result.restarted ? '무료 광고로 다시 시작했습니다.' : '무료 광고로 전환했습니다.');
       setConvertFreeDialog(false);
       fetchDetail();
     } catch (err) {
       console.error('Failed to convert to free:', err);
-      toast.error('무료 전환에 실패했습니다.');
+      toast.error(networkFailedMessage('무료 전환을 하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -630,8 +631,7 @@ export function useApplicationDetailPage(
         { method: 'POST' }
       );
       if (!response.ok) {
-        const err = await response.json();
-        toast.error(err.error || '광고 삭제에 실패했습니다.');
+        toast.error((await readApiErrorMessage(response)) ?? '광고 삭제 처리 중 문제가 생겼습니다. 화면을 새로고침해 삭제 여부를 확인한 뒤 다시 시도해 주세요.');
         return;
       }
       toast.success('광고를 삭제했습니다.');
@@ -639,7 +639,7 @@ export function useApplicationDetailPage(
       router.push('/admin/advertising-v2/applications');
     } catch (err) {
       console.error('Failed to delete advertisement:', err);
-      toast.error('광고 삭제에 실패했습니다.');
+      toast.error(networkFailedMessage('광고를 삭제하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -662,14 +662,14 @@ export function useApplicationDetailPage(
         }
       );
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to reject');
+        toast.error((await readApiErrorMessage(response)) ?? '광고 거절 처리 중 문제가 생겼습니다. 화면을 새로고침해 거절 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('광고 신청이 거절되었습니다.');
       router.push('/admin/advertising-v2/applications');
     } catch (err) {
       console.error('Failed to reject:', err);
-      toast.error('광고 거절에 실패했습니다.');
+      toast.error(networkFailedMessage('광고를 거절하지 못했습니다.'));
     } finally {
       setProcessing(false);
       setRejectDialog(false);
@@ -689,14 +689,14 @@ export function useApplicationDetailPage(
         }
       );
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to update memo');
+        toast.error((await readApiErrorMessage(response)) ?? '메모를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        return;
       }
       toast.success('메모가 저장되었습니다.');
       fetchDetail();
     } catch (err) {
       console.error('Failed to update memo:', err);
-      toast.error('메모 저장에 실패했습니다.');
+      toast.error(networkFailedMessage('메모를 저장하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -715,14 +715,14 @@ export function useApplicationDetailPage(
         }
       );
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to approve modification');
+        toast.error((await readApiErrorMessage(response)) ?? '수정 승인 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('수정 내용이 승인되었습니다.');
       fetchDetail();
     } catch (err) {
       console.error('Failed to approve modification:', err);
-      toast.error('수정 승인에 실패했습니다.');
+      toast.error(networkFailedMessage('수정 요청을 승인하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -755,8 +755,8 @@ export function useApplicationDetailPage(
         }
       );
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to reject modification');
+        toast.error((await readApiErrorMessage(response)) ?? '수정 거절 처리 중 문제가 생겼습니다. 화면을 새로고침해 거절 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('수정 내용이 거절되었습니다.');
       setModificationRejectDialog(false);
@@ -764,7 +764,7 @@ export function useApplicationDetailPage(
       fetchDetail();
     } catch (err) {
       console.error('Failed to reject modification:', err);
-      toast.error('수정 거절에 실패했습니다.');
+      toast.error(networkFailedMessage('수정 요청을 거절하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }

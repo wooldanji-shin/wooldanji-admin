@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -18,12 +18,12 @@ export async function POST(request: NextRequest) {
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const { userId } = await request.json();
     if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+      return NextResponse.json({ error: '승인할 회원 정보가 없습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.' }, { status: 400 });
     }
 
     // service-role key로 RLS bypass
@@ -37,11 +37,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (userError || !targetUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: '회원을 찾을 수 없습니다. 탈퇴했을 수 있으니 목록을 새로고침해 주세요.' }, { status: 404 });
     }
 
     if (targetUser.approvalStatus !== 'pending') {
-      return NextResponse.json({ error: 'User is not in pending status' }, { status: 400 });
+      return NextResponse.json({ error: '멤버십 전환 심사 대기 중인 회원이 아닙니다. 이미 처리됐을 수 있으니 목록을 새로고침해 주세요.' }, { status: 400 });
     }
 
     // approvalStatus를 approve로 UPDATE
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Failed to update approval status:', updateError);
-      return NextResponse.json({ error: 'Failed to approve user' }, { status: 500 });
+      return NextResponse.json({ error: '멤버십 전환을 승인하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
     }
 
     // FCM 알림 전송을 위해 partner_users에서 partnerUserId 역조회
@@ -89,6 +89,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, message: '멤버십 전환 승인이 완료되었습니다.' });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }

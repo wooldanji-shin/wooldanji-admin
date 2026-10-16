@@ -34,7 +34,7 @@ export async function POST(
 
     if (!currentUser) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' },
         { status: 401 }
       );
     }
@@ -50,7 +50,7 @@ export async function POST(
 
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
+        { error: '이 작업을 할 권한이 없습니다.' },
         { status: 403 }
       );
     }
@@ -63,7 +63,7 @@ export async function POST(
 
     if (fetchError || !event) {
       return NextResponse.json(
-        { error: 'Event not found' },
+        { error: '이벤트를 찾을 수 없습니다. 삭제되었을 수 있으니 목록을 새로고침해 주세요.' },
         { status: 404 }
       );
     }
@@ -71,7 +71,7 @@ export async function POST(
     // 종료된 이벤트는 이미 확정된 결과라 내용을 고치지 않는다
     if (event.status === 'ended') {
       return NextResponse.json(
-        { error: 'Ended events cannot be edited' },
+        { error: '종료된 이벤트는 수정할 수 없습니다.' },
         { status: 400 }
       );
     }
@@ -79,13 +79,13 @@ export async function POST(
     const body = await request.json() as UpdateBody;
 
     if (!body.title?.trim()) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+      return NextResponse.json({ error: '이벤트 제목을 입력해 주세요.' }, { status: 400 });
     }
     if (!body.couponTitle?.trim()) {
       return NextResponse.json({ error: '할인 대상(증정품)을 입력해주세요.' }, { status: 400 });
     }
     if (!Array.isArray(body.apartmentIds) || body.apartmentIds.length === 0) {
-      return NextResponse.json({ error: 'At least one apartment is required' }, { status: 400 });
+      return NextResponse.json({ error: '대상 아파트를 1곳 이상 선택해 주세요.' }, { status: 400 });
     }
 
     const { error: updateError } = await supabase
@@ -109,7 +109,7 @@ export async function POST(
       const constraintName = (updateError as { message?: string }).message?.match(/constraint "([a-z_]+)"/)?.[1];
       const friendly = constraintName ? CONSTRAINT_MESSAGE[constraintName] : undefined;
       return NextResponse.json(
-        { error: friendly ?? 'Failed to update event' },
+        { error: friendly ?? '이벤트 정보를 저장하지 못했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.' },
         { status: 400 }
       );
     }
@@ -122,7 +122,7 @@ export async function POST(
 
     if (deleteError) {
       console.error('Failed to clear event apartments:', deleteError);
-      return NextResponse.json({ error: 'Failed to update apartments' }, { status: 500 });
+      return NextResponse.json({ error: '이벤트 내용은 저장됐지만 대상 아파트를 저장하지 못했습니다. 대상 아파트가 비어 있을 수 있으니 다시 선택해 저장해 주세요.' }, { status: 500 });
     }
 
     const { error: insertError } = await supabase
@@ -131,7 +131,7 @@ export async function POST(
 
     if (insertError) {
       console.error('Failed to insert event apartments:', insertError);
-      return NextResponse.json({ error: 'Failed to update apartments' }, { status: 500 });
+      return NextResponse.json({ error: '이벤트 내용은 저장됐지만 대상 아파트를 저장하지 못했습니다. 대상 아파트가 비어 있을 수 있으니 다시 선택해 저장해 주세요.' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -141,7 +141,7 @@ export async function POST(
   } catch (error) {
     console.error('Server error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' },
       { status: 500 }
     );
   }

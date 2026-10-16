@@ -12,6 +12,7 @@ import {
   type AnalyticsPeriod,
 } from '@/lib/ad-analytics-period';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import {
   usePartnerExtraInfo,
   type UsePartnerExtraInfoReturn,
@@ -459,8 +460,8 @@ export function usePremiumDetailPage(
         body: JSON.stringify({ discountRate, adminMemo, salesRepId }),
       });
       if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error ?? 'Failed to approve');
+        toast.error((await readApiErrorMessage(res)) ?? '프리미엄 광고 승인 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       if (grantAnalytics && !detail.partner?.analyticsEnabled) {
         await (supabase as any)
@@ -474,7 +475,7 @@ export function usePremiumDetailPage(
       fetchDetail();
     } catch (err) {
       console.error('프리미엄 광고 승인 실패:', err);
-      toast.error('승인에 실패했습니다.');
+      toast.error(networkFailedMessage('프리미엄 광고를 승인하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -494,8 +495,8 @@ export function usePremiumDetailPage(
         body: JSON.stringify({ reason: rejectReason.trim() }),
       });
       if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error ?? 'Failed to reject');
+        toast.error((await readApiErrorMessage(res)) ?? '프리미엄 광고 거절 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('프리미엄 광고가 거절되었습니다.');
       setRejectDialog(false);
@@ -503,7 +504,7 @@ export function usePremiumDetailPage(
       fetchDetail();
     } catch (err) {
       console.error('프리미엄 광고 거절 실패:', err);
-      toast.error('거절 처리에 실패했습니다.');
+      toast.error(networkFailedMessage('프리미엄 광고를 거절하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -517,14 +518,14 @@ export function usePremiumDetailPage(
         method: 'POST',
       });
       if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error ?? 'Failed to approve modification');
+        toast.error((await readApiErrorMessage(res)) ?? '수정 승인 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('수정 내용이 승인되었습니다.');
       fetchDetail();
     } catch (err) {
       console.error('수정 승인 실패:', err);
-      toast.error('수정 승인에 실패했습니다.');
+      toast.error(networkFailedMessage('수정 요청을 승인하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -542,8 +543,7 @@ export function usePremiumDetailPage(
     try {
       const res = await fetch(`/api/advertising-v2/premium/${detail.id}/delete`, { method: 'POST' });
       if (!res.ok) {
-        const result = await res.json();
-        toast.error(result.error ?? '프리미엄 광고 삭제에 실패했습니다.');
+        toast.error((await readApiErrorMessage(res)) ?? '프리미엄 광고 삭제 처리 중 문제가 생겼습니다. 화면을 새로고침해 삭제 여부를 확인한 뒤 다시 시도해 주세요.');
         return;
       }
       toast.success('프리미엄 광고를 삭제했습니다.');
@@ -551,7 +551,7 @@ export function usePremiumDetailPage(
       router.push('/admin/advertising-v2/premium');
     } catch (err) {
       console.error('프리미엄 광고 삭제 실패:', err);
-      toast.error('프리미엄 광고 삭제에 실패했습니다.');
+      toast.error(networkFailedMessage('프리미엄 광고를 삭제하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -567,14 +567,14 @@ export function usePremiumDetailPage(
         body: JSON.stringify({ adminMemo: adminMemo.trim() }),
       });
       if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error ?? 'Failed to update memo');
+        toast.error((await readApiErrorMessage(res)) ?? '메모를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        return;
       }
       toast.success('메모가 저장되었습니다.');
       fetchDetail();
     } catch (err) {
       console.error('메모 업데이트 실패:', err);
-      toast.error('메모 저장에 실패했습니다.');
+      toast.error(networkFailedMessage('메모를 저장하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -609,8 +609,8 @@ export function usePremiumDetailPage(
         body: JSON.stringify({ reason: modificationRejectReason.trim() }),
       });
       if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error ?? 'Failed to reject modification');
+        toast.error((await readApiErrorMessage(res)) ?? '수정 거절 처리 중 문제가 생겼습니다. 화면을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('수정 내용이 거절되었습니다.');
       setModificationRejectDialog(false);
@@ -618,7 +618,7 @@ export function usePremiumDetailPage(
       fetchDetail();
     } catch (err) {
       console.error('수정 거절 실패:', err);
-      toast.error('수정 거절에 실패했습니다.');
+      toast.error(networkFailedMessage('수정 요청을 거절하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }

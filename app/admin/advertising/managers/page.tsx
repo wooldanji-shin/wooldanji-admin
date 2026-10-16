@@ -65,6 +65,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Textarea } from '@/components/ui/textarea';
 import { ImageUpload } from '@/components/image-upload';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 
 interface Manager {
   id: string;
@@ -363,7 +364,10 @@ export default function AdvertisingManagersPage() {
         method: 'DELETE',
       });
 
-      if (!response.ok) throw new Error('Failed to delete manager');
+      if (!response.ok) {
+        toast.error((await readApiErrorMessage(response)) ?? '매니저 삭제 처리 중 문제가 생겼습니다. 목록을 새로고침해 삭제 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
+      }
 
       setDeleteDialog(false);
       setDeletingManager(null);
@@ -371,7 +375,7 @@ export default function AdvertisingManagersPage() {
       fetchManagers();
     } catch (err) {
       console.error('Failed to delete manager:', err);
-      toast.error('매니저 삭제에 실패했습니다.');
+      toast.error(networkFailedMessage('매니저를 삭제하지 못했습니다.'));
     }
   };
 

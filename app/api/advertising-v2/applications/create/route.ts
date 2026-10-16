@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const body = await request.json() as CreateBody;
@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError || !inserted) {
       console.error('Failed to create advertisement:', insertError);
-      return NextResponse.json({ error: 'Failed to create advertisement' }, { status: 500 });
+      return NextResponse.json({ error: '광고를 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
     }
 
     const advertisementId = inserted.id as string;
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
     if (apartmentError) {
       console.error('Failed to insert apartments:', apartmentError);
       await admin.from('advertisements_v2').delete().eq('id', advertisementId);
-      return NextResponse.json({ error: 'Failed to save apartments' }, { status: 500 });
+      return NextResponse.json({ error: '노출 아파트를 저장하지 못해 광고 등록을 취소했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
     }
 
     if (subCategoryIds.length > 0) {
@@ -256,14 +256,14 @@ export async function POST(request: NextRequest) {
       if (subCategoryError) {
         console.error('Failed to insert sub categories:', subCategoryError);
         await admin.from('advertisements_v2').delete().eq('id', advertisementId);
-        return NextResponse.json({ error: 'Failed to save sub categories' }, { status: 500 });
+        return NextResponse.json({ error: '서브카테고리를 저장하지 못해 광고 등록을 취소했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
       }
     }
 
     // 카드 없이 개시 — 파트너 결제를 기다리지 않고 바로 노출을 시작한다.
     // 주민 앱 노출 조건은 adStatus === 'running' 하나뿐이라 구독만 만들어 두면 된다.
     if (startImmediately) {
-      const subscriptionError = await insertCardlessSubscription(admin, {
+      const { error: subscriptionError } = await insertCardlessSubscription(admin, {
         advertisementId,
         originalMonthlyAmount: calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0),
         discountRate,
@@ -338,6 +338,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }

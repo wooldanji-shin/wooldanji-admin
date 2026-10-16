@@ -56,6 +56,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -178,7 +179,7 @@ export default function PartnerAnnouncementsPage() {
       setTotalCount(rows[0]?.total_count ?? 0);
     } catch (e: any) {
       console.error(e);
-      setError(e?.message ?? '파트너 조회 실패');
+      setError('파트너 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
@@ -194,11 +195,15 @@ export default function PartnerAnnouncementsPage() {
     try {
       setHistoryLoading(true);
       const res = await fetch('/api/admin/partner-announcements/history?limit=50');
+      if (!res.ok) {
+        toast.error((await readApiErrorMessage(res)) ?? '발송 이력을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? '이력 조회 실패');
       setHistory(json.rows as HistoryRow[]);
     } catch (e: any) {
-      toast.error(`이력 조회 실패: ${e?.message ?? e}`);
+      console.error(e);
+      toast.error(networkFailedMessage('발송 이력을 불러오지 못했습니다.'));
     } finally {
       setHistoryLoading(false);
     }
@@ -233,7 +238,8 @@ export default function PartnerAnnouncementsPage() {
         })),
       );
     } catch (e: any) {
-      toast.error(`수신자 조회 실패: ${e?.message ?? e}`);
+      console.error(e);
+      toast.error('수신자 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setRecipientsLoading(false);
     }
@@ -295,10 +301,15 @@ export default function PartnerAnnouncementsPage() {
           body: body.trim(),
         }),
       });
-      const json = (await res.json()) as SendResult | { error: string };
-      if (!res.ok) throw new Error(('error' in json ? json.error : '발송 실패') as string);
+      if (!res.ok) {
+        toast.error(
+          (await readApiErrorMessage(res)) ??
+            '알림 발송 중 문제가 생겼습니다. 발송 이력을 새로고침해 발송 여부를 확인한 뒤 다시 시도해 주세요.'
+        );
+        return;
+      }
 
-      const result = json as SendResult;
+      const result = (await res.json()) as SendResult;
       toast.success(
         `발송 완료 — 성공 ${result.success} / 실패 ${result.failed} / 토큰없음 ${result.noToken} (${result.durationMs}ms)`,
       );
@@ -308,7 +319,8 @@ export default function PartnerAnnouncementsPage() {
       clearSelection();
       void loadHistory();
     } catch (e: any) {
-      toast.error(`발송 실패: ${e?.message ?? e}`);
+      console.error(e);
+      toast.error(networkFailedMessage('알림을 보내지 못했습니다.'));
     } finally {
       setSending(false);
     }
@@ -319,12 +331,15 @@ export default function PartnerAnnouncementsPage() {
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/partner-announcements/${id}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? '삭제 실패');
+      if (!res.ok) {
+        toast.error((await readApiErrorMessage(res)) ?? '알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
       setHistory((prev) => prev.filter((h) => h.key !== id));
       toast.success('삭제됐습니다');
     } catch (e: any) {
-      toast.error(`삭제 실패: ${e?.message ?? e}`);
+      console.error(e);
+      toast.error(networkFailedMessage('알림을 삭제하지 못했습니다.'));
     } finally {
       setDeletingId(null);
     }

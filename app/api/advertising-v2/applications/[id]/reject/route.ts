@@ -12,7 +12,7 @@ export async function POST(
 
     if (!currentUser) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' },
         { status: 401 }
       );
     }
@@ -28,7 +28,7 @@ export async function POST(
 
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
+        { error: '이 작업을 할 권한이 없습니다.' },
         { status: 403 }
       );
     }
@@ -38,7 +38,7 @@ export async function POST(
 
     if (!rejectReason || !rejectReason.trim()) {
       return NextResponse.json(
-        { error: 'Reject reason is required' },
+        { error: '거절 사유를 입력해 주세요.' },
         { status: 400 }
       );
     }
@@ -51,14 +51,14 @@ export async function POST(
 
     if (fetchError || !ad) {
       return NextResponse.json(
-        { error: 'Advertisement not found' },
+        { error: '광고를 찾을 수 없습니다. 삭제되었을 수 있으니 목록을 새로고침해 주세요.' },
         { status: 404 }
       );
     }
 
     if (!['pending', 'approved'].includes(ad.adStatus)) {
       return NextResponse.json(
-        { error: 'Advertisement cannot be rejected in its current status' },
+        { error: '심사 중이거나 결제 전인 광고만 거절할 수 있습니다. 목록을 새로고침해 광고 상태를 확인해 주세요.' },
         { status: 400 }
       );
     }
@@ -77,7 +77,7 @@ export async function POST(
     if (updateError) {
       console.error('Failed to reject advertisement:', updateError);
       return NextResponse.json(
-        { error: 'Failed to reject advertisement' },
+        { error: '광고를 거절하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
         { status: 500 }
       );
     }
@@ -115,7 +115,7 @@ export async function POST(
   } catch (error) {
     console.error('Server error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' },
       { status: 500 }
     );
   }

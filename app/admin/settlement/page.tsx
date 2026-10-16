@@ -54,12 +54,16 @@ const TYPE_TABS: { label: string; value: TypeFilter }[] = [
   { label: '기본광고', value: 'basic' },
   { label: '프리미엄 최초', value: 'premium' },
   { label: '프리미엄 연장', value: 'extension' },
+  { label: '단독 팝업 최초', value: 'solo_popup' },
+  { label: '단독 팝업 연장', value: 'solo_popup_extension' },
 ];
 
 const PAYMENT_TYPE_LABEL: Record<SettlementPaymentType, string> = {
   basic: '기본광고',
   premium: '프리미엄 최초',
   extension: '프리미엄 연장',
+  solo_popup: '단독 팝업 최초',
+  solo_popup_extension: '단독 팝업 연장',
 };
 
 interface PaginationProps {
@@ -185,7 +189,7 @@ export default function SettlementPage(): React.ReactElement {
               loading={loading}
             />
             <StatCard
-              label="프리미엄 매출 비중"
+              label="프리미엄·단독 팝업 매출 비중"
               value={`${summary.premiumRevenueRatioPct.toFixed(1)}%`}
               icon={Receipt}
               accent="info"

@@ -61,6 +61,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { formatLineRange } from '@/lib/utils/line';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import { getUserRoles } from '@/lib/auth';
 
 interface Manager {
@@ -316,13 +317,16 @@ export default function ManagersPage() {
         body: JSON.stringify({ status }),
       });
 
-      if (!response.ok) throw new Error('Failed to update approval status');
+      if (!response.ok) {
+        toast.error((await readApiErrorMessage(response)) ?? '승인 상태 변경 처리 중 문제가 생겼습니다. 목록을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
+      }
 
       toast.success('승인 상태가 변경되었습니다.');
       fetchManagers();
     } catch (err) {
       console.error('Failed to update approval status:', err);
-      toast.error('승인 상태 변경에 실패했습니다.');
+      toast.error(networkFailedMessage('승인 상태를 바꾸지 못했습니다.'));
     }
   };
 
@@ -350,8 +354,8 @@ export default function ManagersPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to suspend manager');
+        toast.error((await readApiErrorMessage(response)) ?? '승인 보류 처리 중 문제가 생겼습니다. 목록을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
 
       toast.success('관리자가 승인 보류 처리되었습니다.');
@@ -361,7 +365,7 @@ export default function ManagersPage() {
       fetchManagers();
     } catch (err) {
       console.error('Failed to suspend manager:', err);
-      toast.error('승인 보류 처리에 실패했습니다.');
+      toast.error(networkFailedMessage('승인 보류 처리를 하지 못했습니다.'));
     }
   };
 
@@ -442,8 +446,8 @@ export default function ManagersPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete manager');
+        toast.error((await readApiErrorMessage(response)) ?? '관리자 삭제 처리 중 문제가 생겼습니다. 목록을 새로고침해 삭제 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
 
       toast.success('관리자가 삭제되었습니다.');
@@ -452,7 +456,7 @@ export default function ManagersPage() {
       fetchManagers();
     } catch (err) {
       console.error('Failed to delete manager:', err);
-      toast.error('관리자 삭제에 실패했습니다.');
+      toast.error(networkFailedMessage('관리자를 삭제하지 못했습니다.'));
     }
   };
 

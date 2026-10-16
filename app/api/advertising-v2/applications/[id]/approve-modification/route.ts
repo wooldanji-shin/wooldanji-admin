@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { PRICE_LOOKUP_FAILED_MESSAGE, fetchPricePerHousehold } from '@/lib/ads/pricing';
+import { pickBaseContentChanges } from '@/lib/ads/pending-changes';
 
 async function applyApartmentChanges(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -41,7 +42,7 @@ export async function POST(
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -51,7 +52,7 @@ export async function POST(
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     // 광고 조회 (modificationStatus, pendingChanges, 할인율 포함)
@@ -62,21 +63,23 @@ export async function POST(
       .single();
 
     if (fetchError || !ad) {
-      return NextResponse.json({ error: 'Advertisement not found' }, { status: 404 });
+      return NextResponse.json({ error: '광고를 찾을 수 없습니다. 삭제되었을 수 있으니 목록을 새로고침해 주세요.' }, { status: 404 });
     }
 
     if (ad.modificationStatus !== 'pending') {
-      return NextResponse.json({ error: 'No pending modification to approve' }, { status: 400 });
+      return NextResponse.json({ error: '심사 중인 수정 요청이 없습니다. 이미 처리됐을 수 있으니 화면을 새로고침해 주세요.' }, { status: 400 });
     }
 
     if (!ad.pendingChanges) {
-      return NextResponse.json({ error: 'pendingChanges is empty' }, { status: 400 });
+      return NextResponse.json({ error: '수정 요청에 바뀐 내용이 없습니다. 파트너에게 다시 요청해 달라고 안내해 주세요.' }, { status: 400 });
     }
 
     const changes = ad.pendingChanges as Record<string, unknown>;
 
     // subCategoryIds, apartments는 junction table로 처리 (advertisements_v2 컬럼에 없음)
-    const { subCategoryIds, apartments: pendingApartments, ...adChanges } = changes;
+    const { subCategoryIds, apartments: pendingApartments, ...rawAdChanges } = changes;
+    // 파트너가 쓴 값이므로 콘텐츠 컬럼만 본 레코드에 반영
+    const adChanges = pickBaseContentChanges(rawAdChanges);
 
     // 아파트 변경 포함 여부 확인 (Design Ref: §6.1)
     const hasPendingApartments = Array.isArray(pendingApartments) && pendingApartments.length > 0;
@@ -153,7 +156,7 @@ export async function POST(
 
         if (updateError) {
           console.error('Failed to approve modification (same apartments):', updateError);
-          return NextResponse.json({ error: 'Failed to approve modification' }, { status: 500 });
+          return NextResponse.json({ error: '수정 요청을 승인하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
         }
 
         if (adminMonthlyAmount !== undefined) {
@@ -299,7 +302,7 @@ export async function POST(
 
       if (updateError) {
         console.error('Failed to approve modification:', updateError);
-        return NextResponse.json({ error: 'Failed to approve modification' }, { status: 500 });
+        return NextResponse.json({ error: '수정 요청을 승인하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
       }
 
       if (adminMonthlyAmount !== undefined) {
@@ -328,7 +331,7 @@ export async function POST(
 
       if (deleteError) {
         console.error('Failed to delete sub categories:', deleteError);
-        return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+        return NextResponse.json({ error: '수정 내용은 반영됐지만 서브카테고리를 저장하지 못했습니다. 광고 수정 화면에서 서브카테고리를 다시 지정해 주세요.' }, { status: 500 });
       }
 
       if (subCategoryIds.length > 0) {
@@ -342,7 +345,7 @@ export async function POST(
 
         if (insertError) {
           console.error('Failed to insert sub categories:', insertError);
-          return NextResponse.json({ error: 'Failed to update sub categories' }, { status: 500 });
+          return NextResponse.json({ error: '수정 내용은 반영됐지만 서브카테고리를 저장하지 못했습니다. 광고 수정 화면에서 서브카테고리를 다시 지정해 주세요.' }, { status: 500 });
         }
       }
     }
@@ -385,6 +388,6 @@ export async function POST(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }

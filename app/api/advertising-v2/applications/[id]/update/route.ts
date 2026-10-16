@@ -14,6 +14,7 @@ import { MAX_AD_IMAGES } from '@/lib/ads/constants';
 import { BIZ_CALL_DUPLICATE_MESSAGE, findBizCallDuplicate } from '@/lib/biz-call';
 import {
   canStartWithoutCard,
+  checkNoLiveSubscription,
   insertCardlessSubscription,
   startedAdColumns,
 } from '@/lib/ads/start-without-card';
@@ -81,7 +82,7 @@ async function replaceSubCategories(
 
   if (deleteError) {
     console.error('Failed to clear sub categories:', deleteError);
-    return 'Failed to update sub categories';
+    return '서브카테고리를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
   }
 
   if (subCategoryIds.length === 0) return null;
@@ -92,7 +93,7 @@ async function replaceSubCategories(
 
   if (insertError) {
     console.error('Failed to insert sub categories:', insertError);
-    return 'Failed to update sub categories';
+    return '서브카테고리를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
   }
 
   return null;
@@ -255,7 +256,7 @@ async function changeRunningApartments(
   if (!(await replaceApartments(admin, ad.id, nextRows))) {
     // 지우기만 되고 넣기가 실패했을 수 있으니 원래 아파트로 되돌린다
     await replaceApartments(admin, ad.id, currentApartments);
-    return { ok: false, status: 500, error: 'Failed to update apartments' };
+    return { ok: false, status: 500, error: '노출 아파트를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' };
   }
 
   const { error: adError } = await admin
@@ -265,7 +266,7 @@ async function changeRunningApartments(
   if (adError) {
     console.error('Failed to update approvedMonthlyAmount:', adError);
     await replaceApartments(admin, ad.id, currentApartments);
-    return { ok: false, status: 500, error: 'Failed to update advertisement' };
+    return { ok: false, status: 500, error: '광고 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' };
   }
 
   const { error: subError } = await admin
@@ -283,7 +284,7 @@ async function changeRunningApartments(
       .update({ approvedMonthlyAmount: ad.approvedMonthlyAmount })
       .eq('id', ad.id);
     await replaceApartments(admin, ad.id, currentApartments);
-    return { ok: false, status: 500, error: 'Failed to update subscription' };
+    return { ok: false, status: 500, error: '구독(정기결제) 금액을 바꾸지 못해 아파트 변경을 취소했습니다. 잠시 후 다시 시도해 주세요.' };
   }
 
   console.log(
@@ -312,7 +313,7 @@ export async function POST(
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const { data: roles } = await supabase
@@ -322,7 +323,7 @@ export async function POST(
 
     const isAdmin = roles?.some(r => ['SUPER_ADMIN', 'MANAGER'].includes(r.role));
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: '이 작업을 할 권한이 없습니다.' }, { status: 403 });
     }
 
     const body = await request.json() as UpdateBody;
@@ -434,7 +435,7 @@ export async function POST(
         .eq('advertisementId', id);
       if (currentAptError) {
         console.error('Failed to fetch current apartments:', currentAptError);
-        return NextResponse.json({ error: 'Failed to fetch apartments' }, { status: 500 });
+        return NextResponse.json({ error: '현재 노출 아파트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
       }
       const currentApartments = (currentAptData ?? []) as ApartmentRow[];
 
@@ -462,7 +463,7 @@ export async function POST(
 
       if (runningUpdateError) {
         console.error('Failed to update advertisement:', runningUpdateError);
-        return NextResponse.json({ error: 'Failed to update advertisement' }, { status: 500 });
+        return NextResponse.json({ error: '광고 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
       }
 
       const subCategoryError = await replaceSubCategories(admin, id, subCategoryIds);
@@ -525,6 +526,14 @@ export async function POST(
     const startImmediately =
       isBeforePayment && canStartWithoutCard(body.startImmediately, discountRate);
 
+    // 살아 있는 구독이 있으면 구독 INSERT가 실패하는데, 그 전에 쓴 광고·아파트 교체는 남는다 — 쓰기 전에 막는다
+    if (startImmediately) {
+      const blocked = await checkNoLiveSubscription(admin, id);
+      if (blocked) {
+        return NextResponse.json({ error: blocked.error }, { status: blocked.status });
+      }
+    }
+
     const { error: updateError } = await admin
       .from('advertisements_v2')
       .update({
@@ -538,7 +547,7 @@ export async function POST(
 
     if (updateError) {
       console.error('Failed to update advertisement:', updateError);
-      return NextResponse.json({ error: 'Failed to update advertisement' }, { status: 500 });
+      return NextResponse.json({ error: '광고 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
     }
 
     // 아파트는 통째로 교체한다
@@ -549,7 +558,7 @@ export async function POST(
 
     if (apartmentDeleteError) {
       console.error('Failed to clear apartments:', apartmentDeleteError);
-      return NextResponse.json({ error: 'Failed to update apartments' }, { status: 500 });
+      return NextResponse.json({ error: '노출 아파트를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
     }
 
     const { error: apartmentInsertError } = await admin
@@ -564,7 +573,7 @@ export async function POST(
 
     if (apartmentInsertError) {
       console.error('Failed to insert apartments:', apartmentInsertError);
-      return NextResponse.json({ error: 'Failed to update apartments' }, { status: 500 });
+      return NextResponse.json({ error: '노출 아파트를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
     }
 
     const subCategoryError = await replaceSubCategories(admin, id, subCategoryIds);
@@ -577,7 +586,7 @@ export async function POST(
     if (startImmediately) {
       const startedAt = new Date().toISOString();
 
-      const subscriptionError = await insertCardlessSubscription(admin, {
+      const { subscriptionId, error: subscriptionError } = await insertCardlessSubscription(admin, {
         advertisementId: id,
         originalMonthlyAmount: calcMonthlyAmount(totalHouseholds, pricePerHousehold, 0),
         discountRate,
@@ -597,8 +606,11 @@ export async function POST(
       // running으로 못 넘겼는데 구독만 남으면 파트너가 결제 시 구독이 두 개가 된다
       if (startError) {
         console.error('Failed to start advertisement:', startError);
-        await admin.from('ad_subscriptions_v2').delete().eq('advertisementId', id);
-        return NextResponse.json({ error: 'Failed to start advertisement' }, { status: 500 });
+        await admin.from('ad_subscriptions_v2').delete().eq('id', subscriptionId);
+        return NextResponse.json(
+          { error: '광고 시작에 실패했습니다. 잠시 후 다시 시도해 주세요.' },
+          { status: 500 }
+        );
       }
     }
 
@@ -638,6 +650,6 @@ export async function POST(
     });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
 }

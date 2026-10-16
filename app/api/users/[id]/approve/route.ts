@@ -12,7 +12,7 @@ export async function PUT(
 
     if (!currentUser) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: '로그인이 만료되었습니다. 다시 로그인해 주세요.' },
         { status: 401 }
       );
     }
@@ -29,7 +29,7 @@ export async function PUT(
 
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
+        { error: '이 작업을 할 권한이 없습니다.' },
         { status: 403 }
       );
     }
@@ -39,7 +39,7 @@ export async function PUT(
 
     if (!['approve', 'pending'].includes(status)) {
       return NextResponse.json(
-        { error: 'Invalid status. Must be "approve" or "pending"' },
+        { error: '알 수 없는 승인 상태입니다. 화면을 새로고침한 뒤 다시 시도해 주세요.' },
         { status: 400 }
       );
     }
@@ -55,7 +55,7 @@ export async function PUT(
     if (error) {
       console.error('Failed to update approval status:', error);
       return NextResponse.json(
-        { error: 'Failed to update approval status' },
+        { error: '회원 승인 상태를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.' },
         { status: 500 }
       );
     }
@@ -67,7 +67,7 @@ export async function PUT(
   } catch (error) {
     console.error('Server error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' },
       { status: 500 }
     );
   }

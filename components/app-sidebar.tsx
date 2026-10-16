@@ -170,6 +170,12 @@ const advertisingItems: MenuItem[] = [
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
+    name: '단독 팝업 광고 관리',
+    href: '/admin/advertising-v2/solo-popup',
+    icon: DoorOpen,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
     name: '가격 변동하기',
     href: '/admin/advertising-v2/pricing',
     icon: TrendingUp,
@@ -193,6 +199,12 @@ const advertisingItems: MenuItem[] = [
     icon: ImageIcon,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
+  {
+    name: '단독 팝업 소개 이미지',
+    href: '/admin/solo-popup-ad-intro-image',
+    icon: ImageIcon,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
 ];
 
 // ─── 홈화면 수정 ───────────────────────────────────────────
@@ -206,6 +218,18 @@ const homeSettingsItems: MenuItem[] = [
   {
     name: '공동현관문 팝업관리',
     href: '/admin/advertising-v2/door-banner',
+    icon: DoorOpen,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '문열림 채움 이미지',
+    href: '/admin/advertising-v2/door-filler-images',
+    icon: ImageIcon,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    name: '문열림 팝업 통계',
+    href: '/admin/advertising-v2/door-popup-stats',
     icon: DoorOpen,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },

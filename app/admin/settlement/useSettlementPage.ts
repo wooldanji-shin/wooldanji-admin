@@ -59,9 +59,14 @@ function previousPeriod(dateFrom: string, dateTo: string): { fromUtc: string; to
 
 const isSuccessStatus = (status: string): boolean => status === 'paid' || status === 'success';
 
+/** 광고 상품(프리미엄·단독 팝업) 매출 비중 집계 대상 */
+const PREMIUM_LIKE_TYPES: SettlementPaymentType[] = ['premium', 'extension', 'solo_popup', 'solo_popup_extension'];
+
 function mapPaymentType(raw: string | null): SettlementPaymentType {
   if (raw === 'extension') return 'extension';
   if (raw === 'premium') return 'premium';
+  if (raw === 'solo_popup') return 'solo_popup';
+  if (raw === 'solo_popup_extension') return 'solo_popup_extension';
   return 'basic';
 }
 
@@ -80,10 +85,13 @@ function mapRow(row: any): SettlementPayment {
     businessRegistrationNumber: partnerUsers?.businessRegistrationNumber ?? null,
     subscriptionId: row.subscriptionId ?? null,
     premiumAdId: row.premiumAdId ?? null,
+    soloPopupAdId: row.soloPopupAdId ?? null,
     paymentType: mapPaymentType(row.paymentType),
     adTitle: row.premiumAdId
       ? (row.premium_advertisements_v2?.title ?? null)
-      : (row.ad_subscriptions_v2?.advertisements_v2?.title ?? null),
+      : row.soloPopupAdId
+        ? (row.solo_popup_ads_v2?.title ?? null)
+        : (row.ad_subscriptions_v2?.advertisements_v2?.title ?? null),
     supplyAmount: row.supplyAmount,
     vatAmount: row.vatAmount,
     amount: row.amount,
@@ -108,7 +116,7 @@ function computeSummary(
   const successCount = payments.filter((p) => isSuccessStatus(p.status)).length;
   const failedCount = payments.filter((p) => p.status === 'failed').length;
   const premiumRevenue = payments
-    .filter((p) => isSuccessStatus(p.status) && (p.paymentType === 'premium' || p.paymentType === 'extension'))
+    .filter((p) => isSuccessStatus(p.status) && (PREMIUM_LIKE_TYPES.includes(p.paymentType)))
     .reduce((sum, p) => sum + p.amount, 0);
 
   const prevRevenue = prev.filter((p) => isSuccessStatus(p.status)).reduce((sum, p) => sum + p.amount, 0);
@@ -128,6 +136,8 @@ const PAYMENT_TYPE_LABEL: Record<SettlementPaymentType, string> = {
   basic: '기본광고',
   premium: '프리미엄 최초',
   extension: '프리미엄 연장',
+  solo_popup: '단독 팝업 최초',
+  solo_popup_extension: '단독 팝업 연장',
 };
 
 const SETTLEMENT_STATUS_LABEL: Record<string, string> = {
@@ -260,6 +270,7 @@ export function useSettlementPage(): UseSettlementPageReturn {
           partnerId,
           subscriptionId,
           premiumAdId,
+          soloPopupAdId,
           paymentType,
           supplyAmount,
           vatAmount,
@@ -280,7 +291,8 @@ export function useSettlementPage(): UseSettlementPageReturn {
               partner_users:partnerId(id, businessName, representativeName, businessRegistrationNumber)
             )
           ),
-          premium_advertisements_v2:premiumAdId(title)
+          premium_advertisements_v2:premiumAdId(title),
+          solo_popup_ads_v2:soloPopupAdId(title)
         `)
         .gte('paymentDate', fromUtc)
         .lte('paymentDate', toUtc)

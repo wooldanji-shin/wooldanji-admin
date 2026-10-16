@@ -12,6 +12,11 @@ import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
 import { BIZ_CALL_DUPLICATE_MESSAGE } from '@/lib/biz-call';
 import { SALES_REP_UNASSIGNED } from '@/components/sales-rep-filter';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
+
+/** 서버가 이유를 알려주지 않은 승인 실패 — 일부만 처리됐을 수 있어 상태 확인을 안내한다 */
+const APPROVE_UNKNOWN_RESULT_MESSAGE =
+  '광고 승인 처리 중 문제가 생겼습니다. 목록을 새로고침해 승인 여부를 확인한 뒤 다시 시도해 주세요.';
 
 export type AdStatus = 'pending' | 'approved' | 'rejected' | 'running' | 'ended' | 'draft';
 export type ModificationStatus = 'pending' | 'approved' | 'rejected' | null;
@@ -684,13 +689,9 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         }
       );
       if (!response.ok) {
-        const err = await response.json();
-        // 비즈콜 중복(409)은 관리자가 바로 고칠 수 있도록 서버 메시지를 그대로 보여준다
-        if (response.status === 409) {
-          toast.error(err.error);
-          return;
-        }
-        throw new Error(err.error || 'Failed to approve');
+        // 서버 메시지가 무엇이 완료됐고 무엇이 안 됐는지 알려주므로 상태코드와 무관하게 그대로 보여준다
+        toast.error((await readApiErrorMessage(response)) ?? APPROVE_UNKNOWN_RESULT_MESSAGE);
+        return;
       }
       const result = await response.json();
       if (grantAnalytics && !selectedAd.partner_users?.analyticsEnabled && selectedAd.partner_users?.id) {
@@ -704,7 +705,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       fetchApplications();
     } catch (err) {
       console.error('Failed to approve:', err);
-      toast.error('광고 승인에 실패했습니다.');
+      toast.error(networkFailedMessage('광고를 승인하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -778,15 +779,15 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         }
       );
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to reject');
+        toast.error((await readApiErrorMessage(response)) ?? '광고 거절 처리 중 문제가 생겼습니다. 목록을 새로고침해 거절 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('광고 신청이 거절되었습니다.');
       setRejectDialog(false);
       fetchApplications();
     } catch (err) {
       console.error('Failed to reject:', err);
-      toast.error('광고 거절에 실패했습니다.');
+      toast.error(networkFailedMessage('광고를 거절하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }

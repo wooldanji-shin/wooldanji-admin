@@ -9,6 +9,7 @@ import type { ApartmentOption } from '@/components/apartment-combobox';
 import { SALES_REP_UNASSIGNED } from '@/components/sales-rep-filter';
 import { useDebounce } from '@/hooks/use-debounce';
 import { toast } from 'sonner';
+import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 
 export interface PremiumAd {
   id: string;
@@ -438,8 +439,8 @@ export function usePremiumPage(): UsePremiumPageReturn {
         body: JSON.stringify({ discountRate, adminMemo }),
       });
       if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error ?? 'Failed to approve');
+        toast.error((await readApiErrorMessage(res)) ?? '프리미엄 광고 승인 처리 중 문제가 생겼습니다. 목록을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       if (grantAnalytics && !selectedAd.partnerAnalyticsEnabled) {
         await (supabase as any)
@@ -454,7 +455,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
       loadAds();
     } catch (err) {
       console.error('프리미엄 광고 승인 실패:', err);
-      toast.error('승인에 실패했습니다.');
+      toast.error(networkFailedMessage('프리미엄 광고를 승인하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }
@@ -493,8 +494,8 @@ export function usePremiumPage(): UsePremiumPageReturn {
         body: JSON.stringify({ reason: rejectReason.trim() }),
       });
       if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error ?? 'Failed to reject');
+        toast.error((await readApiErrorMessage(res)) ?? '프리미엄 광고 거절 처리 중 문제가 생겼습니다. 목록을 새로고침해 반영 여부를 확인한 뒤 다시 시도해 주세요.');
+        return;
       }
       toast.success('프리미엄 광고가 거절되었습니다.');
       setRejectDialog(false);
@@ -502,7 +503,7 @@ export function usePremiumPage(): UsePremiumPageReturn {
       loadAds();
     } catch (err) {
       console.error('프리미엄 광고 거절 실패:', err);
-      toast.error('거절 처리에 실패했습니다.');
+      toast.error(networkFailedMessage('프리미엄 광고를 거절하지 못했습니다.'));
     } finally {
       setProcessing(false);
     }

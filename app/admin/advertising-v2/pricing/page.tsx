@@ -16,6 +16,7 @@ interface AdPricingV2 {
   defaultDiscountRate: number;
   defaultFreeMonths: number;
   premiumPricePerHouseholdPerWeek: number;
+  soloPopupPricePerHouseholdPerWeek: number;
 }
 
 export default function AdPricingPage() {
@@ -29,6 +30,7 @@ export default function AdPricingPage() {
     defaultDiscountRate: '',
     defaultFreeMonths: '',
     premiumPricePerHouseholdPerWeek: '',
+    soloPopupPricePerHouseholdPerWeek: '',
   });
 
   const fetchPricing = useCallback(async () => {
@@ -36,7 +38,7 @@ export default function AdPricingPage() {
     try {
       const { data, error } = await (supabase as any)
         .from('ad_pricing_v2')
-        .select('id, pricePerHousehold, defaultDiscountRate, defaultFreeMonths, premiumPricePerHouseholdPerWeek')
+        .select('id, pricePerHousehold, defaultDiscountRate, defaultFreeMonths, premiumPricePerHouseholdPerWeek, soloPopupPricePerHouseholdPerWeek')
         .single();
       if (error) throw error;
       setPricing(data);
@@ -45,6 +47,7 @@ export default function AdPricingPage() {
         defaultDiscountRate: String(data.defaultDiscountRate),
         defaultFreeMonths: String(data.defaultFreeMonths),
         premiumPricePerHouseholdPerWeek: String(data.premiumPricePerHouseholdPerWeek),
+        soloPopupPricePerHouseholdPerWeek: String(data.soloPopupPricePerHouseholdPerWeek),
       });
     } catch (err) {
       console.error('가격 정보 조회 실패:', err);
@@ -65,6 +68,7 @@ export default function AdPricingPage() {
     const defaultDiscountRate = parseInt(form.defaultDiscountRate);
     const defaultFreeMonths = parseInt(form.defaultFreeMonths);
     const premiumPricePerHouseholdPerWeek = parseInt(form.premiumPricePerHouseholdPerWeek);
+    const soloPopupPricePerHouseholdPerWeek = parseInt(form.soloPopupPricePerHouseholdPerWeek);
 
     if (isNaN(pricePerHousehold) || pricePerHousehold < 0) {
       toast.error('세대당 기본 단가를 올바르게 입력해주세요.');
@@ -82,6 +86,10 @@ export default function AdPricingPage() {
       toast.error('프리미엄 주당 세대단가를 올바르게 입력해주세요.');
       return;
     }
+    if (isNaN(soloPopupPricePerHouseholdPerWeek) || soloPopupPricePerHouseholdPerWeek < 0) {
+      toast.error('단독 팝업 주당 세대단가를 올바르게 입력해주세요.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -92,6 +100,7 @@ export default function AdPricingPage() {
           defaultDiscountRate,
           defaultFreeMonths,
           premiumPricePerHouseholdPerWeek,
+          soloPopupPricePerHouseholdPerWeek,
         })
         .eq('id', pricing.id);
       if (error) throw error;
@@ -180,6 +189,21 @@ export default function AdPricingPage() {
                 onChange={(e) => setForm((prev) => ({ ...prev, premiumPricePerHouseholdPerWeek: e.target.value }))}
                 placeholder="예: 20"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="soloPopupPricePerHouseholdPerWeek">단독 팝업 주당 세대단가 (원)</Label>
+              <Input
+                id="soloPopupPricePerHouseholdPerWeek"
+                type="number"
+                min={0}
+                value={form.soloPopupPricePerHouseholdPerWeek}
+                onChange={(e) => setForm((prev) => ({ ...prev, soloPopupPricePerHouseholdPerWeek: e.target.value }))}
+                placeholder="예: 50"
+              />
+              <p className="text-muted-foreground text-xs">
+                1개월은 4주로 환산해 계산합니다. 서버(DB 함수)가 이 값으로 금액을 계산합니다.
+              </p>
             </div>
 
             <Button onClick={handleSave} disabled={saving} className="w-full">

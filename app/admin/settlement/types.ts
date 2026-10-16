@@ -1,5 +1,5 @@
 export type SettlementPaymentStatus = 'paid' | 'freeTrial' | 'failed' | 'success';
-export type SettlementPaymentType = 'basic' | 'premium' | 'extension';
+export type SettlementPaymentType = 'basic' | 'premium' | 'extension' | 'solo_popup' | 'solo_popup_extension';
 
 export interface SettlementPayment {
   id: string;
@@ -9,6 +9,7 @@ export interface SettlementPayment {
   businessRegistrationNumber: string | null;
   subscriptionId: string | null;
   premiumAdId: string | null;
+  soloPopupAdId: string | null;
   paymentType: SettlementPaymentType;
   adTitle: string | null;
   supplyAmount: number;
@@ -24,7 +25,7 @@ export interface SettlementPayment {
 }
 
 export type StatusFilter = 'all' | 'success' | 'freeTrial' | 'failed';
-export type TypeFilter = 'all' | 'basic' | 'premium' | 'extension';
+export type TypeFilter = 'all' | 'basic' | 'premium' | 'extension' | 'solo_popup' | 'solo_popup_extension';
 
 export interface PartnerOption {
   id: string;
