@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 
-/** 자동승인 플래그가 붙는 두 테이블 */
-export type AutoApproveTable = 'advertisements_v2' | 'premium_advertisements_v2';
+/** 자동승인 플래그가 붙는 테이블 */
+export type AutoApproveTable = 'advertisements_v2' | 'premium_advertisements_v2' | 'solo_popup_ads_v2';
 
 /**
  * 수정 심사 자동승인 켜기/끄기.

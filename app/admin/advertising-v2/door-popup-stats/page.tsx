@@ -15,6 +15,12 @@ import { cn } from '@/lib/utils';
 
 type RangeUnit = 'day' | 'month';
 
+interface DepthRow {
+  totalCards: number;
+  viewedCards: number;
+  count: number;
+}
+
 interface EventRow {
   mode: string;
   action: string;
@@ -49,6 +55,72 @@ function monthRange(month: string): [string, string] {
   return [`${month}-01`, `${month}-${String(last).padStart(2, '0')}`];
 }
 
+interface DepthSummary {
+  /** 팝업 전체 닫힘 횟수 */
+  total: number;
+  /** 본 장수(1~5)별 횟수 — 카드가 2장 이상인 팝업만 */
+  byViewed: number[];
+  /** 카드 2장 이상인 팝업 수 */
+  multiTotal: number;
+  /** 카드 2장 이상 중 끝까지 본 횟수 */
+  completed: number;
+}
+
+/** 카드 1장짜리 팝업은 항상 끝까지 본 것이 되므로 분포·끝까지 비율은 2장 이상만 계산한다 */
+function summarizeDepth(rows: DepthRow[]): DepthSummary {
+  const summary: DepthSummary = { total: 0, byViewed: [0, 0, 0, 0, 0], multiTotal: 0, completed: 0 };
+  for (const r of rows) {
+    summary.total += r.count;
+    if (r.totalCards < 2) continue;
+    summary.multiTotal += r.count;
+    summary.byViewed[r.viewedCards - 1] += r.count;
+    if (r.viewedCards === r.totalCards) summary.completed += r.count;
+  }
+  return summary;
+}
+
+const percent = (count: number, total: number): string =>
+  total > 0 ? `${((count / total) * 100).toFixed(1)}%` : '-';
+
+function ViewDepthCard({ depth, loading }: { depth: DepthSummary; loading: boolean }): React.ReactElement | null {
+  if (loading) return null;
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-card p-5">
+      <div>
+        <h3 className="text-base font-semibold">단독 팝업 — 몇 장까지 봤나요?</h3>
+        <p className="text-sm text-muted-foreground">
+          카드가 2장 이상인 단독 팝업을 닫을 때 몇 장까지 넘겨 봤는지 보여줍니다.
+        </p>
+      </div>
+      {depth.multiTotal === 0 ? (
+        <p className="text-sm text-muted-foreground">선택한 기간에 집계된 데이터가 없습니다.</p>
+      ) : (
+        <>
+          <p className="text-sm">
+            끝까지 본 비율{' '}
+            <strong className="text-lg tabular-nums">{percent(depth.completed, depth.multiTotal)}</strong>
+            <span className="ml-2 text-muted-foreground tabular-nums">
+              ({depth.completed.toLocaleString()} / {depth.multiTotal.toLocaleString()}회)
+            </span>
+          </p>
+          <ul className="space-y-1 text-sm">
+            {depth.byViewed.map((count, i) => (
+              count > 0 && (
+                <li key={i} className="tabular-nums">
+                  {i + 1}장까지 보고 닫음 {count.toLocaleString()}회 ({percent(count, depth.multiTotal)})
+                </li>
+              )
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="text-xs text-muted-foreground">
+        카드가 1장뿐인 팝업은 항상 끝까지 본 것이 되어 이 숫자에서 뺐습니다.
+      </p>
+    </div>
+  );
+}
+
 export default function DoorPopupStatsPage(): React.ReactElement {
   const supabase = createClient();
   const [unit, setUnit] = useState<RangeUnit>('day');
@@ -56,6 +128,7 @@ export default function DoorPopupStatsPage(): React.ReactElement {
   const [to, setTo] = useState(kstDate());
   const [month, setMonth] = useState(kstDate().slice(0, 7));
   const [rows, setRows] = useState<EventRow[]>([]);
+  const [depthRows, setDepthRows] = useState<DepthRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -64,13 +137,15 @@ export default function DoorPopupStatsPage(): React.ReactElement {
     setLoading(true);
     try {
       // 관리자 세션 SELECT (RLS: is_admin)
-      const { data, error } = await (supabase as any)
-        .from('door_popup_event_daily')
-        .select('mode, action, count')
-        .gte('date', start)
-        .lte('date', end);
-      if (error) throw error;
-      setRows((data ?? []) as EventRow[]);
+      const db = supabase as any;
+      const [events, depth] = await Promise.all([
+        db.from('door_popup_event_daily').select('mode, action, count').gte('date', start).lte('date', end),
+        db.from('door_popup_view_depth_daily').select('"totalCards", "viewedCards", count').gte('date', start).lte('date', end),
+      ]);
+      if (events.error) throw events.error;
+      if (depth.error) throw depth.error;
+      setRows((events.data ?? []) as EventRow[]);
+      setDepthRows((depth.data ?? []) as DepthRow[]);
     } catch (err) {
       console.error('문열림 팝업 통계 조회 실패:', err);
       toast.error('통계를 불러오지 못했습니다.');
@@ -93,6 +168,8 @@ export default function DoorPopupStatsPage(): React.ReactElement {
     }
     return map;
   }, [rows]);
+
+  const depth = useMemo(() => summarizeDepth(depthRows), [depthRows]);
 
   return (
     <PageShell>
@@ -180,6 +257,7 @@ export default function DoorPopupStatsPage(): React.ReactElement {
             </Table>
           )}
         </DataTableShell>
+        <ViewDepthCard depth={depth} loading={loading} />
         <p className="text-xs text-muted-foreground">
           괄호 안 비율은 같은 모드의 &apos;표시&apos; 횟수 대비입니다. 팝업을 연 채 앱을 종료하면 &apos;표시&apos;만 남습니다.
         </p>

@@ -1,9 +1,11 @@
 'use client';
 
+import { useRef } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,6 +14,7 @@ import { PartnerCombobox } from '@/components/partner-combobox';
 import { SalesRepSelect } from '@/components/sales-rep-select';
 import {
   SOLO_BULLET_MAX_LENGTH,
+  SOLO_IMAGE_MAX_COUNT,
   SOLO_BULLET_MAX_LINES,
   SOLO_TEXT_MAX_LENGTH,
   SOLO_TEXT_MAX_LINES,
@@ -22,9 +25,18 @@ import {
   soloTextLength,
   type SoloContentType,
 } from '@/lib/ads/solo-popup';
+import { SoloImageSortableList } from './SoloImageSortableList';
+import { SoloImageCropDialog } from './SoloImageCropDialog';
 import { useSoloPopupForm } from './useSoloPopupForm';
 
 const LIST_PATH = '/admin/advertising-v2/solo-popup';
+
+// 선택칸·짧은 입력칸 폭 / 긴 입력칸 최대 폭 / 글자 수 표시 — 폼 전체에서 통일
+const FIELD_WIDTH = 'w-full md:w-[420px]';
+const LONG_FIELD_WIDTH = 'w-full max-w-2xl';
+const COUNTER_CLASS = 'text-right text-xs tabular-nums text-muted-foreground';
+// label 은 inline 이라 좁은 입력칸이 옆에 붙지 않게 block 으로 한 줄을 차지시킨다
+const LABEL_CLASS = 'block text-sm font-medium';
 
 interface SoloPopupFormViewProps {
   /** 주면 수정 모드 */
@@ -34,6 +46,8 @@ interface SoloPopupFormViewProps {
 export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.ReactElement {
   const page = useSoloPopupForm(soloId);
   const { form, patch, isEdit, contentOnly } = page;
+  // 브라우저 기본 파일 칸("Choose Files") 대신 버튼으로 파일 선택창을 연다
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (page.loading) {
     return (
@@ -88,32 +102,45 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
         <CardHeader>
           <CardTitle>파트너 · 기본 광고</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-5">
           {isEdit ? (
             <p className="text-sm text-muted-foreground">
               파트너·기본 광고는 수정할 수 없습니다 (노출 아파트와 금액이 달라지기 때문입니다).
             </p>
           ) : (
             <>
-              <PartnerCombobox
-                partners={page.partners.map((p) => ({ id: p.id, businessName: p.businessName, description: p.description }))}
-                value={form.partnerId}
-                onChange={page.selectPartner}
-              />
+              <div className="space-y-1.5">
+                <label className={LABEL_CLASS}>
+                  파트너 <span className="text-destructive">*</span>
+                </label>
+                <div>
+                  <PartnerCombobox
+                    className={FIELD_WIDTH}
+                    partners={page.partners.map((p) => ({ id: p.id, businessName: p.businessName, description: p.description }))}
+                    value={form.partnerId}
+                    onChange={page.selectPartner}
+                  />
+                </div>
+              </div>
               {form.partnerId &&
                 (page.partnerBaseAds.length > 0 ? (
-                  <Select value={form.baseAdId ?? ''} onValueChange={(v) => patch({ baseAdId: v })}>
-                    <SelectTrigger className="w-full md:w-[420px]">
-                      <SelectValue placeholder="단독 팝업을 연결할 기본 광고 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {page.partnerBaseAds.map((ad) => (
-                        <SelectItem key={ad.id} value={ad.id}>
-                          {ad.title ?? '(제목 없음)'} · {ad.totalHouseholds.toLocaleString()}세대
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-1.5">
+                    <label className={LABEL_CLASS}>
+                      연결할 기본 광고 <span className="text-destructive">*</span>
+                    </label>
+                    <Select value={form.baseAdId ?? ''} onValueChange={(v) => patch({ baseAdId: v })}>
+                      <SelectTrigger className={FIELD_WIDTH}>
+                        <SelectValue placeholder="단독 팝업을 연결할 기본 광고 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {page.partnerBaseAds.map((ad) => (
+                          <SelectItem key={ad.id} value={ad.id}>
+                            {ad.title ?? '(제목 없음)'} · {ad.totalHouseholds.toLocaleString()}세대
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     이 파트너에게는 단독 팝업을 등록할 수 있는 광고가 없습니다. 운영 중(결제 완료)이고
@@ -139,46 +166,55 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  제목 <span className="text-destructive">*</span>{' '}
-                  <span className="text-xs text-muted-foreground">{form.title.length}/{SOLO_TITLE_MAX}</span>
+                <label className={LABEL_CLASS}>
+                  제목 <span className="text-destructive">*</span>
                 </label>
-                <Input value={form.title} maxLength={SOLO_TITLE_MAX} onChange={(e) => patch({ title: e.target.value })} />
+                <div className={`${FIELD_WIDTH} space-y-1`}>
+                  <Input value={form.title} maxLength={SOLO_TITLE_MAX} onChange={(e) => patch({ title: e.target.value })} />
+                  <p className={COUNTER_CLASS}>{form.title.length}/{SOLO_TITLE_MAX}</p>
+                </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
                   이미지 <span className="text-destructive">*</span>{' '}
                   <span className="text-xs font-normal text-muted-foreground">
-                    3:4 세로 · 선택한 이미지를 중앙 기준으로 자동 크롭해 1080×1440으로 저장합니다
+                    최대 {SOLO_IMAGE_MAX_COUNT}장 · 문을 열 때마다 1장이 무작위로 노출됩니다 · 사진을 고르면 한 장씩 원하는 위치를 잘라 1080×1080으로 저장합니다
                   </span>
                 </label>
-                <div className="flex items-start gap-4">
-                  <div className="aspect-[3/4] w-[150px] overflow-hidden rounded-md border border-border bg-muted">
-                    {form.image && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={form.image.kind === 'url' ? form.image.url : form.image.previewUrl}
-                        alt="단독 팝업 이미지"
-                        className="h-full w-full object-cover"
-                      />
-                    )}
-                  </div>
-                  <Input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="w-[280px]"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = '';
-                      if (file) page.pickImage(file);
-                    }}
-                  />
-                </div>
+                <SoloImageSortableList images={form.images} onRemove={page.removeImage} onReorder={page.reorderImages} />
+                {form.images.length > 1 && (
+                  <p className="text-xs text-muted-foreground">사진을 끌어서 순서를 바꿀 수 있어요.</p>
+                )}
+                <SoloImageCropDialog
+                  file={page.cropState.file}
+                  title={page.cropState.title}
+                  onApply={page.applyCrop}
+                  onCancel={page.cancelCrop}
+                />
+                {form.images.length < SOLO_IMAGE_MAX_COUNT && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        e.target.value = '';
+                        if (files.length) page.pickImages(files);
+                      }}
+                    />
+                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                      이미지를 선택해주세요
+                    </Button>
+                  </>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
+              <div className="space-y-3">
+                <label className={`${LABEL_CLASS} block`}>
                   문구 <span className="text-destructive">*</span>{' '}
                   <span className="text-xs font-normal text-muted-foreground">
                     {form.contentType === 'bullets'
@@ -200,7 +236,7 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
                   ))}
                 </div>
                 {form.contentType === 'text' ? (
-                  <div className="space-y-1">
+                  <div className={`${LONG_FIELD_WIDTH} space-y-1`}>
                     <Textarea
                       className="min-h-[90px] resize-none"
                       value={form.bodyText}
@@ -211,31 +247,34 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
                         patch({ bodyText: e.target.value });
                       }}
                     />
-                    <p className="text-right text-xs text-muted-foreground tabular-nums">
+                    <p className={COUNTER_CLASS}>
                       {soloTextLength(form.bodyText)}/{SOLO_TEXT_MAX_LENGTH}
                     </p>
                   </div>
                 ) : (
-                  <>
+                  <div className={`${LONG_FIELD_WIDTH} space-y-3`}>
                     {form.bulletLines.map((line, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Input
-                          value={line}
-                          maxLength={SOLO_BULLET_MAX_LENGTH}
-                          onChange={(e) => setBullet(i, e.target.value)}
-                        />
-                        <span className="w-12 text-xs text-muted-foreground tabular-nums">
-                          {line.length}/{SOLO_BULLET_MAX_LENGTH}
-                        </span>
-                        {form.bulletLines.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => patch({ bulletLines: form.bulletLines.filter((_, idx) => idx !== i) })}
-                          >
-                            삭제
-                          </Button>
-                        )}
+                      <div key={i} className="flex items-start gap-2">
+                        <div className="flex-1 space-y-1">
+                          <Input
+                            value={line}
+                            maxLength={SOLO_BULLET_MAX_LENGTH}
+                            onChange={(e) => setBullet(i, e.target.value)}
+                          />
+                          <p className={COUNTER_CLASS}>
+                            {line.length}/{SOLO_BULLET_MAX_LENGTH}
+                          </p>
+                        </div>
+                        {/* 1줄일 때도 자리를 비워 둬 줄이 늘어도 입력칸 폭이 변하지 않게 한다 */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-11 ${form.bulletLines.length > 1 ? '' : 'invisible'}`}
+                          tabIndex={form.bulletLines.length > 1 ? 0 : -1}
+                          onClick={() => patch({ bulletLines: form.bulletLines.filter((_, idx) => idx !== i) })}
+                        >
+                          삭제
+                        </Button>
                       </div>
                     ))}
                     {form.bulletLines.length < SOLO_BULLET_MAX_LINES && (
@@ -243,17 +282,16 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
                         줄 추가
                       </Button>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium">버튼</label>
+                <label className={LABEL_CLASS}>버튼</label>
                 <p className="text-sm text-muted-foreground">
                   &apos;자세히 보기&apos; 버튼 1개로 고정됩니다. 링크는 등록 후 상세 화면에서 넣을 수 있고, 비워 두면 연결된 기본 광고 상세로 이동합니다.
                 </p>
               </div>
-              {page.contentErr && <p className="text-sm text-destructive">{page.contentErr}</p>}
             </CardContent>
           </Card>
 
@@ -261,65 +299,106 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
             <CardHeader>
               <CardTitle>노출 기간 · 승인 조건</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               {contentOnly ? (
                 <p className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-                  광고중에는 이미 결제된 금액의 근거라 기간·할인율을 바꿀 수 없습니다.
+                  광고중에는 이미 결제된 금액의 근거라 기간·할인율을 바꿀 수 없습니다. 기간·금액은 변경되지 않습니다.
                 </p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">기간 단위</label>
-                    <Select value={form.periodUnit} onValueChange={(v) => page.changeUnit(v as 'week' | 'month')}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="week">주</SelectItem>
-                        <SelectItem value="month">개월 (1개월 = 4주)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <>
+                  <div className={`grid gap-4 md:grid-cols-3 ${LONG_FIELD_WIDTH}`}>
+                    <div className="space-y-1.5">
+                      <label className={LABEL_CLASS}>기간 단위</label>
+                      <Select value={form.periodUnit} onValueChange={(v) => page.changeUnit(v as 'week' | 'month')}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="week">주</SelectItem>
+                          <SelectItem value="month">개월 (1개월 = 4주)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={LABEL_CLASS}>{form.periodUnit === 'month' ? '개월 수' : '주 수'}</label>
+                      <Select value={String(form.periodCount)} onValueChange={(v) => patch({ periodCount: Number(v) })}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countOptions.map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n}
+                              {form.periodUnit === 'month' ? '개월' : '주'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={LABEL_CLASS}>할인율 (%)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={form.discountRate || ''}
+                        onChange={(e) => patch({ discountRate: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">{form.periodUnit === 'month' ? '개월 수' : '주 수'}</label>
-                    <Select value={String(form.periodCount)} onValueChange={(v) => patch({ periodCount: Number(v) })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {countOptions.map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            {n}
-                            {form.periodUnit === 'month' ? '개월' : '주'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {page.canStartImmediately && (
+                    <label className={`${LONG_FIELD_WIDTH} flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/40 p-3`}>
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={form.startImmediately}
+                        onCheckedChange={(checked) => patch({ startImmediately: checked === true })}
+                      />
+                      <span className="space-y-1 text-sm">
+                        <span className="block font-medium">결제 없이 바로 광고 시작</span>
+                        <span className="block text-xs text-muted-foreground">
+                          할인율 100%일 때만 선택할 수 있습니다. 파트너 결제를 건너뛰고 지금 바로 노출이 시작되며, 종료일은 기간에 맞춰 자동으로 정해집니다.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                  <div className={`${LONG_FIELD_WIDTH} space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm`}>
+                    <p>
+                      결제 예정 금액(미리보기){' '}
+                      <strong className="text-base">
+                        {(page.discountedTotalAmount ?? page.totalAmount).toLocaleString()}원
+                      </strong>
+                      {page.discountedTotalAmount !== null && (
+                        <span className="ml-2 text-muted-foreground line-through">{page.totalAmount.toLocaleString()}원</span>
+                      )}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {(page.selectedBaseAd?.totalHouseholds ?? 0).toLocaleString()}세대 × {page.pricePerWeek.toLocaleString()}원 ×{' '}
+                      {page.weeks}주{form.discountRate > 0 && ` · ${form.discountRate}% 할인`} — 확정 금액은 저장 시 서버가 계산합니다.
+                    </p>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">할인율 (%)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={form.discountRate || ''}
-                      onChange={(e) => patch({ discountRate: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
-                    />
-                  </div>
-                </div>
+                </>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>관리 정보</CardTitle>
+              <CardDescription>내부용 정보입니다. 파트너에게는 보이지 않습니다.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">
+                <label className={LABEL_CLASS}>
                   영업 담당자 <span className="text-xs font-normal text-muted-foreground">(선택)</span>
                 </label>
-                <SalesRepSelect className="w-[240px]" value={form.salesRepId} onChange={(salesRepId) => patch({ salesRepId })} />
+                <SalesRepSelect className={FIELD_WIDTH} value={form.salesRepId} onChange={(salesRepId) => patch({ salesRepId })} />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  관리 메모 <span className="text-xs font-normal text-muted-foreground">(내부용, 파트너 비공개)</span>
+                <label className={LABEL_CLASS}>
+                  관리 메모 <span className="text-xs font-normal text-muted-foreground">(선택)</span>
                 </label>
                 <Textarea
-                  className="min-h-[80px] resize-none"
+                  className={`${FIELD_WIDTH} min-h-[80px] resize-none`}
                   value={form.adminMemo}
                   onChange={(e) => patch({ adminMemo: e.target.value })}
                 />
@@ -332,31 +411,12 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
       <Card>
         <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
           <div className="text-sm">
-            {contentOnly ? (
-              <p className="text-muted-foreground">기간·금액은 변경되지 않습니다.</p>
-            ) : (
-              <>
-                <p>
-                  결제 예정 금액(미리보기){' '}
-                  <strong className="text-base">
-                    {(page.discountedTotalAmount ?? page.totalAmount).toLocaleString()}원
-                  </strong>
-                  {page.discountedTotalAmount !== null && (
-                    <span className="ml-2 text-muted-foreground line-through">{page.totalAmount.toLocaleString()}원</span>
-                  )}
-                </p>
-                <p className="text-muted-foreground">
-                  {(page.selectedBaseAd?.totalHouseholds ?? 0).toLocaleString()}세대 × {page.pricePerWeek.toLocaleString()}원 ×{' '}
-                  {page.weeks}주{form.discountRate > 0 && ` · ${form.discountRate}% 할인`} — 확정 금액은 저장 시 서버가 계산합니다.
-                </p>
-              </>
-            )}
-            {page.periodErr && <p className="mt-1 text-destructive">{page.periodErr}</p>}
+            {page.periodErr && <p className="text-destructive">{page.periodErr}</p>}
           </div>
           <Button size="lg" disabled={!page.canSubmit} onClick={page.submit}>
             {page.submitting
               ? isEdit ? '수정 중...' : '등록 중...'
-              : isEdit ? '수정 저장' : '단독 팝업 등록 (결제 대기 상태)'}
+              : isEdit ? '수정 저장' : form.startImmediately && page.canStartImmediately ? '단독 팝업 등록 후 바로 시작' : '단독 팝업 등록 (결제 대기 상태)'}
           </Button>
         </CardContent>
       </Card>

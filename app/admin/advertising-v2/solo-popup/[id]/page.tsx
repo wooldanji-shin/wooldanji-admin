@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { AdminHeader } from '@/components/admin-header';
+import { AutoApproveSwitch } from '@/components/auto-approve-switch';
 import { StatusBadge } from '@/components/status-badge';
 import { SalesRepSelect } from '@/components/sales-rep-select';
 import { Button } from '@/components/ui/button';
@@ -33,15 +34,19 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function ContentCard({ title, c }: { title: string; c: Pick<SoloPopupDetail, 'title' | 'imageUrl' | 'bulletLines' | 'contentType' | 'buttonMode' | 'buttons'> }): React.ReactElement {
+function ContentCard({ title, c, buttonLabel }: { title: string; buttonLabel?: string | null; c: Pick<SoloPopupDetail, 'title' | 'imageUrls' | 'bulletLines' | 'contentType' | 'buttonMode' | 'buttons'> }): React.ReactElement {
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent className="flex gap-5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={c.imageUrl} alt="팝업 이미지" className="aspect-[3/4] w-[160px] rounded-md border border-border object-cover" />
+        <div className="flex w-[160px] shrink-0 flex-wrap content-start gap-1.5">
+          {c.imageUrls.map((url, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={url} alt={`팝업 이미지 ${i + 1}`} className={`aspect-square rounded-md border border-border object-cover ${c.imageUrls.length === 1 ? 'w-[160px]' : 'w-[77px]'}`} />
+          ))}
+        </div>
         <div className="flex-1">
           <InfoRow label="제목">{c.title}</InfoRow>
           <InfoRow label={`문구 (${CONTENT_TYPE_LABEL[c.contentType ?? 'bullets']})`}>
@@ -53,7 +58,7 @@ function ContentCard({ title, c }: { title: string; c: Pick<SoloPopupDetail, 'ti
               </ul>
             )}
           </InfoRow>
-          <InfoRow label="버튼">&apos;자세히 보기&apos; 1개 (아래 링크가 있으면 웹뷰, 없으면 기본 광고 상세)</InfoRow>
+          <InfoRow label="버튼">&apos;{buttonLabel || '자세히 보기'}&apos; 1개 (아래 링크가 있으면 외부 브라우저, 없으면 기본 광고 상세)</InfoRow>
         </div>
       </CardContent>
     </Card>
@@ -66,6 +71,7 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
   const [discountRate, setDiscountRate] = useState(0);
   const [memo, setMemo] = useState<string | null>(null);
   const [detailLink, setDetailLink] = useState<string | null>(null);
+  const [buttonLabel, setButtonLabel] = useState<string | null>(null);
   const [salesRepId, setSalesRepId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
@@ -92,11 +98,18 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
   const { detail, payments, stats, processing } = page;
   const memoValue = memo ?? detail.adminMemo ?? '';
   const detailLinkValue = detailLink ?? detail.detailLinkUrl ?? '';
+  const buttonLabelValue = buttonLabel ?? detail.detailButtonLabel ?? '';
   const isPending = detail.status === 'pending';
   const hasModification = detail.status === 'running' && detail.modificationStatus === 'pending';
   const canEdit =
     (detail.status === 'approved' && detail.paymentStatus === 'unpaid') ||
     (detail.status === 'running' && !hasModification);
+  // null 과 '' 는 같은 "링크 없음"으로 보고, 실제로 바뀔 때만 변경 카드를 보여준다
+  const linkChanged =
+    hasModification &&
+    !!detail.pendingChanges &&
+    'detailLinkUrl' in detail.pendingChanges &&
+    (detail.pendingChanges.detailLinkUrl?.trim() || null) !== (detail.detailLinkUrl?.trim() || null);
   const hasDiscount = (detail.approvedDiscountRate ?? 0) > 0;
   const closeDialog = () => { setDialog(null); setReason(''); };
 
@@ -181,23 +194,60 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
         </CardContent>
       </Card>
 
-      <ContentCard title="팝업 내용" c={detail} />
+      <ContentCard title="팝업 내용" c={detail} buttonLabel={detail.detailButtonLabel} />
       {hasModification && detail.pendingChanges && (
-        <ContentCard title="수정 요청 내용 (승인 시 반영)" c={{ ...detail, ...detail.pendingChanges }} />
+        <ContentCard title="수정 요청 내용 (승인 시 반영)" c={{ ...detail, ...detail.pendingChanges, imageUrls: detail.pendingChanges.imageUrls ?? (detail.pendingChanges.imageUrl ? [detail.pendingChanges.imageUrl] : detail.imageUrls) }} buttonLabel={detail.detailButtonLabel} />
+      )}
+      {linkChanged && detail.pendingChanges && (
+        <Card>
+          <CardHeader><CardTitle>자세히 보기 링크 변경 (승인 시 반영)</CardTitle></CardHeader>
+          <CardContent>
+            <InfoRow label="변경 전">{detail.detailLinkUrl || '링크 없음 (기본 광고 상세로 이동)'}</InfoRow>
+            <InfoRow label="변경 후">{detail.pendingChanges.detailLinkUrl || '링크 없음 (기본 광고 상세로 이동)'}</InfoRow>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 수정 심사 자동승인 — 광고중일 때만 의미가 있다 */}
+      {detail.status === 'running' && (
+        <Card>
+          <CardContent className="px-6 py-4">
+            <AutoApproveSwitch
+              id={detail.id}
+              checked={detail.autoApproveModification}
+              disabled={page.autoApproveToggling}
+              onChange={page.handleToggleAutoApprove}
+            />
+          </CardContent>
+        </Card>
       )}
 
       <Card>
         <CardHeader><CardTitle>자세히 보기 링크</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            버튼 방식이 &apos;자세히 보기&apos;일 때 사용됩니다. 링크가 있으면 앱 안 웹뷰로 열리고, 비워 두면 연결된 기본 광고 상세로 이동합니다.
+            버튼 방식이 &apos;자세히 보기&apos;일 때 사용됩니다. 링크가 있으면 외부 브라우저로 열리고, 비워 두면 연결된 기본 광고 상세로 이동합니다.
           </p>
           <Input
             placeholder="https://"
             value={detailLinkValue}
             onChange={(e) => setDetailLink(e.target.value)}
           />
-          <Button variant="outline" onClick={() => page.saveDetailLink(detailLinkValue)}>링크 저장</Button>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              버튼 이름{' '}
+              <span className="text-xs font-normal text-muted-foreground">
+                {buttonLabelValue.length}/10 · 비워 두면 &apos;자세히 보기&apos;
+              </span>
+            </label>
+            <Input
+              placeholder="자세히 보기"
+              maxLength={10}
+              value={buttonLabelValue}
+              onChange={(e) => setButtonLabel(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" onClick={() => page.saveDetailLink(detailLinkValue, buttonLabelValue)}>저장</Button>
         </CardContent>
       </Card>
 

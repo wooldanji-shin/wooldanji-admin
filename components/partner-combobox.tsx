@@ -32,6 +32,8 @@ interface PartnerComboboxProps {
   value: string | null;
   onChange: (value: string | null) => void;
   placeholder?: string;
+  /** 트리거 버튼에 덧붙일 클래스 (예: 폭 변경) */
+  className?: string;
 }
 
 export function PartnerCombobox({
@@ -39,6 +41,7 @@ export function PartnerCombobox({
   value,
   onChange,
   placeholder = '파트너 선택',
+  className,
 }: PartnerComboboxProps): React.ReactElement {
   const [open, setOpen] = useState(false);
 
@@ -53,7 +56,8 @@ export function PartnerCombobox({
           aria-expanded={open}
           className={cn(
             'h-11 w-[200px] justify-between border-border bg-card text-sm font-normal',
-            !value && 'text-muted-foreground'
+            !value && 'text-muted-foreground',
+            className
           )}
         >
           <span className="truncate">{selected?.businessName ?? placeholder}</span>

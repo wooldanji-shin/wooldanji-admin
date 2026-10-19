@@ -98,7 +98,7 @@ export interface SoloWriteBody {
   partnerId?: string;
   baseAdId?: string;
   title?: string;
-  imageUrl?: string;
+  imageUrls?: string[];
   bulletLines?: string[];
   contentType?: SoloContentType;
   buttonMode?: SoloButtonMode;
@@ -106,6 +106,8 @@ export interface SoloWriteBody {
   periodUnit?: SoloPeriodUnit;
   periodCount?: number;
   discountRate?: number;
+  /** 할인율 100%일 때만 허용 — 결제 없이 바로 게재 시작 */
+  startImmediately?: boolean;
   adminMemo?: string;
   salesRepId?: string | null;
 }
@@ -117,7 +119,7 @@ export class SoloInputError extends Error {}
 export async function buildSoloContent(admin: any, body: SoloWriteBody) {
   const content: SoloContent = {
     title: (body.title ?? '').trim(),
-    imageUrl: body.imageUrl ?? '',
+    imageUrls: body.imageUrls ?? [],
     bulletLines: (body.bulletLines ?? []).map((l) => l.trim()),
     contentType: body.contentType === 'text' ? 'text' : 'bullets',
     buttonMode: body.buttonMode ?? 'detail',
@@ -163,4 +165,14 @@ export async function computeSoloAmounts(
   if (amountError) throw new SoloInputError('기본 광고에 노출 아파트가 없어 금액을 계산할 수 없습니다.');
 
   return { weeks: weeks as number, snapshot, totalAmount: totalAmount as number };
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/** 바로 시작 시 종료 시각 — activate-free-solo-popup-ad EF와 동일하게 KST 종료일 23:59:59.999 */
+export function soloEndedAt(startedAt: Date, weeks: number): Date {
+  const kst = new Date(startedAt.getTime() + weeks * WEEK_MS + KST_OFFSET_MS);
+  kst.setUTCHours(23, 59, 59, 999);
+  return new Date(kst.getTime() - KST_OFFSET_MS);
 }

@@ -1,11 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SOLO_CONTENT_COLUMNS } from '@/lib/ads/solo-popup';
-import { dbErrorMessage, notifyPartner, requireAdmin, soloContentDbErrorMessage } from '@/lib/ads/solo-popup-server';
+import { createAdminClient } from '@/lib/supabase/server';
+import { notifyPartner, requireAdmin, soloContentDbErrorMessage } from '@/lib/ads/solo-popup-server';
+
+/** DB 함수(approve_solo_popup_modification)가 승인하지 못한 이유 → 관리자 안내 */
+const REJECT_RESPONSES: Record<string, { status: number; error: string }> = {
+  not_found: { status: 404, error: '단독 팝업 광고를 찾을 수 없습니다. 삭제되었을 수 있으니 목록을 새로고침해 주세요.' },
+  not_running: { status: 409, error: '게재 중인 광고만 수정 승인할 수 있습니다.' },
+  not_pending: {
+    status: 400,
+    error: '심사 중인 수정 요청이 없습니다. 이미 처리됐을 수 있으니 화면을 새로고침해 주세요.',
+  },
+  no_changes: { status: 400, error: '수정 요청에 바뀐 내용이 없습니다. 파트너에게 다시 요청해 달라고 안내해 주세요.' },
+  invalid_link: {
+    status: 400,
+    error: '수정 요청의 링크가 올바르지 않습니다. 파트너에게 다시 요청해 달라고 안내해 주세요.',
+  },
+  invalid_images: { status: 400, error: '수정 요청의 이미지가 올바르지 않습니다. 파트너에게 다시 요청해 달라고 안내해 주세요.' },
+};
 
 /**
  * 단독 팝업 광고 수정 승인.
- * pendingChanges 는 콘텐츠 컬럼 화이트리스트만 반영한다 (status·금액·기간 등 임의 키 무시).
- * 반영 전 DB 검증 함수(solo_popup_content_error)로 한 번 더 확인한다.
+ * 화이트리스트 반영·링크/내용 검증·조건부 update 는 DB 함수가 한다 (auto-approve EF와 같은 함수).
+ * 함수는 service_role 전용이라 관리자 확인 후 admin 클라이언트로 호출한다.
  */
 export async function POST(
   _request: NextRequest,
@@ -13,69 +29,36 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { supabase, error } = await requireAdmin();
+    const { error } = await requireAdmin();
     if (error) return error;
-    const db = supabase as any;
 
-    const { data: ad } = await db
-      .from('solo_popup_ads_v2')
-      .select('status, modificationStatus, pendingChanges, partnerId, baseAdId, contentType')
-      .eq('id', id)
-      .single();
-    if (!ad) return NextResponse.json({ error: '단독 팝업 광고를 찾을 수 없습니다. 삭제되었을 수 있으니 목록을 새로고침해 주세요.' }, { status: 404 });
-    if (ad.status !== 'running') {
-      return NextResponse.json({ error: '게재 중인 광고만 수정 승인할 수 있습니다.' }, { status: 409 });
-    }
-    if (ad.modificationStatus !== 'pending') {
+    const { data: result, error: rpcError } = await (createAdminClient() as any).rpc(
+      'approve_solo_popup_modification',
+      { p_id: id }
+    );
+    if (rpcError || !result) {
+      console.error('Failed to approve solo popup modification:', rpcError);
       return NextResponse.json(
-        { error: '심사 중인 수정 요청이 없습니다. 이미 처리됐을 수 있으니 화면을 새로고침해 주세요.' },
-        { status: 400 }
+        { error: '단독 팝업 광고를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 500 }
       );
     }
 
-    const pending = (ad.pendingChanges ?? null) as Record<string, unknown> | null;
-    if (!pending) return NextResponse.json({ error: '수정 요청에 바뀐 내용이 없습니다. 파트너에게 다시 요청해 달라고 안내해 주세요.' }, { status: 400 });
-
-    const content = Object.fromEntries(
-      SOLO_CONTENT_COLUMNS.filter((key) => key in pending).map((key) => [key, pending[key]])
-    );
-
-    const { data: contentError } = await db.rpc('solo_popup_content_error', {
-      p_title: content.title,
-      p_bullet_lines: content.bulletLines,
-      p_button_mode: content.buttonMode,
-      p_buttons: content.buttons,
-      // contentType 키가 없는 이전 수정 요청은 현재 형식 기준으로 검증
-      p_content_type: content.contentType ?? ad.contentType ?? 'bullets',
-    });
-    if (contentError) {
-      return NextResponse.json({ error: soloContentDbErrorMessage(String(contentError)) }, { status: 400 });
-    }
-
-    const { data: updated, error: updateError } = await db
-      .from('solo_popup_ads_v2')
-      .update({
-        ...content,
-        modificationStatus: null,
-        modificationRejectedReason: null,
-        pendingChanges: null,
-      })
-      .eq('id', id)
-      .eq('status', 'running')
-      .eq('modificationStatus', 'pending')
-      .select('id');
-    if (updateError) {
-      console.error('Failed to approve solo popup modification:', updateError);
-      return NextResponse.json({ error: dbErrorMessage(updateError) }, { status: 500 });
-    }
-    if (!updated?.length) {
-      return NextResponse.json({ error: '게재 중인 광고만 수정 승인할 수 있습니다.' }, { status: 409 });
+    if (!result.approved) {
+      if (result.reason === 'invalid_content') {
+        return NextResponse.json({ error: soloContentDbErrorMessage(String(result.detail)) }, { status: 400 });
+      }
+      const response = REJECT_RESPONSES[result.reason as string];
+      return NextResponse.json(
+        { error: response?.error ?? '수정을 승인하지 못했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.' },
+        { status: response?.status ?? 400 }
+      );
     }
 
     await notifyPartner({
-      partnerUserId: ad.partnerId,
+      partnerUserId: result.partnerId,
       soloPopupAdId: id,
-      baseAdId: ad.baseAdId,
+      baseAdId: result.baseAdId,
       title: '단독 팝업 광고 수정 심사 결과',
       body: '단독 팝업 광고 수정이 승인되었습니다. 변경 내용이 반영되었습니다.',
       type: 'solo_popup_ad_modification_approved',

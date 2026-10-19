@@ -19,9 +19,11 @@ export const SOLO_MAX_WEEKS = 48;
 export const SOLO_MAX_MONTHS = 12;
 /** 서버 solo_popup_period_to_weeks 와 동일해야 한다 */
 export const SOLO_WEEKS_PER_MONTH = 4;
-/** 3:4 세로 이미지, 업로드 시 이 크기로 축소 */
+/** 1:1 정사각형 이미지, 업로드 시 이 크기로 축소 */
 export const SOLO_IMAGE_WIDTH = 1080;
-export const SOLO_IMAGE_HEIGHT = 1440;
+export const SOLO_IMAGE_HEIGHT = 1080;
+/** 팝업 이미지 최대 장수 (문 열 때마다 랜덤 1장 노출) */
+export const SOLO_IMAGE_MAX_COUNT = 4;
 
 export interface SoloButton {
   label?: string;
@@ -30,15 +32,12 @@ export interface SoloButton {
 
 export interface SoloContent {
   title: string;
-  imageUrl: string;
+  imageUrls: string[];
   bulletLines: string[];
   contentType: SoloContentType;
   buttonMode: SoloButtonMode;
   buttons: SoloButton[];
 }
-
-/** pendingChanges 에서 반영을 허용하는 콘텐츠 컬럼 (화이트리스트) */
-export const SOLO_CONTENT_COLUMNS = ['title', 'imageUrl', 'bulletLines', 'contentType', 'buttonMode', 'buttons'] as const;
 
 export const CONTENT_TYPE_LABEL: Record<SoloContentType, string> = {
   bullets: '글머리표',
@@ -81,7 +80,9 @@ export function isHttpUrl(value: string): boolean {
 export function soloContentError(c: SoloContent): string | null {
   if (!c.title.trim()) return '제목을 입력해주세요.';
   if (c.title.length > SOLO_TITLE_MAX) return `제목은 ${SOLO_TITLE_MAX}자 이하여야 합니다.`;
-  if (!c.imageUrl) return '이미지를 등록해주세요.';
+  if (c.imageUrls.length < 1) return '이미지를 등록해주세요.';
+  if (c.imageUrls.length > SOLO_IMAGE_MAX_COUNT) return `이미지는 최대 ${SOLO_IMAGE_MAX_COUNT}장까지 등록할 수 있습니다.`;
+  if (c.imageUrls.some((u) => !isHttpUrl(u))) return '이미지 주소가 올바르지 않습니다.';
 
   const linesError = c.contentType === 'text' ? textLinesError(c.bulletLines) : bulletLinesError(c.bulletLines);
   if (linesError) return linesError;

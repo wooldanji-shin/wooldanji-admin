@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { setAutoApproveModification } from '@/lib/ads/auto-approve';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { SoloPeriodUnit, SoloPopupStatus } from '@/lib/ads/solo-popup';
 
@@ -21,6 +22,7 @@ export interface SoloPopupRow {
   approvedDiscountRate: number | null;
   discountedTotalAmount: number | null;
   modificationStatus: string | null;
+  autoApproveModification: boolean;
   startedAt: string | null;
   endedAt: string | null;
   salesRepName: string | null;
@@ -48,6 +50,8 @@ export function useSoloPopupPage() {
   const [searchTerm, setSearchTermState] = useState('');
   const debouncedSearch = useDebounce(searchTerm);
   const [page, setPage] = useState(1);
+  const supabase = useMemo(() => createClient(), []);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,7 +61,7 @@ export function useSoloPopupPage() {
       const { data, error } = await db
         .from('solo_popup_ads_v2')
         .select(
-          'id, "partnerId", "baseAdId", title, status, "paymentStatus", "periodUnit", "periodCount", weeks, "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "startedAt", "endedAt", sales_reps:salesRepId(name)'
+          'id, "partnerId", "baseAdId", title, status, "paymentStatus", "periodUnit", "periodCount", weeks, "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "autoApproveModification", "startedAt", "endedAt", sales_reps:salesRepId(name)'
         )
         .order('createdAt', { ascending: false });
       if (error) throw error;
@@ -130,6 +134,14 @@ export function useSoloPopupPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const handleToggleAutoApprove = useCallback(async (row: SoloPopupRow, next: boolean) => {
+    if (togglingId) return;
+    setTogglingId(row.id);
+    const ok = await setAutoApproveModification(supabase, 'solo_popup_ads_v2', row.id, next);
+    if (ok) setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, autoApproveModification: next } : r)));
+    setTogglingId(null);
+  }, [supabase, togglingId]);
+
   return {
     loading,
     statusFilter,
@@ -141,6 +153,8 @@ export function useSoloPopupPage() {
     page,
     setPage,
     totalPages,
+    handleToggleAutoApprove,
+    togglingId,
     handleRowClick: (id: string) => router.push(`/admin/advertising-v2/solo-popup/${id}`),
   };
 }

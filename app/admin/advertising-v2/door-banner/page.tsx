@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createClient } from '@/lib/supabase/client';
@@ -22,6 +24,9 @@ interface DoorPopupSettings {
   mode: PopupMode;
 }
 
+// DB CHECK 와 같은 범위 — 팝업 카드는 최대 5장
+const FILLER_COUNT_MAX = 5;
+
 export default function DoorBannerPage() {
   const supabase = createClient();
 
@@ -29,6 +34,8 @@ export default function DoorBannerPage() {
   const [loading, setLoading] = useState(true);
   // 저장 중 상태 — 중복 토글 방지
   const [saving, setSaving] = useState(false);
+  // 채움 이미지 개수 입력값 (빈 문자열 = 제한 없음)
+  const [fillerInput, setFillerInput] = useState('');
 
   // 초기 설정값 조회
   useEffect(() => {
@@ -37,11 +44,12 @@ export default function DoorBannerPage() {
         // door_popup_settings 미타입 테이블 any 캐스팅
         const { data, error } = await (supabase as any)
           .from('door_popup_settings')
-          .select('id, mode')
+          .select('id, mode, "fillerImageCount"')
           .limit(1)
           .single();
         if (error) throw error;
-        setSettings(data as DoorPopupSettings);
+        setSettings({ id: data.id, mode: data.mode });
+        setFillerInput(data.fillerImageCount == null ? '' : String(data.fillerImageCount));
       } catch (err) {
         console.error('door_popup_settings 조회 실패:', err);
         toast.error('설정을 불러오는데 실패했습니다.');
@@ -87,6 +95,32 @@ export default function DoorBannerPage() {
       toast.error(err.message || '설정 변경에 실패했습니다.');
       // 실패 시 원래 값으로 롤백
       setSettings((prev) => (prev ? { ...prev, mode: settings.mode } : prev));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** 채움 이미지 노출 개수 저장 — 빈 값이면 제한 없음(null) */
+  const handleSaveFillerCount = async () => {
+    if (!settings || saving) return;
+    const trimmed = fillerInput.trim();
+    const count = trimmed === '' ? null : Number(trimmed);
+    if (count !== null && (!Number.isInteger(count) || count < 0 || count > FILLER_COUNT_MAX)) {
+      toast.error(`0~${FILLER_COUNT_MAX} 사이의 숫자로 입력해 주세요.`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('door_popup_settings')
+        .update({ fillerImageCount: count })
+        .eq('id', settings.id);
+      if (error) throw error;
+      toast.success(count === null ? '남은 칸을 모두 채우도록 저장했습니다.' : `채움 이미지를 최대 ${count}장 노출하도록 저장했습니다.`);
+    } catch (err) {
+      console.error('채움 이미지 개수 저장 실패:', err);
+      toast.error('저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setSaving(false);
     }
@@ -180,6 +214,31 @@ export default function DoorBannerPage() {
                   {settings?.mode === 'solo_popup' ? 'ON' : 'OFF'}
                 </span>
               </p>
+            </CardContent>
+          </Card>
+
+          {/* 단독 팝업 모드의 채움 이미지 노출 개수 */}
+          <Card className="bg-card border-border">
+            <CardHeader className="space-y-1 pb-2">
+              <CardTitle className="text-base font-semibold">채움 이미지 노출 개수</CardTitle>
+              <CardDescription>
+                단독 팝업 광고로 채우고 남은 칸에 보여줄 이미지 수입니다. 비우면 남은 칸을 모두 채워요.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center gap-3">
+              <Input
+                type="number"
+                min={0}
+                max={FILLER_COUNT_MAX}
+                className="w-32"
+                placeholder="제한 없음"
+                value={fillerInput}
+                onChange={(e) => setFillerInput(e.target.value)}
+                disabled={saving}
+                aria-label="채움 이미지 노출 개수"
+              />
+              <span className="text-xs text-muted-foreground">0~{FILLER_COUNT_MAX}장 (비우면 제한 없음)</span>
+              <Button variant="outline" onClick={handleSaveFillerCount} disabled={saving}>저장</Button>
             </CardContent>
           </Card>
         </div>

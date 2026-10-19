@@ -1,10 +1,11 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import { createClient } from '@/lib/supabase/client';
+import { setAutoApproveModification } from '@/lib/ads/auto-approve';
 import type { SoloButton, SoloButtonMode, SoloContentType, SoloPeriodUnit, SoloPopupStatus } from '@/lib/ads/solo-popup';
 
 export interface SoloPopupDetail {
@@ -12,7 +13,7 @@ export interface SoloPopupDetail {
   partnerId: string;
   baseAdId: string | null;
   title: string;
-  imageUrl: string;
+  imageUrls: string[];
   bulletLines: string[];
   contentType: SoloContentType;
   buttonMode: SoloButtonMode;
@@ -31,15 +32,22 @@ export interface SoloPopupDetail {
   modificationRejectedReason: string | null;
   pendingChanges: Partial<{
     title: string;
+    imageUrls: string[];
+    /** 이전 형식 수정 요청 (imageUrls 없음) */
     imageUrl: string;
     bulletLines: string[];
     contentType: SoloContentType;
     buttonMode: SoloButtonMode;
     buttons: SoloButton[];
+    /** 키가 없으면 링크 변경 없음(구버전 앱 요청), null 이면 링크 삭제 */
+    detailLinkUrl: string | null;
   }> | null;
   adminMemo: string | null;
-  /** 자세히 보기 링크 (있으면 앱이 인앱 웹뷰, 없으면 기본 광고 상세) */
+  autoApproveModification: boolean;
+  /** 자세히 보기 링크 (있으면 앱이 외부 브라우저, 없으면 기본 광고 상세) */
   detailLinkUrl: string | null;
+  /** 자세히 보기 버튼 문구 (null 이면 앱이 '자세히 보기' 표시) */
+  detailButtonLabel: string | null;
   salesRepId: string | null;
   startedAt: string | null;
   endedAt: string | null;
@@ -69,11 +77,13 @@ type ActionPath = 'approve' | 'reject' | 'approve-modification' | 'reject-modifi
 export function useSoloPopupDetailPage(params: Promise<{ id: string }>) {
   const { id } = use(params);
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [detail, setDetail] = useState<SoloPopupDetail | null>(null);
   const [payments, setPayments] = useState<SoloPaymentRow[]>([]);
   const [stats, setStats] = useState<SoloStats>({ impressions: 0, primaryClicks: 0, secondaryClicks: 0 });
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [autoApproveToggling, setAutoApproveToggling] = useState(false);
 
   const load = useCallback(async () => {
     const db = createClient() as any;
@@ -175,22 +185,36 @@ export function useSoloPopupDetailPage(params: Promise<{ id: string }>) {
   );
 
   const saveDetailLink = useCallback(
-    async (detailLinkUrl: string) => {
+    async (detailLinkUrl: string, detailButtonLabel: string) => {
       const res = await fetch(`/api/advertising-v2/solo-popup/${id}/detail-link`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ detailLinkUrl }),
+        body: JSON.stringify({ detailLinkUrl, detailButtonLabel }),
       });
       if (!res.ok) {
         return toast.error(
           (await readApiErrorMessage(res)) ?? '링크를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
         );
       }
-      toast.success(detailLinkUrl.trim() ? '링크를 저장했습니다.' : '링크를 삭제했습니다.');
+      toast.success('링크와 버튼 이름을 저장했습니다.');
       await load();
     },
     [id, load]
   );
 
-  return { id, detail, payments, stats, loading, processing, runAction, saveMemo, saveDetailLink };
+  const handleToggleAutoApprove = useCallback(
+    async (next: boolean) => {
+      if (!detail || autoApproveToggling) return;
+      setAutoApproveToggling(true);
+      const ok = await setAutoApproveModification(supabase, 'solo_popup_ads_v2', detail.id, next);
+      if (ok) setDetail((prev) => (prev ? { ...prev, autoApproveModification: next } : prev));
+      setAutoApproveToggling(false);
+    },
+    [detail, autoApproveToggling, supabase]
+  );
+
+  return {
+    id, detail, payments, stats, loading, processing, runAction, saveMemo, saveDetailLink,
+    autoApproveToggling, handleToggleAutoApprove,
+  };
 }

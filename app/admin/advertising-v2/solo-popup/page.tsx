@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { periodLabel } from '@/lib/ads/solo-popup';
@@ -108,6 +109,7 @@ export default function SoloPopupListPage(): React.ReactElement {
                   <TableHead>영업 담당자</TableHead>
                   <TableHead className="text-center">노출수</TableHead>
                   <TableHead className="text-center">클릭수</TableHead>
+                  <TableHead className="text-center">자동승인</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -140,6 +142,19 @@ export default function SoloPopupListPage(): React.ReactElement {
                       <TableCell className="text-muted-foreground">{ad.salesRepName ?? '-'}</TableCell>
                       <TableCell className="text-center tabular-nums">{ad.impressions.toLocaleString()}</TableCell>
                       <TableCell className="text-center tabular-nums">{ad.clicks.toLocaleString()}</TableCell>
+                      {/* 행 클릭이 상세로 넘어가므로 체크박스 조작은 여기서 막는다 */}
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        {ad.status === 'running' ? (
+                          <Checkbox
+                            checked={ad.autoApproveModification}
+                            aria-label="수정 심사 자동승인"
+                            disabled={p.togglingId !== null}
+                            onCheckedChange={(v) => p.handleToggleAutoApprove(ad, v === true)}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}

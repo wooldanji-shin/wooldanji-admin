@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/ads/solo-popup-server';
 
-// 앱이 인앱 웹뷰로 여는 링크 — DB CHECK 와 같은 규칙 (http/https 만)
+// 앱이 외부 브라우저로 여는 링크 — DB CHECK 와 같은 규칙 (http/https 만)
 const LINK_PATTERN = /^https?:\/\//;
+// DB CHECK 와 같은 규칙 — 버튼 문구 최대 글자 수
+const BUTTON_LABEL_MAX = 10;
 
 export async function PATCH(
   request: NextRequest,
@@ -20,9 +22,19 @@ export async function PATCH(
       return NextResponse.json({ error: '링크는 http:// 또는 https:// 로 시작해야 합니다.' }, { status: 400 });
     }
 
+    // 필드가 body 에 있을 때만 갱신 — 링크만 보내는 기존 호출이 문구를 지우지 않도록. 빈 값이면 null(앱 기본 문구)
+    const update: Record<string, string | null> = { detailLinkUrl };
+    if (body && 'detailButtonLabel' in body) {
+      const label: string | null = String(body.detailButtonLabel ?? '').trim() || null;
+      if (label && label.length > BUTTON_LABEL_MAX) {
+        return NextResponse.json({ error: `버튼 이름은 ${BUTTON_LABEL_MAX}자 이하로 입력해 주세요.` }, { status: 400 });
+      }
+      update.detailButtonLabel = label;
+    }
+
     const { error: updateError } = await (supabase as any)
       .from('solo_popup_ads_v2')
-      .update({ detailLinkUrl })
+      .update(update)
       .eq('id', id);
     if (updateError) {
       console.error('Failed to update detail link:', updateError);
