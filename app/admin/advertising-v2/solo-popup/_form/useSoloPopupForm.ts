@@ -28,11 +28,20 @@ export interface SoloPartnerOption {
   description: string;
 }
 
+export interface SoloBaseAdApartment {
+  apartmentId: string;
+  name: string;
+  address: string | null;
+  totalHouseholds: number;
+}
+
 export interface SoloBaseAdOption {
   id: string;
   partnerId: string;
   title: string | null;
   categoryName: string | null;
+  /** 기본 광고의 현재 노출 아파트 (실제 노출 기준) */
+  apartments: SoloBaseAdApartment[];
   totalHouseholds: number;
 }
 
@@ -93,6 +102,8 @@ export function useSoloPopupForm(soloId?: string) {
   const [baseAds, setBaseAds] = useState<SoloBaseAdOption[]>([]);
   const [pricePerWeek, setPricePerWeek] = useState(0);
   const [contentOnly, setContentOnly] = useState(false);
+  // 수정 모드에서 신청 당시(snapshotApartments) 아파트 수·세대수 — 현재 기본 광고와 비교용
+  const [snapshotTotals, setSnapshotTotals] = useState<{ count: number; households: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -107,7 +118,7 @@ export function useSoloPopupForm(soloId?: string) {
         supabase
           .from('advertisements_v2')
           .select(
-            'id, partnerId, title, ad_categories_v2:categoryId(categoryName), advertisement_apartments_v2(totalHouseholds)'
+            'id, partnerId, title, ad_categories_v2:categoryId(categoryName), advertisement_apartments_v2(apartmentId, totalHouseholds, apartments:apartmentId(name, address))'
           )
           .eq('adStatus', 'running')
           .eq('paymentStatus', 'paid'),
@@ -122,16 +133,22 @@ export function useSoloPopupForm(soloId?: string) {
       );
       return ((adRes.data ?? []) as any[])
         .filter((ad) => !occupied.has(ad.id))
-        .map((ad) => ({
-          id: ad.id,
-          partnerId: ad.partnerId,
-          title: ad.title,
-          categoryName: ad.ad_categories_v2?.categoryName ?? null,
-          totalHouseholds: ((ad.advertisement_apartments_v2 ?? []) as any[]).reduce(
-            (sum, a) => sum + (a.totalHouseholds ?? 0),
-            0
-          ),
-        }));
+        .map((ad) => {
+          const apartments: SoloBaseAdApartment[] = ((ad.advertisement_apartments_v2 ?? []) as any[]).map((a) => ({
+            apartmentId: a.apartmentId,
+            name: a.apartments?.name ?? '-',
+            address: a.apartments?.address ?? null,
+            totalHouseholds: a.totalHouseholds ?? 0,
+          }));
+          return {
+            id: ad.id,
+            partnerId: ad.partnerId,
+            title: ad.title,
+            categoryName: ad.ad_categories_v2?.categoryName ?? null,
+            apartments,
+            totalHouseholds: apartments.reduce((sum, a) => sum + a.totalHouseholds, 0),
+          };
+        });
     };
 
     const loadExisting = async (id: string) => {
@@ -147,6 +164,11 @@ export function useSoloPopupForm(soloId?: string) {
         return setLoadError('파트너의 수정 심사가 진행 중입니다. 먼저 승인하거나 거절해주세요.');
       }
       setContentOnly(isRunning);
+      const snapshot = (data.snapshotApartments ?? []) as { totalHouseholds: number }[];
+      setSnapshotTotals({
+        count: snapshot.length,
+        households: snapshot.reduce((sum, a) => sum + (a.totalHouseholds ?? 0), 0),
+      });
 
       const stored = (data.buttons ?? []) as SoloButton[];
       setForm({
@@ -208,6 +230,13 @@ export function useSoloPopupForm(soloId?: string) {
     () => baseAds.find((ad) => ad.id === form.baseAdId) ?? null,
     [baseAds, form.baseAdId]
   );
+
+  // 신청 당시와 지금의 기본 광고 아파트가 다르면 안내한다 (금액은 신청 당시 기준)
+  const apartmentsChangedSinceApply =
+    !!snapshotTotals &&
+    !!selectedBaseAd &&
+    (snapshotTotals.count !== selectedBaseAd.apartments.length ||
+      snapshotTotals.households !== selectedBaseAd.totalHouseholds);
 
   const selectPartner = useCallback((partnerId: string | null) => {
     setForm((prev) => ({ ...prev, partnerId, baseAdId: null }));
@@ -360,6 +389,7 @@ export function useSoloPopupForm(soloId?: string) {
     partners,
     partnerBaseAds,
     selectedBaseAd,
+    apartmentsChangedSinceApply,
     selectPartner,
     pickImages,
     cropState,

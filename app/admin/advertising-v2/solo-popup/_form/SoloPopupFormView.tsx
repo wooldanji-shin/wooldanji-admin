@@ -27,7 +27,7 @@ import {
 } from '@/lib/ads/solo-popup';
 import { SoloImageSortableList } from './SoloImageSortableList';
 import { SoloImageCropDialog } from './SoloImageCropDialog';
-import { useSoloPopupForm } from './useSoloPopupForm';
+import { useSoloPopupForm, type SoloBaseAdOption } from './useSoloPopupForm';
 
 const LIST_PATH = '/admin/advertising-v2/solo-popup';
 
@@ -41,6 +41,48 @@ const LABEL_CLASS = 'block text-sm font-medium';
 interface SoloPopupFormViewProps {
   /** 주면 수정 모드 */
   soloId?: string;
+}
+
+/** 연결된 기본 광고의 현재 노출 아파트 — 확인용 읽기 전용 목록 */
+function BaseAdApartments({
+  baseAd,
+  changedSinceApply,
+}: {
+  baseAd: SoloBaseAdOption;
+  changedSinceApply: boolean;
+}): React.ReactElement {
+  return (
+    <div className="space-y-1.5">
+      <p className={LABEL_CLASS}>
+        노출 아파트 <span className="text-xs font-normal text-muted-foreground">(기본 광고를 그대로 따라요)</span>
+      </p>
+      <p className="text-xs text-muted-foreground">카테고리 {baseAd.categoryName ?? '-'}</p>
+      {baseAd.apartments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">아파트 정보 없음</p>
+      ) : (
+        <ul className={`${LONG_FIELD_WIDTH} max-h-60 divide-y divide-border/50 overflow-auto rounded-md border border-border px-3`}>
+          {baseAd.apartments.map((apt) => (
+            <li key={apt.apartmentId} className="flex items-start justify-between gap-3 py-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{apt.name}</p>
+                {apt.address && <p className="mt-0.5 truncate text-xs text-muted-foreground">{apt.address}</p>}
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular-nums">
+                {apt.totalHouseholds.toLocaleString()}
+                <span className="ml-0.5 text-xs font-normal text-muted-foreground">세대</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-sm font-medium tabular-nums">
+        총 {baseAd.apartments.length.toLocaleString()}곳 · {baseAd.totalHouseholds.toLocaleString()}세대
+      </p>
+      {changedSinceApply && (
+        <p className="text-xs text-destructive">신청 당시와 아파트가 달라졌어요 (금액은 신청 당시 기준입니다).</p>
+      )}
+    </div>
+  );
 }
 
 export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.ReactElement {
@@ -149,12 +191,7 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
                 ))}
             </>
           )}
-          {page.selectedBaseAd && (
-            <p className="rounded-md border border-border bg-muted/40 p-3 text-sm">
-              카테고리 {page.selectedBaseAd.categoryName ?? '-'} · 총{' '}
-              <strong>{page.selectedBaseAd.totalHouseholds.toLocaleString()}세대</strong> (노출 아파트는 기본 광고를 그대로 따릅니다)
-            </p>
-          )}
+          {page.selectedBaseAd && <BaseAdApartments baseAd={page.selectedBaseAd} changedSinceApply={page.apartmentsChangedSinceApply} />}
         </CardContent>
       </Card>
 
