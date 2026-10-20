@@ -60,6 +60,8 @@ export interface SoloFormState {
   bodyText: string;
   buttonMode: SoloButtonMode;
   buttons: SoloButton[];
+  /** 빈 값이면 앱이 '자세히 보기' 표시 */
+  detailButtonLabel: string;
   periodUnit: SoloPeriodUnit;
   periodCount: number;
   discountRate: number;
@@ -79,6 +81,7 @@ const EMPTY_FORM: SoloFormState = {
   bodyText: '',
   buttonMode: 'detail',
   buttons: [{ label: '', url: '' }, { label: '', url: '' }],
+  detailButtonLabel: '',
   periodUnit: 'week',
   periodCount: 1,
   discountRate: 0,
@@ -102,11 +105,15 @@ export function useSoloPopupForm(soloId?: string) {
   const [baseAds, setBaseAds] = useState<SoloBaseAdOption[]>([]);
   const [pricePerWeek, setPricePerWeek] = useState(0);
   const [contentOnly, setContentOnly] = useState(false);
+  // 수정 모드에서 결제 전(approved + unpaid)이어야 바로 시작할 수 있다 — running 은 이미 시작된 광고
+  const [beforePayment, setBeforePayment] = useState(false);
   // 수정 모드에서 신청 당시(snapshotApartments) 아파트 수·세대수 — 현재 기본 광고와 비교용
   const [snapshotTotals, setSnapshotTotals] = useState<{ count: number; households: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // 수정 중 광고 상태가 바뀐 경우(409 stale_status) — 새로고침 안내 팝업용. contentSaved: 내용은 이미 저장됐는지
+  const [staleNotice, setStaleNotice] = useState<{ contentSaved: boolean } | null>(null);
 
   const patch = useCallback((changes: Partial<SoloFormState>) => {
     setForm((prev) => ({ ...prev, ...changes }));
@@ -164,6 +171,7 @@ export function useSoloPopupForm(soloId?: string) {
         return setLoadError('파트너의 수정 심사가 진행 중입니다. 먼저 승인하거나 거절해주세요.');
       }
       setContentOnly(isRunning);
+      setBeforePayment(isBeforePayment);
       const snapshot = (data.snapshotApartments ?? []) as { totalHouseholds: number }[];
       setSnapshotTotals({
         count: snapshot.length,
@@ -182,6 +190,7 @@ export function useSoloPopupForm(soloId?: string) {
         bodyText: data.contentType === 'text' ? data.bulletLines.join('\n') : '',
         buttonMode: data.buttonMode,
         buttons: [0, 1].map((i) => ({ label: stored[i]?.label ?? '', url: stored[i]?.url ?? '' })),
+        detailButtonLabel: data.detailButtonLabel ?? '',
         periodUnit: data.periodUnit,
         periodCount: data.periodCount,
         discountRate: data.approvedDiscountRate ?? 0,
@@ -310,7 +319,7 @@ export function useSoloPopupForm(soloId?: string) {
   const discountedTotalAmount = calcDiscountedTotalAmount(totalAmount, form.discountRate);
 
   // 받을 돈이 0원일 때만 바로 시작할 수 있다 (서버도 같은 기준으로 검증)
-  const canStartImmediately = !isEdit && form.discountRate === 100;
+  const canStartImmediately = (!isEdit || beforePayment) && form.discountRate === 100;
 
   const canSubmit =
     !!form.partnerId && !!form.baseAdId && !contentErr && !periodErr && !loadError && !submitting;
@@ -347,6 +356,7 @@ export function useSoloPopupForm(soloId?: string) {
             contentType: form.contentType,
             buttonMode: form.buttonMode,
             buttons,
+            detailButtonLabel: form.detailButtonLabel,
             periodUnit: form.periodUnit,
             periodCount: form.periodCount,
             discountRate: form.discountRate,
@@ -356,6 +366,13 @@ export function useSoloPopupForm(soloId?: string) {
           }),
         }
       );
+      if (response.status === 409) {
+        const body = await response.clone().json().catch(() => null);
+        if (body?.code === 'stale_status') {
+          setStaleNotice({ contentSaved: body.contentSaved === true });
+          return;
+        }
+      }
       if (!response.ok) {
         toast.error((await readApiErrorMessage(response)) ?? failMessage);
         return;
@@ -363,7 +380,9 @@ export function useSoloPopupForm(soloId?: string) {
       const result = await response.json();
       toast.success(
         isEdit
-          ? '단독 팝업 광고를 수정했습니다.'
+          ? result.startImmediately
+            ? '단독 팝업 광고를 수정하고 바로 시작했습니다.'
+            : '단독 팝업 광고를 수정했습니다.'
           : result.startImmediately
             ? '단독 팝업 광고를 등록하고 바로 시작했습니다.'
             : '단독 팝업 광고를 등록했습니다. 파트너 결제만 남았습니다.'
@@ -406,5 +425,7 @@ export function useSoloPopupForm(soloId?: string) {
     discountedTotalAmount,
     canStartImmediately,
     submit,
+    staleNotice,
+    closeStaleNotice: () => setStaleNotice(null),
   };
 }

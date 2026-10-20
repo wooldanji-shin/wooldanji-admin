@@ -9,6 +9,8 @@ export type SoloPeriodUnit = 'week' | 'month';
 export type SoloContentType = 'bullets' | 'text';
 
 export const SOLO_TITLE_MAX = 20;
+/** DB CHECK(detailButtonLabel 1~10자)와 같은 규칙 */
+export const SOLO_BUTTON_LABEL_MAX = 10;
 export const SOLO_BULLET_MAX_LINES = 3;
 export const SOLO_BULLET_MAX_LENGTH = 25;
 /** 자유 문장 — 최대 3줄, 줄 길이 합(줄바꿈 제외) 75자 */

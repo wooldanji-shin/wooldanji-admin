@@ -24,8 +24,9 @@ interface DoorPopupSettings {
   mode: PopupMode;
 }
 
-// DB CHECK 와 같은 범위 — 팝업 카드는 최대 5장
-const FILLER_COUNT_MAX = 5;
+// DB CHECK 와 같은 범위 — 팝업 카드 최대 장수
+const MAX_CARDS_MIN = 5;
+const MAX_CARDS_MAX = 10;
 
 export default function DoorBannerPage() {
   const supabase = createClient();
@@ -34,8 +35,8 @@ export default function DoorBannerPage() {
   const [loading, setLoading] = useState(true);
   // 저장 중 상태 — 중복 토글 방지
   const [saving, setSaving] = useState(false);
-  // 채움 이미지 개수 입력값 (빈 문자열 = 제한 없음)
-  const [fillerInput, setFillerInput] = useState('');
+  // 팝업 최대 장수 입력값
+  const [maxCardsInput, setMaxCardsInput] = useState(String(MAX_CARDS_MIN));
 
   // 초기 설정값 조회
   useEffect(() => {
@@ -44,12 +45,12 @@ export default function DoorBannerPage() {
         // door_popup_settings 미타입 테이블 any 캐스팅
         const { data, error } = await (supabase as any)
           .from('door_popup_settings')
-          .select('id, mode, "fillerImageCount"')
+          .select('id, mode, "maxCards"')
           .limit(1)
           .single();
         if (error) throw error;
         setSettings({ id: data.id, mode: data.mode });
-        setFillerInput(data.fillerImageCount == null ? '' : String(data.fillerImageCount));
+        setMaxCardsInput(String(data.maxCards ?? MAX_CARDS_MIN));
       } catch (err) {
         console.error('door_popup_settings 조회 실패:', err);
         toast.error('설정을 불러오는데 실패했습니다.');
@@ -100,13 +101,12 @@ export default function DoorBannerPage() {
     }
   };
 
-  /** 채움 이미지 노출 개수 저장 — 빈 값이면 제한 없음(null) */
-  const handleSaveFillerCount = async () => {
+  /** 팝업 최대 장수 저장 — 광고가 먼저, 남은 칸은 채움 이미지로 채워진다 */
+  const handleSaveMaxCards = async () => {
     if (!settings || saving) return;
-    const trimmed = fillerInput.trim();
-    const count = trimmed === '' ? null : Number(trimmed);
-    if (count !== null && (!Number.isInteger(count) || count < 0 || count > FILLER_COUNT_MAX)) {
-      toast.error(`0~${FILLER_COUNT_MAX} 사이의 숫자로 입력해 주세요.`);
+    const count = Number(maxCardsInput);
+    if (!Number.isInteger(count) || count < MAX_CARDS_MIN || count > MAX_CARDS_MAX) {
+      toast.error(`${MAX_CARDS_MIN}~${MAX_CARDS_MAX} 사이의 숫자로 입력해 주세요.`);
       return;
     }
 
@@ -114,12 +114,12 @@ export default function DoorBannerPage() {
     try {
       const { error } = await (supabase as any)
         .from('door_popup_settings')
-        .update({ fillerImageCount: count })
+        .update({ maxCards: count })
         .eq('id', settings.id);
       if (error) throw error;
-      toast.success(count === null ? '남은 칸을 모두 채우도록 저장했습니다.' : `채움 이미지를 최대 ${count}장 노출하도록 저장했습니다.`);
+      toast.success(`팝업 최대 장수를 ${count}장으로 저장했습니다.`);
     } catch (err) {
-      console.error('채움 이미지 개수 저장 실패:', err);
+      console.error('팝업 최대 장수 저장 실패:', err);
       toast.error('저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setSaving(false);
@@ -217,28 +217,27 @@ export default function DoorBannerPage() {
             </CardContent>
           </Card>
 
-          {/* 단독 팝업 모드의 채움 이미지 노출 개수 */}
+          {/* 단독 팝업 모드의 팝업 최대 장수 */}
           <Card className="bg-card border-border">
             <CardHeader className="space-y-1 pb-2">
-              <CardTitle className="text-base font-semibold">채움 이미지 노출 개수</CardTitle>
+              <CardTitle className="text-base font-semibold">팝업 최대 장수</CardTitle>
               <CardDescription>
-                단독 팝업 광고로 채우고 남은 칸에 보여줄 이미지 수입니다. 비우면 남은 칸을 모두 채워요.
+                광고를 먼저 보여주고 남은 칸은 채움 이미지로 채워요.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center gap-3">
               <Input
                 type="number"
-                min={0}
-                max={FILLER_COUNT_MAX}
+                min={MAX_CARDS_MIN}
+                max={MAX_CARDS_MAX}
                 className="w-32"
-                placeholder="제한 없음"
-                value={fillerInput}
-                onChange={(e) => setFillerInput(e.target.value)}
+                value={maxCardsInput}
+                onChange={(e) => setMaxCardsInput(e.target.value)}
                 disabled={saving}
-                aria-label="채움 이미지 노출 개수"
+                aria-label="팝업 최대 장수"
               />
-              <span className="text-xs text-muted-foreground">0~{FILLER_COUNT_MAX}장 (비우면 제한 없음)</span>
-              <Button variant="outline" onClick={handleSaveFillerCount} disabled={saving}>저장</Button>
+              <span className="text-xs text-muted-foreground">{MAX_CARDS_MIN}~{MAX_CARDS_MAX}장 (기본 {MAX_CARDS_MIN})</span>
+              <Button variant="outline" onClick={handleSaveMaxCards} disabled={saving}>저장</Button>
             </CardContent>
           </Card>
         </div>

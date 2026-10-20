@@ -3,6 +3,16 @@
 import { useRef } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,6 +30,7 @@ import {
   SOLO_TEXT_MAX_LINES,
   SOLO_MAX_MONTHS,
   SOLO_MAX_WEEKS,
+  SOLO_BUTTON_LABEL_MAX,
   SOLO_TITLE_MAX,
   CONTENT_TYPE_LABEL,
   soloTextLength,
@@ -323,10 +334,19 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
                 )}
               </div>
 
-              <div className="space-y-1">
-                <label className={LABEL_CLASS}>버튼</label>
+              <div className="space-y-1.5">
+                <label className={LABEL_CLASS}>버튼 문구</label>
+                <div className={`${FIELD_WIDTH} space-y-1`}>
+                  <Input
+                    value={form.detailButtonLabel}
+                    maxLength={SOLO_BUTTON_LABEL_MAX}
+                    placeholder="자세히 보기"
+                    onChange={(e) => patch({ detailButtonLabel: e.target.value })}
+                  />
+                  <p className={COUNTER_CLASS}>{form.detailButtonLabel.length}/{SOLO_BUTTON_LABEL_MAX}</p>
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  &apos;자세히 보기&apos; 버튼 1개로 고정됩니다. 링크는 등록 후 상세 화면에서 넣을 수 있고, 비워 두면 연결된 기본 광고 상세로 이동합니다.
+                  버튼은 1개로 고정됩니다. 비워 두면 &apos;자세히 보기&apos;로 표시됩니다. 링크는 등록 후 상세 화면에서 넣을 수 있고, 비워 두면 연결된 기본 광고 상세로 이동합니다.
                 </p>
               </div>
             </CardContent>
@@ -453,10 +473,27 @@ export function SoloPopupFormView({ soloId }: SoloPopupFormViewProps): React.Rea
           <Button size="lg" disabled={!page.canSubmit} onClick={page.submit}>
             {page.submitting
               ? isEdit ? '수정 중...' : '등록 중...'
-              : isEdit ? '수정 저장' : form.startImmediately && page.canStartImmediately ? '단독 팝업 등록 후 바로 시작' : '단독 팝업 등록 (결제 대기 상태)'}
+              : form.startImmediately && page.canStartImmediately ? (isEdit ? '수정 후 바로 시작' : '단독 팝업 등록 후 바로 시작') : isEdit ? '수정 저장' : '단독 팝업 등록 (결제 대기 상태)'}
           </Button>
         </CardContent>
       </Card>
+
+      <AlertDialog open={page.staleNotice !== null} onOpenChange={(open) => !open && page.closeStaleNotice()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>광고 상태가 바뀌었어요</AlertDialogTitle>
+            <AlertDialogDescription>
+              {page.staleNotice?.contentSaved
+                ? '내용은 저장됐어요. 그 사이 결제되었거나 상태가 바뀌어 바로 시작하지 못했어요. 새로고침 후 다시 확인해 주세요.'
+                : '수정 화면을 연 사이에 결제되었거나 상태가 바뀌어 저장하지 않았어요. 새로고침 후 다시 확인해 주세요.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>닫기</AlertDialogCancel>
+            <AlertDialogAction onClick={() => window.location.reload()}>새로고침</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

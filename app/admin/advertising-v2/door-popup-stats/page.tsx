@@ -55,10 +55,13 @@ function monthRange(month: string): [string, string] {
   return [`${month}-01`, `${month}-${String(last).padStart(2, '0')}`];
 }
 
+// DB CHECK(door_popup_view_depth_daily) 와 같은 상한
+const DOOR_POPUP_MAX_CARDS = 10;
+
 interface DepthSummary {
   /** 팝업 전체 닫힘 횟수 */
   total: number;
-  /** 본 장수(1~5)별 횟수 — 카드가 2장 이상인 팝업만 */
+  /** 본 장수(1~10)별 횟수 — 카드가 2장 이상인 팝업만 */
   byViewed: number[];
   /** 카드 2장 이상인 팝업 수 */
   multiTotal: number;
@@ -68,7 +71,7 @@ interface DepthSummary {
 
 /** 카드 1장짜리 팝업은 항상 끝까지 본 것이 되므로 분포·끝까지 비율은 2장 이상만 계산한다 */
 function summarizeDepth(rows: DepthRow[]): DepthSummary {
-  const summary: DepthSummary = { total: 0, byViewed: [0, 0, 0, 0, 0], multiTotal: 0, completed: 0 };
+  const summary: DepthSummary = { total: 0, byViewed: Array<number>(DOOR_POPUP_MAX_CARDS).fill(0), multiTotal: 0, completed: 0 };
   for (const r of rows) {
     summary.total += r.count;
     if (r.totalCards < 2) continue;

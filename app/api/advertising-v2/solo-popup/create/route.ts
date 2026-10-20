@@ -6,38 +6,13 @@ import {
   computeSoloAmounts,
   dbErrorMessage,
   notifyPartner,
+  notifySoloStarted,
+  recordFreeSoloPayment,
   requireAdmin,
   soloEndedAt,
   SoloInputError,
   type SoloWriteBody,
 } from '@/lib/ads/solo-popup-server';
-
-/** 0원 결제 이력 — 무료 활성화(activate-free-solo-popup-ad)와 같은 형식. 실패해도 광고 시작은 유지 */
-async function recordFreePayment(
-  admin: any,
-  soloPopupAdId: string,
-  partnerId: string,
-  weeks: number,
-  startedAt: Date,
-  endedAt: Date
-): Promise<void> {
-  const { error } = await admin.from('ad_payment_history_v2').insert({
-    partnerId,
-    soloPopupAdId,
-    periodWeeks: weeks,
-    amount: 0,
-    supplyAmount: 0,
-    vatAmount: 0,
-    status: 'paid',
-    paymentType: 'solo_popup',
-    paymentDate: startedAt.toISOString(),
-    billingPeriodStart: startedAt.toISOString(),
-    billingPeriodEnd: endedAt.toISOString(),
-    paymentKey: null,
-    receiptUrl: null,
-  });
-  if (error) console.error('Failed to record free payment (non-critical):', error);
-}
 
 /**
  * 관리자가 파트너를 대신해 단독 팝업 광고를 등록한다 (approved + unpaid → 파트너 결제만 남음).
@@ -115,18 +90,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: dbErrorMessage(insertError ?? {}) }, { status });
     }
 
-    if (startImmediately) await recordFreePayment(admin, inserted.id, partnerId, amounts.weeks, startedAt, endedAt);
+    if (startImmediately) await recordFreeSoloPayment(admin, inserted.id, partnerId, amounts.weeks, startedAt, endedAt);
 
-    await notifyPartner({
-      partnerUserId: partnerId,
-      soloPopupAdId: inserted.id,
-      baseAdId,
-      title: startImmediately ? '단독 팝업 광고 시작' : '단독 팝업 광고 등록 안내',
-      body: startImmediately
-        ? '단독 팝업 광고가 시작되었습니다. 앱에서 확인해보세요.'
-        : '단독 팝업 광고가 등록되었습니다. 앱에서 결제 후 광고를 시작해보세요.',
-      type: startImmediately ? 'solo_popup_ad_started' : 'solo_popup_ad_approved',
-    });
+    if (startImmediately) {
+      await notifySoloStarted(partnerId, inserted.id, baseAdId);
+    } else {
+      await notifyPartner({
+        partnerUserId: partnerId,
+        soloPopupAdId: inserted.id,
+        baseAdId,
+        title: '단독 팝업 광고 등록 안내',
+        body: '단독 팝업 광고가 등록되었습니다. 앱에서 결제 후 광고를 시작해보세요.',
+        type: 'solo_popup_ad_approved',
+      });
+    }
 
     return NextResponse.json({
       success: true,

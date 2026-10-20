@@ -41,6 +41,8 @@ export interface SoloPopupDetail {
     buttons: SoloButton[];
     /** 키가 없으면 링크 변경 없음(구버전 앱 요청), null 이면 링크 삭제 */
     detailLinkUrl: string | null;
+    /** 키가 없으면 문구 변경 없음, null 이면 문구 삭제(앱 기본 문구) */
+    detailButtonLabel: string | null;
   }> | null;
   adminMemo: string | null;
   autoApproveModification: boolean;

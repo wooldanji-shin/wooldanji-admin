@@ -15,6 +15,10 @@ const REJECT_RESPONSES: Record<string, { status: number; error: string }> = {
     status: 400,
     error: '수정 요청의 링크가 올바르지 않습니다. 파트너에게 다시 요청해 달라고 안내해 주세요.',
   },
+  invalid_button_label: {
+    status: 400,
+    error: '수정 요청의 버튼 문구가 올바르지 않습니다(1~10자). 파트너에게 다시 요청해 달라고 안내해 주세요.',
+  },
   invalid_images: { status: 400, error: '수정 요청의 이미지가 올바르지 않습니다. 파트너에게 다시 요청해 달라고 안내해 주세요.' },
 };
 

@@ -196,7 +196,7 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
 
       <ContentCard title="팝업 내용" c={detail} buttonLabel={detail.detailButtonLabel} />
       {hasModification && detail.pendingChanges && (
-        <ContentCard title="수정 요청 내용 (승인 시 반영)" c={{ ...detail, ...detail.pendingChanges, imageUrls: detail.pendingChanges.imageUrls ?? (detail.pendingChanges.imageUrl ? [detail.pendingChanges.imageUrl] : detail.imageUrls) }} buttonLabel={detail.detailButtonLabel} />
+        <ContentCard title="수정 요청 내용 (승인 시 반영)" c={{ ...detail, ...detail.pendingChanges, imageUrls: detail.pendingChanges.imageUrls ?? (detail.pendingChanges.imageUrl ? [detail.pendingChanges.imageUrl] : detail.imageUrls) }} buttonLabel={'detailButtonLabel' in detail.pendingChanges ? detail.pendingChanges.detailButtonLabel : detail.detailButtonLabel} />
       )}
       {linkChanged && detail.pendingChanges && (
         <Card>

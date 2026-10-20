@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import {
   normalizeButtons,
   periodError,
+  SOLO_BUTTON_LABEL_MAX,
   soloContentError,
   type SoloButton,
   type SoloButtonMode,
@@ -103,6 +104,8 @@ export interface SoloWriteBody {
   contentType?: SoloContentType;
   buttonMode?: SoloButtonMode;
   buttons?: SoloButton[];
+  /** 비워 두면 NULL → 앱이 '자세히 보기' 표시 */
+  detailButtonLabel?: string;
   periodUnit?: SoloPeriodUnit;
   periodCount?: number;
   discountRate?: number;
@@ -138,7 +141,12 @@ export async function buildSoloContent(admin: any, body: SoloWriteBody) {
   });
   if (dbError) throw new SoloInputError(soloContentDbErrorMessage(String(dbError)));
 
-  return { ...content, buttons };
+  const detailButtonLabel = (body.detailButtonLabel ?? '').trim() || null;
+  if (detailButtonLabel && detailButtonLabel.length > SOLO_BUTTON_LABEL_MAX) {
+    throw new SoloInputError(`버튼 문구는 ${SOLO_BUTTON_LABEL_MAX}자 이하여야 합니다.`);
+  }
+
+  return { ...content, buttons, detailButtonLabel };
 }
 
 /** 기간 환산·스냅샷·총액 — 전부 DB 함수가 계산한다 (TS 에 환산식을 두지 않는다) */
@@ -175,4 +183,73 @@ export function soloEndedAt(startedAt: Date, weeks: number): Date {
   const kst = new Date(startedAt.getTime() + weeks * WEEK_MS + KST_OFFSET_MS);
   kst.setUTCHours(23, 59, 59, 999);
   return new Date(kst.getTime() - KST_OFFSET_MS);
+}
+
+/** 0원 결제 이력 — 무료 활성화(activate-free-solo-popup-ad)와 같은 형식. 실패해도 광고 시작은 유지 */
+export async function recordFreeSoloPayment(
+  admin: any,
+  soloPopupAdId: string,
+  partnerId: string,
+  weeks: number,
+  startedAt: Date,
+  endedAt: Date
+): Promise<void> {
+  const { error } = await admin.from('ad_payment_history_v2').insert({
+    partnerId,
+    soloPopupAdId,
+    periodWeeks: weeks,
+    amount: 0,
+    supplyAmount: 0,
+    vatAmount: 0,
+    status: 'paid',
+    paymentType: 'solo_popup',
+    paymentDate: startedAt.toISOString(),
+    billingPeriodStart: startedAt.toISOString(),
+    billingPeriodEnd: endedAt.toISOString(),
+    paymentKey: null,
+    receiptUrl: null,
+  });
+  if (error) console.error('Failed to record free payment (non-critical):', error);
+}
+
+/** 결제 없이 시작했음을 파트너에게 알린다 */
+export function notifySoloStarted(partnerId: string, soloPopupAdId: string, baseAdId: string): Promise<void> {
+  return notifyPartner({
+    partnerUserId: partnerId,
+    soloPopupAdId,
+    baseAdId,
+    title: '단독 팝업 광고 시작',
+    body: '단독 팝업 광고가 시작되었습니다. 앱에서 확인해보세요.',
+    type: 'solo_popup_ad_started',
+  });
+}
+
+/**
+ * 결제 전(approved + unpaid) 광고를 결제 없이 바로 시작한다 (수정 화면의 "수정 후 바로 시작").
+ * 조건부 UPDATE 라 그 사이 결제·상태 변경이 있었으면 0행 → false (아무것도 바꾸지 않는다).
+ */
+export async function startSoloPopupWithoutPayment(
+  admin: any,
+  ad: { id: string; partnerId: string; baseAdId: string; weeks: number }
+): Promise<boolean> {
+  const startedAt = new Date();
+  const endedAt = soloEndedAt(startedAt, ad.weeks);
+  const { data, error } = await admin
+    .from('solo_popup_ads_v2')
+    .update({
+      status: 'running',
+      paymentStatus: 'paid',
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+    })
+    .eq('id', ad.id)
+    .eq('status', 'approved')
+    .eq('paymentStatus', 'unpaid')
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) return false;
+
+  await recordFreeSoloPayment(admin, ad.id, ad.partnerId, ad.weeks, startedAt, endedAt);
+  await notifySoloStarted(ad.partnerId, ad.id, ad.baseAdId);
+  return true;
 }
