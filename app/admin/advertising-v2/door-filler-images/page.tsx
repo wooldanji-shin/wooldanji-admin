@@ -95,7 +95,7 @@ export default function DoorFillerImagesPage(): React.ReactElement {
       <PageHeader>
         <PageHeaderTitle
           title="문열림 채움 이미지"
-          description="유료 단독 팝업이 5장보다 적으면 남은 자리를 이 이미지들이 뒤에서 채웁니다. 시간대·아파트 조건에 맞는 것 중 랜덤으로 나갑니다. (팝업 모드가 '단독 팝업'일 때만 노출)"
+          description="단독 팝업 광고를 먼저 채우고, '팝업 최대 장수'보다 적으면 남은 자리를 이 이미지들이 채웁니다. 보여주는 순서는 광고와 섞여 랜덤입니다. 시간대·아파트 조건에 맞는 것 중 랜덤으로 나갑니다. (팝업 모드가 '단독 팝업'일 때만 노출)"
         />
         <PageHeaderActions>
           <Button onClick={openCreate}>

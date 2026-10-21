@@ -92,7 +92,7 @@ export function FillerImageDialog({ open, image, apartments, saving, onClose, on
         <DialogHeader>
           <DialogTitle>{image ? '채움 이미지 수정' : '채움 이미지 등록'}</DialogTitle>
           <DialogDescription>
-            유료 단독 팝업이 5장보다 적을 때 뒤쪽 빈자리에 나옵니다. 단독 팝업 카드 크기 안에 이미지 전체가 보이게 들어갑니다.
+            단독 팝업 광고가 최대 장수보다 적을 때 남은 자리를 채우며, 광고와 섞여 랜덤으로 나옵니다. 단독 팝업 카드 크기 안에 이미지 전체가 보이게 들어갑니다.
           </DialogDescription>
         </DialogHeader>
 

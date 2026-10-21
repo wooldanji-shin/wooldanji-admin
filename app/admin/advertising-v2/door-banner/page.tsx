@@ -197,7 +197,7 @@ export default function DoorBannerPage() {
               <div className="space-y-1">
                 <CardTitle className="text-base font-semibold">단독 팝업</CardTitle>
                 <CardDescription>
-                  파트너가 신청한 단독 팝업 광고를 최대 5장 캐러셀로 노출합니다.
+                  파트너가 신청한 단독 팝업 광고를 최대 장수(아래 설정)까지 캐러셀로 노출합니다.
                 </CardDescription>
               </div>
               <Switch
@@ -222,7 +222,7 @@ export default function DoorBannerPage() {
             <CardHeader className="space-y-1 pb-2">
               <CardTitle className="text-base font-semibold">팝업 최대 장수</CardTitle>
               <CardDescription>
-                광고를 먼저 보여주고 남은 칸은 채움 이미지로 채워요.
+                광고를 먼저 채우고 남은 칸은 채움 이미지로 채워요. 보여주는 순서는 섞여서 랜덤이에요.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center gap-3">

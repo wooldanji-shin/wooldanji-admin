@@ -107,8 +107,10 @@ export default function SoloPopupListPage(): React.ReactElement {
                   <TableHead>시작일</TableHead>
                   <TableHead>종료일</TableHead>
                   <TableHead>영업 담당자</TableHead>
-                  <TableHead className="text-center">노출수</TableHead>
-                  <TableHead className="text-center">클릭수</TableHead>
+                  <TableHead className="text-center">문열림 노출</TableHead>
+                  <TableHead className="text-center">문열림 클릭</TableHead>
+                  <TableHead className="text-center">홈 노출</TableHead>
+                  <TableHead className="text-center">홈 클릭</TableHead>
                   <TableHead className="text-center">자동승인</TableHead>
                 </TableRow>
               </TableHeader>
@@ -142,6 +144,8 @@ export default function SoloPopupListPage(): React.ReactElement {
                       <TableCell className="text-muted-foreground">{ad.salesRepName ?? '-'}</TableCell>
                       <TableCell className="text-center tabular-nums">{ad.impressions.toLocaleString()}</TableCell>
                       <TableCell className="text-center tabular-nums">{ad.clicks.toLocaleString()}</TableCell>
+                      <TableCell className="text-center tabular-nums">{ad.homeImpressions.toLocaleString()}</TableCell>
+                      <TableCell className="text-center tabular-nums">{ad.homeClicks.toLocaleString()}</TableCell>
                       {/* 행 클릭이 상세로 넘어가므로 체크박스 조작은 여기서 막는다 */}
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         {ad.status === 'running' ? (

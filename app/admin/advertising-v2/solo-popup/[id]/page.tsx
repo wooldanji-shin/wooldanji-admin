@@ -186,9 +186,12 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
               ))}
             </ul>
           </InfoRow>
-          <InfoRow label="통계">
+          <InfoRow label="통계 (문열림 팝업)">
             노출 {stats.impressions.toLocaleString()} · 클릭 {(stats.primaryClicks + stats.secondaryClicks).toLocaleString()}
             {detail.buttonMode === 'split' && ` (버튼1 ${stats.primaryClicks} / 버튼2 ${stats.secondaryClicks})`}
+          </InfoRow>
+          <InfoRow label="통계 (홈 추천)">
+            노출 {stats.homeImpressions.toLocaleString()} · 클릭 {stats.homeClicks.toLocaleString()}
           </InfoRow>
           <InfoRow label="신청일">{formatDateTime(detail.createdAt)}</InfoRow>
         </CardContent>

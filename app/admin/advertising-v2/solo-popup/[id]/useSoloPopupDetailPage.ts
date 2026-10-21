@@ -72,6 +72,9 @@ export interface SoloStats {
   impressions: number;
   primaryClicks: number;
   secondaryClicks: number;
+  /** 홈 프리미엄 추천 섹션 (위 3개는 문열림 팝업) */
+  homeImpressions: number;
+  homeClicks: number;
 }
 
 type ActionPath = 'approve' | 'reject' | 'approve-modification' | 'reject-modification' | 'delete';
@@ -82,7 +85,7 @@ export function useSoloPopupDetailPage(params: Promise<{ id: string }>) {
   const supabase = useMemo(() => createClient(), []);
   const [detail, setDetail] = useState<SoloPopupDetail | null>(null);
   const [payments, setPayments] = useState<SoloPaymentRow[]>([]);
-  const [stats, setStats] = useState<SoloStats>({ impressions: 0, primaryClicks: 0, secondaryClicks: 0 });
+  const [stats, setStats] = useState<SoloStats>({ impressions: 0, primaryClicks: 0, secondaryClicks: 0, homeImpressions: 0, homeClicks: 0 });
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [autoApproveToggling, setAutoApproveToggling] = useState(false);
@@ -108,7 +111,7 @@ export function useSoloPopupDetailPage(params: Promise<{ id: string }>) {
         .order('paymentDate', { ascending: false }),
       db
         .from('solo_popup_ad_analytics_v2')
-        .select('"impressionCount", "primaryClickCount", "secondaryClickCount"')
+        .select('"impressionCount", "primaryClickCount", "secondaryClickCount", "homeImpressionCount", "homeClickCount"')
         .eq('soloPopupAdId', id),
       db.from('partner_users').select('businessName').eq('id', data.partnerId).maybeSingle(),
     ]);
@@ -125,8 +128,10 @@ export function useSoloPopupDetailPage(params: Promise<{ id: string }>) {
           impressions: acc.impressions + a.impressionCount,
           primaryClicks: acc.primaryClicks + a.primaryClickCount,
           secondaryClicks: acc.secondaryClicks + a.secondaryClickCount,
+          homeImpressions: acc.homeImpressions + a.homeImpressionCount,
+          homeClicks: acc.homeClicks + a.homeClickCount,
         }),
-        { impressions: 0, primaryClicks: 0, secondaryClicks: 0 }
+        { impressions: 0, primaryClicks: 0, secondaryClicks: 0, homeImpressions: 0, homeClicks: 0 }
       )
     );
     setLoading(false);

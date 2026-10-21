@@ -29,6 +29,9 @@ export interface SoloPopupRow {
   partnerBusinessName: string;
   impressions: number;
   clicks: number;
+  /** 홈 프리미엄 추천 섹션 (위 2개는 문열림 팝업) */
+  homeImpressions: number;
+  homeClicks: number;
 }
 
 /** 필터 탭 — 수정 심사는 running + modificationStatus=pending */
@@ -77,17 +80,19 @@ export function useSoloPopupPage() {
         adIds.length
           ? db
               .from('solo_popup_ad_analytics_v2')
-              .select('"soloPopupAdId", "impressionCount", "primaryClickCount", "secondaryClickCount"')
+              .select('"soloPopupAdId", "impressionCount", "primaryClickCount", "secondaryClickCount", "homeImpressionCount", "homeClickCount"')
               .in('soloPopupAdId', adIds)
           : Promise.resolve({ data: [] }),
       ]);
 
       const names = new Map<string, string>((partners ?? []).map((p: any) => [p.id, p.businessName]));
-      const sums = new Map<string, { imp: number; clk: number }>();
+      const sums = new Map<string, { imp: number; clk: number; homeImp: number; homeClk: number }>();
       for (const s of (stats ?? []) as any[]) {
-        const cur = sums.get(s.soloPopupAdId) ?? { imp: 0, clk: 0 };
+        const cur = sums.get(s.soloPopupAdId) ?? { imp: 0, clk: 0, homeImp: 0, homeClk: 0 };
         cur.imp += s.impressionCount;
         cur.clk += s.primaryClickCount + s.secondaryClickCount;
+        cur.homeImp += s.homeImpressionCount;
+        cur.homeClk += s.homeClickCount;
         sums.set(s.soloPopupAdId, cur);
       }
 
@@ -98,6 +103,8 @@ export function useSoloPopupPage() {
           partnerBusinessName: names.get(a.partnerId) ?? '-',
           impressions: sums.get(a.id)?.imp ?? 0,
           clicks: sums.get(a.id)?.clk ?? 0,
+          homeImpressions: sums.get(a.id)?.homeImp ?? 0,
+          homeClicks: sums.get(a.id)?.homeClk ?? 0,
         }))
       );
     } catch (err) {
