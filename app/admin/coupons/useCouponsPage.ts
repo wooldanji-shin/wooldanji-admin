@@ -22,6 +22,8 @@ export interface CouponItem {
   // 파트너 회원이 탈퇴한 경우 (탈퇴 시 partnerUserId가 SET NULL 처리됨)
   isPartnerWithdrawn: boolean;
   downloadCount: number;
+  // 최대 다운로드 수 (null = 무제한)
+  maxDownloadCount: number | null;
   usageCount: number;
   // 파트너 직접 만료 시각 (파트너가 쿠폰을 직접 만료시킨 경우)
   expiredAt: string | null;
@@ -64,7 +66,7 @@ export function useCouponsPage(): UseCouponsPageReturn {
           `
           id, title, description, discountType, discountValue,
           minAmount, expiresAt, isActive, createdAt, partnerUserId,
-          expiredAt, expiredReason, updateReason,
+          expiredAt, expiredReason, updateReason, maxDownloadCount,
           partner_users(businessName),
           coupon_downloads(count)
         `,
@@ -97,6 +99,7 @@ export function useCouponsPage(): UseCouponsPageReturn {
           partnerBusinessName: row.partner_users?.businessName ?? '-',
           isPartnerWithdrawn,
           downloadCount,
+          maxDownloadCount: row.maxDownloadCount ?? null,
           usageCount: 0,
           expiredAt: row.expiredAt ?? null,
           expiredReason: row.expiredReason ?? null,

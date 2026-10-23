@@ -46,7 +46,7 @@ export function usePartnerExtraInfo(partnerDbId: string | null): UsePartnerExtra
           .order('createdAt', { ascending: false }),
         supabase
           .from('coupons')
-          .select('id, title, description, discountType, discountValue, minAmount, expiresAt, isActive, createdAt, coupon_downloads(count)')
+          .select('id, title, description, discountType, discountValue, minAmount, expiresAt, isActive, createdAt, maxDownloadCount, coupon_downloads(count)')
           .eq('partnerUserId', id)
           .order('createdAt', { ascending: false }),
         // auth.users는 클라이언트에서 못 읽어 관리자 API 경유
@@ -91,6 +91,7 @@ export function usePartnerExtraInfo(partnerDbId: string | null): UsePartnerExtra
             isActive: row.isActive,
             createdAt: row.createdAt,
             downloadCount: downloads?.[0]?.count ?? 0,
+            maxDownloadCount: row.maxDownloadCount ?? null,
           };
         })
       );

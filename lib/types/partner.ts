@@ -68,4 +68,6 @@ export interface PartnerCoupon {
   isActive: boolean;
   createdAt: string;
   downloadCount: number;
+  // 최대 다운로드 수 (null = 무제한)
+  maxDownloadCount: number | null;
 }

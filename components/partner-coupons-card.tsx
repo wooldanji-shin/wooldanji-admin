@@ -61,7 +61,7 @@ export function PartnerCouponsCard({
                       {formatDiscount(coupon)}
                       {coupon.minAmount ? ` · ${coupon.minAmount.toLocaleString()}원 이상` : ''}
                       {` · ~${new Date(coupon.expiresAt).toLocaleDateString('ko-KR')}`}
-                      {` · 다운로드 ${coupon.downloadCount}`}
+                      {` · 다운로드 ${coupon.downloadCount}/${coupon.maxDownloadCount ?? '무제한'}`}
                     </p>
                   </div>
                   <div className="shrink-0">

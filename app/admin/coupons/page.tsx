@@ -130,7 +130,7 @@ function CouponsContent(): React.ReactElement {
                           {new Date(coupon.expiresAt).toLocaleDateString('ko-KR')}
                         </TableCell>
                         <TableCell className="px-4 text-center tabular-nums">
-                          {coupon.downloadCount}
+                          {coupon.downloadCount} / {coupon.maxDownloadCount ?? '무제한'}
                         </TableCell>
                         <TableCell className="px-4 text-center tabular-nums">
                           {coupon.usageCount}

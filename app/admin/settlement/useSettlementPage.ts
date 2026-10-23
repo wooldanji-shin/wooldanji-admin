@@ -77,12 +77,14 @@ function mapRow(row: any): SettlementPayment {
   const subscriptionAd = row.ad_subscriptions_v2?.advertisements_v2;
   const partnerUsers = row.partner_users ?? subscriptionAd?.partner_users ?? null;
 
+  // 파트너 탈퇴·광고 삭제로 연결이 끊긴 결제는 결제 당시 저장한 스냅샷으로 표시한다
   return {
     id: row.id,
     partnerId: row.partnerId ?? subscriptionAd?.partnerId ?? null,
-    partnerBusinessName: partnerUsers?.businessName ?? null,
-    representativeName: partnerUsers?.representativeName ?? null,
-    businessRegistrationNumber: partnerUsers?.businessRegistrationNumber ?? null,
+    partnerBusinessName: partnerUsers?.businessName ?? row.businessNameSnapshot ?? null,
+    representativeName: partnerUsers?.representativeName ?? row.representativeNameSnapshot ?? null,
+    businessRegistrationNumber:
+      partnerUsers?.businessRegistrationNumber ?? row.businessRegistrationNumberSnapshot ?? null,
     subscriptionId: row.subscriptionId ?? null,
     premiumAdId: row.premiumAdId ?? null,
     soloPopupAdId: row.soloPopupAdId ?? null,
@@ -282,6 +284,9 @@ export function useSettlementPage(): UseSettlementPageReturn {
           receiptUrl,
           failReason,
           orderId,
+          businessNameSnapshot,
+          businessRegistrationNumberSnapshot,
+          representativeNameSnapshot,
           partner_users:partnerId(id, businessName, representativeName, businessRegistrationNumber),
           ad_subscriptions_v2:subscriptionId(
             advertisementId,
