@@ -25,8 +25,10 @@ interface DoorPopupSettings {
 }
 
 // DB CHECK 와 같은 범위 — 팝업 카드 최대 장수
-const MAX_CARDS_MIN = 5;
+const MAX_CARDS_MIN = 3;
 const MAX_CARDS_MAX = 10;
+// DB 기본값과 같음 — 설정값이 없을 때 보여줄 값
+const MAX_CARDS_DEFAULT = 5;
 
 export default function DoorBannerPage() {
   const supabase = createClient();
@@ -36,7 +38,7 @@ export default function DoorBannerPage() {
   // 저장 중 상태 — 중복 토글 방지
   const [saving, setSaving] = useState(false);
   // 팝업 최대 장수 입력값
-  const [maxCardsInput, setMaxCardsInput] = useState(String(MAX_CARDS_MIN));
+  const [maxCardsInput, setMaxCardsInput] = useState(String(MAX_CARDS_DEFAULT));
 
   // 초기 설정값 조회
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function DoorBannerPage() {
           .single();
         if (error) throw error;
         setSettings({ id: data.id, mode: data.mode });
-        setMaxCardsInput(String(data.maxCards ?? MAX_CARDS_MIN));
+        setMaxCardsInput(String(data.maxCards ?? MAX_CARDS_DEFAULT));
       } catch (err) {
         console.error('door_popup_settings 조회 실패:', err);
         toast.error('설정을 불러오는데 실패했습니다.');
@@ -222,7 +224,7 @@ export default function DoorBannerPage() {
             <CardHeader className="space-y-1 pb-2">
               <CardTitle className="text-base font-semibold">팝업 최대 장수</CardTitle>
               <CardDescription>
-                광고를 먼저 채우고 남은 칸은 채움 이미지로 채워요. 보여주는 순서는 섞여서 랜덤이에요.
+                광고를 먼저 채우고 남은 칸은 채움 이미지로 채워요. 팝업 우선 광고는 맨 앞에 나오고, 나머지 순서는 섞여서 랜덤이에요.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center gap-3">
@@ -236,7 +238,7 @@ export default function DoorBannerPage() {
                 disabled={saving}
                 aria-label="팝업 최대 장수"
               />
-              <span className="text-xs text-muted-foreground">{MAX_CARDS_MIN}~{MAX_CARDS_MAX}장 (기본 {MAX_CARDS_MIN})</span>
+              <span className="text-xs text-muted-foreground">{MAX_CARDS_MIN}~{MAX_CARDS_MAX}장 (기본 {MAX_CARDS_DEFAULT})</span>
               <Button variant="outline" onClick={handleSaveMaxCards} disabled={saving}>저장</Button>
             </CardContent>
           </Card>

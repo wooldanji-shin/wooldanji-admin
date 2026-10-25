@@ -551,7 +551,9 @@ export default function AdApplicationsPage(): React.ReactElement {
                           <br />
                           전부 해제하면 운영 중 광고 전체에서 무작위로 나옵니다.
                           <br />
-                          단독 팝업 모드에서는 이 광고가 단독 팝업 카드(첫 번째 사진·제목·광고 내용)로 함께 노출됩니다.
+                          단독 팝업 모드에서는 이 광고가 단독 팝업 카드(첫 번째 사진·제목·광고 내용)로 맨 앞에 노출됩니다.
+                          <br />
+                          체크한 수만큼 유료 단독 팝업 자리가 줄어드니, 영업 시연이 끝나면 꼭 해제해 주세요.
                         </TooltipContent>
                       </Tooltip>
                     </TableHead>
