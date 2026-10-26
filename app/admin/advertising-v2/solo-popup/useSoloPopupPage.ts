@@ -23,6 +23,8 @@ export interface SoloPopupRow {
   discountedTotalAmount: number | null;
   modificationStatus: string | null;
   autoApproveModification: boolean;
+  /** 관리자 '첫 화면' 체크 — 문열림 단독 팝업 맨 앞 카드로 노출 */
+  isDoorPopupFirst: boolean;
   startedAt: string | null;
   endedAt: string | null;
   salesRepName: string | null;
@@ -64,7 +66,7 @@ export function useSoloPopupPage() {
       const { data, error } = await db
         .from('solo_popup_ads_v2')
         .select(
-          'id, "partnerId", "baseAdId", title, status, "paymentStatus", "periodUnit", "periodCount", weeks, "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "autoApproveModification", "startedAt", "endedAt", sales_reps:salesRepId(name)'
+          'id, "partnerId", "baseAdId", title, status, "paymentStatus", "periodUnit", "periodCount", weeks, "totalAmount", "approvedDiscountRate", "discountedTotalAmount", "modificationStatus", "autoApproveModification", "isDoorPopupFirst", "startedAt", "endedAt", sales_reps:salesRepId(name)'
         )
         .order('createdAt', { ascending: false });
       if (error) throw error;
@@ -149,6 +151,25 @@ export function useSoloPopupPage() {
     setTogglingId(null);
   }, [supabase, togglingId]);
 
+  // 첫 화면 토글 — 선택 로직은 DB 함수(get_door_popup_payload)에 있어 앱 릴리스 없이 즉시 반영된다
+  const handleToggleDoorPopupFirst = useCallback(async (row: SoloPopupRow, next: boolean) => {
+    if (togglingId) return;
+    setTogglingId(row.id);
+    const { error } = await (supabase as any)
+      .from('solo_popup_ads_v2')
+      .update({ isDoorPopupFirst: next })
+      .eq('id', row.id);
+    setTogglingId(null);
+
+    if (error) {
+      console.error('첫 화면 설정 변경 실패:', error);
+      toast.error('첫 화면 설정 변경에 실패했습니다.');
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, isDoorPopupFirst: next } : r)));
+    toast.success(next ? '문열림 팝업 첫 화면에 노출합니다.' : '첫 화면 노출을 해제했습니다.');
+  }, [supabase, togglingId]);
+
   return {
     loading,
     statusFilter,
@@ -161,6 +182,7 @@ export function useSoloPopupPage() {
     setPage,
     totalPages,
     handleToggleAutoApprove,
+    handleToggleDoorPopupFirst,
     togglingId,
     handleRowClick: (id: string) => router.push(`/admin/advertising-v2/solo-popup/${id}`),
   };

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { periodLabel } from '@/lib/ads/solo-popup';
 import { cn } from '@/lib/utils';
 import { useSoloPopupPage, type SoloStatusFilter } from './useSoloPopupPage';
@@ -112,6 +113,22 @@ export default function SoloPopupListPage(): React.ReactElement {
                   <TableHead className="text-center">홈 노출</TableHead>
                   <TableHead className="text-center">홈 클릭</TableHead>
                   <TableHead className="text-center">자동승인</TableHead>
+                  <TableHead className="text-center">
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help underline decoration-dotted">첫 화면</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          체크한 단독 팝업은 문열림 팝업 맨 앞 카드로 나옵니다 (여러 개면 그들끼리 섞임).
+                          <br />
+                          기본 광고 &apos;팝업 우선&apos;보다도 앞에 나옵니다.
+                          <br />
+                          체크한 수가 최대 카드 수보다 많으면 그중에서 무작위로 나옵니다.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -154,6 +171,18 @@ export default function SoloPopupListPage(): React.ReactElement {
                             aria-label="수정 심사 자동승인"
                             disabled={p.togglingId !== null}
                             onCheckedChange={(v) => p.handleToggleAutoApprove(ad, v === true)}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        {ad.status === 'running' ? (
+                          <Checkbox
+                            checked={ad.isDoorPopupFirst}
+                            aria-label="문열림 팝업 첫 화면 노출"
+                            disabled={p.togglingId !== null}
+                            onCheckedChange={(v) => p.handleToggleDoorPopupFirst(ad, v === true)}
                           />
                         ) : (
                           <span className="text-muted-foreground">-</span>

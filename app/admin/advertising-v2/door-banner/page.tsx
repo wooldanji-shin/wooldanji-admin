@@ -224,7 +224,7 @@ export default function DoorBannerPage() {
             <CardHeader className="space-y-1 pb-2">
               <CardTitle className="text-base font-semibold">팝업 최대 장수</CardTitle>
               <CardDescription>
-                광고를 먼저 채우고 남은 칸은 채움 이미지로 채워요. 팝업 우선 광고는 맨 앞에 나오고, 나머지 순서는 섞여서 랜덤이에요.
+                광고를 먼저 채우고 남은 칸은 채움 이미지로 채워요. 단독 팝업 &apos;첫 화면&apos; 광고 → 팝업 우선 광고 순으로 맨 앞에 나오고, 나머지 순서는 섞여서 랜덤이에요.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center gap-3">
