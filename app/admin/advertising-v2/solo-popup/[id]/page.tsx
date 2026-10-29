@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { SalesRepSelect } from '@/components/sales-rep-select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -67,8 +68,9 @@ function ContentCard({ title, c, buttonLabel }: { title: string; buttonLabel?: s
 
 export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: string }> }): React.ReactElement {
   const page = useSoloPopupDetailPage(params);
-  const [dialog, setDialog] = useState<'approve' | 'reject' | 'rejectMod' | 'delete' | null>(null);
+  const [dialog, setDialog] = useState<'approve' | 'reject' | 'rejectMod' | 'stop' | 'delete' | null>(null);
   const [discountRate, setDiscountRate] = useState(0);
+  const [startImmediately, setStartImmediately] = useState(false);
   const [memo, setMemo] = useState<string | null>(null);
   const [detailLink, setDetailLink] = useState<string | null>(null);
   const [buttonLabel, setButtonLabel] = useState<string | null>(null);
@@ -111,17 +113,30 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
     'detailLinkUrl' in detail.pendingChanges &&
     (detail.pendingChanges.detailLinkUrl?.trim() || null) !== (detail.detailLinkUrl?.trim() || null);
   const hasDiscount = (detail.approvedDiscountRate ?? 0) > 0;
-  const closeDialog = () => { setDialog(null); setReason(''); };
+  // 체크박스는 할인율 100%일 때만 보이므로, 숨겨진 뒤 남은 값이 전송되지 않게 한다
+  const canStartImmediately = discountRate === 100;
+  const closeDialog = () => { setDialog(null); setReason(''); setStartImmediately(false); };
+
+  const submitApprove = () => {
+    const start = canStartImmediately && startImmediately;
+    return page.runAction(
+      'approve',
+      { discountRate, adminMemo: memoValue, salesRepId, startImmediately: start },
+      start ? '승인하고 바로 시작했습니다.' : '승인했습니다.'
+    );
+  };
 
   const submitDialog = async () => {
     const ok =
       dialog === 'approve'
-        ? await page.runAction('approve', { discountRate, adminMemo: memoValue, salesRepId }, '승인했습니다.')
+        ? await submitApprove()
         : dialog === 'reject'
           ? await page.runAction('reject', { reason }, '거절했습니다.')
           : dialog === 'rejectMod'
             ? await page.runAction('reject-modification', { reason }, '수정을 거절했습니다.')
-            : await page.runAction('delete', {}, '삭제했습니다.');
+            : dialog === 'stop'
+              ? await page.runAction('stop', {}, '광고를 중단했습니다.')
+              : await page.runAction('delete', {}, '삭제했습니다.');
     if (ok) closeDialog();
   };
 
@@ -154,6 +169,9 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
               <Button variant="outline" asChild>
                 <Link href={`${LIST_PATH}/${detail.id}/edit`}>수정</Link>
               </Button>
+            )}
+            {detail.status === 'running' && (
+              <Button variant="outline" onClick={() => setDialog('stop')} disabled={processing}>중단</Button>
             )}
             <Button variant="destructive" onClick={() => setDialog('delete')} disabled={processing}>삭제</Button>
           </div>
@@ -282,14 +300,16 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {{ approve: '신청 승인', reject: '신청 거절', rejectMod: '수정 거절', delete: '광고 삭제', '': '' }[dialog ?? '']}
+              {{ approve: '신청 승인', reject: '신청 거절', rejectMod: '수정 거절', stop: '광고 중단', delete: '광고 삭제', '': '' }[dialog ?? '']}
             </DialogTitle>
             <DialogDescription>
               {dialog === 'delete'
                 ? '삭제하면 노출이 즉시 멈추고 통계가 함께 삭제됩니다. 결제 이력은 보존되며 환불은 되지 않습니다.'
-                : dialog === 'approve'
-                  ? '할인율을 입력하면 결제 금액에 반영됩니다.'
-                  : '사유는 파트너에게 알림으로 전달됩니다.'}
+                : dialog === 'stop'
+                  ? '지금 종료 처리됩니다. 노출이 즉시 멈추고 환불은 없으며 통계와 결제 이력은 남습니다. 파트너에게 종료 알림이 전달됩니다.'
+                  : dialog === 'approve'
+                    ? '할인율을 입력하면 결제 금액에 반영됩니다.'
+                    : '사유는 파트너에게 알림으로 전달됩니다.'}
             </DialogDescription>
           </DialogHeader>
           {dialog === 'approve' && (
@@ -302,6 +322,21 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
                 value={discountRate || ''}
                 onChange={(e) => setDiscountRate(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
               />
+              {canStartImmediately && (
+                <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={startImmediately}
+                    onCheckedChange={(checked) => setStartImmediately(checked === true)}
+                  />
+                  <span className="space-y-1 text-sm">
+                    <span className="block font-medium">결제 없이 바로 광고 시작</span>
+                    <span className="block text-xs text-muted-foreground">
+                      할인율 100%일 때만 선택할 수 있습니다. 파트너 결제를 건너뛰고 지금 바로 노출이 시작되며, 종료일은 기간에 맞춰 자동으로 정해집니다.
+                    </span>
+                  </span>
+                </label>
+              )}
               <label className="block text-sm font-medium">영업 담당자 (선택)</label>
               <SalesRepSelect value={salesRepId} onChange={setSalesRepId} />
             </div>

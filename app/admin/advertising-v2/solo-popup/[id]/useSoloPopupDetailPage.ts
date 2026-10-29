@@ -77,7 +77,7 @@ export interface SoloStats {
   homeClicks: number;
 }
 
-type ActionPath = 'approve' | 'reject' | 'approve-modification' | 'reject-modification' | 'delete';
+type ActionPath = 'approve' | 'reject' | 'approve-modification' | 'reject-modification' | 'stop' | 'delete';
 
 export function useSoloPopupDetailPage(params: Promise<{ id: string }>) {
   const { id } = use(params);
