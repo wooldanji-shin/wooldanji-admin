@@ -6,10 +6,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 
+//업로드파일
 interface UploadedFile {
   url: string;
   fileName: string;
-  originalFileName?: string; // 원본 파일명 (한글 포함)
+  originalFileName?: string;
   fileType: string;
   uploadedAt: number;
 }
