@@ -7,6 +7,7 @@ import type {
   AdminScope,
   UseDevicesFetchReturn,
 } from '../types';
+import { getSessionUser } from '@/lib/auth';
 
 function formatApartmentData(raw: any): ApartmentDetails {
   return {
@@ -70,7 +71,7 @@ export function useDevicesFetch(
 
     try {
       // Auth & permission check
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getSessionUser();
       if (!user) throw new Error('로그인이 필요합니다.');
 
       const { data: roles } = await supabase

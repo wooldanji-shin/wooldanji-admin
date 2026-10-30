@@ -13,6 +13,7 @@ import { BIZ_CALL_DUPLICATE_MESSAGE } from '@/lib/biz-call';
 import { SALES_REP_UNASSIGNED } from '@/components/sales-rep-filter';
 import { toast } from 'sonner';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
+import { useAdCategoryLookup, useApartmentLookup } from '@/lib/hooks/useLookups';
 
 /** 서버가 이유를 알려주지 않은 승인 실패 — 일부만 처리됐을 수 있어 상태 확인을 안내한다 */
 const APPROVE_UNKNOWN_RESULT_MESSAGE =
@@ -232,9 +233,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const debouncedSearchTerm = useDebounce(searchTerm);
   const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
   const [salesRepFilter, _setSalesRepFilter] = useState<string | null>(null);
-  const [categories, setCategories] = useState<AdCategory[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
-  const [allApartments, setAllApartments] = useState<ApartmentOption[]>([]);
   const [pricePerHousehold, setPricePerHousehold] = useState(70);
   const [defaultDiscountRate, setDefaultDiscountRate] = useState(28);
   const [defaultFreeMonths, setDefaultFreeMonths] = useState(1);
@@ -262,7 +261,6 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const setApartmentFilter = useCallback((v: string | null) => { _setApartmentFilter(v); setPage(1); }, [setPage]);
   const setSalesRepFilter = useCallback((v: string | null) => { _setSalesRepFilter(v); setPage(1); }, [setPage]);
 
-  const [allCategoriesWithSubs, setAllCategoriesWithSubs] = useState<AdCategoryWithSubs[]>([]);
   const [selectedAd, setSelectedAd] = useState<AdApplication | null>(null);
   const [approveDialog, setApproveDialog] = useState(false);
   const [rejectDialog, setRejectDialog] = useState(false);
@@ -286,23 +284,26 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     selectedAd?.partner_users?.id ?? null
   );
 
-  const fetchCategories = useCallback(async () => {
-    const { data } = await supabase
-      .from('ad_categories_v2')
-      .select('id, categoryName, ad_sub_categories_v2(id, subCategoryName, isActive, orderIndex)')
-      .order('categoryName');
-    setCategories(((data ?? []) as any[]).map((c: any) => ({ id: c.id, categoryName: c.categoryName })));
-    setAllCategoriesWithSubs(
-      ((data ?? []) as any[]).map((cat: any) => ({
+  // 카테고리·아파트 목록은 여러 화면이 함께 쓰는 공용 캐시에서 받는다
+  const categoryLookup = useAdCategoryLookup();
+  const apartmentLookup = useApartmentLookup();
+  const categories = useMemo<AdCategory[]>(
+    () => categoryLookup.map((c) => ({ id: c.id, categoryName: c.categoryName })),
+    [categoryLookup]
+  );
+  const allCategoriesWithSubs = useMemo<AdCategoryWithSubs[]>(
+    () =>
+      categoryLookup.map((cat) => ({
         id: cat.id,
         categoryName: cat.categoryName,
-        subCategories: ((cat.ad_sub_categories_v2 ?? []) as any[])
-          .filter((s: any) => s.isActive !== false)
-          .sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
-          .map((s: any) => ({ id: s.id, subCategoryName: s.subCategoryName })),
-      }))
-    );
-  }, [supabase]);
+        subCategories: cat.subCategories
+          .filter((sub) => sub.isActive !== false)
+          .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+          .map((sub) => ({ id: sub.id, subCategoryName: sub.subCategoryName })),
+      })),
+    [categoryLookup]
+  );
+  const allApartments = apartmentLookup as ApartmentOption[];
 
   const fetchPricing = useCallback(async () => {
     const { data } = await supabase
@@ -318,14 +319,6 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     }
   }, [supabase]);
 
-  const fetchApartments = useCallback(async () => {
-    const { data } = await supabase
-      .from('apartments')
-      .select('id, name')
-      .order('name');
-    setAllApartments((data ?? []) as ApartmentOption[]);
-  }, [supabase]);
-
   const fetchSubCategories = useCallback(async (categoryId: string) => {
     const { data } = await supabase
       .from('ad_sub_categories_v2')
@@ -336,10 +329,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   }, [supabase]);
 
   useEffect(() => {
-    fetchCategories();
     fetchPricing();
-    fetchApartments();
-  }, [fetchCategories, fetchPricing, fetchApartments]);
+  }, [fetchPricing]);
 
   useEffect(() => {
     if (categoryFilter) {
@@ -390,21 +381,23 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
 
       const adIds = (data ?? []).map((r: any) => r.id as string);
 
-      const { data: analyticsRows } = adIds.length > 0
-        ? await supabase
-            .from('ad_analytics_v2')
-            .select('baseAdId, impressionCount, homeImpressionCount, clickCount, phoneClickCount')
-            .in('baseAdId', adIds)
-        : { data: [] };
-
-      const { data: subscriptionRows } = adIds.length > 0
-        ? await supabase
-            .from('ad_subscriptions_v2')
-            .select('advertisementId, nextBillingDate, freeEndDate, subscriptionStatus, createdAt')
-            .in('advertisementId', adIds)
-            .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
-            .order('createdAt', { ascending: false })
-        : { data: [] };
+      // 통계와 구독은 서로 기다릴 필요가 없어 동시에 요청한다
+      const [{ data: analyticsRows }, { data: subscriptionRows }] = await Promise.all([
+        adIds.length > 0
+          ? supabase
+              .from('ad_analytics_v2')
+              .select('baseAdId, impressionCount, homeImpressionCount, clickCount, phoneClickCount')
+              .in('baseAdId', adIds)
+          : Promise.resolve({ data: [] }),
+        adIds.length > 0
+          ? supabase
+              .from('ad_subscriptions_v2')
+              .select('advertisementId, nextBillingDate, freeEndDate, subscriptionStatus, createdAt')
+              .in('advertisementId', adIds)
+              .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
+              .order('createdAt', { ascending: false })
+          : Promise.resolve({ data: [] }),
+      ]);
 
       // 광고당 가장 최근 구독 1건만 남긴다 (createdAt 내림차순이라 먼저 온 것이 최신)
       const subscriptionMap = (subscriptionRows ?? []).reduce<

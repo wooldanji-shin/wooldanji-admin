@@ -2,6 +2,15 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
+  // 이 proxy는 세션 쿠키 갱신만 하고 접근을 막지는 않는다.
+  // 로그인 쿠키가 없는 요청(로그인 전)은 갱신할 세션이 없으니 Supabase에 다녀오지 않고 통과시킨다.
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith('sb-') && name.includes('-auth-token'));
+  if (!hasAuthCookie) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });

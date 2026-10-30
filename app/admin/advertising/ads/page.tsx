@@ -60,7 +60,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { getCurrentUser, getUserRoles } from '@/lib/auth';
+import { getCurrentUser, getUserRoles, getSessionUser } from '@/lib/auth';
 import { ImageUpload } from '@/components/image-upload';
 import { deleteFolderFromStorage } from '@/lib/utils/storage';
 import { format, parseISO } from 'date-fns';
@@ -379,7 +379,7 @@ export default function AdsManagementPage() {
       setLoading(true);
 
       // 현재 사용자 정보 가져오기
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getSessionUser();
 
       // roles가 전달되지 않으면 userRoles 상태 사용
       const currentRoles = roles || userRoles;

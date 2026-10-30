@@ -21,6 +21,7 @@ import { PageShell, PageHeader, PageHeaderTitle } from '@/components/page-shell'
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
 import type { SalesRep } from '@/lib/ads/sales-reps';
+import { useInvalidateLookup } from '@/lib/hooks/useLookups';
 
 interface SalesRepRow extends SalesRep {
   /** 이 담당자로 승인된 광고 수 — 삭제 시 영향 범위를 보여준다 */
@@ -32,6 +33,8 @@ export default function SalesRepsPage() {
   // 모든 테이블이 never로 추론된다(레포 전반의 기존 타입 에러와 같은 원인).
   // 레포 전체를 고치는 건 별도 작업이라 여기서만 스키마 타입을 벗겨 쓴다.
   const supabase = createClient() as unknown as SupabaseClient;
+  // 담당자를 바꾸면 다른 화면의 담당자 선택·필터가 새 목록을 받도록 공용 캐시를 비운다
+  const invalidateLookup = useInvalidateLookup();
 
   const [reps, setReps] = useState<SalesRepRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +47,7 @@ export default function SalesRepsPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const fetchReps = useCallback(async () => {
+    invalidateLookup('salesReps');
     const [repRes, adRes, premiumRes] = await Promise.all([
       supabase
         .from('sales_reps')
@@ -68,7 +72,7 @@ export default function SalesRepsPage() {
       }))
     );
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, invalidateLookup]);
 
   useEffect(() => {
     fetchReps().catch(() => {

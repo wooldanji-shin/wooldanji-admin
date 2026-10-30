@@ -39,7 +39,7 @@ import { confirmModal } from '@/components/confirm-modal';
 import { useRouter, useParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { getUserRoles } from '@/lib/auth';
+import { getUserRoles, getSessionUser } from '@/lib/auth';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 
 interface Inquiry {
@@ -116,7 +116,7 @@ export default function InquiryDetailPage() {
       setLoading(true);
 
       // 현재 사용자 정보 및 권한 가져오기
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getSessionUser();
       if (!user) {
         toast.error('로그인이 필요합니다.');
         router.push('/login');
@@ -214,7 +214,7 @@ export default function InquiryDetailPage() {
       setSending(true);
 
       // 현재 사용자 정보 가져오기
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getSessionUser();
 
       if (!user) {
         toast.error('로그인이 필요합니다.');

@@ -43,6 +43,7 @@ import { TableSkeleton } from '@/components/skeletons';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { getSessionUser } from '@/lib/auth';
 
 type BannerCase = 'A' | 'B' | 'C' | 'D';
 
@@ -93,7 +94,7 @@ export default function PartnerBannersPage() {
       setLoading(true);
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getSessionUser();
       if (!user) {
         toast.error('로그인이 필요합니다.');
         router.push('/login');

@@ -13,6 +13,7 @@ import { createClient } from '@/supabase';
 import { Loader2, RotateCcw, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { confirmModal } from '@/components/confirm-modal';
+import { getSessionUser } from '@/lib/auth';
 
 /** 앱의 단독 팝업 광고 소개 이미지 슬롯 키 */
 const IMAGE_KEY = 'solo_popup_ad_intro';
@@ -168,7 +169,7 @@ export default function SoloPopupAdIntroImagePage() {
 
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getSessionUser();
 
       const { data: saved, error: saveError } = await supabase
         .from('app_images')

@@ -23,7 +23,7 @@ import {
 import { ChevronLeft, Check, X } from 'lucide-react';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { createClient } from '@/lib/supabase/client';
-import { getUserRoles } from '@/lib/auth';
+import { getUserRoles, getSessionUser } from '@/lib/auth';
 import { toast } from 'sonner';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 
@@ -113,7 +113,7 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
 
         // 매니저인 경우 자신이 관리하는 아파트인지 확인
         if (isManager && data.user.apartmentId) {
-          const { data: { user } } = await supabase.auth.getUser();
+          const { data: { user } } = await getSessionUser();
           if (user) {
             const { data: managerApartments } = await supabase
               .from('manager_apartments')

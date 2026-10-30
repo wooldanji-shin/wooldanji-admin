@@ -44,7 +44,8 @@ import {
 } from '@mantine/core';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
-import { getUserRoles } from '@/lib/auth';
+import { getUserRoles, getSessionUser } from '@/lib/auth';
+import { useInvalidateLookup } from '@/lib/hooks/useLookups';
 
 interface Apartment {
   id: string;
@@ -73,6 +74,7 @@ export default function ApartmentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const invalidateLookup = useInvalidateLookup();
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -184,7 +186,7 @@ export default function ApartmentsPage() {
 
       // 매니저인 경우 자신이 관리하는 아파트만 필터링
       if (isManager) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getSessionUser();
         if (user) {
           const { data: managerApartments } = await supabase
             .from('manager_apartments')
@@ -346,6 +348,7 @@ export default function ApartmentsPage() {
       setApartments(apartments.filter(apt => apt.id !== deletingApartment.id));
       setDeleteDialog(false);
       setDeletingApartment(null);
+      invalidateLookup('apartments');
       toast.success('아파트가 삭제되었습니다.');
     } catch (error) {
       console.error('Failed to delete apartment:', error);

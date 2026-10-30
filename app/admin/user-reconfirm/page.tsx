@@ -12,7 +12,7 @@ import { DataTableShell } from '@/components/data-table-shell';
 import { Badge, Group, Table, Text, Tooltip } from '@mantine/core';
 import { TableSkeleton } from '@/components/skeletons';
 import { createClient } from '@/lib/supabase/client';
-import { getUserRoles } from '@/lib/auth';
+import { getUserRoles, getSessionUser } from '@/lib/auth';
 import { toast } from 'sonner';
 
 // 통합 타입
@@ -59,7 +59,7 @@ export default function UserReconfirmPage() {
       // 매니저인 경우 아파트 ID 가져오기
       let apartmentIds: string[] = [];
       if (isManager) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await getSessionUser();
         if (user) {
           const { data: managerApartments } = await supabase
             .from('manager_apartments')

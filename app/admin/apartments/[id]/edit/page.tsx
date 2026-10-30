@@ -25,6 +25,7 @@ import { DetailSkeleton } from '@/components/skeletons';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { parseMultipleLineRanges, formatLineRange } from '@/lib/utils/line';
+import { useInvalidateLookup } from '@/lib/hooks/useLookups';
 
 interface Building {
   id: string;
@@ -51,6 +52,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   const resolvedParams = use(params);
   const router = useRouter();
   const supabase = createClient();
+  const invalidateLookup = useInvalidateLookup();
 
   const [apartment, setApartment] = useState<ApartmentDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -417,6 +419,7 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
       }
 
       setHasChanges(false);
+      invalidateLookup('apartments');
       toast.success('아파트 정보가 저장되었습니다.');
       router.push('/admin/apartments');
     } catch (err) {

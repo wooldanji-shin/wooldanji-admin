@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { useBizCallDuplicate } from '@/hooks/use-biz-call-duplicate';
+import { useAdCategoryLookup } from '@/lib/hooks/useLookups';
 
 export interface PartnerDetail {
   id: string;
@@ -122,7 +123,12 @@ export function usePartnerDetailPage(
   const [adHistory, setAdHistory] = useState<AdHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyticsToggling, setAnalyticsToggling] = useState(false);
-  const [categories, setCategories] = useState<PartnerCategoryOption[]>([]);
+  // 카테고리 목록은 여러 화면이 함께 쓰는 공용 캐시에서 받는다
+  const categoryLookup = useAdCategoryLookup();
+  const categories = useMemo<PartnerCategoryOption[]>(
+    () => categoryLookup.map((c) => ({ id: c.id, categoryName: c.categoryName })),
+    [categoryLookup]
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PartnerEditDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
@@ -207,14 +213,6 @@ export function usePartnerDetailPage(
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
-
-  useEffect(() => {
-    supabase
-      .from('ad_categories_v2')
-      .select('id, categoryName')
-      .order('categoryName')
-      .then(({ data }) => setCategories((data ?? []) as PartnerCategoryOption[]));
-  }, [supabase]);
 
   const handleToggleAnalytics = async (): Promise<void> => {
     if (!partner || analyticsToggling) return;

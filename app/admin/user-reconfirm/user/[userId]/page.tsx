@@ -21,7 +21,7 @@ import {
 import { ChevronLeft } from 'lucide-react';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { createClient } from '@/lib/supabase/client';
-import { getUserRoles } from '@/lib/auth';
+import { getUserRoles, getSessionUser } from '@/lib/auth';
 import { toast } from 'sonner';
 
 type SuspendedUserDetails = {
@@ -130,7 +130,7 @@ export default function SuspendedUserDetailPage({
 
         // 매니저 권한 체크
         if (isManager && data.apartmentId) {
-          const { data: { user: authUser } } = await supabase.auth.getUser();
+          const { data: { user: authUser } } = await getSessionUser();
           if (authUser) {
             const { data: managerApartments } = await supabase
               .from('manager_apartments')

@@ -20,6 +20,7 @@ import { FilterChips, FilterRow } from '@/components/filter-chips';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
+import { getSessionUser } from '@/lib/auth';
 
 interface PartnerInquiry {
   id: string;
@@ -61,7 +62,7 @@ export default function PartnerInquiriesPage() {
 
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getSessionUser();
       if (!user) {
         toast.error('로그인이 필요합니다.');
         router.push('/login');

@@ -36,23 +36,10 @@ import {
   type LucideIcon,
   ChevronRight,
 } from 'lucide-react';
-import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { logout } from '@/lib/auth';
+import { useState, useEffect } from 'react';
+import { useAuthUser } from '@/components/auth-user-context';
 import classes from './app-sidebar.module.css';
-
-// 메뉴별 badgeKey 매핑
-const BADGE_KEYS: Record<string, string> = {
-  '/admin/users': 'users',
-  '/admin/user-reconfirm': 'user_reconfirm',
-  '/admin/inquiries': 'inquiries',
-  '/admin/managers': 'managers',
-  '/admin/advertising-v2/applications': 'ad_applications',
-  '/admin/advertising-v2/premium': 'premium_applications',
-  '/admin/partner-events': 'partner_events',
-};
-
-const LAST_READ_PREFIX = 'lastRead_';
 
 interface MenuItem {
   name: string;
@@ -279,26 +266,6 @@ const MENU_SECTIONS: MenuSection[] = [
   { label: 'V1 시스템 관리', items: v1Items },
 ];
 
-interface NewCounts {
-  inquiries: number;
-  users: number;
-  user_reconfirm: number;
-  managers: number;
-  ad_applications: number;
-  premium_applications: number;
-  partner_events: number;
-}
-
-const INITIAL_COUNTS: NewCounts = {
-  inquiries: 0,
-  users: 0,
-  user_reconfirm: 0,
-  managers: 0,
-  ad_applications: 0,
-  premium_applications: 0,
-  partner_events: 0,
-};
-
 interface SidebarUser {
   name: string;
   email: string | null;
@@ -313,9 +280,10 @@ interface AppSidebarProps {
 export function AppSidebar({ collapsed, onCloseMobile }: AppSidebarProps): React.ReactElement {
   const pathname = usePathname();
   const router = useRouter();
-  const [userRoles, setUserRoles] = useState<string[]>([]);
-  const [user, setUser] = useState<SidebarUser | null>(null);
-  const [newCounts, setNewCounts] = useState<NewCounts>(INITIAL_COUNTS);
+  // 로그인 사용자·권한은 AuthGuard가 확인한 값을 함께 쓴다 (다시 조회하지 않음)
+  const authUser = useAuthUser();
+  const userRoles = authUser.roles;
+  const user: SidebarUser = { name: authUser.name, email: authUser.email || null };
   // 펼쳐 둔 사이드바 섹션 — 현재 페이지가 속한 섹션은 자동으로 펼친다
   const [openedSections, setOpenedSections] = useState<string[]>(() => {
     const current = MENU_SECTIONS.find((section) =>
@@ -339,94 +307,10 @@ export function AppSidebar({ collapsed, onCloseMobile }: AppSidebarProps): React
     );
   };
 
-  const supabase = createClient();
-
-  const getLastReadTimes = useCallback((): Record<string, string | null> => {
-    if (typeof window === 'undefined') return {};
-    return {
-      inquiries: localStorage.getItem(`${LAST_READ_PREFIX}inquiries`),
-      users: localStorage.getItem(`${LAST_READ_PREFIX}users`),
-      user_reconfirm: localStorage.getItem(`${LAST_READ_PREFIX}user_reconfirm`),
-      managers: localStorage.getItem(`${LAST_READ_PREFIX}managers`),
-    };
-  }, []);
-
-  const fetchNewCounts = useCallback(async (): Promise<void> => {
-    try {
-      const lastReadTimes = getLastReadTimes();
-
-      const [
-        menuCountsResult,
-        adApplicationsResult,
-        premiumApplicationsResult,
-        partnerEventsResult,
-      ] = await Promise.all([
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase.rpc as any)('get_menu_new_counts', {
-          p_last_read_inquiries: lastReadTimes.inquiries || null,
-          p_last_read_users: lastReadTimes.users || null,
-          p_last_read_user_reconfirm: lastReadTimes.user_reconfirm || null,
-          p_last_read_managers: lastReadTimes.managers || null,
-        }),
-        supabase
-          .from('advertisements_v2')
-          .select('id', { count: 'exact', head: true })
-          .eq('adStatus', 'pending'),
-        supabase
-          .from('premium_advertisements_v2')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending'),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any)
-          .from('partner_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending'),
-      ]);
-
-      if (menuCountsResult.error) {
-        console.error('Failed to fetch new counts:', menuCountsResult.error);
-        return;
-      }
-
-      if (menuCountsResult.data) {
-        setNewCounts({
-          ...(menuCountsResult.data as NewCounts),
-          ad_applications: adApplicationsResult.count ?? 0,
-          premium_applications: premiumApplicationsResult.count ?? 0,
-          partner_events: partnerEventsResult.count ?? 0,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to fetch new counts:', err);
-    }
-  }, [supabase, getLastReadTimes]);
-
   const handleMenuClick = (href: string): void => {
-    const badgeKey = BADGE_KEYS[href];
-    if (badgeKey && typeof window !== 'undefined') {
-      localStorage.setItem(`${LAST_READ_PREFIX}${badgeKey}`, new Date().toISOString());
-      setNewCounts((prev) => ({ ...prev, [badgeKey]: 0 }));
-    }
     onCloseMobile();
     router.push(href);
   };
-
-  useEffect(() => {
-    const fetchProfile = async (): Promise<void> => {
-      const [roles, current] = await Promise.all([getUserRoles(), getCurrentUser()]);
-      setUserRoles(roles);
-      if (current) {
-        setUser({ name: current.name, email: current.email ?? null });
-      }
-    };
-    fetchProfile();
-  }, []);
-
-  useEffect(() => {
-    fetchNewCounts();
-    const interval = setInterval(fetchNewCounts, 30000);
-    return () => clearInterval(interval);
-  }, [fetchNewCounts]);
 
   const handleLogout = async (): Promise<void> => {
     await logout();

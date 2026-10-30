@@ -16,6 +16,8 @@ import type {
   NewApartmentSummary,
   UseNewApartmentPageReturn,
 } from './types';
+import { getSessionUser } from '@/lib/auth';
+import { useInvalidateLookup } from '@/lib/hooks/useLookups';
 
 const LIST_PATH = '/admin/apartments';
 const BULK_MAX = 100;
@@ -61,6 +63,7 @@ function newId(): string {
 export function useNewApartmentPage(): UseNewApartmentPageReturn {
   const router = useRouter();
   const supabase = createClient();
+  const invalidateLookup = useInvalidateLookup();
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -227,7 +230,7 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
     let managerId: string | null = null;
     try {
       // 현재 로그인한 사용자 정보 가져오기
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getSessionUser();
       if (!user) throw new Error('User not authenticated');
 
       // 1. apartments 테이블에 추가
@@ -284,6 +287,7 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
         }
       }
 
+      invalidateLookup('apartments');
       toast.success('아파트가 성공적으로 등록되었습니다.');
       router.push(LIST_PATH);
     } catch (error) {

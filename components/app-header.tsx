@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, User as UserIcon } from 'lucide-react';
 import {
   ActionIcon,
@@ -14,7 +14,8 @@ import {
   Text,
   UnstyledButton,
 } from '@mantine/core';
-import { getCurrentUser, logout } from '@/lib/auth';
+import { logout } from '@/lib/auth';
+import { useAuthUser } from '@/components/auth-user-context';
 import type { UseAdminShellReturn } from '@/components/useAdminShell';
 import { ColorSchemeToggle } from '@/components/color-scheme-toggle';
 import classes from './app-header.module.css';
@@ -112,17 +113,11 @@ interface AppHeaderProps {
 export function AppHeader({ shell }: AppHeaderProps): React.ReactElement {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<HeaderUser | null>(null);
+  // 로그인 사용자는 AuthGuard가 확인한 값을 함께 쓴다 (다시 조회하지 않음)
+  const authUser = useAuthUser();
+  const user: HeaderUser | null = { name: authUser.name, email: authUser.email };
 
   const crumbs = useMemo<Crumb[]>(() => buildCrumbs(pathname), [pathname]);
-
-  useEffect(() => {
-    const fetchUser = async (): Promise<void> => {
-      const current = await getCurrentUser();
-      if (current) setUser({ name: current.name, email: current.email });
-    };
-    fetchUser();
-  }, []);
 
   const handleLogout = async (): Promise<void> => {
     await logout();

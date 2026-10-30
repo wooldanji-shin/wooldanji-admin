@@ -52,6 +52,7 @@ import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { getSessionUser } from '@/lib/auth';
 
 type AdCase = 'A' | 'B' | 'C';
 
@@ -145,13 +146,14 @@ export default function PartnerAnnouncementsPage() {
   async function initialAuth() {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getSessionUser();
     if (!user) {
       toast.error('로그인이 필요합니다.');
       router.push('/login');
       return;
     }
-    await Promise.all([loadPartners(), loadHistory()]);
+    // 파트너 목록은 아래 [page, filterCase] effect가 마운트 시 이미 불러오므로 여기서 다시 부르지 않는다
+    await loadHistory();
   }
 
   // ─── 파트너 목록 조회 ──────────────────────────────────────────

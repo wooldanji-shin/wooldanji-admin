@@ -39,6 +39,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { StatusBadge } from '@/components/status-badge';
+import { getSessionUser } from '@/lib/auth';
 
 interface PartnerInquiry {
   id: string;
@@ -102,7 +103,7 @@ export default function PartnerInquiryDetailPage() {
 
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getSessionUser();
       if (!user) {
         toast.error('로그인이 필요합니다.');
         router.push('/login');
@@ -164,7 +165,7 @@ export default function PartnerInquiryDetailPage() {
 
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getSessionUser();
 
       if (!user) {
         toast.error('로그인이 필요합니다.');

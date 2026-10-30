@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Select } from '@mantine/core';
-import { fetchSelectableSalesReps, type SalesRep } from '@/lib/ads/sales-reps';
+import type { SalesRep } from '@/lib/ads/sales-reps';
+import { useSalesRepLookup } from '@/lib/hooks/useLookups';
 
 /** "지정 안 함"을 나타내는 값 — Select는 빈 문자열을 값으로 쓸 수 없다 */
 const NONE_VALUE = '__none__';
@@ -23,13 +24,12 @@ export function SalesRepSelect({
   onChange,
   className,
 }: SalesRepSelectProps): React.ReactElement {
-  const [reps, setReps] = useState<SalesRep[]>([]);
-
-  useEffect(() => {
-    fetchSelectableSalesReps({ includeId: value })
-      .then(setReps)
-      .catch(() => setReps([]));
-  }, [value]);
+  // 공용 목록에서 활성 담당자 + 이미 지정된 담당자만 남긴다 (값이 바뀌어도 다시 조회하지 않음)
+  const allReps = useSalesRepLookup();
+  const reps = useMemo<SalesRep[]>(
+    () => allReps.filter((rep) => rep.isActive || rep.id === value),
+    [allReps, value]
+  );
 
   return (
     <Select

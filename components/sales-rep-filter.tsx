@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Select } from '@mantine/core';
-import { fetchSelectableSalesReps, type SalesRep } from '@/lib/ads/sales-reps';
+import type { SalesRep } from '@/lib/ads/sales-reps';
+import { useSalesRepLookup } from '@/lib/hooks/useLookups';
 
 const ALL_VALUE = '__all__';
 
@@ -24,13 +24,8 @@ export function SalesRepFilter({
   value,
   onChange,
 }: SalesRepFilterProps): React.ReactElement {
-  const [reps, setReps] = useState<SalesRep[]>([]);
-
-  useEffect(() => {
-    fetchSelectableSalesReps({ includeInactive: true })
-      .then(setReps)
-      .catch(() => setReps([]));
-  }, []);
+  // 비활성 포함 전체 — 공용 목록을 그대로 쓴다
+  const reps: SalesRep[] = useSalesRepLookup();
 
   return (
     <Select

@@ -47,6 +47,7 @@ import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error
 import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { getSessionUser } from '@/lib/auth';
 
 interface UserRow {
   id: string;
@@ -145,7 +146,7 @@ export default function UserAnnouncementsPage() {
   }, []);
 
   async function initialAuth() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await getSessionUser();
     if (!user) {
       toast.error('로그인이 필요합니다.');
       router.push('/login');

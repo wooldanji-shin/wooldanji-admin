@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import type { EventBannerPreviewData } from './EventBannerPreview';
+import { useApartmentLookup } from '@/lib/hooks/useLookups';
 
 export type EventParticipationType = 'draw' | 'first_come';
 export type EventStatus = 'pending' | 'approved' | 'rejected' | 'ended';
@@ -232,7 +233,8 @@ export function useEventDetailPage(
   const [id, setId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<EventDetail | null>(null);
-  const [allApartments, setAllApartments] = useState<ApartmentOption[]>([]);
+  // 아파트 목록은 여러 화면이 함께 쓰는 공용 캐시에서 받는다
+  const allApartments = useApartmentLookup() as ApartmentOption[];
   const [entries, setEntries] = useState<EventEntryRow[]>([]);
   const [winners, setWinners] = useState<EventEntryRow[]>([]);
 
@@ -312,11 +314,6 @@ export function useEventDetailPage(
     }
   }, [supabase, id]);
 
-  const fetchApartments = useCallback(async (): Promise<void> => {
-    const { data } = await supabase.from('apartments').select('id, name').order('name');
-    setAllApartments((data ?? []) as ApartmentOption[]);
-  }, [supabase]);
-
   const fetchEntries = useCallback(async (): Promise<void> => {
     if (!id) return;
     const [entriesRes, winnersRes] = await Promise.all([
@@ -331,9 +328,8 @@ export function useEventDetailPage(
 
   useEffect(() => {
     fetchDetail();
-    fetchApartments();
     fetchEntries();
-  }, [fetchDetail, fetchApartments, fetchEntries]);
+  }, [fetchDetail, fetchEntries]);
 
   const startEdit = useCallback(() => {
     if (!detail) return;

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { useAdCategoryLookup } from '@/lib/hooks/useLookups';
 
 export interface PartnerUser {
   id: string;
@@ -76,24 +77,14 @@ export function usePartnersPage(): UsePartnersPageReturn {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [searchInput, setSearchInput] = useState(searchQuery);
-  const [categories, setCategories] = useState<PartnerCategory[]>([]);
   const [subCategories, setSubCategories] = useState<PartnerSubCategory[]>([]);
 
-  const fetchCategories = useCallback(async (): Promise<void> => {
-    const { data, error } = await supabase
-      .from('ad_categories_v2')
-      .select('id, categoryName')
-      .order('categoryName');
-    if (error) {
-      console.error('카테고리 목록 로드 실패:', error);
-      return;
-    }
-    setCategories((data as PartnerCategory[]) ?? []);
-  }, [supabase]);
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+  // 카테고리 목록은 여러 화면이 함께 쓰는 공용 캐시에서 받는다
+  const categoryLookup = useAdCategoryLookup();
+  const categories = useMemo<PartnerCategory[]>(
+    () => categoryLookup.map((c) => ({ id: c.id, categoryName: c.categoryName })),
+    [categoryLookup]
+  );
 
   const fetchSubCategories = useCallback(async (categoryId: string): Promise<void> => {
     const { data, error } = await supabase
