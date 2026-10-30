@@ -159,6 +159,8 @@ export interface UseSettlementPageReturn {
   setDateToDraft: (v: string) => void;
   applyDateRange: () => void;
   monthOptions: { value: string; label: string }[];
+  /** 확정된 조회 기간이 정확히 한 달(1일 ~ min(말일, 오늘))과 같을 때만 그 월(yyyy-MM), 아니면 null */
+  selectedMonth: string | null;
   applyMonth: (monthValue: string) => void;
   statusFilter: StatusFilter;
   setStatusFilter: (v: StatusFilter) => void;
@@ -247,6 +249,15 @@ export function useSettlementPage(): UseSettlementPageReturn {
     },
     [setPage]
   );
+
+  const selectedMonth = useMemo<string | null>((): string | null => {
+    const match = /^(\d{4})-(\d{2})-01$/.exec(dateFrom);
+    if (!match) return null;
+    const lastDay = lastDayOfMonth(Number(match[1]), Number(match[2]));
+    const today = todayLocalDate();
+    const expectedTo = lastDay > today ? today : lastDay;
+    return dateTo === expectedTo ? `${match[1]}-${match[2]}` : null;
+  }, [dateFrom, dateTo]);
 
   const fetchPartners = useCallback(async () => {
     const { data } = await supabase
@@ -403,6 +414,7 @@ export function useSettlementPage(): UseSettlementPageReturn {
     setDateToDraft,
     applyDateRange,
     monthOptions,
+    selectedMonth,
     applyMonth,
     statusFilter,
     setStatusFilter,

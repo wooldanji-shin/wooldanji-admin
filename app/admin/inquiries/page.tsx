@@ -1,14 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { ActionIcon, Divider, Group, Stack, Table, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
 import { MessageSquare, Eye, HelpCircle } from 'lucide-react';
@@ -24,11 +16,11 @@ import {
   PageShell,
 } from '@/components/page-shell';
 import { DataTableShell } from '@/components/data-table-shell';
-import { DataToolbar, DataToolbarSearch, DataToolbarFilters, FilterChip } from '@/components/data-toolbar';
+import { DataToolbarSearch } from '@/components/data-toolbar';
+import { FilterChips, FilterRow } from '@/components/filter-chips';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
-import { cn } from '@/lib/utils';
 
 interface Inquiry {
   id: string;
@@ -53,8 +45,8 @@ export default function InquiriesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'ANSWERED'>('ALL');
-  const [userRoles, setUserRoles] = useState<string[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [, setUserRoles] = useState<string[]>([]);
+  const [, setCurrentUserId] = useState<string>('');
 
   const supabase = createClient();
   const router = useRouter();
@@ -226,44 +218,32 @@ export default function InquiriesPage() {
       <PageContent>
         <DataTableShell
           toolbar={
-            <DataToolbar>
-              <DataToolbarSearch
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="제목, 내용, 작성자, 연락처 검색..."
-              />
-              <DataToolbarFilters>
-                {filterOptions.map((opt) => {
-                  const count =
-                    opt.value === 'ALL'
-                      ? inquiries.length
-                      : inquiries.filter((i) => i.status === opt.value).length;
-                  const isActive = statusFilter === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => setStatusFilter(opt.value)}
-                      className={cn(
-                        'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                      )}
-                    >
-                      {opt.label}
-                      <span
-                        className={cn(
-                          'tabular-nums',
-                          isActive ? 'text-primary-foreground' : 'text-muted-foreground'
-                        )}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </DataToolbarFilters>
-            </DataToolbar>
+            <Stack gap="md">
+              <Group gap="xs">
+                <DataToolbarSearch
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="제목, 내용, 작성자, 연락처 검색..."
+                />
+              </Group>
+
+              <Divider />
+
+              <FilterRow label="답변 상태">
+                <FilterChips
+                  options={filterOptions.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                    count:
+                      opt.value === 'ALL'
+                        ? inquiries.length
+                        : inquiries.filter((i) => i.status === opt.value).length,
+                  }))}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                />
+              </FilterRow>
+            </Stack>
           }
         >
           {loading ? (
@@ -283,76 +263,76 @@ export default function InquiriesPage() {
               }
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-28">상태</TableHead>
-                  <TableHead>제목</TableHead>
-                  <TableHead className="w-40">작성자</TableHead>
-                  <TableHead className="w-44">작성일</TableHead>
-                  <TableHead className="w-24 text-center">답변</TableHead>
-                  <TableHead className="w-20 text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w={112}>상태</Table.Th>
+                  <Table.Th>제목</Table.Th>
+                  <Table.Th w={160}>작성자</Table.Th>
+                  <Table.Th w={176}>작성일</Table.Th>
+                  <Table.Th w={96} ta="center">답변</Table.Th>
+                  <Table.Th w={80} />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {filteredInquiries.map((inquiry) => (
-                  <TableRow
+                  <Table.Tr
                     key={inquiry.id}
-                    className="cursor-pointer"
+                    style={{ cursor: 'pointer' }}
                     onClick={() => handleInquiryClick(inquiry.id)}
                   >
-                    <TableCell>
+                    <Table.Td>
                       <StatusBadge.Inquiry
                         status={inquiry.status === 'PENDING' ? 'pending' : 'answered'}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium">{inquiry.title}</span>
-                        <span className="max-w-md truncate text-xs text-muted-foreground">
+                    </Table.Td>
+                    <Table.Td>
+                      <Stack gap={2}>
+                        <Text size="sm" fw={500}>{inquiry.title}</Text>
+                        <Text size="xs" c="dimmed" maw={448} truncate>
                           {inquiry.content}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
+                        </Text>
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td>
+                      <Stack gap={0}>
+                        <Text size="sm" fw={500}>
                           {inquiry.user?.name || '알 수 없음'}
-                        </span>
+                        </Text>
                         {inquiry.user?.phoneNumber && (
-                          <span className="text-xs text-muted-foreground">
+                          <Text size="xs" c="dimmed">
                             {inquiry.user.phoneNumber}
-                          </span>
+                          </Text>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td c="dimmed">
                       {formatDate(inquiry.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center gap-1 text-sm">
-                        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-medium tabular-nums">
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4} justify="center" wrap="nowrap">
+                        <MessageSquare size={14} color="var(--mantine-color-dimmed)" />
+                        <Text size="sm" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {inquiry._replyCount || 0}
-                        </span>
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
+                        </Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleInquiryClick(inquiry.id);
                         }}
                         aria-label="상세 보기"
                       >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                        <Eye size={16} />
+                      </ActionIcon>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </TableBody>
+              </Table.Tbody>
             </Table>
           )}
         </DataTableShell>

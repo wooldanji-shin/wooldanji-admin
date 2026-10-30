@@ -6,13 +6,21 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { InlineLoadingSkeleton } from '@/components/skeletons';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { confirmModal } from '@/components/confirm-modal';
+import { DetailSkeleton } from '@/components/skeletons';
+import { EmptyState } from '@/components/empty-state';
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
 import {
@@ -198,9 +206,12 @@ export default function DialogMessagesPage() {
 
   const handleDelete = async (message: DialogMessage) => {
     if (
-      !confirm(
-        `"${message.messageKey}" 메시지를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`
-      )
+      !(await confirmModal({
+        title: '메시지 삭제',
+        message: `"${message.messageKey}" 메시지를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`,
+        confirmLabel: '삭제',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -228,14 +239,7 @@ export default function DialogMessagesPage() {
   };
 
   if (loading) {
-    return (
-      <PageShell>
-        <PageHeader>
-          <PageHeaderTitle title="다이얼로그 메시지 관리" />
-        </PageHeader>
-        <InlineLoadingSkeleton />
-      </PageShell>
-    );
+    return <DetailSkeleton sections={3} />;
   }
 
   return (
@@ -245,205 +249,201 @@ export default function DialogMessagesPage() {
       </PageHeader>
 
       <PageContent>
-        <div className='space-y-6'>
-          {/* List View */}
-          {mode === 'list' && (
-            <>
-              {/* Search and Add Button */}
-              <div className='flex items-center gap-3'>
-                <div className='relative flex-1 max-w-md'>
-                  <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                  <Input
-                    type='text'
-                    placeholder='메시지 키, 설명, 제목, 내용으로 검색...'
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className='pl-9'
-                  />
-                </div>
-                <Button onClick={handleCreate} className='shrink-0'>
-                  <Plus className='h-4 w-4 mr-2' />
-                  새 메시지 추가
-                </Button>
-              </div>
+        {/* List View */}
+        {mode === 'list' && (
+          <>
+            {/* Search and Add Button */}
+            <Group gap="sm">
+              <TextInput
+                type="text"
+                placeholder="메시지 키, 설명, 제목, 내용으로 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                leftSection={<Search size={16} />}
+                style={{ flex: 1 }}
+                miw={240}
+                maw={448}
+              />
+              <Button
+                onClick={handleCreate}
+                leftSection={<Plus size={16} />}
+                style={{ flexShrink: 0 }}
+              >
+                새 메시지 추가
+              </Button>
+            </Group>
 
-              {/* Messages List */}
-              {filteredMessages.length === 0 ? (
-                <Card className='bg-card border-border'>
-                  <CardContent className='flex flex-col items-center justify-center py-12'>
-                    <MessageSquare className='h-12 w-12 text-muted-foreground mb-4' />
-                    <p className='text-muted-foreground text-center'>
-                      {searchQuery
-                        ? '검색 결과가 없습니다.'
-                        : '등록된 메시지가 없습니다.'}
-                    </p>
-                    {!searchQuery && (
-                      <Button onClick={handleCreate} variant='outline' className='mt-4'>
-                        <Plus className='h-4 w-4 mr-2' />
+            {/* Messages List */}
+            {filteredMessages.length === 0 ? (
+              <Paper withBorder radius="md">
+                <EmptyState
+                  icon={MessageSquare}
+                  title={searchQuery ? '검색 결과가 없습니다.' : '등록된 메시지가 없습니다.'}
+                  action={
+                    !searchQuery && (
+                      <Button
+                        onClick={handleCreate}
+                        variant="default"
+                        leftSection={<Plus size={16} />}
+                      >
                         첫 메시지 추가하기
                       </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className='grid gap-4'>
-                  {filteredMessages.map((message) => (
-                    <Card key={message.id} className='bg-card border-border'>
-                      <CardContent className='p-6'>
-                        <div className='flex items-start justify-between gap-4'>
-                          <div className='flex-1 min-w-0'>
-                            {message.description && (
-                              <div className='flex items-center gap-2 mb-3'>
-                                <span className='px-2.5 py-1 rounded-md bg-primary/10 text-sm font-medium text-primary'>
-                                  {message.description}
-                                </span>
-                              </div>
-                            )}
-                            <h3 className='font-semibold text-lg mb-2'>{message.title}</h3>
-                            {message.content && (
-                              <p className='text-muted-foreground text-sm whitespace-pre-wrap line-clamp-3 mb-2'>
-                                {message.content}
-                              </p>
-                            )}
-                            <p className='text-xs text-muted-foreground font-mono'>
-                              Key: {message.messageKey}
-                            </p>
-                          </div>
-                          <div className='flex items-center gap-2 shrink-0'>
-                            <Button
-                              variant='outline'
-                              size='icon'
-                              onClick={() => handleEdit(message)}
-                            >
-                              <Edit2 className='h-4 w-4' />
-                            </Button>
-                            <Button
-                              variant='outline'
-                              size='icon'
-                              onClick={() => handleDelete(message)}
-                              disabled={deleting === message.id}
-                            >
-                              {deleting === message.id ? (
-                                <Loader2 className='h-4 w-4 animate-spin' />
-                              ) : (
-                                <Trash2 className='h-4 w-4 text-destructive' />
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+                    )
+                  }
+                />
+              </Paper>
+            ) : (
+              <Stack gap="md">
+                {filteredMessages.map((message) => (
+                  <Paper key={message.id} withBorder radius="md" p="lg">
+                    <Group justify="space-between" align="flex-start" gap="md" wrap="nowrap">
+                      <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                        {message.description && (
+                          <Group gap="xs">
+                            <Badge variant="light" color="blue" size="lg" radius="sm" tt="none">
+                              {message.description}
+                            </Badge>
+                          </Group>
+                        )}
+                        <Title order={4}>{message.title}</Title>
+                        {message.content && (
+                          <Text size="sm" c="dimmed" lineClamp={3} style={{ whiteSpace: 'pre-wrap' }}>
+                            {message.content}
+                          </Text>
+                        )}
+                        <Text size="xs" c="dimmed" ff="monospace">
+                          Key: {message.messageKey}
+                        </Text>
+                      </Stack>
+                      <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                        <ActionIcon
+                          variant="default"
+                          size="lg"
+                          aria-label="수정"
+                          onClick={() => handleEdit(message)}
+                        >
+                          <Edit2 size={16} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="default"
+                          size="lg"
+                          c="red"
+                          aria-label="삭제"
+                          onClick={() => handleDelete(message)}
+                          disabled={deleting === message.id}
+                        >
+                          {deleting === message.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                        </ActionIcon>
+                      </Group>
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </>
+        )}
 
-          {/* Create/Edit Form */}
-          {(mode === 'create' || mode === 'edit') && (
-            <Card className='bg-card border-border'>
-              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4'>
-                <CardTitle className='text-card-foreground'>
-                  {mode === 'create' ? '새 메시지 추가' : '메시지 수정'}
-                </CardTitle>
-                <Button variant='ghost' size='icon' onClick={resetForm}>
-                  <X className='h-4 w-4' />
+        {/* Create/Edit Form */}
+        {(mode === 'create' || mode === 'edit') && (
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="lg">
+              <Group justify="space-between" wrap="nowrap">
+                <Title order={4}>{mode === 'create' ? '새 메시지 추가' : '메시지 수정'}</Title>
+                <ActionIcon variant="subtle" color="gray" aria-label="닫기" onClick={resetForm}>
+                  <X size={16} />
+                </ActionIcon>
+              </Group>
+
+              {/* Message Key */}
+              <TextInput
+                id="messageKey"
+                type="text"
+                label="메시지 키"
+                withAsterisk
+                value={messageKey}
+                onChange={(e) => setMessageKey(e.target.value.toLowerCase())}
+                placeholder="예: door_opened_success"
+                disabled={mode === 'edit'}
+                description={
+                  mode === 'edit'
+                    ? '메시지 키는 수정할 수 없습니다.'
+                    : '영문 소문자, 숫자, 언더스코어(_)만 사용 가능합니다. 예: door_opened_success'
+                }
+                inputWrapperOrder={['label', 'input', 'description']}
+              />
+
+              {/* Description */}
+              <TextInput
+                id="description"
+                type="text"
+                label={
+                  <>
+                    사용 시점 설명{' '}
+                    <Text span c="dimmed" inherit>
+                      (선택사항)
+                    </Text>
+                  </>
+                }
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="예: 문이 성공적으로 열렸을 때 표시"
+                description="이 메시지가 언제 사용되는지 설명을 입력하세요. (관리자용 메모)"
+                inputWrapperOrder={['label', 'input', 'description']}
+              />
+
+              {/* Title */}
+              <TextInput
+                id="title"
+                type="text"
+                label="제목"
+                withAsterisk
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: 문이 열렸습니다!"
+              />
+
+              {/* Content */}
+              <Textarea
+                id="content"
+                label={
+                  <>
+                    내용{' '}
+                    <Text span c="dimmed" inherit>
+                      (선택사항)
+                    </Text>
+                  </>
+                }
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="다이얼로그에 표시될 내용을 입력하세요"
+                rows={5}
+                styles={{ input: { resize: 'none' } }}
+                description="줄바꿈이 그대로 반영됩니다."
+                inputWrapperOrder={['label', 'input', 'description']}
+              />
+
+              {/* Action Buttons */}
+              <Group justify="flex-end" gap="sm">
+                <Button variant="default" onClick={resetForm} disabled={saving}>
+                  취소
                 </Button>
-              </CardHeader>
-              <CardContent className='space-y-6'>
-                {/* Message Key */}
-                <div className='space-y-2'>
-                  <Label htmlFor='messageKey' className='text-sm font-medium'>
-                    메시지 키 <span className='text-destructive'>*</span>
-                  </Label>
-                  <Input
-                    id='messageKey'
-                    type='text'
-                    value={messageKey}
-                    onChange={(e) => setMessageKey(e.target.value.toLowerCase())}
-                    placeholder='예: door_opened_success'
-                    disabled={mode === 'edit'}
-                    className={mode === 'edit' ? 'bg-muted' : ''}
-                  />
-                  <p className='text-xs text-muted-foreground'>
-                    {mode === 'edit'
-                      ? '메시지 키는 수정할 수 없습니다.'
-                      : '영문 소문자, 숫자, 언더스코어(_)만 사용 가능합니다. 예: door_opened_success'}
-                  </p>
-                </div>
-
-                {/* Description */}
-                <div className='space-y-2'>
-                  <Label htmlFor='description' className='text-sm font-medium'>
-                    사용 시점 설명 <span className='text-muted-foreground'>(선택사항)</span>
-                  </Label>
-                  <Input
-                    id='description'
-                    type='text'
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder='예: 문이 성공적으로 열렸을 때 표시'
-                  />
-                  <p className='text-xs text-muted-foreground'>
-                    이 메시지가 언제 사용되는지 설명을 입력하세요. (관리자용 메모)
-                  </p>
-                </div>
-
-                {/* Title */}
-                <div className='space-y-2'>
-                  <Label htmlFor='title' className='text-sm font-medium'>
-                    제목 <span className='text-destructive'>*</span>
-                  </Label>
-                  <Input
-                    id='title'
-                    type='text'
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder='예: 문이 열렸습니다!'
-                  />
-                </div>
-
-                {/* Content */}
-                <div className='space-y-2'>
-                  <Label htmlFor='content' className='text-sm font-medium'>
-                    내용 <span className='text-muted-foreground'>(선택사항)</span>
-                  </Label>
-                  <Textarea
-                    id='content'
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder='다이얼로그에 표시될 내용을 입력하세요'
-                    rows={5}
-                    className='resize-none'
-                  />
-                  <p className='text-xs text-muted-foreground'>
-                    줄바꿈이 그대로 반영됩니다.
-                  </p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className='flex justify-end gap-3 pt-4'>
-                  <Button variant='outline' onClick={resetForm} disabled={saving}>
-                    취소
-                  </Button>
-                  <Button onClick={handleSave} disabled={saving}>
-                    {saving ? (
-                      <>
-                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                        저장 중...
-                      </>
-                    ) : (
-                      <>
-                        <Save className='mr-2 h-4 w-4' />
-                        저장
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  leftSection={
+                    saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />
+                  }
+                >
+                  {saving ? '저장 중...' : '저장'}
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
+        )}
       </PageContent>
     </PageShell>
   );

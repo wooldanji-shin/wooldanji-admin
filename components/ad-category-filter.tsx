@@ -1,8 +1,9 @@
 'use client';
 
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { DataToolbarFilters } from '@/components/data-toolbar';
+import { FilterChips, FilterRow } from '@/components/filter-chips';
+
+/** '전체' 칩의 값 — 실제로는 선택 해제(null)를 뜻한다 */
+const ALL = '__all__';
 
 export interface CategoryFilterOption {
   id: string;
@@ -39,84 +40,40 @@ export function AdCategoryFilter({
   return (
     <>
       {categories.length > 0 && (
-        <DataToolbarFilters>
-          <button
-            type="button"
-            onClick={() => onCategoryChange(null)}
-            className={cn(
-              'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
-              categoryFilter === null
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-            )}
-          >
-            전체 카테고리
-          </button>
-          {categories.map((cat) => {
-            const isActive = categoryFilter === cat.id;
-            const count = categoryCounts[cat.id] ?? 0;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => onCategoryChange(isActive ? null : cat.id)}
-                className={cn(
-                  'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                )}
-              >
-                {cat.categoryName}
-                <Badge
-                  variant="secondary"
-                  className={cn(
-                    'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
-                    isActive && 'bg-primary-foreground/20 text-primary-foreground'
-                  )}
-                >
-                  {count}
-                </Badge>
-              </button>
-            );
-          })}
-        </DataToolbarFilters>
+        <FilterRow label="카테고리">
+          <FilterChips
+            options={[
+              { value: ALL, label: '전체 카테고리' },
+              ...categories.map((cat) => ({
+                value: cat.id,
+                label: cat.categoryName,
+                count: categoryCounts[cat.id] ?? 0,
+              })),
+            ]}
+            value={categoryFilter ?? ALL}
+            onChange={(v) => {
+              if (v === ALL) return onCategoryChange(null);
+              onCategoryChange(categoryFilter === v ? null : v);
+            }}
+          />
+        </FilterRow>
       )}
 
       {/* 서브카테고리 필터 — 카테고리 선택 시 표시 */}
       {subCategories.length > 0 && (
-        <DataToolbarFilters>
-          <button
-            type="button"
-            onClick={() => onSubCategoryChange(null)}
-            className={cn(
-              'inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors',
-              subCategoryFilter === null
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-            )}
-          >
-            전체
-          </button>
-          {subCategories.map((sub) => {
-            const isActive = subCategoryFilter === sub.id;
-            return (
-              <button
-                key={sub.id}
-                type="button"
-                onClick={() => onSubCategoryChange(isActive ? null : sub.id)}
-                className={cn(
-                  'inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition-colors',
-                  isActive
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                )}
-              >
-                {sub.subCategoryName}
-              </button>
-            );
-          })}
-        </DataToolbarFilters>
+        <FilterRow label="세부 카테고리">
+          <FilterChips
+            options={[
+              { value: ALL, label: '전체' },
+              ...subCategories.map((sub) => ({ value: sub.id, label: sub.subCategoryName })),
+            ]}
+            value={subCategoryFilter ?? ALL}
+            onChange={(v) => {
+              if (v === ALL) return onSubCategoryChange(null);
+              onSubCategoryChange(subCategoryFilter === v ? null : v);
+            }}
+          />
+        </FilterRow>
       )}
     </>
   );

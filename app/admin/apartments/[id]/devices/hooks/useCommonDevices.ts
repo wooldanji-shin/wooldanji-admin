@@ -131,6 +131,7 @@ export function useCommonDevices({
   const [deleteDialog, setDeleteDialog] = useState<boolean>(false);
   const [deviceToDelete, setDeviceToDelete] = useState<string | null>(null);
   const [bulkDeleteDialog, setBulkDeleteDialog] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const clearSelection = (): void => {
     setSelectedDevices(new Set());
@@ -171,6 +172,7 @@ export function useCommonDevices({
 
     if (deviceToDelete.startsWith('temp-common-')) return;
 
+    setDeleting(true);
     try {
       const { error } = await supabase
         .from('apartment_common_devices')
@@ -181,6 +183,8 @@ export function useCommonDevices({
       console.error('Failed to delete common device:', err);
       toast.error('기기 삭제에 실패했습니다. 페이지를 새로고침해주세요.');
       await fetchCommonDevices();
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -306,6 +310,7 @@ export function useCommonDevices({
     deleteDialog,
     setDeleteDialog,
     deviceToDelete,
+    deleting,
     handleDeleteDevice,
     confirmDeleteDevice,
     bulkDeleteDialog,

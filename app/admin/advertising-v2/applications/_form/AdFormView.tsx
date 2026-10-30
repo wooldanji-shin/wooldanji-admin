@@ -2,19 +2,25 @@
 
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { useRouter } from 'next/navigation';
 import {
+  Alert,
+  Button,
+  Checkbox,
+  Group,
+  Input,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { PageShell, PageHeader, PageHeaderTitle } from '@/components/page-shell';
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { PageShell } from '@/components/page-shell';
+import { HeaderTitle } from '@/components/header-title';
+import { DetailSkeleton } from '@/components/skeletons';
 import { PartnerCombobox } from '@/components/partner-combobox';
 import { SalesRepSelect } from '@/components/sales-rep-select';
 import { formatBizCallNumber } from '@/lib/utils/format';
@@ -39,6 +45,7 @@ interface AdFormViewProps {
 
 export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
   const page = useAdForm(adId);
+  const router = useRouter();
   const {
     isEdit,
     contentOnly,
@@ -63,22 +70,21 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
   } = page;
 
   if (loading) {
-    return (
-      <PageShell>
-        <p className="text-sm text-muted-foreground">불러오는 중...</p>
-      </PageShell>
-    );
+    return <DetailSkeleton sections={7} />;
   }
 
   if (loadError) {
     return (
       <PageShell>
-        <p className="text-sm text-destructive">{loadError}</p>
-        <Button variant="outline" asChild className="self-start">
-          <Link href="/admin/advertising-v2/applications">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            목록으로
-          </Link>
+        <Text size="sm" c="red">{loadError}</Text>
+        <Button
+          variant="default"
+          component={Link}
+          href="/admin/advertising-v2/applications"
+          leftSection={<ArrowLeft size={16} />}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          목록으로
         </Button>
       </PageShell>
     );
@@ -86,37 +92,28 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
 
   return (
     <PageShell>
-      <PageHeader>
-        <PageHeaderTitle
-          title={isEdit ? '광고 수정' : '광고 대리 등록'}
-          description={contentOnly
-            ? '광고중인 광고의 내용을 고칩니다. 저장하면 앱에 바로 반영됩니다.'
-            : isEdit
-              ? '결제 전 광고의 내용과 승인 조건을 고칩니다.'
-              : '파트너를 대신해 광고를 작성하고 결제만 남은 상태로 만듭니다.'}
-        />
-        <Button variant="outline" asChild>
-          <Link
-            href={isEdit
-              ? `/admin/advertising-v2/applications/${adId}`
-              : '/admin/advertising-v2/applications'}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {isEdit ? '상세로' : '목록으로'}
-          </Link>
-        </Button>
-      </PageHeader>
+      <HeaderTitle
+        title={isEdit ? '광고 수정' : '광고 대리 등록'}
+        onBack={() => router.push(isEdit
+          ? `/admin/advertising-v2/applications/${adId}`
+          : '/admin/advertising-v2/applications')}
+      />
+      <Text size="sm" c="dimmed">
+        {contentOnly
+          ? '광고중인 광고의 내용을 고칩니다. 저장하면 앱에 바로 반영됩니다.'
+          : isEdit
+            ? '결제 전 광고의 내용과 승인 조건을 고칩니다.'
+            : '파트너를 대신해 광고를 작성하고 결제만 남은 상태로 만듭니다.'}
+      </Text>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>파트너</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">파트너</Title>
+        <Stack gap="sm">
           {isEdit ? (
             // 파트너를 바꾸는 건 사실상 다른 광고 — 수정에서는 잠근다
-            <p className="text-base font-semibold">
+            <Text fw={600}>
               {selectedPartner?.businessName ?? '-'}
-            </p>
+            </Text>
           ) : (
             <PartnerCombobox
               partners={page.partnerOptions}
@@ -125,91 +122,81 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
             />
           )}
           {selectedPartner && (
-            <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
-              <p>
-                대표자 {selectedPartner.representativeName ?? '-'} · 전화{' '}
-                {selectedPartner.displayPhoneNumber ?? '-'}
-              </p>
-              <p className="text-muted-foreground">
-                {selectedPartner.businessAddress ?? '주소 미등록'}
-              </p>
-              <p className={isFirstAdExpected ? 'text-emerald-600' : 'text-muted-foreground'}>
-                {isFirstAdExpected
-                  ? '첫 광고 — 할인·무료기간 적용 가능'
-                  : '첫 광고 아님 — 예외 적용을 켜야 할인·무료기간이 적용됩니다'}
-              </p>
-            </div>
+            <Paper withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)">
+              <Stack gap={4}>
+                <Text size="sm">
+                  대표자 {selectedPartner.representativeName ?? '-'} · 전화{' '}
+                  {selectedPartner.displayPhoneNumber ?? '-'}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {selectedPartner.businessAddress ?? '주소 미등록'}
+                </Text>
+                <Text size="sm" c={isFirstAdExpected ? 'green' : 'dimmed'}>
+                  {isFirstAdExpected
+                    ? '첫 광고 — 할인·무료기간 적용 가능'
+                    : '첫 광고 아님 — 예외 적용을 켜야 할인·무료기간이 적용됩니다'}
+                </Text>
+              </Stack>
+            </Paper>
           )}
-        </CardContent>
-      </Card>
+        </Stack>
+      </Paper>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>카테고리</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Select value={form.categoryId ?? ''} onValueChange={page.selectCategory}>
-            <SelectTrigger className="w-[240px]">
-              <SelectValue placeholder="카테고리 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.categoryName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">카테고리</Title>
+        <Stack gap="sm">
+          <Select
+            w={240}
+            placeholder="카테고리 선택"
+            data={categories.map((cat) => ({ value: cat.id, label: cat.categoryName }))}
+            value={form.categoryId || null}
+            onChange={(v) => {
+              if (v === null) return;
+              page.selectCategory(v);
+            }}
+            allowDeselect={false}
+          />
           {subCategories.length > 0 && (
-            <div className="flex flex-wrap gap-3">
+            <Group gap="sm">
               {subCategories.map((sub) => (
-                <label key={sub.id} className="flex cursor-pointer items-center gap-1.5">
-                  <Checkbox
-                    checked={form.subCategoryIds.includes(sub.id)}
-                    onCheckedChange={() => page.toggleSubCategory(sub.id)}
-                  />
-                  <span className="text-sm">{sub.subCategoryName}</span>
-                </label>
+                <Checkbox
+                  key={sub.id}
+                  label={sub.subCategoryName}
+                  checked={form.subCategoryIds.includes(sub.id)}
+                  onChange={() => page.toggleSubCategory(sub.id)}
+                />
               ))}
-            </div>
+            </Group>
           )}
-        </CardContent>
-      </Card>
+        </Stack>
+      </Paper>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>광고 내용</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              제목 <span className="text-destructive">*</span>
-            </label>
-            <Input
-              value={form.title}
-              maxLength={30}
-              placeholder="앱 광고 목록에 표시될 제목"
-              onChange={(e) => patch({ title: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">본문</label>
-            <Textarea
-              className="min-h-[140px]"
-              value={form.content}
-              placeholder="가게 소개, 메뉴, 이벤트 등"
-              onChange={(e) => patch({ content: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                이미지 <span className="text-destructive">*</span>
-              </label>
-              <span className="text-sm text-muted-foreground">
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">광고 내용</Title>
+        <Stack gap="md">
+          <TextInput
+            label="제목"
+            withAsterisk
+            value={form.title}
+            maxLength={30}
+            placeholder="앱 광고 목록에 표시될 제목"
+            onChange={(e) => patch({ title: e.target.value })}
+          />
+          <Textarea
+            label="본문"
+            minRows={6}
+            autosize
+            value={form.content}
+            placeholder="가게 소개, 메뉴, 이벤트 등"
+            onChange={(e) => patch({ content: e.target.value })}
+          />
+          <Stack gap={6}>
+            <Group justify="space-between">
+              <Input.Label required>이미지</Input.Label>
+              <Text size="sm" c="dimmed">
                 {form.images.length}/{MAX_AD_IMAGES}
-              </span>
-            </div>
+              </Text>
+            </Group>
             {form.partnerId ? (
               <AdImagePicker
                 items={form.images}
@@ -218,31 +205,28 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
                 onReorder={page.reorderImages}
               />
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <Text size="sm" c="dimmed">
                 파트너를 먼저 선택해주세요. 이미지가 파트너 폴더에 저장됩니다.
-              </p>
+              </Text>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </Stack>
+        </Stack>
+      </Paper>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>링크</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">링크</Title>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
           {LINK_FIELDS.map((field) => (
-            <div key={field.key} className="space-y-1.5">
-              <label className="text-sm font-medium">{field.label}</label>
-              <Input
-                value={form[field.key]}
-                placeholder={field.placeholder}
-                onChange={(e) => patch({ [field.key]: e.target.value })}
-              />
-            </div>
+            <TextInput
+              key={field.key}
+              label={field.label}
+              value={form[field.key]}
+              placeholder={field.placeholder}
+              onChange={(e) => patch({ [field.key]: e.target.value })}
+            />
           ))}
-        </CardContent>
-      </Card>
+        </SimpleGrid>
+      </Paper>
 
       <CtaButtonsCard
         buttons={form.ctaButtons}
@@ -253,251 +237,257 @@ export function AdFormView({ adId }: AdFormViewProps): React.ReactElement {
         onRemove={page.removeCtaButton}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            노출 아파트{' '}
-            {apartmentsEditable
-              ? <span className="text-destructive">*</span>
-              : <span className="text-sm font-normal text-muted-foreground">(수정 불가)</span>}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">
+          노출 아파트{' '}
+          {apartmentsEditable
+            ? <Text span inherit c="red">*</Text>
+            : <Text span size="sm" fw={500} c="dimmed">(수정 불가)</Text>}
+        </Title>
+        <Stack gap="sm">
           {/* 광고중 광고는 구독 상태상 금액을 안전하게 바꿀 수 있을 때만 아파트를 연다 */}
           {!apartmentsEditable ? (
-            <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
-              <p className="text-muted-foreground">
-                {apartments
-                  .filter((apt) => form.apartmentIds.includes(apt.id))
-                  .map((apt) => apt.name)
-                  .join(', ') || '-'}
-              </p>
-              <p>{apartmentLockReason}</p>
-            </div>
+            <Paper withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)">
+              <Stack gap={4}>
+                <Text size="sm" c="dimmed">
+                  {apartments
+                    .filter((apt) => form.apartmentIds.includes(apt.id))
+                    .map((apt) => apt.name)
+                    .join(', ') || '-'}
+                </Text>
+                <Text size="sm">{apartmentLockReason}</Text>
+              </Stack>
+            </Paper>
           ) : (
             <>
             {contentOnly && (
-              <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                <p>노출 아파트를 바꾸면 저장 즉시 앱 노출이 바뀌고, 월 광고료는 다음 정기결제부터 새 금액으로 청구됩니다.</p>
-                <p>할인율·무료기간·다음 결제일은 그대로이며, 진행 중인 프리미엄 광고도 바뀐 아파트에 노출됩니다. 파트너에게 알림은 가지 않습니다.</p>
-              </div>
+              <Alert color="yellow" variant="light" p="sm">
+                <Stack gap={4}>
+                  <Text size="sm">노출 아파트를 바꾸면 저장 즉시 앱 노출이 바뀌고, 월 광고료는 다음 정기결제부터 새 금액으로 청구됩니다.</Text>
+                  <Text size="sm">할인율·무료기간·다음 결제일은 그대로이며, 진행 중인 프리미엄 광고도 바뀐 아파트에 노출됩니다. 파트너에게 알림은 가지 않습니다.</Text>
+                </Stack>
+              </Alert>
             )}
-            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+            <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="xs">
               {apartments.map((apt) => (
-                <label
+                <Paper
                   key={apt.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-2.5"
+                  withBorder
+                  radius="md"
+                  p="xs"
+                  component="label"
+                  style={{ cursor: 'pointer' }}
                 >
-                  <Checkbox
-                    checked={form.apartmentIds.includes(apt.id)}
-                    onCheckedChange={() => page.toggleApartment(apt.id)}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm">{apt.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {apt.totalHouseholds.toLocaleString()}세대
-                  </span>
-                </label>
+                  <Group gap="xs" wrap="nowrap">
+                    <Checkbox
+                      checked={form.apartmentIds.includes(apt.id)}
+                      onChange={() => page.toggleApartment(apt.id)}
+                    />
+                    <Text size="sm" truncate style={{ flex: 1, minWidth: 0 }}>{apt.name}</Text>
+                    <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+                      {apt.totalHouseholds.toLocaleString()}세대
+                    </Text>
+                  </Group>
+                </Paper>
               ))}
-            </div>
+            </SimpleGrid>
             </>
           )}
-          <p className="text-sm">
+          <Text size="sm">
             선택 {form.apartmentIds.length}곳 · 총{' '}
             <strong>{totalHouseholds.toLocaleString()}세대</strong>
-          </p>
-        </CardContent>
-      </Card>
+          </Text>
+        </Stack>
+      </Paper>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>승인 조건</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">승인 조건</Title>
+        <Stack gap="md">
           {/* 광고중에는 할인·무료기간이 이미 청구되고 있는 금액의 근거다 */}
           {contentOnly ? (
-            <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
-              <p>
-                할인 {form.discountRate}% · 무료 {form.freeMonths}개월
-              </p>
-              <p className="text-muted-foreground">
-                광고중에는 이미 청구 중인 금액의 근거라 바꿀 수 없습니다.
-              </p>
-            </div>
+            <Paper withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)">
+              <Stack gap={4}>
+                <Text size="sm">
+                  할인 {form.discountRate}% · 무료 {form.freeMonths}개월
+                </Text>
+                <Text size="sm" c="dimmed">
+                  광고중에는 이미 청구 중인 금액의 근거라 바꿀 수 없습니다.
+                </Text>
+              </Stack>
+            </Paper>
           ) : (
             <>
               {!isFirstAdExpected && (
-                <label className="flex cursor-pointer items-center gap-2">
-                  <Checkbox
-                    checked={form.overrideEnabled}
-                    onCheckedChange={(checked) => patch({ overrideEnabled: checked === true })}
-                  />
-                  <span className="text-sm">
-                    첫 광고가 아니지만 협의된 할인·무료기간을 예외 적용
-                  </span>
-                </label>
-              )}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">할인율 (%)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    disabled={!benefitsApplied}
-                    value={form.discountRate || ''}
-                    onChange={(e) =>
-                      patch({
-                        discountRate: Math.min(
-                          100,
-                          Math.max(0, parseInt(e.target.value) || 0)
-                        ),
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">무료 개월 수</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={24}
-                    disabled={!benefitsApplied}
-                    value={form.freeMonths || ''}
-                    onChange={(e) =>
-                      patch({ freeMonths: Math.max(0, parseInt(e.target.value) || 0) })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  파트너 할인관련 안내 문구{' '}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    (파트너에게 표시)
-                  </span>
-                </label>
-                <Textarea
-                  className="min-h-[80px] resize-none"
-                  maxLength={100}
-                  placeholder="예: 개업 축하 혜택으로 함께합니다 / 신규 상권 지원 등"
-                  value={form.discountNote}
-                  onChange={(e) => patch({ discountNote: e.target.value })}
+                <Checkbox
+                  checked={form.overrideEnabled}
+                  onChange={(e) => patch({ overrideEnabled: e.currentTarget.checked })}
+                  label="첫 광고가 아니지만 협의된 할인·무료기간을 예외 적용"
                 />
-              </div>
+              )}
+              <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                <TextInput
+                  label="할인율 (%)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  disabled={!benefitsApplied}
+                  value={form.discountRate || ''}
+                  onChange={(e) =>
+                    patch({
+                      discountRate: Math.min(
+                        100,
+                        Math.max(0, parseInt(e.target.value) || 0)
+                      ),
+                    })
+                  }
+                />
+                <TextInput
+                  label="무료 개월 수"
+                  type="number"
+                  min={0}
+                  max={24}
+                  disabled={!benefitsApplied}
+                  value={form.freeMonths || ''}
+                  onChange={(e) =>
+                    patch({ freeMonths: Math.min(24, Math.max(0, parseInt(e.target.value) || 0)) })
+                  }
+                />
+              </SimpleGrid>
+              <Textarea
+                label={
+                  <>
+                    파트너 할인관련 안내 문구{' '}
+                    <Text span size="xs" fw={500} c="dimmed">
+                      (파트너에게 표시)
+                    </Text>
+                  </>
+                }
+                minRows={3}
+                autosize
+                maxLength={100}
+                placeholder="예: 개업 축하 혜택으로 함께합니다 / 신규 상권 지원 등"
+                value={form.discountNote}
+                onChange={(e) => patch({ discountNote: e.target.value })}
+              />
               {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다.
                   contentOnly(=광고중)는 이미 개시된 상태라 대상이 아니다 */}
               {!contentOnly && benefitsApplied && form.discountRate === 100 && (
-                <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
-                  <Checkbox
-                    className="mt-0.5"
-                    checked={form.startImmediately}
-                    onCheckedChange={(checked) => patch({ startImmediately: checked === true })}
-                  />
-                  <span className="space-y-1 text-sm">
-                    <span className="block font-medium">
-                      카드 등록 없이 바로 광고 시작
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      파트너 결제를 건너뛰고 즉시 노출됩니다. 정기결제는 돌지 않으며
-                      파트너 앱에는 &lsquo;광고중&rsquo;으로 표시됩니다.
-                    </span>
-                  </span>
-                </label>
+                <Paper component="label" withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)" style={{ cursor: 'pointer' }}>
+                  {/* 원래처럼 상자 전체(설명 포함)를 눌러도 체크된다 */}
+                  <Group gap="sm" align="flex-start" wrap="nowrap">
+                    <Checkbox
+                      checked={form.startImmediately}
+                      onChange={(e) => patch({ startImmediately: e.currentTarget.checked })}
+                      mt={2}
+                    />
+                    <div>
+                      <Text size="sm" fw={500}>카드 등록 없이 바로 광고 시작</Text>
+                      <Text size="xs" c="dimmed" mt={2}>
+                        파트너 결제를 건너뛰고 즉시 노출됩니다. 정기결제는 돌지 않으며
+                        파트너 앱에는 &lsquo;광고중&rsquo;으로 표시됩니다.
+                      </Text>
+                    </div>
+                  </Group>
+                </Paper>
               )}
             </>
           )}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              비즈콜 번호{' '}
-              <span className="text-xs font-normal text-muted-foreground">
-                (안심번호, 선택)
-              </span>
-            </label>
-            <Input
+          <Stack gap={6}>
+            <TextInput
+              label={
+                <>
+                  비즈콜 번호{' '}
+                  <Text span size="xs" fw={500} c="dimmed">
+                    (안심번호, 선택)
+                  </Text>
+                </>
+              }
               placeholder="예: 0507-1234-5678"
               inputMode="numeric"
               value={form.bizCallNumber}
               onChange={(e) => patch({ bizCallNumber: formatBizCallNumber(e.target.value) })}
             />
             {bizCallDuplicateName ? (
-              <p className="text-xs text-red-600">
+              <Text size="xs" c="red">
                 이미 다른 파트너({bizCallDuplicateName})가 사용 중인 번호입니다.
-              </p>
+              </Text>
             ) : (
-              <p className="text-xs text-muted-foreground">
+              <Text size="xs" c="dimmed">
                 입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
                 {selectedPartner?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
-              </p>
+              </Text>
             )}
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              영업 담당자{' '}
-              <span className="text-xs font-normal text-muted-foreground">(선택)</span>
-            </label>
+          </Stack>
+          <Input.Wrapper
+            label={
+              <>
+                영업 담당자{' '}
+                <Text span size="xs" fw={500} c="dimmed">(선택)</Text>
+              </>
+            }
+          >
             <SalesRepSelect
               className="w-[240px]"
               value={form.salesRepId}
               onChange={(salesRepId) => patch({ salesRepId })}
             />
-          </div>
-          <label className="flex cursor-pointer items-center gap-2">
-            <Checkbox
-              checked={form.grantAnalytics}
-              onCheckedChange={(checked) => patch({ grantAnalytics: checked === true })}
-            />
-            <span className="text-sm">광고 분석 권한 부여</span>
-          </label>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              관리 메모{' '}
-              <span className="text-xs font-normal text-muted-foreground">
-                (내부용, 파트너 비공개)
-              </span>
-            </label>
-            <Textarea
-              className="min-h-[80px] resize-none"
-              value={form.adminMemo}
-              onChange={(e) => patch({ adminMemo: e.target.value })}
-            />
-          </div>
-        </CardContent>
-      </Card>
+          </Input.Wrapper>
+          <Checkbox
+            checked={form.grantAnalytics}
+            onChange={(e) => patch({ grantAnalytics: e.currentTarget.checked })}
+            label="광고 분석 권한 부여"
+          />
+          <Textarea
+            label={
+              <>
+                관리 메모{' '}
+                <Text span size="xs" fw={500} c="dimmed">
+                  (내부용, 파트너 비공개)
+                </Text>
+              </>
+            }
+            minRows={3}
+            autosize
+            value={form.adminMemo}
+            onChange={(e) => patch({ adminMemo: e.target.value })}
+          />
+        </Stack>
+      </Paper>
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm">
+      <Paper withBorder radius="md" p="lg">
+        <Group justify="space-between" gap="sm">
+          <Stack gap={2}>
             {runningAmounts ? (
               <RunningAmountSummary amounts={runningAmounts} />
             ) : contentOnly ? (
-              <p className="text-muted-foreground">현재 월 광고료 변동 없음</p>
+              <Text size="sm" c="dimmed">현재 월 광고료 변동 없음</Text>
             ) : (
               <>
-                <p>
+                <Text size="sm">
                   예상 월 광고료{' '}
-                  <strong className="text-base">
+                  <Text span fw={700}>
                     {estimatedMonthlyAmount.toLocaleString()}원
-                  </strong>
-                </p>
-                <p className="text-muted-foreground">
+                  </Text>
+                </Text>
+                <Text size="sm" c="dimmed">
                   {totalHouseholds.toLocaleString()}세대 ×{' '}
                   {page.pricePerHousehold.toLocaleString()}원
                   {benefitsApplied && form.discountRate > 0 && ` · ${form.discountRate}% 할인`}
                   {benefitsApplied && form.freeMonths > 0 && ` · ${form.freeMonths}개월 무료`}
-                </p>
+                </Text>
               </>
             )}
             {page.ctaError && (
-              <p className="mt-1 text-destructive">{page.ctaError}</p>
+              <Text size="sm" c="red" mt={4}>{page.ctaError}</Text>
             )}
-          </div>
-          <Button size="lg" disabled={!canSubmit} onClick={page.submit}>
+          </Stack>
+          <Button size="md" disabled={!canSubmit} onClick={page.submit}>
             {submitting
               ? (isEdit ? '수정 중...' : '등록 중...')
               : (isEdit ? '수정 저장' : '광고 등록 (결제 대기 상태)')}
           </Button>
-        </CardContent>
-      </Card>
+        </Group>
+      </Paper>
     </PageShell>
   );
 }
@@ -511,24 +501,24 @@ function RunningAmountSummary({
   const { currentMonthlyAmount, next } = amounts;
   return (
     <>
-      <p>
+      <Text size="sm">
         현재 월 광고료{' '}
-        <strong className="text-base">{currentMonthlyAmount.toLocaleString()}원</strong>
+        <Text span fw={700}>{currentMonthlyAmount.toLocaleString()}원</Text>
         {next && (
           <>
             {' → '}
-            <strong className="text-base text-primary">
+            <Text span fw={700} c="blue">
               {next.monthlyAmount.toLocaleString()}원
-            </strong>
+            </Text>
           </>
         )}
-      </p>
-      <p className="text-muted-foreground">
+      </Text>
+      <Text size="sm" c="dimmed">
         {next
           ? `다음 정기결제부터 청구 · 정상가 ${next.originalMonthlyAmount.toLocaleString()}원` +
             (next.method === 'proportional' ? ' · 기존 단가 유지(세대수 비율 조정)' : '')
           : '노출 아파트를 바꾸지 않으면 변동 없음'}
-      </p>
+      </Text>
     </>
   );
 }

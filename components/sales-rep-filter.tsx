@@ -1,13 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@mantine/core';
 import { fetchSelectableSalesReps, type SalesRep } from '@/lib/ads/sales-reps';
 
 const ALL_VALUE = '__all__';
@@ -41,21 +35,18 @@ export function SalesRepFilter({
   return (
     <Select
       value={value ?? ALL_VALUE}
-      onValueChange={(v) => onChange(v === ALL_VALUE ? null : v)}
-    >
-      <SelectTrigger className="h-11 w-[180px]">
-        <SelectValue placeholder="영업 담당자" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL_VALUE}>담당자 전체</SelectItem>
-        <SelectItem value={SALES_REP_UNASSIGNED}>미지정</SelectItem>
-        {reps.map((rep) => (
-          <SelectItem key={rep.id} value={rep.id}>
-            {rep.name}
-            {!rep.isActive && ' (비활성)'}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      onChange={(v) => onChange(v === null || v === ALL_VALUE ? null : v)}
+      allowDeselect={false}
+      placeholder="영업 담당자"
+      w={180}
+      data={[
+        { value: ALL_VALUE, label: '담당자 전체' },
+        { value: SALES_REP_UNASSIGNED, label: '미지정' },
+        ...reps.map((rep) => ({
+          value: rep.id,
+          label: `${rep.name}${!rep.isActive ? ' (비활성)' : ''}`,
+        })),
+      ]}
+    />
   );
 }

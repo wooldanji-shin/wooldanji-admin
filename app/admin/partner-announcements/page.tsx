@@ -10,38 +10,29 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { InlineLoadingSkeleton } from '@/components/skeletons';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
+import { TableSkeleton } from '@/components/skeletons';
 import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Center,
+  Checkbox,
+  Grid,
+  Group,
+  Loader,
+  Modal,
+  Paper,
+  ScrollArea,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
+  SimpleGrid,
+  Stack,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/supabase';
 import {
@@ -56,6 +47,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { confirmModal } from '@/components/confirm-modal';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -288,7 +280,7 @@ export default function PartnerAnnouncementsPage() {
       toast.error('제목과 내용을 입력하세요');
       return;
     }
-    if (!confirm(`${selected.size}명에게 발송합니다. 진행할까요?`)) return;
+    if (!(await confirmModal({ title: '알림 발송', message: `${selected.size}명에게 발송합니다. 진행할까요?`, confirmLabel: '발송' }))) return;
 
     setSending(true);
     try {
@@ -327,7 +319,7 @@ export default function PartnerAnnouncementsPage() {
   }
 
   async function handleDelete(id: string, title: string) {
-    if (!confirm(`"${title}" 알림을 삭제합니다. 수신자 기록도 함께 삭제됩니다.`)) return;
+    if (!(await confirmModal({ title: '알림 삭제', message: `"${title}" 알림을 삭제합니다. 수신자 기록도 함께 삭제됩니다.`, confirmLabel: '삭제', danger: true }))) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/partner-announcements/${id}`, { method: 'DELETE' });
@@ -345,19 +337,11 @@ export default function PartnerAnnouncementsPage() {
     }
   }
 
-  if (loading && partners.length === 0) {
-    return (
-      <PageShell>
-        <InlineLoadingSkeleton />
-      </PageShell>
-    );
-  }
   if (error) {
     return (
       <PageShell>
-        <Alert variant='destructive'>
-          <AlertCircle className='h-4 w-4' />
-          <AlertDescription>{error}</AlertDescription>
+        <Alert color="red" variant="light" icon={<AlertCircle size={16} />}>
+          {error}
         </Alert>
       </PageShell>
     );
@@ -376,413 +360,427 @@ export default function PartnerAnnouncementsPage() {
 
       <PageContent>
 
-      <div className='grid grid-cols-1 gap-6 lg:grid-cols-5'>
+      <Grid columns={5} gap="lg">
         {/* ─── 좌측 60% ─────────────────────────────────────────── */}
-        <div className='space-y-4 lg:col-span-3'>
-          <Card>
-            <CardHeader>
-              <CardTitle>파트너 목록 (총 {totalCount}명)</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-4'>
-              <div className='flex flex-wrap items-center gap-2'>
-                <Input
-                  placeholder='상호명 / 대표자 / 전화번호'
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+        <Grid.Col span={{ base: 5, lg: 3 }}>
+          <Stack gap="md">
+            <Paper withBorder radius="md" p="lg">
+              <Title order={4} mb="md">
+                파트너 목록 (총 {totalCount}명)
+              </Title>
+              <Stack gap="md">
+                <Group gap="xs">
+                  <TextInput
+                    placeholder="상호명 / 대표자 / 전화번호"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setPage(0);
+                        void loadPartners();
+                      }
+                    }}
+                    w="100%"
+                    maw={320}
+                  />
+                  <Button
+                    variant="default"
+                    leftSection={<Search size={16} />}
+                    onClick={() => {
                       setPage(0);
                       void loadPartners();
-                    }
-                  }}
-                  className='max-w-xs'
-                />
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => {
-                    setPage(0);
-                    void loadPartners();
-                  }}
-                >
-                  <Search className='mr-1 h-4 w-4' />
-                  검색
-                </Button>
+                    }}
+                  >
+                    검색
+                  </Button>
 
-                <Select
-                  value={filterCase}
-                  onValueChange={(v) => {
-                    setFilterCase(v as 'ALL' | AdCase);
-                    setPage(0);
-                  }}
-                >
-                  <SelectTrigger className='w-[180px]'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='ALL'>전체 케이스</SelectItem>
-                    <SelectItem value='A'>A — 광고전</SelectItem>
-                    <SelectItem value='B'>B — 광고중</SelectItem>
-                    <SelectItem value='C'>C — 광고중단</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={() => loadPartners()}
-                  disabled={loading}
-                >
-                  <RefreshCw
-                    className={`mr-1 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+                  <Select
+                    w={180}
+                    data={[
+                      { value: 'ALL', label: '전체 케이스' },
+                      { value: 'A', label: 'A — 광고전' },
+                      { value: 'B', label: 'B — 광고중' },
+                      { value: 'C', label: 'C — 광고중단' },
+                    ]}
+                    value={filterCase}
+                    onChange={(v) => {
+                      if (v === null) return;
+                      setFilterCase(v as 'ALL' | AdCase);
+                      setPage(0);
+                    }}
+                    allowDeselect={false}
                   />
-                </Button>
-              </div>
 
-              <div className='overflow-x-auto'>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className='w-10'>
-                      <Checkbox
-                        checked={allOnPageSelected}
-                        onCheckedChange={toggleAllOnPage}
-                        aria-label='페이지 전체 선택 (마케팅 미동의자 제외)'
-                      />
-                    </TableHead>
-                    <TableHead>상호명</TableHead>
-                    <TableHead>대표자</TableHead>
-                    <TableHead>전화</TableHead>
-                    <TableHead className='w-[120px]'>케이스</TableHead>
-                    <TableHead className='w-[80px]'>FCM</TableHead>
-                    <TableHead className='w-[80px]'>마케팅</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {partners.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className='py-8 text-center text-muted-foreground'>
-                        조회된 파트너가 없습니다
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    partners.map((p) => (
-                      <TableRow
-                        key={p.id}
-                        className={p.marketingAgreed && p.hasFcmToken ? 'cursor-pointer' : 'opacity-40'}
-                        onClick={() => togglePartner(p.id)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="lg"
+                    onClick={() => loadPartners()}
+                    disabled={loading}
+                    aria-label="새로고침"
+                  >
+                    <RefreshCw size={16} className={loading ? 'animate-spin' : undefined} />
+                  </ActionIcon>
+                </Group>
+
+                <Table.ScrollContainer minWidth={560}>
+                  <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th w={40}>
                           <Checkbox
-                            checked={selected.has(p.id)}
-                            disabled={!p.marketingAgreed || !p.hasFcmToken}
-                            onCheckedChange={() => togglePartner(p.id)}
+                            checked={allOnPageSelected}
+                            onChange={() => toggleAllOnPage()}
+                            aria-label="페이지 전체 선택 (마케팅 미동의자 제외)"
                           />
-                        </TableCell>
-                        <TableCell>{p.businessName ?? '-'}</TableCell>
-                        <TableCell>{p.representativeName ?? '-'}</TableCell>
-                        <TableCell>{p.displayPhoneNumber ?? '-'}</TableCell>
-                        <TableCell>
-                          <Badge variant={CASE_COLORS[p.adCase]}>
-                            {p.adCase} · {CASE_LABELS[p.adCase]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {p.hasFcmToken ? (
-                            <CheckCircle2 className='h-4 w-4 text-green-600' />
-                          ) : (
-                            <XCircle className='h-4 w-4 text-destructive' />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {p.marketingAgreed ? (
-                            <CheckCircle2 className='h-4 w-4 text-green-600' />
-                          ) : (
-                            <XCircle className='h-4 w-4 text-destructive' />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-              </div>
+                        </Table.Th>
+                        <Table.Th>상호명</Table.Th>
+                        <Table.Th>대표자</Table.Th>
+                        <Table.Th>전화</Table.Th>
+                        <Table.Th w={120}>케이스</Table.Th>
+                        <Table.Th w={80}>FCM</Table.Th>
+                        <Table.Th w={80}>마케팅</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {loading && partners.length === 0 ? (
+                        <Table.Tr>
+                          <Table.Td colSpan={7} p={0}>
+                            <TableSkeleton rows={8} columns={7} showHeader={false} />
+                          </Table.Td>
+                        </Table.Tr>
+                      ) : partners.length === 0 ? (
+                        <Table.Tr>
+                          <Table.Td colSpan={7} py="xl" ta="center" c="dimmed">
+                            조회된 파트너가 없습니다
+                          </Table.Td>
+                        </Table.Tr>
+                      ) : (
+                        partners.map((p) => (
+                          <Table.Tr
+                            key={p.id}
+                            style={
+                              p.marketingAgreed && p.hasFcmToken
+                                ? { cursor: 'pointer' }
+                                : { opacity: 0.4 }
+                            }
+                            onClick={() => togglePartner(p.id)}
+                          >
+                            <Table.Td onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selected.has(p.id)}
+                                disabled={!p.marketingAgreed || !p.hasFcmToken}
+                                onChange={() => togglePartner(p.id)}
+                                aria-label="선택"
+                              />
+                            </Table.Td>
+                            <Table.Td>{p.businessName ?? '-'}</Table.Td>
+                            <Table.Td>{p.representativeName ?? '-'}</Table.Td>
+                            <Table.Td>{p.displayPhoneNumber ?? '-'}</Table.Td>
+                            <Table.Td>
+                              <Badge
+                                variant="light"
+                                color={CASE_COLORS[p.adCase] === 'default' ? 'blue' : 'gray'}
+                              >
+                                {p.adCase} · {CASE_LABELS[p.adCase]}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              {p.hasFcmToken ? (
+                                <CheckCircle2 size={16} color="var(--mantine-color-green-filled)" />
+                              ) : (
+                                <XCircle size={16} color="var(--mantine-color-red-filled)" />
+                              )}
+                            </Table.Td>
+                            <Table.Td>
+                              {p.marketingAgreed ? (
+                                <CheckCircle2 size={16} color="var(--mantine-color-green-filled)" />
+                              ) : (
+                                <XCircle size={16} color="var(--mantine-color-red-filled)" />
+                              )}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
 
-              {/* 페이지네이션 */}
-              <div className='flex items-center justify-between'>
-                <div className='text-sm text-muted-foreground'>
-                  {page * PAGE_SIZE + 1}–
-                  {Math.min((page + 1) * PAGE_SIZE, totalCount)} / {totalCount}
-                </div>
-                <div className='flex gap-2'>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  >
-                    이전
-                  </Button>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    다음
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                {/* 페이지네이션 */}
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">
+                    {totalCount === 0 ? (
+                      '0건'
+                    ) : (
+                      <>
+                        {page * PAGE_SIZE + 1}–
+                        {Math.min((page + 1) * PAGE_SIZE, totalCount)} / {totalCount}
+                      </>
+                    )}
+                  </Text>
+                  <Group gap="xs">
+                    <Button
+                      size="xs"
+                      variant="default"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    >
+                      이전
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      disabled={page + 1 >= totalPages}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      다음
+                    </Button>
+                  </Group>
+                </Group>
+              </Stack>
+            </Paper>
 
-          {/* 발송 폼 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>발송</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-3'>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <Badge variant='default' className='mr-2'>
-                    선택 {selected.size}명
-                  </Badge>
+            {/* 발송 폼 */}
+            <Paper withBorder radius="md" p="lg">
+              <Title order={4} mb="md">
+                발송
+              </Title>
+              <Stack gap="sm">
+                <Group gap="xs">
+                  <Badge variant="filled">선택 {selected.size}명</Badge>
                   {selected.size > 0 && (
-                    <Button size='sm' variant='ghost' onClick={clearSelection}>
+                    <Button size="xs" variant="subtle" onClick={clearSelection}>
                       선택 해제
                     </Button>
                   )}
-                </div>
-              </div>
-              <div>
-                <Label htmlFor='ann-title'>제목</Label>
-                <Input
-                  id='ann-title'
+                </Group>
+                <TextInput
+                  id="ann-title"
+                  label="제목"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   maxLength={50}
-                  placeholder='예: 봄 프로모션 안내'
+                  placeholder="예: 봄 프로모션 안내"
                 />
-              </div>
-              <div>
-                <Label htmlFor='ann-body'>내용</Label>
                 <Textarea
-                  id='ann-body'
+                  id="ann-body"
+                  label="내용"
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   maxLength={300}
                   rows={4}
-                  placeholder='예: 5월 한 달간 첫 광고 등록 시 50% 할인!'
+                  placeholder="예: 5월 한 달간 첫 광고 등록 시 50% 할인!"
                 />
-              </div>
-              <div className='flex justify-end'>
-                <Button
-                  onClick={handleSend}
-                  disabled={sending || selected.size === 0 || !title.trim() || !body.trim()}
-                >
-                  {sending ? (
-                    <Loader2 className='mr-1 h-4 w-4 animate-spin' />
-                  ) : (
-                    <Send className='mr-1 h-4 w-4' />
-                  )}
-                  발송 ({selected.size}명)
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                <Group justify="flex-end">
+                  <Button
+                    onClick={handleSend}
+                    disabled={sending || selected.size === 0 || !title.trim() || !body.trim()}
+                    leftSection={
+                      sending ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Send size={16} />
+                      )
+                    }
+                  >
+                    발송 ({selected.size}명)
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          </Stack>
+        </Grid.Col>
 
         {/* ─── 우측 40% — 발송 이력 ────────────────────────────── */}
-        <div className='lg:col-span-2'>
-          <Card className='h-full'>
-            <CardHeader className='flex flex-row items-center justify-between space-y-0'>
-              <CardTitle className='flex items-center gap-2'>
-                <History className='h-4 w-4' />
-                발송 이력
-              </CardTitle>
-              <Button
-                size='sm'
-                variant='ghost'
+        <Grid.Col span={{ base: 5, lg: 2 }}>
+          <Paper withBorder radius="md" p="lg" h="100%">
+            <Group justify="space-between" mb="md">
+              <Group gap="xs">
+                <History size={16} />
+                <Title order={4}>발송 이력</Title>
+              </Group>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
                 onClick={() => loadHistory()}
                 disabled={historyLoading}
+                aria-label="발송 이력 새로고침"
               >
-                <RefreshCw
-                  className={`h-4 w-4 ${historyLoading ? 'animate-spin' : ''}`}
-                />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {historyLoading ? (
-                <div className='flex h-32 items-center justify-center'>
-                  <Loader2 className='h-5 w-5 animate-spin text-muted-foreground' />
-                </div>
-              ) : history.length === 0 ? (
-                <div className='py-8 text-center text-muted-foreground'>
-                  발송 이력이 없습니다
-                </div>
-              ) : (
-                <div className='space-y-3'>
-                  {history.map((h) => (
-                    <div
-                      key={h.key}
-                      className='rounded-lg border bg-card p-3'
-                    >
-                      <div className='flex items-start justify-between gap-2'>
-                        <div className='font-medium'>{h.title}</div>
-                        <div className='flex shrink-0 items-center gap-1'>
-                          <Badge
-                            variant='outline'
-                            className='cursor-pointer hover:bg-accent'
-                            onClick={() => {
-                              setRecipientsModal({ key: h.key, title: h.title });
-                              void loadRecipients(h.key);
-                            }}
-                          >
-                            {h.recipients}명
-                          </Badge>
-                          <button
-                            onClick={() => handleDelete(h.key, h.title)}
-                            disabled={deletingId === h.key}
-                            className='rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50'
-                          >
-                            {deletingId === h.key ? (
-                              <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                            ) : (
-                              <Trash2 className='h-3.5 w-3.5' />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                      <div className='line-clamp-2 mt-1 text-sm text-muted-foreground'>
-                        {h.body}
-                      </div>
-                      <div className='mt-2 text-xs text-muted-foreground'>
-                        {format(new Date(h.sentAt), 'yyyy-MM-dd HH:mm', {
-                          locale: ko,
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                <RefreshCw size={16} className={historyLoading ? 'animate-spin' : undefined} />
+              </ActionIcon>
+            </Group>
+            {historyLoading ? (
+              <Center h={128}>
+                <Loader size="sm" color="gray" />
+              </Center>
+            ) : history.length === 0 ? (
+              <Text py="xl" ta="center" c="dimmed">
+                발송 이력이 없습니다
+              </Text>
+            ) : (
+              <Stack gap="sm">
+                {history.map((h) => (
+                  <Paper key={h.key} withBorder radius="md" p="sm">
+                    <Group justify="space-between" align="flex-start" gap="xs" wrap="nowrap">
+                      <Text fw={500}>{h.title}</Text>
+                      <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+                        <Badge
+                          component="button"
+                          type="button"
+                          variant="light"
+                          color="gray"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            setRecipientsModal({ key: h.key, title: h.title });
+                            void loadRecipients(h.key);
+                          }}
+                        >
+                          {h.recipients}명
+                        </Badge>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          size="sm"
+                          onClick={() => handleDelete(h.key, h.title)}
+                          disabled={deletingId === h.key}
+                          aria-label="삭제"
+                        >
+                          {deletingId === h.key ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+                        </ActionIcon>
+                      </Group>
+                    </Group>
+                    <Text size="sm" c="dimmed" mt={4} lineClamp={2}>
+                      {h.body}
+                    </Text>
+                    <Text size="xs" c="dimmed" mt="xs">
+                      {format(new Date(h.sentAt), 'yyyy-MM-dd HH:mm', {
+                        locale: ko,
+                      })}
+                    </Text>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+        </Grid.Col>
+      </Grid>
 
       {/* 발송 결과 모달 */}
-      <Dialog open={!!resultModal} onOpenChange={(o) => !o && setResultModal(null)}>
-        <DialogContent className='flex max-h-[85vh] max-w-2xl flex-col'>
-          <DialogHeader>
-            <DialogTitle>발송 결과</DialogTitle>
-            <DialogDescription>
-              {resultModal?.chunks}개 청크로 처리됨 · {resultModal?.durationMs}ms
-            </DialogDescription>
-          </DialogHeader>
-          {resultModal && (
-            <div className='flex-1 space-y-4 overflow-y-auto pr-1'>
-              <div className='grid grid-cols-4 gap-2'>
-                <Stat label='총 대상' value={resultModal.total} />
-                <Stat label='성공' value={resultModal.success} variant='success' />
-                <Stat label='실패' value={resultModal.failed} variant='danger' />
-                <Stat label='토큰없음' value={resultModal.noToken} variant='warning' />
+      <Modal
+        opened={!!resultModal}
+        onClose={() => setResultModal(null)}
+        title="발송 결과"
+        size={672}
+      >
+        <Text size="sm" c="dimmed">
+          {resultModal?.chunks}개 청크로 처리됨 · {resultModal?.durationMs}ms
+        </Text>
+        {resultModal && (
+          <Stack gap="md" mt="md">
+            <SimpleGrid cols={4} spacing="xs">
+              <Stat label='총 대상' value={resultModal.total} />
+              <Stat label='성공' value={resultModal.success} variant='success' />
+              <Stat label='실패' value={resultModal.failed} variant='danger' />
+              <Stat label='토큰없음' value={resultModal.noToken} variant='warning' />
+            </SimpleGrid>
+            {resultModal.chunkErrors > 0 && (
+              <Alert color="red" variant="light" icon={<AlertCircle size={16} />}>
+                청크 호출 실패 {resultModal.chunkErrors}건 — 일부 파트너 미발송 가능성
+              </Alert>
+            )}
+            {resultModal.failures.length > 0 && (
+              <div>
+                <Text size="sm" fw={500} mb="xs">
+                  실패 사유 (최대 50건 표시)
+                </Text>
+                <Paper withBorder radius="sm">
+                  <Table verticalSpacing="xs" horizontalSpacing="sm">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>partnerUserId</Table.Th>
+                        <Table.Th>사유</Table.Th>
+                        <Table.Th>메시지</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {resultModal.failures.slice(0, 50).map((f, i) => (
+                        <Table.Tr key={`${f.partnerUserId}-${i}`}>
+                          <Table.Td ff="monospace" fz="xs">
+                            {f.partnerUserId.slice(0, 8)}…
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge variant="light" color="gray">
+                              {f.reason === 'UNREGISTERED' ? '앱 삭제/재설치' : f.reason}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td fz="xs" c="dimmed">
+                            {f.message ?? '-'}
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Paper>
               </div>
-              {resultModal.chunkErrors > 0 && (
-                <Alert variant='destructive'>
-                  <AlertCircle className='h-4 w-4' />
-                  <AlertDescription>
-                    청크 호출 실패 {resultModal.chunkErrors}건 — 일부 파트너 미발송 가능성
-                  </AlertDescription>
-                </Alert>
-              )}
-              {resultModal.failures.length > 0 && (
-                <div>
-                  <div className='mb-2 text-sm font-medium'>
-                    실패 사유 (최대 50건 표시)
-                  </div>
-                  <div className='rounded border'>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>partnerUserId</TableHead>
-                          <TableHead>사유</TableHead>
-                          <TableHead>메시지</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {resultModal.failures.slice(0, 50).map((f, i) => (
-                          <TableRow key={`${f.partnerUserId}-${i}`}>
-                            <TableCell className='font-mono text-xs'>
-                              {f.partnerUserId.slice(0, 8)}…
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant='secondary'>
-                                {f.reason === 'UNREGISTERED' ? '앱 삭제/재설치' : f.reason}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className='text-xs text-muted-foreground'>
-                              {f.message ?? '-'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setResultModal(null)}>닫기</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            )}
+          </Stack>
+        )}
+        <Group justify="flex-end" mt="lg">
+          <Button onClick={() => setResultModal(null)}>닫기</Button>
+        </Group>
+      </Modal>
       {/* 수신자 목록 모달 */}
-      <Dialog open={!!recipientsModal} onOpenChange={(o) => !o && setRecipientsModal(null)}>
-        <DialogContent className='max-w-lg'>
-          <DialogHeader>
-            <DialogTitle>수신자 목록</DialogTitle>
-            <DialogDescription className='line-clamp-1'>{recipientsModal?.title}</DialogDescription>
-          </DialogHeader>
-          {recipientsLoading ? (
-            <div className='flex h-32 items-center justify-center'>
-              <Loader2 className='h-5 w-5 animate-spin text-muted-foreground' />
-            </div>
-          ) : (
-            <div className='max-h-96 overflow-y-auto'>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>상호명</TableHead>
-                    <TableHead>대표자</TableHead>
-                    <TableHead>전화</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recipients.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className='py-8 text-center text-muted-foreground'>
-                        수신자 정보 없음
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    recipients.map((r) => (
-                      <TableRow key={r.partnerUserId}>
-                        <TableCell>{r.businessName ?? '-'}</TableCell>
-                        <TableCell>{r.representativeName ?? '-'}</TableCell>
-                        <TableCell>{r.displayPhoneNumber ?? '-'}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setRecipientsModal(null)}>닫기</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal
+        opened={!!recipientsModal}
+        onClose={() => setRecipientsModal(null)}
+        title="수신자 목록"
+        size="lg"
+      >
+        <Text size="sm" c="dimmed" lineClamp={1}>
+          {recipientsModal?.title}
+        </Text>
+        {recipientsLoading ? (
+          <Center h={128}>
+            <Loader size="sm" color="gray" />
+          </Center>
+        ) : (
+          <ScrollArea.Autosize mah={384} mt="md">
+            <Table verticalSpacing="xs" horizontalSpacing="sm">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>상호명</Table.Th>
+                  <Table.Th>대표자</Table.Th>
+                  <Table.Th>전화</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {recipients.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={3} py="xl" ta="center" c="dimmed">
+                      수신자 정보 없음
+                    </Table.Td>
+                  </Table.Tr>
+                ) : (
+                  recipients.map((r) => (
+                    <Table.Tr key={r.partnerUserId}>
+                      <Table.Td>{r.businessName ?? '-'}</Table.Td>
+                      <Table.Td>{r.representativeName ?? '-'}</Table.Td>
+                      <Table.Td>{r.displayPhoneNumber ?? '-'}</Table.Td>
+                    </Table.Tr>
+                  ))
+                )}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea.Autosize>
+        )}
+        <Group justify="flex-end" mt="lg">
+          <Button onClick={() => setRecipientsModal(null)}>닫기</Button>
+        </Group>
+      </Modal>
 
       </PageContent>
     </PageShell>
@@ -798,18 +796,26 @@ function Stat({
   value: number;
   variant?: 'success' | 'danger' | 'warning';
 }) {
-  const colorClass =
-    variant === 'success'
-      ? 'text-green-600'
-      : variant === 'danger'
-        ? 'text-destructive'
-        : variant === 'warning'
-          ? 'text-amber-600'
-          : 'text-foreground';
   return (
-    <div className='rounded-lg border p-3 text-center'>
-      <div className='text-xs text-muted-foreground'>{label}</div>
-      <div className={`text-2xl font-semibold ${colorClass}`}>{value}</div>
-    </div>
+    <Paper withBorder radius="md" p="sm" ta="center">
+      <Text size="xs" c="dimmed">
+        {label}
+      </Text>
+      <Text
+        fz="1.5rem"
+        fw={600}
+        c={
+          variant === 'success'
+            ? 'green'
+            : variant === 'danger'
+              ? 'red'
+              : variant === 'warning'
+                ? 'yellow.7'
+                : undefined
+        }
+      >
+        {value}
+      </Text>
+    </Paper>
   );
 }

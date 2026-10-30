@@ -4,6 +4,7 @@ import type React from 'react';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AdminShellSkeleton } from '@/components/admin-shell-skeleton';
 import { getCurrentUser } from '@/lib/auth';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -25,11 +26,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   if (isLoading || !isAuthenticated) {
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-background'>
-        <div className='text-muted-foreground'>로딩 중...</div>
-      </div>
-    );
+    return <AdminShellSkeleton />;
   }
 
   return <>{children}</>;

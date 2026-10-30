@@ -57,6 +57,14 @@ export interface UseDevicesPageReturn {
   brokenDeviceCount: number;
   totalDeviceCount: number;
 
+  // Combined bulk delete (line devices + common-entrance devices)
+  bulkDeleteDialog: boolean;
+  setBulkDeleteDialog: (open: boolean) => void;
+  bulkDeleteCount: number;
+  bulkDeleting: boolean;
+  handleBulkDelete: () => void;
+  confirmBulkDelete: () => Promise<void>;
+
   // Actions
   handleToggleDeviceWorking: (deviceId: string, currentStatus: boolean) => Promise<void>;
   handleExportCSV: () => void;
@@ -103,6 +111,9 @@ export function useDevicesPage(
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [showBrokenOnly, setShowBrokenOnly] = useState<boolean>(false);
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState<boolean>(false);
+  const [bulkDeleteCount, setBulkDeleteCount] = useState<number>(0);
+  const [bulkDeleting, setBulkDeleting] = useState<boolean>(false);
 
   // --- Derived data ---
   const brokenDeviceCount = useMemo<number>(
@@ -163,6 +174,30 @@ export function useDevicesPage(
       );
     });
   }, [commonDevicesHook.commonDevices, searchTerm, showBrokenOnly]);
+
+  // --- Combined bulk delete ---
+  // 일반 기기와 공동출입문 기기를 함께 선택해도 확인 모달은 하나만 띄운다.
+  const handleBulkDelete = (): void => {
+    const count =
+      selectionHook.selectedDevices.size + commonDevicesHook.selectedDevices.size;
+    if (count === 0) return;
+    // 각 하위 훅의 confirm이 선택을 즉시 비우므로 개수를 미리 저장해 둔다.
+    setBulkDeleteCount(count);
+    setBulkDeleteDialog(true);
+  };
+
+  const confirmBulkDelete = async (): Promise<void> => {
+    setBulkDeleting(true);
+    try {
+      const tasks: Promise<void>[] = [];
+      if (selectionHook.selectedDevices.size > 0) tasks.push(selectionHook.confirmBulkDelete());
+      if (commonDevicesHook.selectedDevices.size > 0) tasks.push(commonDevicesHook.confirmBulkDelete());
+      await Promise.all(tasks);
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteDialog(false);
+    }
+  };
 
   // --- Actions ---
   const handleToggleDeviceWorking = async (
@@ -256,6 +291,13 @@ export function useDevicesPage(
     groupedDevices,
     brokenDeviceCount,
     totalDeviceCount,
+
+    bulkDeleteDialog,
+    setBulkDeleteDialog,
+    bulkDeleteCount,
+    bulkDeleting,
+    handleBulkDelete,
+    confirmBulkDelete,
 
     handleToggleDeviceWorking,
     handleExportCSV,

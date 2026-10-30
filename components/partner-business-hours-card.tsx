@@ -1,9 +1,40 @@
 'use client';
 
 import { Clock } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Badge, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { DAY_OF_WEEK_LABEL, type PartnerBusinessHour } from '@/lib/types/partner';
+
+interface HoursGroup {
+  /** 예: '월–토', '일' */
+  label: string;
+  hour: PartnerBusinessHour;
+}
+
+function sameHours(a: PartnerBusinessHour, b: PartnerBusinessHour): boolean {
+  return (
+    a.isClosed === b.isClosed &&
+    a.openTime === b.openTime &&
+    a.closeTime === b.closeTime &&
+    a.breakStartTime === b.breakStartTime &&
+    a.breakEndTime === b.breakEndTime &&
+    a.lastOrderTime === b.lastOrderTime
+  );
+}
+
+/** 연달아 같은 시간인 요일을 '월–토'처럼 한 줄로 묶는다 (표시용) */
+function groupSameHours(hours: PartnerBusinessHour[]): HoursGroup[] {
+  const groups: { days: PartnerBusinessHour[] }[] = [];
+  hours.forEach((hour) => {
+    const last = groups[groups.length - 1];
+    if (last && sameHours(last.days[0], hour)) last.days.push(hour);
+    else groups.push({ days: [hour] });
+  });
+  return groups.map(({ days }) => {
+    const first = DAY_OF_WEEK_LABEL[days[0].dayOfWeek];
+    const lastDay = DAY_OF_WEEK_LABEL[days[days.length - 1].dayOfWeek];
+    return { label: days.length > 1 ? `${first}–${lastDay}` : first, hour: days[0] };
+  });
+}
 
 interface PartnerBusinessHoursCardProps {
   businessHours: PartnerBusinessHour[];
@@ -20,68 +51,65 @@ export function PartnerBusinessHoursCard({
   const hasHours = businessHours.length > 0;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          영업시간
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-6 py-0 pb-4">
-        {loading ? (
-          <p className="py-2 text-sm text-muted-foreground">불러오는 중...</p>
-        ) : !hasHours ? (
-          <p className="py-2 text-sm text-muted-foreground">등록된 영업시간이 없습니다.</p>
-        ) : (
-          <div className="divide-y divide-border/60">
-            {businessHours.map((hour) => (
-              <div
-                key={hour.dayOfWeek}
-                className="flex items-start justify-between gap-4 py-2 text-sm"
-              >
-                <span className="w-8 shrink-0 font-medium">
-                  {DAY_OF_WEEK_LABEL[hour.dayOfWeek]}
-                </span>
-                {hour.isClosed ? (
-                  <Badge variant="secondary" className="ml-auto">
-                    휴무
-                  </Badge>
-                ) : (
-                  <div className="ml-auto text-right">
-                    <div className="tabular-nums">
-                      {hour.openTime && hour.closeTime
-                        ? `${hour.openTime} – ${hour.closeTime}`
-                        : '-'}
-                    </div>
-                    {/* 브레이크타임·라스트오더는 입력한 파트너가 적어 등록된 경우에만 표기 */}
-                    {(hour.breakStartTime || hour.lastOrderTime) && (
-                      <div className="mt-1 flex flex-wrap justify-end gap-1">
-                        {hour.breakStartTime && hour.breakEndTime && (
-                          <Badge variant="outline" className="font-normal tabular-nums">
-                            브레이크 {hour.breakStartTime}–{hour.breakEndTime}
-                          </Badge>
-                        )}
-                        {hour.lastOrderTime && (
-                          <Badge variant="outline" className="font-normal tabular-nums">
-                            라스트오더 {hour.lastOrderTime}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+    <Paper withBorder radius="md" p="lg" h="100%">
+      <Group gap="xs" mb="sm">
+        <Clock size={16} color="var(--mantine-color-dimmed)" />
+        <Title order={5}>영업시간</Title>
+      </Group>
+      {loading ? (
+        <Text size="sm" c="dimmed" py="xs">불러오는 중...</Text>
+      ) : !hasHours ? (
+        <Text size="sm" c="dimmed" py="xs">등록된 영업시간이 없습니다.</Text>
+      ) : (
+        <Stack gap={0}>
+          {groupSameHours(businessHours).map(({ label, hour }, idx) => (
+            // 같은 시간인 요일은 한 줄로: 요일 · 영업시간 · (브레이크·라스트오더는 작게)
+            <Group
+              key={hour.dayOfWeek}
+              gap="sm"
+              wrap="nowrap"
+              align="baseline"
+              py={8}
+              style={idx > 0 ? { borderTop: '1px solid var(--app-divider)' } : undefined}
+            >
+              <Text size="sm" fw={600} w={48} style={{ flexShrink: 0 }}>
+                {label}
+              </Text>
+              {hour.isClosed ? (
+                <Text size="sm" c="dimmed">
+                  휴무
+                </Text>
+              ) : (
+                <Stack gap={2}>
+                  <Text size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {hour.openTime && hour.closeTime
+                      ? `${hour.openTime} – ${hour.closeTime}`
+                      : '-'}
+                  </Text>
+                  {/* 브레이크타임·라스트오더는 입력한 파트너가 적어 등록된 경우에만 표기 */}
+                  {hour.breakStartTime && hour.breakEndTime && (
+                    <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      브레이크 {hour.breakStartTime}–{hour.breakEndTime}
+                    </Text>
+                  )}
+                  {hour.lastOrderTime && (
+                    <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      라스트오더 {hour.lastOrderTime}
+                    </Text>
+                  )}
+                </Stack>
+              )}
+            </Group>
+          ))}
+        </Stack>
+      )}
 
-        {businessHoursNote && (
-          <div className="mt-3 rounded-md bg-muted/40 px-3 py-2">
-            <p className="text-xs font-medium text-muted-foreground">파트너 안내 문구</p>
-            <p className="mt-0.5 whitespace-pre-wrap text-sm">{businessHoursNote}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {businessHoursNote && (
+        <Paper bg="var(--app-bg-muted)" radius="sm" px="sm" py="xs" mt="sm">
+          <Text size="xs" fw={500} c="dimmed">파트너 안내 문구</Text>
+          <Text size="sm" mt={2} style={{ whiteSpace: 'pre-wrap' }}>{businessHoursNote}</Text>
+        </Paper>
+      )}
+    </Paper>
   );
 }

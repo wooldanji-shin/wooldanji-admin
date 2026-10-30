@@ -16,7 +16,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button } from '@/components/ui/button';
+import { Button, Group } from '@mantine/core';
 import { adImageKey } from '@/components/ad-image-picker';
 import type { SoloImage } from './useSoloPopupForm';
 
@@ -50,7 +50,7 @@ export function SoloImageSortableList({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={keys} strategy={rectSortingStrategy}>
-        <div className="flex flex-wrap items-start gap-3">
+        <Group align="flex-start" gap="sm">
           {images.map((image, index) => (
             <SortableThumbnail
               key={keys[index]}
@@ -60,7 +60,7 @@ export function SoloImageSortableList({
               onRemove={() => onRemove(index)}
             />
           ))}
-        </div>
+        </Group>
       </SortableContext>
     </DndContext>
   );
@@ -80,10 +80,17 @@ function SortableThumbnail({ id, image, index, onRemove }: SortableThumbnailProp
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
-      className="space-y-1"
     >
       <div
-        className="aspect-square w-[150px] cursor-grab touch-none overflow-hidden rounded-md border border-border bg-muted active:cursor-grabbing"
+        className="cursor-grab touch-none active:cursor-grabbing"
+        style={{
+          width: 150,
+          aspectRatio: '1 / 1',
+          overflow: 'hidden',
+          borderRadius: 'var(--mantine-radius-md)',
+          border: '1px solid var(--app-divider)',
+          background: 'var(--app-bg-muted)',
+        }}
         {...attributes}
         {...listeners}
       >
@@ -93,10 +100,11 @@ function SortableThumbnail({ id, image, index, onRemove }: SortableThumbnailProp
           src={image.kind === 'url' ? image.url : image.previewUrl}
           alt={`단독 팝업 이미지 ${index + 1}`}
           draggable={false}
-          className="h-full w-full object-cover"
+          className="object-cover"
+          style={{ width: '100%', height: '100%', display: 'block' }}
         />
       </div>
-      <Button type="button" size="sm" variant="outline" className="w-full" onClick={onRemove}>
+      <Button type="button" size="xs" variant="default" fullWidth mt={4} onClick={onRemove}>
         삭제
       </Button>
     </div>

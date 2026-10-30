@@ -158,6 +158,7 @@ export interface UseDeviceSelectionReturn {
   deleteDialog: boolean;
   setDeleteDialog: (open: boolean) => void;
   deviceToDelete: string | null;
+  deleting: boolean;
   handleDeleteDevice: (id: string) => void;
   confirmDeleteDevice: () => Promise<void>;
   bulkDeleteDialog: boolean;
@@ -188,6 +189,7 @@ export interface UseCommonDevicesReturn {
   deleteDialog: boolean;
   setDeleteDialog: (open: boolean) => void;
   deviceToDelete: string | null;
+  deleting: boolean;
   handleDeleteDevice: (id: string) => void;
   confirmDeleteDevice: () => Promise<void>;
   bulkDeleteDialog: boolean;

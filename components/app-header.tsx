@@ -2,29 +2,22 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { LogOut, User as UserIcon } from 'lucide-react';
-import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Separator } from '@/components/ui/separator';
+import { ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, User as UserIcon } from 'lucide-react';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+  ActionIcon,
+  Anchor,
+  Avatar,
+  Breadcrumbs,
+  Burger,
+  Group,
+  Menu,
+  Text,
+  UnstyledButton,
+} from '@mantine/core';
 import { getCurrentUser, logout } from '@/lib/auth';
-import { Fragment } from 'react';
+import type { UseAdminShellReturn } from '@/components/useAdminShell';
+import { ColorSchemeToggle } from '@/components/color-scheme-toggle';
+import classes from './app-header.module.css';
 
 const ROUTE_LABEL_MAP: Record<string, string> = {
   admin: '관리자',
@@ -55,6 +48,23 @@ const ROUTE_LABEL_MAP: Record<string, string> = {
   edit: '수정',
   view: '상세',
   new: '신규',
+  advertisements: '광고 관리',
+  'business-names': '상호명 관리',
+  coupons: '쿠폰 관리',
+  'design-system': '디자인 시스템',
+  'door-banner': '공동현관문 팝업',
+  'door-filler-images': '문열림 채움 이미지',
+  'door-popup-stats': '문열림 팝업 통계',
+  'membership-conversion': '회원 전환',
+  'partner-ad-intro-image': '광고 소개 이미지',
+  'partner-events': '이벤트 관리',
+  partners: '파트너 회원',
+  pricing: '가격 변동',
+  'sales-reps': '영업 담당자',
+  settlement: '정산 관리',
+  'solo-popup': '단독 팝업 광고',
+  'solo-popup-ad-intro-image': '단독 팝업 소개 이미지',
+  user: '보류 회원',
 };
 
 interface Crumb {
@@ -95,7 +105,11 @@ interface HeaderUser {
   email: string;
 }
 
-export function AppHeader(): React.ReactElement {
+interface AppHeaderProps {
+  shell: UseAdminShellReturn;
+}
+
+export function AppHeader({ shell }: AppHeaderProps): React.ReactElement {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<HeaderUser | null>(null);
@@ -117,87 +131,106 @@ export function AppHeader(): React.ReactElement {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:px-4">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mx-1 h-5" />
-      <Breadcrumb className="min-w-0">
-        <BreadcrumbList>
-          <BreadcrumbItem className="hidden md:inline-flex">
-            <BreadcrumbLink
-              onClick={() => router.push('/admin/apartments')}
-              className="cursor-pointer text-muted-foreground hover:text-foreground"
-            >
-              관리자
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          {crumbs.length > 0 && <BreadcrumbSeparator className="hidden md:block" />}
-          {crumbs.map((c, idx) => (
-            <Fragment key={c.href}>
-              {idx > 0 && <BreadcrumbSeparator />}
-              <BreadcrumbItem>
-                {c.isLast ? (
-                  <BreadcrumbPage className="font-medium text-foreground">
-                    {c.label}
-                  </BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink
-                    onClick={() => router.push(c.href)}
-                    className="cursor-pointer text-muted-foreground hover:text-foreground"
-                  >
-                    {c.label}
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            </Fragment>
-          ))}
-        </BreadcrumbList>
-      </Breadcrumb>
+    <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+      <Group gap="sm" wrap="nowrap" miw={0}>
+        <Burger
+          opened={shell.mobileOpened}
+          onClick={shell.toggleMobile}
+          hiddenFrom="sm"
+          size="sm"
+          aria-label="메뉴 열기"
+        />
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="lg"
+          onClick={shell.toggleDesktop}
+          visibleFrom="sm"
+          aria-label={shell.desktopOpened ? '사이드바 접기' : '사이드바 펼치기'}
+        >
+          {shell.desktopOpened ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+        </ActionIcon>
+        {/* 상세 페이지 제목 자리 (HeaderTitle이 채움) — 채워지면 아래 브레드크럼은 숨는다 */}
+        <div id="app-header-title" className={classes.titleSlot} style={{ minWidth: 0 }} />
+        <div className={classes.crumbs} style={{ minWidth: 0 }}>
+        {/* 휴대폰: 현재 페이지 이름만 */}
+        <Text size="sm" fw={600} truncate hiddenFrom="sm" aria-current="page">
+          {crumbs[crumbs.length - 1]?.label ?? '관리자'}
+        </Text>
+        <Breadcrumbs
+          visibleFrom="sm"
+          component="nav"
+          aria-label="breadcrumb"
+          separatorMargin={6}
+          style={{ flexWrap: 'nowrap', minWidth: 0 }}
+        >
+          <Anchor
+            component="button"
+            onClick={() => router.push('/admin/apartments')}
+            c="dimmed"
+            size="sm"
+          >
+            관리자
+          </Anchor>
+          {crumbs.map((c) =>
+            c.isLast ? (
+              <Text key={c.href} size="sm" fw={600} truncate aria-current="page">
+                {c.label}
+              </Text>
+            ) : (
+              <Anchor
+                key={c.href}
+                component="button"
+                onClick={() => router.push(c.href)}
+                c="dimmed"
+                size="sm"
+              >
+                {c.label}
+              </Anchor>
+            )
+          )}
+        </Breadcrumbs>
+        </div>
+      </Group>
 
-      <div className="ml-auto flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 gap-2 px-2 hover:bg-muted/60"
-            >
-              <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                  {user?.name?.charAt(0) ?? '?'}
-                </AvatarFallback>
+      <Group gap="sm" wrap="nowrap">
+      <ColorSchemeToggle />
+      <Menu position="bottom-end" width={224} shadow="md">
+        <Menu.Target>
+          <UnstyledButton>
+            <Group gap="xs" wrap="nowrap">
+              <Avatar size="sm" radius="xl" color="blue">
+                {user?.name?.charAt(0) ?? '?'}
               </Avatar>
-              <span className="hidden text-sm font-medium md:inline">
+              <Text size="sm" fw={500} visibleFrom="sm">
                 {user?.name ?? '...'}
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 shadow-popover">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{user?.name ?? '관리자'}</span>
-                {user?.email && (
-                  <span className="truncate text-xs text-muted-foreground">
-                    {user.email}
-                  </span>
-                )}
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled className="gap-2">
-              <UserIcon className="h-4 w-4" />
-              <span>프로필</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleLogout}
-              className="gap-2 text-destructive focus:text-destructive"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>로그아웃</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </header>
+              </Text>
+              <ChevronDown size={14} />
+            </Group>
+          </UnstyledButton>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Label>
+            <Text size="sm" fw={600} c="var(--mantine-color-text)">
+              {user?.name ?? '관리자'}
+            </Text>
+            {user?.email && (
+              <Text size="xs" c="dimmed" truncate>
+                {user.email}
+              </Text>
+            )}
+          </Menu.Label>
+          <Menu.Divider />
+          <Menu.Item disabled leftSection={<UserIcon size={16} />}>
+            프로필
+          </Menu.Item>
+          <Menu.Divider />
+          <Menu.Item color="red" leftSection={<LogOut size={16} />} onClick={handleLogout}>
+            로그아웃
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+      </Group>
+    </Group>
   );
 }

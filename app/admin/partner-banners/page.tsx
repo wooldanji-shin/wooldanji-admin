@@ -11,32 +11,23 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { TableSkeleton } from '@/components/skeletons';
-import { EmptyState } from '@/components/empty-state';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Group,
+  Modal,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Switch,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/supabase';
 import {
@@ -47,6 +38,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { confirmModal } from '@/components/confirm-modal';
+import { TableSkeleton } from '@/components/skeletons';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -156,7 +149,7 @@ export default function PartnerBannersPage() {
   }
 
   async function deleteBanner(b: PartnerBanner) {
-    if (!confirm('이 배너를 삭제하시겠습니까?')) return;
+    if (!(await confirmModal({ title: '배너 삭제', message: '이 배너를 삭제하시겠습니까?', confirmLabel: '삭제', danger: true }))) return;
     try {
       const { error: deleteErr } = await supabase
         .from('partner_banners')
@@ -173,9 +166,8 @@ export default function PartnerBannersPage() {
   if (error) {
     return (
       <PageShell>
-        <Alert variant='destructive'>
-          <AlertCircle className='h-4 w-4' />
-          <AlertDescription>{error}</AlertDescription>
+        <Alert color="red" variant="light" icon={<AlertCircle size={16} />}>
+          {error}
         </Alert>
       </PageShell>
     );
@@ -191,58 +183,78 @@ export default function PartnerBannersPage() {
       </PageHeader>
 
       <PageContent>
-        <Card>
-          <CardHeader>
-            <CardTitle>케이스 공통 배너 (A/B/C)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='overflow-x-auto'>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className='w-[12%]'>케이스</TableHead>
-                  <TableHead className='w-[20%]'>제목</TableHead>
-                  <TableHead className='w-[25%]'>내용</TableHead>
-                  <TableHead className='w-[10%]'>활성</TableHead>
-                  <TableHead className='w-[10%]'>시작</TableHead>
-                  <TableHead className='w-[10%]'>종료</TableHead>
-                  <TableHead className='w-[13%] text-right'>관리</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {caseRows.map(({ caseKey, banner }) => (
-                  <TableRow key={caseKey}>
-                    <TableCell>
-                      <div className='font-medium'>{caseKey}</div>
-                      <div className='text-xs text-muted-foreground'>
+        <Paper withBorder radius="md" p="lg">
+          <Title order={4} mb="md">
+            케이스 공통 배너 (A/B/C/D)
+          </Title>
+          <Table.ScrollContainer minWidth={720}>
+            <Table verticalSpacing="sm" horizontalSpacing="md" style={{ tableLayout: 'fixed' }}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w="12%">케이스</Table.Th>
+                  <Table.Th w="20%">제목</Table.Th>
+                  <Table.Th w="25%">내용</Table.Th>
+                  <Table.Th w="10%">활성</Table.Th>
+                  <Table.Th w="10%">시작</Table.Th>
+                  <Table.Th w="10%">종료</Table.Th>
+                  <Table.Th w="13%" ta="right">
+                    관리
+                  </Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {loading ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={7} p={0}>
+                      <TableSkeleton rows={4} columns={7} showHeader={false} />
+                    </Table.Td>
+                  </Table.Tr>
+                ) : caseRows.map(({ caseKey, banner }) => (
+                  <Table.Tr key={caseKey}>
+                    <Table.Td>
+                      <Text size="sm" fw={500}>
+                        {caseKey}
+                      </Text>
+                      <Text size="xs" c="dimmed">
                         {CASE_LABELS[caseKey]}
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
                       {banner ? (
-                        <span className='line-clamp-2'>{banner.title}</span>
+                        <Text size="sm" lineClamp={2}>
+                          {banner.title}
+                        </Text>
                       ) : (
-                        <span className='text-muted-foreground'>(없음)</span>
+                        <Text size="sm" c="dimmed">
+                          (없음)
+                        </Text>
                       )}
-                    </TableCell>
-                    <TableCell className='max-w-0'>
+                    </Table.Td>
+                    <Table.Td>
                       {banner ? (
-                        <p className='truncate text-sm text-muted-foreground'>{banner.content}</p>
+                        <Text size="sm" c="dimmed" truncate>
+                          {banner.content}
+                        </Text>
                       ) : (
-                        <span className='text-muted-foreground'>-</span>
+                        <Text size="sm" c="dimmed">
+                          -
+                        </Text>
                       )}
-                    </TableCell>
-                    <TableCell>
+                    </Table.Td>
+                    <Table.Td>
                       {banner ? (
                         <Switch
                           checked={banner.isActive}
-                          onCheckedChange={() => toggleActive(banner)}
+                          onChange={() => toggleActive(banner)}
+                          aria-label="활성"
                         />
                       ) : (
-                        <span className='text-muted-foreground'>-</span>
+                        <Text size="sm" c="dimmed">
+                          -
+                        </Text>
                       )}
-                    </TableCell>
-                    <TableCell>
+                    </Table.Td>
+                    <Table.Td>
                       {banner?.startAt
                         ? format(new Date(banner.startAt), 'yyyy-MM-dd', {
                             locale: ko,
@@ -250,8 +262,8 @@ export default function PartnerBannersPage() {
                         : banner
                           ? '즉시'
                           : '-'}
-                    </TableCell>
-                    <TableCell>
+                    </Table.Td>
+                    <Table.Td>
                       {banner?.endAt
                         ? format(new Date(banner.endAt), 'yyyy-MM-dd', {
                             locale: ko,
@@ -259,34 +271,35 @@ export default function PartnerBannersPage() {
                         : banner
                           ? '무기한'
                           : '-'}
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <Button
-                        size='sm'
-                        variant='outline'
-                        onClick={() => openCaseEditor(caseKey, banner)}
-                      >
-                        <Pencil className='mr-1 h-3 w-3' />
-                        {banner ? '편집' : '신규'}
-                      </Button>
-                      {banner ? (
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4} justify="flex-end" wrap="nowrap">
                         <Button
-                          size='sm'
-                          variant='ghost'
-                          className='ml-1 text-destructive'
-                          onClick={() => deleteBanner(banner)}
+                          size="xs"
+                          variant="default"
+                          leftSection={<Pencil size={12} />}
+                          onClick={() => openCaseEditor(caseKey, banner)}
                         >
-                          <Trash2 className='h-3 w-3' />
+                          {banner ? '편집' : '신규'}
                         </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
+                        {banner ? (
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            aria-label="삭제"
+                            onClick={() => deleteBanner(banner)}
+                          >
+                            <Trash2 size={14} />
+                          </ActionIcon>
+                        ) : null}
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </TableBody>
+              </Table.Tbody>
             </Table>
-            </div>
-          </CardContent>
-        </Card>
+          </Table.ScrollContainer>
+        </Paper>
 
         {/* 편집 모달 */}
         <BannerEditorDialog
@@ -387,88 +400,84 @@ function BannerEditorDialog({
   }
 
   return (
-    <Dialog open={!!editing} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className='max-w-lg'>
-        <DialogHeader>
-          <DialogTitle className='flex items-center gap-2'>
-            <Megaphone className='h-4 w-4 text-primary' />
-            {headerLabel}
-          </DialogTitle>
-          <DialogDescription>
-            케이스/파트너당 1행만 존재합니다. 저장 시 기존 배너가 있으면 덮어씁니다.
-          </DialogDescription>
-        </DialogHeader>
+    <Modal
+      opened={!!editing}
+      onClose={() => onClose()}
+      size="lg"
+      title={
+        <Group gap="xs">
+          <Megaphone size={16} color="var(--mantine-color-blue-filled)" />
+          {headerLabel}
+        </Group>
+      }
+    >
+      <Text size="sm" c="dimmed">
+        케이스/파트너당 1행만 존재합니다. 저장 시 기존 배너가 있으면 덮어씁니다.
+      </Text>
 
-        <div className='space-y-4'>
-          <div>
-            <Label htmlFor='banner-title'>제목</Label>
-            <Input
-              id='banner-title'
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={50}
-              placeholder='예: 가입 환영 — 첫 광고 무료'
-            />
-          </div>
-          <div>
-            <Label htmlFor='banner-content'>내용</Label>
-            <Textarea
-              id='banner-content'
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={4}
-              maxLength={300}
-              placeholder='예: 신규 파트너 회원에게는 첫 달 광고 비용을 면제합니다.'
-            />
-          </div>
-          <div className='flex items-center gap-3'>
-            <Switch checked={isActive} onCheckedChange={setIsActive} />
-            <Label>활성</Label>
-            <Badge variant={isActive ? 'default' : 'secondary'}>
-              {isActive ? '활성' : '비활성'}
-            </Badge>
-          </div>
-          <div className='grid grid-cols-2 gap-3'>
-            <div>
-              <Label htmlFor='banner-start'>시작 일시 (선택)</Label>
-              <Input
-                id='banner-start'
-                type='datetime-local'
-                value={startAt}
-                onChange={(e) => setStartAt(e.target.value)}
-              />
-              <div className='mt-1 text-xs text-muted-foreground'>
-                비워두면 즉시 시작
-              </div>
-            </div>
-            <div>
-              <Label htmlFor='banner-end'>종료 일시 (선택)</Label>
-              <Input
-                id='banner-end'
-                type='datetime-local'
-                value={endAt}
-                onChange={(e) => setEndAt(e.target.value)}
-              />
-              <div className='mt-1 text-xs text-muted-foreground'>
-                비워두면 무기한
-              </div>
-            </div>
-          </div>
-        </div>
+      <Stack gap="md" mt="md">
+        <TextInput
+          id="banner-title"
+          label="제목"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={50}
+          placeholder="예: 가입 환영 — 첫 광고 무료"
+        />
+        <Textarea
+          id="banner-content"
+          label="내용"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={4}
+          maxLength={300}
+          placeholder="예: 신규 파트너 회원에게는 첫 달 광고 비용을 면제합니다."
+        />
+        <Group gap="sm">
+          <Switch
+            checked={isActive}
+            onChange={(e) => setIsActive(e.currentTarget.checked)}
+            label="활성"
+          />
+          <Badge variant="light" color={isActive ? 'blue' : 'gray'}>
+            {isActive ? '활성' : '비활성'}
+          </Badge>
+        </Group>
+        <SimpleGrid cols={2} spacing="sm">
+          <TextInput
+            id="banner-start"
+            label="시작 일시 (선택)"
+            type="datetime-local"
+            value={startAt}
+            onChange={(e) => setStartAt(e.target.value)}
+            description="비워두면 즉시 시작"
+            inputWrapperOrder={['label', 'input', 'description', 'error']}
+          />
+          <TextInput
+            id="banner-end"
+            label="종료 일시 (선택)"
+            type="datetime-local"
+            value={endAt}
+            onChange={(e) => setEndAt(e.target.value)}
+            description="비워두면 무기한"
+            inputWrapperOrder={['label', 'input', 'description', 'error']}
+          />
+        </SimpleGrid>
+      </Stack>
 
-        <DialogFooter>
-          <Button variant='outline' onClick={onClose} disabled={saving}>
-            취소
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <Loader2 className='mr-1 h-4 w-4 animate-spin' />
-            ) : null}
-            저장 (UPSERT)
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={onClose} disabled={saving}>
+          취소
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          leftSection={saving ? <Loader2 size={16} className="animate-spin" /> : null}
+        >
+          저장 (UPSERT)
+        </Button>
+      </Group>
+    </Modal>
   );
 }
 

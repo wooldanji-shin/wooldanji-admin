@@ -6,12 +6,8 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { InlineLoadingSkeleton } from '@/components/skeletons';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { DetailSkeleton } from '@/components/skeletons';
+import { Button, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
 import { Loader2, Save } from 'lucide-react';
@@ -115,14 +111,7 @@ export default function HeaderSettingsPage() {
   };
 
   if (loading) {
-    return (
-      <PageShell>
-        <PageHeader>
-          <PageHeaderTitle title="헤더 설정" />
-        </PageHeader>
-        <InlineLoadingSkeleton />
-      </PageShell>
-    );
+    return <DetailSkeleton sections={1} />;
   }
 
   return (
@@ -132,72 +121,47 @@ export default function HeaderSettingsPage() {
       </PageHeader>
 
       <PageContent>
-        <div className='space-y-6'>
-          {/* Header Settings Card */}
-          <Card className='bg-card border-border'>
-            <CardHeader>
-              <CardTitle className='text-card-foreground'>헤더 텍스트</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-6'>
-              {/* Input Field */}
-              <div className='space-y-2'>
-                <Label htmlFor='headerText' className='text-sm font-medium'>
-                  텍스트
-                </Label>
-                <div className='relative'>
-                  <Input
-                    id='headerText'
-                    type='text'
-                    value={headerText}
-                    onChange={handleInputChange}
-                    placeholder='예: 주민이 추천하는 믿을 수 있는 곳'
-                    className='pr-16'
-                    maxLength={MAX_HEADER_LENGTH}
-                  />
-                  <div
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${
-                      headerText.length === MAX_HEADER_LENGTH
-                        ? 'text-destructive font-medium'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    {headerText.length}/{MAX_HEADER_LENGTH}
-                  </div>
-                </div>
-                <p className='text-xs text-muted-foreground'>
-                  스페이스 포함 최대 {MAX_HEADER_LENGTH}자까지 입력 가능합니다.
-                </p>
-              </div>
+        <Paper withBorder radius="md" p="lg">
+          <Stack gap="lg">
+            <Title order={4}>헤더 텍스트</Title>
+            <TextInput
+              id="headerText"
+              type="text"
+              label="텍스트"
+              description={`스페이스 포함 최대 ${MAX_HEADER_LENGTH}자까지 입력 가능합니다.`}
+              inputWrapperOrder={['label', 'input', 'description']}
+              value={headerText}
+              onChange={handleInputChange}
+              placeholder="예: 주민이 추천하는 믿을 수 있는 곳"
+              maxLength={MAX_HEADER_LENGTH}
+              rightSectionWidth={64}
+              rightSection={
+                <Text
+                  size="sm"
+                  c={headerText.length === MAX_HEADER_LENGTH ? 'red' : 'dimmed'}
+                  fw={headerText.length === MAX_HEADER_LENGTH ? 500 : undefined}
+                >
+                  {headerText.length}/{MAX_HEADER_LENGTH}
+                </Text>
+              }
+            />
 
-              {/* Action Buttons */}
-              <div className='flex justify-end gap-3 pt-4'>
-                <Button
-                  variant='outline'
-                  onClick={loadHeader}
-                  disabled={saving}
-                >
-                  초기화
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={saving || !headerText.trim()}
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                      저장 중...
-                    </>
-                  ) : (
-                    <>
-                      <Save className='mr-2 h-4 w-4' />
-                      저장
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <Group justify="flex-end" gap="sm">
+              <Button variant="default" onClick={loadHeader} disabled={saving}>
+                되돌리기
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving || !headerText.trim()}
+                leftSection={
+                  saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />
+                }
+              >
+                {saving ? '저장 중...' : '저장'}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
       </PageContent>
     </PageShell>
   );

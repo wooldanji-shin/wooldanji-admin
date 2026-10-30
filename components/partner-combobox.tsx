@@ -1,22 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, ChevronsUpDown, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { useMemo } from 'react';
+import { Select, Text, type ComboboxItem, type OptionsFilter } from '@mantine/core';
 
 export interface PartnerOption {
   id: string;
@@ -32,7 +17,7 @@ interface PartnerComboboxProps {
   value: string | null;
   onChange: (value: string | null) => void;
   placeholder?: string;
-  /** 트리거 버튼에 덧붙일 클래스 (예: 폭 변경) */
+  /** 입력창에 덧붙일 클래스 (예: 폭 변경) */
   className?: string;
 }
 
@@ -43,87 +28,52 @@ export function PartnerCombobox({
   placeholder = '파트너 선택',
   className,
 }: PartnerComboboxProps): React.ReactElement {
-  const [open, setOpen] = useState(false);
+  const partnerById = useMemo<Map<string, PartnerOption>>(
+    () => new Map(partners.map((p) => [p.id, p])),
+    [partners]
+  );
 
-  const selected = partners.find((p) => p.id === value);
+  // 화면에 보이는 항목은 모두 검색되게 한다 (상호명·대표자·전화번호·이메일)
+  const filter: OptionsFilter = ({ options, search }) => {
+    const query = search.toLowerCase().trim();
+    if (!query) return options;
+    return (options as ComboboxItem[]).filter((option) => {
+      const partner = partnerById.get(option.value);
+      if (!partner) return false;
+      return [partner.businessName, partner.description ?? '', partner.email ?? '']
+        .some((text) => text.toLowerCase().includes(query));
+    });
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            'h-11 w-[200px] justify-between border-border bg-card text-sm font-normal',
-            !value && 'text-muted-foreground',
-            className
-          )}
-        >
-          <span className="truncate">{selected?.businessName ?? placeholder}</span>
-          {value ? (
-            <X
-              className="ml-2 h-4 w-4 shrink-0 opacity-50 hover:opacity-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange(null);
-                setOpen(false);
-              }}
-            />
-          ) : (
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          )}
-        </Button>
-      </PopoverTrigger>
-      {/* 상호명 아래 대표자·전화번호가 잘리지 않을 만큼 넓힌다 */}
-      <PopoverContent className="w-[340px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="파트너 검색..." />
-          <CommandList>
-            <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
-            <CommandGroup>
-              {partners.map((partner) => (
-                <CommandItem
-                  key={partner.id}
-                  // 상호명이 같은 파트너가 있으면 cmdk가 같은 항목으로 취급해
-                  // 엉뚱한 파트너가 선택되므로 id를 붙여 값을 고유하게 만든다
-                  value={`${partner.businessName} ${partner.id}`}
-                  // 화면에 보이는 항목은 모두 검색되게 한다 (상호명·대표자·전화번호·이메일)
-                  keywords={[
-                    partner.businessName,
-                    partner.description ?? '',
-                    partner.email ?? '',
-                  ].filter(Boolean)}
-                  onSelect={() => {
-                    onChange(partner.id === value ? null : partner.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4 shrink-0',
-                      value === partner.id ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate">{partner.businessName}</span>
-                    {partner.description && (
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {partner.description}
-                      </span>
-                    )}
-                    {partner.email && (
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {partner.email}
-                      </span>
-                    )}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Select
+      searchable
+      clearable
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      nothingFoundMessage="검색 결과가 없습니다."
+      // value는 id라 상호명이 같은 파트너가 있어도 서로 구분된다
+      data={partners.map((p) => ({ value: p.id, label: p.businessName }))}
+      filter={filter}
+      renderOption={({ option }) => {
+        const partner = partnerById.get(option.value);
+        return (
+          <div style={{ minWidth: 0 }}>
+            <Text size="sm" truncate>{option.label}</Text>
+            {partner?.description && (
+              <Text size="xs" c="dimmed" truncate>{partner.description}</Text>
+            )}
+            {partner?.email && (
+              <Text size="xs" c="dimmed" truncate>{partner.email}</Text>
+            )}
+          </div>
+        );
+      }}
+      w={className ? undefined : 200}
+      className={className}
+      // 상호명 아래 대표자·전화번호가 잘리지 않을 만큼 넓힌다
+      comboboxProps={{ width: 340, position: 'bottom-start' }}
+    />
   );
 }

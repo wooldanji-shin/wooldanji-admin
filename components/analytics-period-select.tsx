@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Group, Select } from '@mantine/core';
 import type { AnalyticsPeriod } from '@/lib/ad-analytics-period';
 
 /** "전체"를 나타내는 값 — Select는 빈 문자열을 값으로 쓸 수 없다 */
@@ -35,49 +29,41 @@ export function AnalyticsPeriodSelect({
   const months = periods.filter((p) => p.year === value.year).map((p) => p.month);
 
   return (
-    <div className='flex items-center gap-1.5'>
+    <Group gap={6} wrap="nowrap">
       <Select
+        size="xs"
+        w={96}
         value={value.year === null ? ALL_VALUE : String(value.year)}
-        onValueChange={(v) =>
-          onChange({ year: v === ALL_VALUE ? null : Number(v), month: null })
-        }
-      >
-        <SelectTrigger className='h-8 w-[92px] text-xs'>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_VALUE}>전체</SelectItem>
-          {years.map((y) => (
-            <SelectItem key={y} value={String(y)}>
-              {y}년
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        onChange={(v) => {
+          if (v === null) return;
+          onChange({ year: v === ALL_VALUE ? null : Number(v), month: null });
+        }}
+        allowDeselect={false}
+        data={[
+          { value: ALL_VALUE, label: '전체' },
+          ...years.map((y) => ({ value: String(y), label: `${y}년` })),
+        ]}
+      />
 
       {value.year !== null && (
         <Select
+          size="xs"
+          w={84}
           value={value.month === null ? ALL_VALUE : String(value.month)}
-          onValueChange={(v) =>
+          onChange={(v) => {
+            if (v === null) return;
             onChange({
               year: value.year,
               month: v === ALL_VALUE ? null : Number(v),
-            })
-          }
-        >
-          <SelectTrigger className='h-8 w-[80px] text-xs'>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_VALUE}>전체</SelectItem>
-            {months.map((m) => (
-              <SelectItem key={m} value={String(m)}>
-                {m}월
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            });
+          }}
+          allowDeselect={false}
+          data={[
+            { value: ALL_VALUE, label: '전체' },
+            ...months.map((m) => ({ value: String(m), label: `${m}월` })),
+          ]}
+        />
       )}
-    </div>
+    </Group>
   );
 }

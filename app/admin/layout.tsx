@@ -1,9 +1,7 @@
 import type React from 'react';
 import { cookies } from 'next/headers';
 import { AuthGuard } from '@/components/auth-guard';
-import { AppSidebar } from '@/components/app-sidebar';
-import { AppHeader } from '@/components/app-header';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { AdminShell } from '@/components/admin-shell';
 
 export default async function AdminLayout({
   children,
@@ -16,13 +14,7 @@ export default async function AdminLayout({
 
   return (
     <AuthGuard>
-      <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar />
-        <SidebarInset className="bg-background">
-          <AppHeader />
-          <main className="flex-1 overflow-x-auto min-w-0">{children}</main>
-        </SidebarInset>
-      </SidebarProvider>
+      <AdminShell defaultOpen={defaultOpen}>{children}</AdminShell>
     </AuthGuard>
   );
 }

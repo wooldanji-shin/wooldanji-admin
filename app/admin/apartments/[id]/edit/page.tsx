@@ -1,29 +1,28 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Building2, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Plus, Trash2, Building2, AlertCircle } from 'lucide-react';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+  ActionIcon,
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Modal,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
+import { PageShell } from '@/components/page-shell';
+import { HeaderTitle } from '@/components/header-title';
+import { DetailSkeleton } from '@/components/skeletons';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { parseMultipleLineRanges, formatLineRange } from '@/lib/utils/line';
 
@@ -429,321 +428,309 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
   };
 
   if (loading) {
-    return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8"><div className="space-y-3"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-72" /></div><div className="flex flex-col gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div></div>
-    );
+    return <DetailSkeleton sections={2} />;
   }
 
   if (!apartment) {
     return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-        <Card className="border-border/70 shadow-card">
-          <CardContent className="text-center py-12 text-muted-foreground">
+      <PageShell>
+        <Paper withBorder radius="md" py={48} px="lg">
+          <Text ta="center" c="dimmed">
             아파트 정보를 찾을 수 없습니다.
-          </CardContent>
-        </Card>
-      </div>
+          </Text>
+        </Paper>
+      </PageShell>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 pb-24 pt-6 md:pt-8">
-      {/* Sticky Header */}
-      <div className="sticky top-14 z-10 -mx-4 border-b border-border bg-background/85 px-4 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:-mx-6 md:px-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            if (hasChanges) {
-              setBackConfirmDialog(true);
-            } else {
-              router.push('/admin/apartments');
-            }
-          }}
-          className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
-          뒤로
-        </Button>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight md:text-[1.625rem]">아파트 설정</h1>
-              {hasChanges && (
-                <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning-foreground">
-                  저장 안됨
-                </Badge>
-              )}
-            </div>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              아파트 정보와 구조를 관리합니다
-            </p>
-          </div>
-          <Button onClick={handleSave} disabled={saving || !hasChanges} size="lg">
-            {saving ? '저장 중...' : '저장'}
-          </Button>
-        </div>
-      </div>
+    <PageShell>
+      <HeaderTitle
+        title="아파트 설정"
+        onBack={() => {
+          if (hasChanges) {
+            setBackConfirmDialog(true);
+          } else {
+            router.push('/admin/apartments');
+          }
+        }}
+      />
+      <Group gap="sm">
+        <Text size="sm" c="dimmed">
+          아파트 정보와 구조를 관리합니다
+        </Text>
+        {hasChanges && (
+          <Badge variant="light" color="yellow">
+            저장 안됨
+          </Badge>
+        )}
+      </Group>
 
       {/* Basic Info */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>기본 정보</CardTitle>
-          <CardDescription>아파트의 기본 정보를 수정합니다</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>아파트명</Label>
-            <Input
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setHasChanges(true);
-              }}
-              placeholder="아파트명"
+      <Paper withBorder radius="md" p="lg">
+        <Stack gap="md">
+          <Stack gap={4}>
+            <Title order={4}>기본 정보</Title>
+            <Text size="sm" c="dimmed">아파트의 기본 정보를 수정합니다</Text>
+          </Stack>
+          <TextInput
+            label="아파트명"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setHasChanges(true);
+            }}
+            placeholder="아파트명"
+          />
+          <Group gap="xs" align="flex-end" wrap="nowrap">
+            <TextInput
+              label="주소"
+              value={address}
+              readOnly
+              placeholder="주소를 검색해주세요"
+              style={{ flex: 1 }}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>주소</Label>
-            <div className="flex gap-2">
-              <Input
-                value={address}
-                readOnly
-                placeholder="주소를 검색해주세요"
-              />
-              <Button type="button" onClick={handleAddressSearch}>
-                주소 검색
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            <Button type="button" onClick={handleAddressSearch}>
+              주소 검색
+            </Button>
+          </Group>
+        </Stack>
+      </Paper>
 
       {/* Buildings */}
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <Building2 className="inline-block mr-2 h-5 w-5" />
-              동 및 라인 관리
-            </CardTitle>
-            <CardDescription>각 동의 정보와 라인을 관리합니다</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {buildings.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  등록된 동이 없습니다. '동 추가하기' 버튼을 클릭하여 동을 추가해주세요.
-                </p>
-              ) : (
-                buildings.map((building) => (
-                  <Card key={building.id} className={building.isNew ? 'border-blue-200' : ''}>
-                    <CardContent className="pt-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {building.isNew && (
-                              <Badge variant="outline" className="text-blue-600 border-blue-600">
-                                신규
-                              </Badge>
-                            )}
-                            <span className="text-sm text-muted-foreground">
-                              {building.buildingNumber}동 {building.lines.length > 0 && `· ${building.lines.length}개 라인`}
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteBuilding(building.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            동 삭제
-                          </Button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>동 번호</Label>
-                            <Input
-                              type="number"
-                              value={building.buildingNumber === 0 ? '' : building.buildingNumber}
-                              onChange={(e) =>
-                                updateBuildingNumber(building.id, parseInt(e.target.value) || 0)
-                              }
-                              placeholder="동 번호 입력"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>세대수</Label>
-                            <Input
-                              type="number"
-                              value={building.householdsCount === 0 ? '' : building.householdsCount}
-                              onChange={(e) =>
-                                updateHouseholdsCount(building.id, parseInt(e.target.value) || 0)
-                              }
-                              placeholder="세대수 입력"
-                            />
-                          </div>
-                        </div>
+      <Stack gap="md">
+        <Paper withBorder radius="md" p="lg">
+          <Stack gap="lg">
+            <Stack gap={4}>
+              <Group gap="xs">
+                <Building2 size={20} />
+                <Title order={4}>동 및 라인 관리</Title>
+              </Group>
+              <Text size="sm" c="dimmed">각 동의 정보와 라인을 관리합니다</Text>
+            </Stack>
 
-                        <div className="space-y-2">
-                          <Label>라인 목록</Label>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {building.lines.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">등록된 라인이 없습니다</p>
-                            ) : (
-                              building.lines.map((line) => {
-                                const lineRange = formatLineRange(line.line);
-                                return (
-                                  <Badge
-                                    key={line.id}
-                                    variant={line.isNew ? "outline" : "secondary"}
-                                    className={`flex items-center gap-2 ${line.isNew ? 'border-blue-600 text-blue-600' : ''}`}
+            {buildings.length === 0 ? (
+              <Text ta="center" c="dimmed" py="xl">
+                등록된 동이 없습니다. &apos;동 추가하기&apos; 버튼을 클릭하여 동을 추가해주세요.
+              </Text>
+            ) : (
+              buildings.map((building) => (
+                <Paper
+                  key={building.id}
+                  withBorder
+                  radius="md"
+                  p="md"
+                  style={building.isNew ? { borderColor: 'var(--mantine-color-blue-3)' } : undefined}
+                >
+                  <Stack gap="md">
+                    <Group justify="space-between">
+                      <Group gap="xs">
+                        {building.isNew && (
+                          <Badge variant="light" color="blue">
+                            신규
+                          </Badge>
+                        )}
+                        <Text size="sm" c="dimmed">
+                          {building.buildingNumber}동 {building.lines.length > 0 && `· ${building.lines.length}개 라인`}
+                        </Text>
+                      </Group>
+                      <Button
+                        variant="subtle"
+                        color="red"
+                        size="xs"
+                        leftSection={<Trash2 size={16} />}
+                        onClick={() => handleDeleteBuilding(building.id)}
+                      >
+                        동 삭제
+                      </Button>
+                    </Group>
+                    <SimpleGrid cols={2} spacing="md">
+                      <TextInput
+                        label="동 번호"
+                        type="number"
+                        value={building.buildingNumber === 0 ? '' : building.buildingNumber}
+                        onChange={(e) =>
+                          updateBuildingNumber(building.id, parseInt(e.target.value) || 0)
+                        }
+                        placeholder="동 번호 입력"
+                      />
+                      <TextInput
+                        label="세대수"
+                        type="number"
+                        value={building.householdsCount === 0 ? '' : building.householdsCount}
+                        onChange={(e) =>
+                          updateHouseholdsCount(building.id, parseInt(e.target.value) || 0)
+                        }
+                        placeholder="세대수 입력"
+                      />
+                    </SimpleGrid>
+
+                    <Stack gap="xs">
+                      <Text size="sm" fw={500}>라인 목록</Text>
+                      <Group gap="xs">
+                        {building.lines.length === 0 ? (
+                          <Text size="sm" c="dimmed">등록된 라인이 없습니다</Text>
+                        ) : (
+                          building.lines.map((line) => {
+                            const lineRange = formatLineRange(line.line);
+                            return (
+                              <Badge
+                                key={line.id}
+                                variant="light"
+                                color={line.isNew ? 'blue' : 'gray'}
+                                size="lg"
+                                tt="none"
+                                rightSection={
+                                  <ActionIcon
+                                    size="xs"
+                                    variant="transparent"
+                                    color="red"
+                                    aria-label="라인 삭제"
+                                    onClick={() => handleDeleteLineClick(building.id, line.id, lineRange)}
                                   >
-                                    {lineRange}라인
-                                    {line.isNew && <span className="text-xs">(신규)</span>}
-                                    <button
-                                      onClick={() => handleDeleteLineClick(building.id, line.id, lineRange)}
-                                      className="ml-1 hover:text-destructive"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </button>
-                                  </Badge>
-                                );
-                              })
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="라인 번호 (예: 1~2, 3~7, 8~10)"
-                              value={newLines[building.id] || ''}
-                              onChange={(e) => {
-                                // 숫자, 쉼표, 물결표, 하이픈, 공백만 허용
-                                const value = e.target.value.replace(/[^0-9,~\-\s]/g, '');
-                                setNewLines({ ...newLines, [building.id]: value });
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleAddLine(building.id);
+                                    <Trash2 size={12} />
+                                  </ActionIcon>
                                 }
-                              }}
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleAddLine(building.id)}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              라인 추가
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                              >
+                                {lineRange}라인
+                                {line.isNew && <Text span size="xs" ml={4}>(신규)</Text>}
+                              </Badge>
+                            );
+                          })
+                        )}
+                      </Group>
+                      <Group gap="xs" wrap="nowrap">
+                        <TextInput
+                          placeholder="라인 번호 (예: 1~2, 3~7, 8~10)"
+                          value={newLines[building.id] || ''}
+                          onChange={(e) => {
+                            // 숫자, 쉼표, 물결표, 하이픈, 공백만 허용
+                            const value = e.target.value.replace(/[^0-9,~\-\s]/g, '');
+                            setNewLines({ ...newLines, [building.id]: value });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleAddLine(building.id);
+                            }
+                          }}
+                          style={{ flex: 1 }}
+                        />
+                        <Button
+                          variant="default"
+                          leftSection={<Plus size={16} />}
+                          onClick={() => handleAddLine(building.id)}
+                        >
+                          라인 추가
+                        </Button>
+                      </Group>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))
+            )}
+          </Stack>
+        </Paper>
 
-        <Button onClick={handleAddBuilding} className="w-full" variant="outline" size="lg">
-          <Plus className="h-4 w-4 mr-2" />
+        <Button
+          onClick={handleAddBuilding}
+          fullWidth
+          variant="default"
+          size="md"
+          leftSection={<Plus size={16} />}
+        >
           동 추가하기
         </Button>
-      </div>
+      </Stack>
 
       {/* Sticky Bottom Save Button */}
       {hasChanges && (
-        <div className="fixed bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t p-4">
-          <div className="container max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              <AlertCircle className="h-4 w-4 text-orange-600" />
-              <span className="text-muted-foreground">저장하지 않은 변경사항이 있습니다</span>
-            </div>
-            <Button onClick={handleSave} disabled={saving} size="lg">
+        <Box
+          pos="fixed"
+          bottom={0}
+          left="var(--app-shell-navbar-offset, 0px)"
+          right={0}
+          p="md"
+          bg="var(--mantine-color-body)"
+          style={{
+            zIndex: 10,
+            borderTop: '1px solid var(--app-divider)',
+          }}
+        >
+          <Group justify="space-between" maw={1280} mx="auto">
+            <Group gap="xs">
+              <ThemeIcon variant="transparent" color="orange" size="sm">
+                <AlertCircle size={16} />
+              </ThemeIcon>
+              <Text size="sm" c="dimmed">저장하지 않은 변경사항이 있습니다</Text>
+            </Group>
+            <Button onClick={handleSave} disabled={saving} size="md">
               {saving ? '저장 중...' : '저장'}
             </Button>
-          </div>
-        </div>
+          </Group>
+        </Box>
       )}
 
       {/* Delete Line Confirmation Dialog */}
-      <Dialog open={deleteLineDialog} onOpenChange={setDeleteLineDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>라인 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingLine?.lineRange}라인</strong>을 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없으며, 해당 라인의 모든 데이터(장소, 기기)가 삭제됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteLineDialog(false)}>
-              취소
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteLineConfirm}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={deleteLineDialog} onClose={() => setDeleteLineDialog(false)} title="라인 삭제">
+        <Text size="sm" c="dimmed">
+          정말로 <strong>{deletingLine?.lineRange}라인</strong>을 삭제하시겠습니까?
+          <br />
+          이 작업은 되돌릴 수 없으며, 해당 라인의 모든 데이터(장소, 기기)가 삭제됩니다.
+        </Text>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => setDeleteLineDialog(false)}>
+            취소
+          </Button>
+          <Button color="red" onClick={handleDeleteLineConfirm}>
+            삭제
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Delete Building Confirmation Dialog */}
-      <Dialog open={deleteBuildingDialog} onOpenChange={setDeleteBuildingDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>동 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingBuilding?.buildingNumber}동</strong>을 삭제하시겠습니까?
-            </DialogDescription>
-          </DialogHeader>
-          {deletingBuilding && deletingBuilding.linesCount > 0 && (
-            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <p className="text-sm text-destructive">
-                이 동에는 <strong>{deletingBuilding.linesCount}개의 라인</strong>이 있습니다.
-                <br />
-                동을 삭제하면 모든 라인과 해당 라인의 데이터(장소, 기기)도 함께 삭제됩니다.
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setDeleteBuildingDialog(false);
-              setDeletingBuilding(null);
-            }}>
-              취소
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteBuilding}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={deleteBuildingDialog} onClose={() => setDeleteBuildingDialog(false)} title="동 삭제">
+        <Text size="sm" c="dimmed">
+          정말로 <strong>{deletingBuilding?.buildingNumber}동</strong>을 삭제하시겠습니까?
+        </Text>
+        {deletingBuilding && deletingBuilding.linesCount > 0 && (
+          <Alert color="red" variant="light" mt="md">
+            <Text size="sm" c="red">
+              이 동에는 <strong>{deletingBuilding.linesCount}개의 라인</strong>이 있습니다.
+              <br />
+              동을 삭제하면 모든 라인과 해당 라인의 데이터(장소, 기기)도 함께 삭제됩니다.
+            </Text>
+          </Alert>
+        )}
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => {
+            setDeleteBuildingDialog(false);
+            setDeletingBuilding(null);
+          }}>
+            취소
+          </Button>
+          <Button color="red" onClick={confirmDeleteBuilding}>
+            삭제
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Back Confirmation Dialog */}
-      <Dialog open={backConfirmDialog} onOpenChange={setBackConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>저장하지 않은 변경사항</DialogTitle>
-            <DialogDescription>
-              저장하지 않은 변경사항이 있습니다. 정말 나가시겠습니까?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBackConfirmDialog(false)}>
-              취소
-            </Button>
-            <Button variant="destructive" onClick={() => {
-              setBackConfirmDialog(false);
-              router.push('/admin/apartments');
-            }}>
-              나가기
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <Modal opened={backConfirmDialog} onClose={() => setBackConfirmDialog(false)} title="저장하지 않은 변경사항">
+        <Text size="sm" c="dimmed">
+          저장하지 않은 변경사항이 있습니다. 정말 나가시겠습니까?
+        </Text>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => setBackConfirmDialog(false)}>
+            취소
+          </Button>
+          <Button color="red" onClick={() => {
+            setBackConfirmDialog(false);
+            router.push('/admin/apartments');
+          }}>
+            나가기
+          </Button>
+        </Group>
+      </Modal>
+    </PageShell>
   );
 }

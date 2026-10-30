@@ -1,53 +1,42 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   PageContent,
   PageHeader,
+  PageHeaderActions,
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { DataTableShell } from '@/components/data-table-shell';
+import { DataToolbar } from '@/components/data-toolbar';
+import { READONLY_INPUT_STYLES } from '@/components/readonly-input-styles';
+import { DataPagination } from '@/components/data-pagination';
+import { TableSkeleton } from '@/components/skeletons';
 import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Divider,
+  Group,
+  Menu,
+  Modal,
+  Overlay,
+  Select,
+  SimpleGrid,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Search, MoreVertical, Check, X, Eye, ChevronLeft, ChevronRight, Image as ImageIcon, Ban, Download, Edit, Loader2 } from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+  Text,
+  Textarea,
+  TextInput,
+  ThemeIcon,
+  UnstyledButton,
+} from '@mantine/core';
+import { Search, MoreVertical, Check, X, Eye, Image as ImageIcon, Ban, Download, Edit, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { UserFullDetails } from '@/lib/supabase/types';
 import { getUserRoles } from '@/lib/auth';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 
@@ -97,7 +86,7 @@ export default function UsersPage() {
   const [suspensionReason, setSuspensionReason] = useState('');
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
-  const [hideOpenDoorColumn, setHideOpenDoorColumn] = useState(false);
+  const [, setHideOpenDoorColumn] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   // 전체보기/수정 다이얼로그
@@ -670,48 +659,38 @@ export default function UsersPage() {
   const getApprovalBadge = (status: string | null) => {
     switch (status) {
       case 'approve':
-        return <Badge className="bg-green-500 text-white">승인</Badge>;
+        return <Badge variant="light" color="green">승인</Badge>;
       case 'pending':
-        return <Badge variant="secondary">대기</Badge>;
+        return <Badge variant="light" color="yellow">대기</Badge>;
       case 'suspended':
-        return <Badge className="bg-yellow-500 text-white">보류</Badge>;
+        return <Badge variant="light" color="orange">보류</Badge>;
       case 'inactive':
-        return <Badge className="bg-gray-500 text-white">비활성</Badge>;
+        return <Badge variant="light" color="gray">비활성</Badge>;
       default:
-        return <Badge variant="secondary">-</Badge>;
+        return <Badge variant="light" color="gray">-</Badge>;
     }
   };
 
   const getRegistrationTypeBadge = (type: string | null) => {
     switch (type) {
       case 'APARTMENT':
-        return <Badge className="bg-blue-500 text-white">아파트</Badge>;
+        return <Badge variant="light" color="blue">아파트</Badge>;
       case 'GENERAL':
-        return <Badge variant="outline">일반</Badge>;
+        return <Badge variant="light" color="gray">일반</Badge>;
       default:
-        return <Badge variant="secondary">-</Badge>;
+        return <Badge variant="light" color="gray">-</Badge>;
     }
   };
 
-  const getUserRole = (roles?: any[]) => {
-    if (!roles || roles.length === 0) return '-';
-    const roleMap: Record<string, string> = {
-      'APP_USER': '앱 사용자',
-      'APT_ADMIN': '아파트 관리자',
-      'MANAGER': '매니저',
-      'SUPER_ADMIN': '최고 관리자'
-    };
-    return roles.map(r => roleMap[r.role] || r.role).join(', ');
-  };
 
   const getRegisterMethodBadge = (method: string | null) => {
     switch (method?.toLowerCase()) {
       case 'google':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Google</Badge>;
+        return <Badge variant="light" color="red" size="sm">Google</Badge>;
       case 'kakao':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Kakao</Badge>;
+        return <Badge variant="light" color="yellow" size="sm">Kakao</Badge>;
       case 'local':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Email</Badge>;
+        return <Badge variant="light" color="blue" size="sm">Email</Badge>;
       default:
         return null;
     }
@@ -726,356 +705,315 @@ export default function UsersPage() {
           title="회원 관리"
           description="등록된 회원 정보를 검색하고 관리합니다."
         />
+        <PageHeaderActions>
+          <Button
+            variant='default'
+            onClick={handleExportCSV}
+            disabled={exporting || totalCount === 0}
+            leftSection={<Download size={16} />}
+          >
+            {exporting ? '내보내는 중...' : 'CSV 내보내기'}
+          </Button>
+        </PageHeaderActions>
       </PageHeader>
 
       <PageContent>
-        {/* Search and Filters */}
-        <div className='flex flex-col lg:flex-row gap-4 items-start lg:items-center mb-6'>
-          <div className='relative w-full lg:w-[300px]'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-            <Input
-              placeholder='이름, 이메일, 전화번호로 검색...'
-              value={searchInput}
-              onChange={(e) => handleSearch(e.target.value)}
-              className='pl-10'
-            />
-          </div>
+        <DataTableShell
+          toolbar={
+            <DataToolbar>
+              <TextInput
+                placeholder='이름, 이메일, 전화번호로 검색...'
+                value={searchInput}
+                onChange={(e) => handleSearch(e.target.value)}
+                leftSection={<Search size={16} />}
+                w={{ base: '100%', lg: 300 }}
+              />
 
-          <Select value={selectedApartment || 'all'} onValueChange={handleApartmentChange}>
-            <SelectTrigger className='w-full lg:w-[200px]'>
-              <SelectValue placeholder='아파트 선택' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>전체 아파트</SelectItem>
-              {apartments.map((apartment) => (
-                <SelectItem key={apartment.id} value={apartment.id}>
-                  {apartment.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <Select
+                placeholder='아파트 선택'
+                data={[
+                  { value: 'all', label: '전체 아파트' },
+                  ...apartments.map((apartment) => ({ value: apartment.id, label: apartment.name })),
+                ]}
+                value={selectedApartment || 'all'}
+                onChange={(v) => {
+                  if (v === null) return;
+                  handleApartmentChange(v);
+                }}
+                allowDeselect={false}
+                w={{ base: '100%', lg: 200 }}
+              />
 
-          <Select
-            value={selectedBuilding || 'all'}
-            onValueChange={handleBuildingChange}
-            disabled={!selectedApartment || selectedApartment === 'all'}
-          >
-            <SelectTrigger className='w-full lg:w-[150px]'>
-              <SelectValue placeholder='동 선택' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>전체 동</SelectItem>
-              {buildings.map((building) => (
-                <SelectItem key={building.id} value={building.id}>
-                  {building.buildingNumber}동
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <Select
+                placeholder='동 선택'
+                data={[
+                  { value: 'all', label: '전체 동' },
+                  ...buildings.map((building) => ({ value: building.id, label: `${building.buildingNumber}동` })),
+                ]}
+                value={selectedBuilding || 'all'}
+                onChange={(v) => {
+                  if (v === null) return;
+                  handleBuildingChange(v);
+                }}
+                allowDeselect={false}
+                disabled={!selectedApartment || selectedApartment === 'all'}
+                w={{ base: '100%', lg: 150 }}
+              />
 
-          <Select value={selectedRegistrationType || 'all'} onValueChange={handleRegistrationTypeChange}>
-            <SelectTrigger className='w-full lg:w-[150px]'>
-              <SelectValue placeholder='회원유형' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>전체 유형</SelectItem>
-              <SelectItem value='APARTMENT'>아파트</SelectItem>
-              <SelectItem value='GENERAL'>일반</SelectItem>
-              <SelectItem value='PARTNER'>파트너</SelectItem>
-            </SelectContent>
-          </Select>
+              <Select
+                placeholder='회원유형'
+                data={[
+                  { value: 'all', label: '전체 유형' },
+                  { value: 'APARTMENT', label: '아파트' },
+                  { value: 'GENERAL', label: '일반' },
+                  { value: 'PARTNER', label: '파트너' },
+                ]}
+                value={selectedRegistrationType || 'all'}
+                onChange={(v) => {
+                  if (v === null) return;
+                  handleRegistrationTypeChange(v);
+                }}
+                allowDeselect={false}
+                w={{ base: '100%', lg: 150 }}
+              />
 
-          <div className='flex items-center gap-4 lg:ml-auto'>
-            <span className='text-sm text-muted-foreground whitespace-nowrap'>
-              전체 {totalCount}명
-            </span>
-            <Button
-              variant='outline'
-              onClick={handleExportCSV}
-              disabled={exporting || totalCount === 0}
-              className='h-11 px-5'
-            >
-              <Download className='h-4 w-4 mr-2' />
-              {exporting ? '내보내는 중...' : 'CSV 내보내기'}
-            </Button>
-          </div>
-        </div>
-
-        {/* Users Table */}
-        <Card className='bg-card border-border'>
-          <CardContent className='p-0'>
-            <div className='overflow-x-auto relative min-h-[400px]'>
-              <Table>
-                <TableHeader>
-                  <TableRow className='border-border hover:bg-transparent'>
-                    <TableHead className='text-muted-foreground w-12'>
-                      사진
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      이름
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      전화번호
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      회원유형
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      아파트/동/호
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      출생년도
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      승인상태
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      가입일
-                    </TableHead>
-                    <TableHead className='text-muted-foreground text-center'>
-                      문 연 횟수
-                    </TableHead>
-                    <TableHead className='text-muted-foreground text-right'>
-                      작업
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {initialLoading && loading ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className='text-center py-12 text-muted-foreground'>
-  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
-                      </TableCell>
-                    </TableRow>
-                  ) : users.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className='text-center py-12 text-muted-foreground'>
-                        {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    users.map((user) => (
-                      <TableRow
-                        key={user.id}
-                        className='border-border hover:bg-secondary/50 cursor-pointer'
-                        onClick={() => handleDetailClick(user)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          {user.confirmImageUrl ? (
-                            <button
-                              onClick={() => setImagePreview(user.confirmImageUrl)}
-                              className='w-10 h-10 rounded-full overflow-hidden bg-secondary flex items-center justify-center hover:opacity-80 transition-opacity'
+            </DataToolbar>
+          }
+          summary={
+            <Text size="sm" c="dimmed">
+              전체 <Text span fw={700} c="var(--mantine-color-text)">{totalCount}</Text>명
+            </Text>
+          }
+        >
+          <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w={48}>사진</Table.Th>
+                <Table.Th>이름</Table.Th>
+                <Table.Th>전화번호</Table.Th>
+                <Table.Th>회원유형</Table.Th>
+                <Table.Th>아파트/동/호</Table.Th>
+                <Table.Th>출생년도</Table.Th>
+                <Table.Th>승인상태</Table.Th>
+                <Table.Th>가입일</Table.Th>
+                <Table.Th ta="center">문 연 횟수</Table.Th>
+                <Table.Th ta="right">작업</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {initialLoading && loading ? (
+                <Table.Tr>
+                  <Table.Td colSpan={10} p={0}>
+                    <TableSkeleton rows={8} columns={10} showHeader={false} />
+                  </Table.Td>
+                </Table.Tr>
+              ) : users.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={10} ta="center" py={48} c="dimmed">
+                    {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
+                  </Table.Td>
+                </Table.Tr>
+              ) : (
+                users.map((user) => (
+                  <Table.Tr
+                    key={user.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleDetailClick(user)}
+                  >
+                    <Table.Td onClick={(e) => e.stopPropagation()}>
+                      {user.confirmImageUrl ? (
+                        <UnstyledButton
+                          onClick={() => setImagePreview(user.confirmImageUrl)}
+                          w={40}
+                          h={40}
+                          bg="var(--app-bg-subtle)"
+                          style={{
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <img
+                            src={user.confirmImageUrl}
+                            alt={user.name || ''}
+                            className='w-full h-full object-cover'
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement!.innerHTML = '<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                            }}
+                          />
+                        </UnstyledButton>
+                      ) : (
+                        <ThemeIcon variant="light" color="gray" radius="xl" size={40}>
+                          <ImageIcon size={20} />
+                        </ThemeIcon>
+                      )}
+                    </Table.Td>
+                    <Table.Td fw={500}>
+                      <Group gap={6} wrap="nowrap">
+                        {user.name || '-'}
+                        {getRegisterMethodBadge(user.registerMethod)}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {user.phoneNumber || '-'}
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4}>
+                        {getRegistrationTypeBadge(user.registrationType)}
+                        {partnerUserIds.has(user.id) && (
+                          <Badge variant="light" color="grape">파트너</Badge>
+                        )}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {user.registrationType === 'APARTMENT' && user.apartments ? (
+                        <Text size="sm" c="dimmed">
+                          {user.apartments.name}<br/>
+                          {user.buildingNumber ? `${user.buildingNumber}동` : ''}
+                          {user.unit ? `${user.unit}호` : ''}
+                        </Text>
+                      ) : (
+                        '-'
+                      )}
+                    </Table.Td>
+                    <Table.Td c="dimmed" fz="sm">
+                      {(user as any).birthDay ? (
+                        <>
+                          {(user as any).birthDay.substring(0, 4)}
+                          <Text span size="xs" ml={4}>
+                            (만 {new Date().getFullYear() - parseInt((user as any).birthDay.substring(0, 4))}세)
+                          </Text>
+                        </>
+                      ) : '-'}
+                    </Table.Td>
+                    <Table.Td>
+                      {getApprovalBadge(user.approvalStatus)}
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {formatDate(user.createdAt)}
+                    </Table.Td>
+                    <Table.Td ta="center" c="dimmed">
+                      {(user as any).openDoorCount > 0 ? (
+                        <span>{(user as any).openDoorCount}회</span>
+                      ) : (
+                        <span>-</span>
+                      )}
+                    </Table.Td>
+                    <Table.Td onClick={(e) => e.stopPropagation()}>
+                      <Group gap={4} justify="flex-end" wrap="nowrap">
+                        {user.registrationType === 'APARTMENT' && user.approvalStatus === 'pending' && (
+                          <>
+                            <Button
+                              variant='subtle'
+                              color='green'
+                              size='compact-sm'
+                              leftSection={<Check size={12} />}
+                              onClick={() => handleApprovalStatusChange(user.id, 'approve')}
                             >
-                              <img
-                                src={user.confirmImageUrl}
-                                alt={user.name || ''}
-                                className='w-full h-full object-cover'
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  e.currentTarget.parentElement!.innerHTML = '<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
-                                }}
-                              />
-                            </button>
-                          ) : (
-                            <div className='w-10 h-10 rounded-full bg-secondary flex items-center justify-center'>
-                              <ImageIcon className='w-5 h-5 text-muted-foreground' />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className='font-medium text-card-foreground'>
-                          <div className='flex items-center gap-1.5'>
-                            {user.name || '-'}
-                            {getRegisterMethodBadge(user.registerMethod)}
-                          </div>
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {user.phoneNumber || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className='flex items-center gap-1 flex-wrap'>
-                            {getRegistrationTypeBadge(user.registrationType)}
-                            {partnerUserIds.has(user.id) && (
-                              <Badge className='bg-purple-500 text-white'>파트너</Badge>
+                              승인
+                            </Button>
+                            <Button
+                              variant='subtle'
+                              color='yellow'
+                              size='compact-sm'
+                              leftSection={<Ban size={12} />}
+                              onClick={() => handleSuspendClick(user)}
+                            >
+                              보류
+                            </Button>
+                          </>
+                        )}
+                        <Menu position='bottom-end' withinPortal>
+                          <Menu.Target>
+                            <ActionIcon variant='subtle' color='gray' aria-label='더보기'>
+                              <MoreVertical size={16} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item
+                              leftSection={<Edit size={16} />}
+                              onClick={() => handleDetailClick(user)}
+                            >
+                              전체보기
+                            </Menu.Item>
+                            {user.confirmImageUrl && (
+                              <Menu.Item
+                                leftSection={<Eye size={16} />}
+                                onClick={() => setImagePreview(user.confirmImageUrl)}
+                              >
+                                인증 사진 보기
+                              </Menu.Item>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {user.registrationType === 'APARTMENT' && user.apartments ? (
-                            <span className='text-sm'>
-                              {user.apartments.name}<br/>
-                              {user.buildingNumber ? `${user.buildingNumber}동` : ''}
-                              {user.unit ? `${user.unit}호` : ''}
-                            </span>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell className='text-muted-foreground text-sm'>
-                          {(user as any).birthDay ? (
-                            <>
-                              {(user as any).birthDay.substring(0, 4)}
-                              <span className='text-xs ml-1'>
-                                (만 {new Date().getFullYear() - parseInt((user as any).birthDay.substring(0, 4))}세)
-                              </span>
-                            </>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {getApprovalBadge(user.approvalStatus)}
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {formatDate(user.createdAt)}
-                        </TableCell>
-                        <TableCell className='text-center text-muted-foreground'>
-                          {(user as any).openDoorCount > 0 ? (
-                            <span>{(user as any).openDoorCount}회</span>
-                          ) : (
-                            <span>-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className='text-right' onClick={(e) => e.stopPropagation()}>
-                          <div className='flex items-center justify-end gap-1'>
-                            {user.registrationType === 'APARTMENT' && user.approvalStatus === 'pending' && (
-                              <>
-                                <Button
-                                  variant='ghost'
-                                  size='sm'
-                                  className='text-green-600 hover:text-green-700 hover:bg-green-50 h-8 px-2 text-xs'
-                                  onClick={() => handleApprovalStatusChange(user.id, 'approve')}
-                                >
-                                  <Check className='h-3 w-3 mr-1' />
-                                  승인
-                                </Button>
-                                <Button
-                                  variant='ghost'
-                                  size='sm'
-                                  className='text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 h-8 px-2 text-xs'
-                                  onClick={() => handleSuspendClick(user)}
-                                >
-                                  <Ban className='h-3 w-3 mr-1' />
-                                  보류
-                                </Button>
-                              </>
+                            {user.registrationType === 'APARTMENT' && user.approvalStatus === 'approve' && (
+                              <Menu.Item
+                                color='orange'
+                                leftSection={<X size={16} />}
+                                onClick={() => handleApprovalStatusChange(user.id, 'pending')}
+                              >
+                                승인 취소
+                              </Menu.Item>
                             )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant='ghost'
-                                  size='icon-sm'
-                                  className='text-muted-foreground hover:text-foreground hover:bg-secondary'
-                                >
-                                  <MoreVertical className='h-4 w-4' />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align='end'>
-                                <DropdownMenuItem onClick={() => handleDetailClick(user)}>
-                                  <Edit className='mr-2 h-4 w-4' />
-                                  전체보기
-                                </DropdownMenuItem>
-                                {user.confirmImageUrl && (
-                                  <DropdownMenuItem onClick={() => setImagePreview(user.confirmImageUrl)}>
-                                    <Eye className='mr-2 h-4 w-4' />
-                                    인증 사진 보기
-                                  </DropdownMenuItem>
-                                )}
-                                {user.registrationType === 'APARTMENT' && user.approvalStatus === 'approve' && (
-                                  <DropdownMenuItem
-                                    onClick={() => handleApprovalStatusChange(user.id, 'pending')}
-                                    className='text-orange-600'
-                                  >
-                                    <X className='mr-2 h-4 w-4' />
-                                    승인 취소
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))
+              )}
+            </Table.Tbody>
+          </Table>
+        </DataTableShell>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className='flex items-center justify-center gap-2'>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className='h-4 w-4' />
-              이전
-            </Button>
-            <div className='flex gap-1'>
-              {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 10) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 4) {
-                  pageNum = totalPages - 9 + i;
-                } else {
-                  pageNum = currentPage - 4 + i;
-                }
-
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? 'default' : 'outline'}
-                    size='sm'
-                    onClick={() => handlePageChange(pageNum)}
-                    className='w-10'
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              다음
-              <ChevronRight className='h-4 w-4' />
-            </Button>
-          </div>
+          <DataPagination
+            page={currentPage}
+            pageSize={ITEMS_PER_PAGE}
+            totalCount={totalCount}
+            onPageChange={handlePageChange}
+          />
         )}
       </PageContent>
 
       {/* Image Preview Modal */}
       {imagePreview && (
-        <div
-          className='fixed inset-0 bg-black/80 flex items-center justify-center p-8'
-          style={{ zIndex: 9999 }}
+        <Overlay
+          fixed
+          center
+          zIndex={9999}
+          backgroundOpacity={0.8}
+          p="xl"
           onClick={(e) => {
             e.stopPropagation();
             setImagePreview(null);
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div
-            className='relative max-w-4xl max-h-[85vh] flex items-center justify-center'
+          <Box
+            pos='relative'
+            maw={896}
+            mah='85vh'
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={(e) => e.stopPropagation()}
           >
             <img
               src={imagePreview}
               alt='인증 사진'
-              className='max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl'
+              className='object-contain'
+              style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 8 }}
               onClick={(e) => e.stopPropagation()}
             />
-            <Button
-              variant='secondary'
-              size='icon'
-              className='absolute top-4 right-4 rounded-full shadow-lg'
+            <ActionIcon
+              variant='default'
+              radius='xl'
+              size='lg'
+              pos='absolute'
+              top={16}
+              right={16}
+              aria-label='닫기'
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1086,243 +1024,207 @@ export default function UsersPage() {
                 e.stopPropagation();
               }}
             >
-              <X className='h-5 w-5' />
-            </Button>
-          </div>
-        </div>
+              <X size={20} />
+            </ActionIcon>
+          </Box>
+        </Overlay>
       )}
 
       {/* Suspend Confirmation Dialog */}
-      <Dialog open={suspendDialog} onOpenChange={setSuspendDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>승인 보류</DialogTitle>
-            <DialogDescription>
-              <strong>{suspendingUser?.name || suspendingUser?.email}</strong>님의 승인을 보류하시겠습니까?
-              <br />
-              보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className='py-4'>
-            <textarea
-              className='w-full min-h-[100px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary'
-              placeholder='보류 사유를 입력해주세요...'
-              value={suspensionReason}
-              onChange={(e) => setSuspensionReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setSuspendDialog(false)}>
-              취소
-            </Button>
-            <Button variant='default' onClick={handleSuspendConfirm} className='bg-yellow-600 hover:bg-yellow-700'>
-              승인 보류
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={suspendDialog} onClose={() => setSuspendDialog(false)} title='승인 보류'>
+        <Text size='sm' c='dimmed'>
+          <strong>{suspendingUser?.name || suspendingUser?.email}</strong>님의 승인을 보류하시겠습니까?
+          <br />
+          보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
+        </Text>
+        <Textarea
+          mt='md'
+          minRows={4}
+          autosize
+          placeholder='보류 사유를 입력해주세요...'
+          value={suspensionReason}
+          onChange={(e) => setSuspensionReason(e.target.value)}
+        />
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setSuspendDialog(false)}>
+            취소
+          </Button>
+          <Button color='yellow' onClick={handleSuspendConfirm}>
+            승인 보류
+          </Button>
+        </Group>
+      </Modal>
 
       {/* 전체보기/수정 다이얼로그 */}
-      <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
-        <DialogContent className='max-w-3xl max-h-[90vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>회원 전체보기</DialogTitle>
-            <DialogDescription>
-              회원 정보를 확인하고 수정할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
+      <Modal
+        opened={detailDialog}
+        onClose={() => setDetailDialog(false)}
+        title='회원 전체보기'
+        size='xl'
+      >
+        <Text size='sm' c='dimmed'>
+          회원 정보를 확인하고 수정할 수 있습니다.
+        </Text>
 
-          <div className='grid grid-cols-2 gap-4 py-4'>
-            {/* 기본 정보 */}
-            <div className='space-y-2'>
-              <Label htmlFor='detail-name'>이름</Label>
-              <Input
-                id='detail-name'
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-email'>이메일 </Label>
-              <Input
-                id='detail-email'
-                value={editForm.email}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-phone'>전화번호</Label>
-              <Input
-                id='detail-phone'
-                value={editForm.phoneNumber}
-                onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-birthday'>생년월일</Label>
-              <Input
-                id='detail-birthday'
-                value={editForm.birthDay}
-                onChange={(e) => setEditForm({ ...editForm, birthDay: e.target.value })}
-                placeholder='YYYY-MM-DD'
-              />
-            </div>
+        <SimpleGrid cols={2} spacing='md' mt='md'>
+          {/* 기본 정보 */}
+          <TextInput
+            id='detail-name'
+            label='이름'
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+          />
+          <TextInput
+            id='detail-email'
+            label='이메일'
+            value={editForm.email}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            id='detail-phone'
+            label='전화번호'
+            value={editForm.phoneNumber}
+            onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+          />
+          <TextInput
+            id='detail-birthday'
+            label='생년월일'
+            value={editForm.birthDay}
+            onChange={(e) => setEditForm({ ...editForm, birthDay: e.target.value })}
+            placeholder='YYYY-MM-DD'
+          />
 
-            {/* 아파트 정보 */}
-            <div className='col-span-2 space-y-2'>
-              <Label htmlFor='detail-apartment'>아파트 </Label>
-              <Input
-                id='detail-apartment'
-                value={detailUser?.apartments?.name || '-'}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-building'>동</Label>
-              <Input
-                id='detail-building'
-                type='number'
-                value={editForm.buildingNumber}
-                onChange={(e) => setEditForm({ ...editForm, buildingNumber: e.target.value })}
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-unit'>호</Label>
-              <Input
-                id='detail-unit'
-                type='number'
-                value={editForm.unit}
-                onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
-              />
-            </div>
+          {/* 아파트 정보 */}
+          <TextInput
+            id='detail-apartment'
+            label='아파트'
+            value={detailUser?.apartments?.name || '-'}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+            style={{ gridColumn: 'span 2' }}
+          />
+          <TextInput
+            id='detail-building'
+            label='동'
+            type='text'
+            inputMode='numeric'
+            value={editForm.buildingNumber}
+            onChange={(e) => setEditForm({ ...editForm, buildingNumber: e.target.value })}
+          />
+          <TextInput
+            id='detail-unit'
+            label='호'
+            type='text'
+            inputMode='numeric'
+            value={editForm.unit}
+            onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+          />
 
-            {/* 지역 정보  */}
-            <div className='space-y-2'>
-              <Label htmlFor='detail-address'>주소 </Label>
-              <Input
-                id='detail-address'
-                value={editForm.address}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-sido'>시/도 </Label>
-              <Input
-                id='detail-sido'
-                value={editForm.regionSido}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-sigungu'>시/군/구 </Label>
-              <Input
-                id='detail-sigungu'
-                value={editForm.regionSigungu}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-dong'>읍/면/동 </Label>
-              <Input
-                id='detail-dong'
-                value={editForm.regionDong}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
+          {/* 지역 정보  */}
+          <TextInput
+            id='detail-address'
+            label='주소'
+            value={editForm.address}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            id='detail-sido'
+            label='시/도'
+            value={editForm.regionSido}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            id='detail-sigungu'
+            label='시/군/구'
+            value={editForm.regionSigungu}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            id='detail-dong'
+            label='읍/면/동'
+            value={editForm.regionDong}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
 
-            {/* 상태 정보  */}
-            <div className='space-y-2'>
-              <Label htmlFor='detail-registrationType'>회원유형 </Label>
-              <Select
-                value={editForm.registrationType}
-                disabled
-              >
-                <SelectTrigger className='bg-muted text-gray-700 disabled:opacity-100'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='APARTMENT'>아파트</SelectItem>
-                  <SelectItem value='GENERAL'>일반</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-approvalStatus'>승인상태 </Label>
-              <Select
-                value={editForm.approvalStatus}
-                disabled
-              >
-                <SelectTrigger className='bg-muted text-gray-700 disabled:opacity-100'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='pending'>대기</SelectItem>
-                  <SelectItem value='approve'>승인</SelectItem>
-                  <SelectItem value='suspended'>보류</SelectItem>
-                  <SelectItem value='inactive'>비활성</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* 상태 정보  */}
+          <Select
+            id='detail-registrationType'
+            label='회원유형'
+            data={[
+              { value: 'APARTMENT', label: '아파트' },
+              { value: 'GENERAL', label: '일반' },
+            ]}
+            value={editForm.registrationType || null}
+            allowDeselect={false}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <Select
+            id='detail-approvalStatus'
+            label='승인상태'
+            data={[
+              { value: 'pending', label: '대기' },
+              { value: 'approve', label: '승인' },
+              { value: 'suspended', label: '보류' },
+              { value: 'inactive', label: '비활성' },
+            ]}
+            value={editForm.approvalStatus || null}
+            allowDeselect={false}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
 
-            {/* 카운트 정보 */}
-            <div className='space-y-2'>
-              <Label htmlFor='detail-openDoorCount'>문 연 횟수</Label>
-              <Input
-                id='detail-openDoorCount'
-                type='number'
-                value={editForm.openDoorCount}
-                onChange={(e) => setEditForm({ ...editForm, openDoorCount: e.target.value })}
-              />
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor='detail-rssLevel'>RSS 레벨</Label>
-              <Input
-                id='detail-rssLevel'
-                type='number'
-                value={editForm.rssLevel}
-                onChange={(e) => setEditForm({ ...editForm, rssLevel: e.target.value })}
-              />
-            </div>
+          {/* 카운트 정보 */}
+          <TextInput
+            id='detail-openDoorCount'
+            label='문 연 횟수'
+            type='text'
+            inputMode='numeric'
+            value={editForm.openDoorCount}
+            onChange={(e) => setEditForm({ ...editForm, openDoorCount: e.target.value })}
+          />
+          <TextInput
+            id='detail-rssLevel'
+            label='RSS 레벨'
+            type='text'
+            inputMode='numeric'
+            value={editForm.rssLevel}
+            onChange={(e) => setEditForm({ ...editForm, rssLevel: e.target.value })}
+          />
+        </SimpleGrid>
 
-            {/* 읽기 전용 정보 */}
-            <div className='col-span-2 border-t pt-4 mt-2'>
-              <p className='text-sm text-muted-foreground mb-2'>읽기 전용 정보</p>
-              <div className='grid grid-cols-2 gap-4 text-sm'>
-                <div>
-                  <span className='text-muted-foreground'>가입일: </span>
-                  <span>{detailUser?.createdAt ? formatDate(detailUser.createdAt) : '-'}</span>
-                </div>
-                <div>
-                  <span className='text-muted-foreground'>플랫폼: </span>
-                  <span>{detailUser?.platform || '-'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* 읽기 전용 정보 */}
+        <Divider my='md' />
+        <Text size='sm' c='dimmed' mb='xs'>읽기 전용 정보</Text>
+        <SimpleGrid cols={2} spacing='md'>
+          <Text size='sm'>
+            <Text span c='dimmed' inherit>가입일: </Text>
+            {detailUser?.createdAt ? formatDate(detailUser.createdAt) : '-'}
+          </Text>
+          <Text size='sm'>
+            <Text span c='dimmed' inherit>플랫폼: </Text>
+            {detailUser?.platform || '-'}
+          </Text>
+        </SimpleGrid>
 
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDetailDialog(false)} disabled={saving}>
-              취소
-            </Button>
-            <Button onClick={handleDetailSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  저장 중...
-                </>
-              ) : (
-                '저장'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setDetailDialog(false)} disabled={saving}>
+            취소
+          </Button>
+          <Button
+            onClick={handleDetailSave}
+            disabled={saving}
+            leftSection={saving ? <Loader2 size={16} className='animate-spin' /> : undefined}
+          >
+            {saving ? '저장 중...' : '저장'}
+          </Button>
+        </Group>
+      </Modal>
     </PageShell>
   );
 }

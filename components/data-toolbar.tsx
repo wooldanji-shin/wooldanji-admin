@@ -1,10 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { Search, X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Search } from 'lucide-react';
+import { CloseButton, Group, Text, TextInput, UnstyledButton } from '@mantine/core';
 
 interface DataToolbarProps {
   children: React.ReactNode;
@@ -13,14 +11,9 @@ interface DataToolbarProps {
 
 export function DataToolbar({ children, className }: DataToolbarProps): React.ReactElement {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-3 border-b border-border/60 px-6 py-3 sm:flex-row sm:items-center sm:gap-2',
-        className
-      )}
-    >
+    <Group gap="sm" className={className}>
       {children}
-    </div>
+    </Group>
   );
 }
 
@@ -38,25 +31,20 @@ export function DataToolbarSearch({
   className,
 }: DataToolbarSearchProps): React.ReactElement {
   return (
-    <div className={cn('relative w-full sm:max-w-xs', className)}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="h-11 pl-9"
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="검색어 지우기"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
-    </div>
+    <TextInput
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      placeholder={placeholder}
+      leftSection={<Search size={16} />}
+      rightSectionPointerEvents="all"
+      rightSection={
+        value ? (
+          <CloseButton size="sm" onClick={() => onChange('')} aria-label="검색어 지우기" />
+        ) : null
+      }
+      w={{ base: '100%', sm: 320 }}
+      className={className}
+    />
   );
 }
 
@@ -70,7 +58,9 @@ export function DataToolbarFilters({
   className,
 }: DataToolbarFiltersProps): React.ReactElement {
   return (
-    <div className={cn('flex flex-wrap items-center gap-2', className)}>{children}</div>
+    <Group gap="xs" className={className}>
+      {children}
+    </Group>
   );
 }
 
@@ -84,9 +74,9 @@ export function DataToolbarActions({
   className,
 }: DataToolbarActionsProps): React.ReactElement {
   return (
-    <div className={cn('flex flex-wrap items-center gap-2 sm:ml-auto', className)}>
+    <Group gap="xs" ml={{ sm: 'auto' }} className={className}>
       {children}
-    </div>
+    </Group>
   );
 }
 
@@ -112,56 +102,41 @@ export function FilterChip({
 }: FilterChipProps): React.ReactElement {
   const active = value !== null && value !== undefined && value !== '';
   return (
-    <div
-      className={cn(
-        'inline-flex h-11 items-center gap-2 rounded-md border border-dashed bg-card px-4 text-sm font-medium transition-colors',
-        active
-          ? 'border-border bg-accent/60 text-foreground'
-          : 'border-border text-muted-foreground hover:border-border/80 hover:bg-accent/40 hover:text-foreground',
-        className
-      )}
+    <Group
+      gap={6}
+      h={36}
+      px="sm"
+      wrap="nowrap"
+      className={className}
+      style={{
+        border: `1px ${active ? 'solid' : 'dashed'} var(--app-divider)`,
+        borderRadius: 'var(--mantine-radius-default)',
+        background: active ? 'var(--mantine-color-blue-light)' : 'var(--mantine-color-body)',
+      }}
     >
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex items-center gap-1.5"
-      >
-        {Icon ? (
-          <Icon className="h-3.5 w-3.5" />
-        ) : (
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              active ? 'bg-primary' : 'bg-muted-foreground/40'
-            )}
-            aria-hidden
-          />
-        )}
-        <span>{label}</span>
-        {active && value && (
-          <>
-            <span className="text-border" aria-hidden>
-              |
-            </span>
-            <span className="max-w-[140px] truncate text-foreground">{value}</span>
-          </>
-        )}
-      </button>
+      <UnstyledButton onClick={onClick}>
+        <Group gap={6} wrap="nowrap">
+          {Icon && <Icon className="h-3.5 w-3.5" />}
+          <Text size="sm" fw={500} c={active ? undefined : 'dimmed'}>
+            {label}
+          </Text>
+          {active && value && (
+            <Text size="sm" fw={600} c="blue" maw={140} truncate>
+              {value}
+            </Text>
+          )}
+        </Group>
+      </UnstyledButton>
       {active && onClear && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          className="-mr-1 ml-0.5 h-4 w-4 text-muted-foreground hover:text-foreground"
+        <CloseButton
+          size="xs"
           onClick={(e) => {
             e.stopPropagation();
             onClear();
           }}
           aria-label={`${label} 필터 지우기`}
-        >
-          <X className="h-3 w-3" />
-        </Button>
+        />
       )}
-    </div>
+    </Group>
   );
 }

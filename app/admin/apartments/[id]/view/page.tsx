@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useEffect, use, useCallback, useRef } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft,
   MapPin,
   Search,
   ChevronLeft,
@@ -12,50 +10,34 @@ import {
   Eye,
   X,
   Image as ImageIcon,
-  AlertCircle,
   MoreVertical,
   Check,
   Trash2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Menu,
+  Modal,
+  Overlay,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  ThemeIcon,
+  UnstyledButton,
+} from '@mantine/core';
+import { PageShell } from '@/components/page-shell';
+import { HeaderTitle } from '@/components/header-title';
+import { DataTableShell } from '@/components/data-table-shell';
+import { DataToolbar } from '@/components/data-toolbar';
+import { PageSkeleton, TableSkeleton } from '@/components/skeletons';
 import { toast } from 'sonner';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
 import { createClient } from '@/lib/supabase/client';
@@ -381,10 +363,10 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
   const getApprovalBadge = (status: string | null) => {
     switch (status) {
       case 'approve':
-        return <Badge className="bg-green-500 text-white">승인</Badge>;
+        return <Badge variant="light" color="green">승인</Badge>;
       case 'pending':
       default:
-        return <Badge variant="secondary">대기</Badge>;
+        return <Badge variant="light" color="gray">대기</Badge>;
     }
   };
 
@@ -450,413 +432,414 @@ export default function ApartmentUsersPage({ params }: { params: Promise<{ id: s
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   if (loading && initialLoading) {
-    return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8"><div className="space-y-3"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-72" /></div><div className="flex flex-col gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div></div>
-    );
+    return <PageSkeleton stats={4} searchBar rows={8} columns={10} />;
   }
 
   if (!apartment) {
     return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-        <Card className="border-border/70 shadow-card">
-          <CardContent className="text-center py-12 text-muted-foreground">
+      <PageShell>
+        <Paper withBorder radius="md" py={48} px="lg">
+          <Text ta="center" c="dimmed">
             아파트 정보를 찾을 수 없습니다.
-          </CardContent>
-        </Card>
-      </div>
+          </Text>
+        </Paper>
+      </PageShell>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-      {/* Header */}
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/admin/apartments')}
-          className="-ml-2 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
-          목록으로
-        </Button>
-      </div>
+    <PageShell>
+      <HeaderTitle title={apartment.name} onBack={() => router.push('/admin/apartments')} />
 
       {/* Apartment Info Card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <CardTitle className="text-2xl">{apartment.name}</CardTitle>
-              </div>
-              <CardDescription className="mt-2">
-                <MapPin className="inline-block h-4 w-4 mr-1" />
-                {apartment.address}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-sm text-muted-foreground">총 동수</p>
-              <p className="text-2xl font-bold">{apartment.buildings.length}</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-sm text-muted-foreground">전체 회원</p>
-              <p className="text-2xl font-bold">{totalCount}</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-sm text-muted-foreground">선택된 동 회원</p>
-              <p className="text-2xl font-bold">
+      <Paper withBorder radius="md" p="lg">
+        <Stack gap="lg">
+          {/* 아파트 이름은 헤더에 있으니 여기서는 주소만 */}
+          <Group gap={4} c="dimmed">
+            <MapPin size={16} />
+            <Text size="sm" c="dimmed">{apartment.address}</Text>
+          </Group>
+          <SimpleGrid cols={{ base: 2, md: 5 }} spacing="md">
+            <Paper bg="var(--app-bg-muted)" radius="md" p="sm">
+              <Text size="sm" c="dimmed">총 동수</Text>
+              <Text fz="1.5rem" fw={700}>{apartment.buildings.length}</Text>
+            </Paper>
+            <Paper bg="var(--app-bg-muted)" radius="md" p="sm">
+              <Text size="sm" c="dimmed">전체 회원</Text>
+              <Text fz="1.5rem" fw={700}>{totalCount}</Text>
+            </Paper>
+            <Paper bg="var(--app-bg-muted)" radius="md" p="sm">
+              <Text size="sm" c="dimmed">선택된 동 회원</Text>
+              <Text fz="1.5rem" fw={700}>
                 {selectedBuilding && selectedBuilding !== 'all'
                   ? buildingStats[apartment.buildings.find(b => b.id === selectedBuilding)?.buildingNumber || 0] || 0
                   : totalCount}
-              </p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-sm text-muted-foreground">최대 호수당 회원</p>
-              <p className="text-2xl font-bold">
+              </Text>
+            </Paper>
+            <Paper bg="var(--app-bg-muted)" radius="md" p="sm">
+              <Text size="sm" c="dimmed">최대 호수당 회원</Text>
+              <Text fz="1.5rem" fw={700}>
                 {Object.keys(unitStats).length > 0
                   ? Math.max(...Object.values(unitStats))
                   : 0}
-              </p>
-            </div>
-            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-              <p className="text-sm text-blue-700">총 문 연 횟수</p>
-              <p className="text-2xl font-bold text-blue-700">{totalOpenDoorCount}회</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </Text>
+            </Paper>
+            <Paper
+              bg="var(--mantine-color-blue-light)"
+              radius="md"
+              p="sm"
+            >
+              <Text size="sm" c="blue">총 문 연 횟수</Text>
+              <Text fz="1.5rem" fw={700} c="blue">{totalOpenDoorCount}회</Text>
+            </Paper>
+          </SimpleGrid>
+        </Stack>
+      </Paper>
 
-      {/* Search and Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="이름, 이메일, 전화번호로 검색..."
-                  value={searchInput}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Select value={selectedBuilding || 'all'} onValueChange={handleBuildingChange}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="동 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체 동</SelectItem>
-                    {apartment.buildings.map((building) => (
-                      <SelectItem key={building.id} value={building.id}>
-                        {building.buildingNumber}동
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={selectedLine || 'all'}
-                  onValueChange={handleLineChange}
-                  disabled={!selectedBuilding || selectedBuilding === 'all'}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="라인 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체 라인</SelectItem>
-                    {lines.map((line) => (
-                      <SelectItem key={line.id} value={line.id}>
-                        {formatLineDisplay(line.line)}라인
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={selectedRole || 'all'} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="회원유형" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체 유형</SelectItem>
-                    <SelectItem value="APP_USER">앱 사용자</SelectItem>
-                    <SelectItem value="APT_ADMIN">아파트 관리자</SelectItem>
-                    <SelectItem value="MANAGER">매니저</SelectItem>
-                    <SelectItem value="SUPER_ADMIN">최고 관리자</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <DataTableShell
+        toolbar={
+          <DataToolbar>
+            {/* Search and Filters */}
+            <TextInput
+              placeholder="이름, 이메일, 전화번호로 검색..."
+              value={searchInput}
+              onChange={(e) => handleSearch(e.target.value)}
+              leftSection={<Search size={16} />}
+              style={{ flex: 1 }}
+              miw={200}
+            />
+            <Group gap="xs">
+              <Select
+                w={150}
+                placeholder="동 선택"
+                value={selectedBuilding || 'all'}
+                onChange={(v) => {
+                  if (v === null) return;
+                  handleBuildingChange(v);
+                }}
+                allowDeselect={false}
+                data={[
+                  { value: 'all', label: '전체 동' },
+                  ...apartment.buildings.map((building) => ({
+                    value: building.id,
+                    label: `${building.buildingNumber}동`,
+                  })),
+                ]}
+              />
+              <Select
+                w={150}
+                placeholder="라인 선택"
+                value={selectedLine || 'all'}
+                onChange={(v) => {
+                  if (v === null) return;
+                  handleLineChange(v);
+                }}
+                allowDeselect={false}
+                disabled={!selectedBuilding || selectedBuilding === 'all'}
+                data={[
+                  { value: 'all', label: '전체 라인' },
+                  ...lines.map((line) => ({
+                    value: line.id,
+                    label: `${formatLineDisplay(line.line)}라인`,
+                  })),
+                ]}
+              />
+              <Select
+                w={160}
+                placeholder="회원유형"
+                value={selectedRole || 'all'}
+                onChange={(v) => {
+                  if (v === null) return;
+                  handleRoleChange(v);
+                }}
+                allowDeselect={false}
+                data={[
+                  { value: 'all', label: '전체 유형' },
+                  { value: 'APP_USER', label: '앱 사용자' },
+                  { value: 'APT_ADMIN', label: '아파트 관리자' },
+                  { value: 'MANAGER', label: '매니저' },
+                  { value: 'SUPER_ADMIN', label: '최고 관리자' },
+                ]}
+              />
+            </Group>
+          </DataToolbar>
+        }
+        pagination={
+          totalPages > 1 ? (
+            <Group
+              justify="center"
+              gap="xs"
+              px="md"
+              py="sm"
+              style={{ borderTop: '1px solid var(--app-divider)' }}
+            >
+              <Button
+                variant="default"
+                size="xs"
+                leftSection={<ChevronLeft size={16} />}
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                이전
+              </Button>
+              <Group gap={4}>
+                {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 10) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 4) {
+                    pageNum = totalPages - 9 + i;
+                  } else {
+                    pageNum = currentPage - 4 + i;
+                  }
 
-      {/* Users Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto relative min-h-[400px]">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground w-12">
-                    사진
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    이름
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    이메일
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    전화번호
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    동/호
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    역할
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    승인상태
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    문 열기
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    가입일
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-right">
-                    작업
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {initialLoading && loading ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
-  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
-                    </TableCell>
-                  </TableRow>
-                ) : users.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
-                      {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users.map((user) => (
-                    <TableRow
-                      key={user.id}
-                      className="border-border hover:bg-secondary/50"
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? 'filled' : 'default'}
+                      size="xs"
+                      onClick={() => handlePageChange(pageNum)}
+                      w={36}
+                      px={0}
                     >
-                      <TableCell>
-                        {user.confirmImageUrl ? (
-                          <button
-                            onClick={() => setImagePreview(user.confirmImageUrl)}
-                            className="w-10 h-10 rounded-full overflow-hidden bg-secondary flex items-center justify-center hover:opacity-80 transition-opacity"
-                          >
-                            <img
-                              src={user.confirmImageUrl}
-                              alt={user.name || ''}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                e.currentTarget.parentElement!.innerHTML = '<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
-                              }}
-                            />
-                          </button>
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                            <ImageIcon className="w-5 h-5 text-muted-foreground" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium text-card-foreground">
-                        {user.name || '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {user.email}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {user.phoneNumber || '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <span className="text-sm">
-                          {user.buildingNumber ? `${user.buildingNumber}동` : ''}
-                          {user.unit ? ` ${user.unit}호` : ''}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {getUserRole(user.user_roles)}
-                      </TableCell>
-                      <TableCell>
-                        {getApprovalBadge(user.approvalStatus)}
-                      </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
-                        {user.openDoorCount !== null && user.openDoorCount !== undefined ? (
-                          <span>{user.openDoorCount}회</span>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(user.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant='ghost'
-                              size='icon-sm'
-                              className='text-muted-foreground hover:text-foreground hover:bg-secondary'
-                            >
-                              <MoreVertical className='h-4 w-4' />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align='end'>
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </Group>
+              <Button
+                variant="default"
+                size="xs"
+                rightSection={<ChevronRight size={16} />}
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                다음
+              </Button>
+            </Group>
+          ) : undefined
+        }
+      >
+        {/* Users Table */}
+        {initialLoading && loading ? (
+          <TableSkeleton rows={8} columns={10} />
+        ) : (
+        <Table.ScrollContainer minWidth={900} mih={400}>
+          <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w={48}>
+                  사진
+                </Table.Th>
+                <Table.Th>
+                  이름
+                </Table.Th>
+                <Table.Th>
+                  이메일
+                </Table.Th>
+                <Table.Th>
+                  전화번호
+                </Table.Th>
+                <Table.Th>
+                  동/호
+                </Table.Th>
+                <Table.Th>
+                  역할
+                </Table.Th>
+                <Table.Th>
+                  승인상태
+                </Table.Th>
+                <Table.Th>
+                  문 열기
+                </Table.Th>
+                <Table.Th>
+                  가입일
+                </Table.Th>
+                <Table.Th ta="right">
+                  작업
+                </Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {users.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={10} py={48} ta="center" c="dimmed">
+                    {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
+                  </Table.Td>
+                </Table.Tr>
+              ) : (
+                users.map((user) => (
+                  <Table.Tr key={user.id}>
+                    <Table.Td>
+                      {user.confirmImageUrl ? (
+                        <UnstyledButton
+                          onClick={() => setImagePreview(user.confirmImageUrl)}
+                          w={40}
+                          h={40}
+                          bg="var(--app-bg-subtle)"
+                          style={{
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--mantine-color-dimmed)',
+                          }}
+                        >
+                          <img
+                            src={user.confirmImageUrl}
+                            alt={user.name || ''}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement!.innerHTML = '<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                            }}
+                          />
+                        </UnstyledButton>
+                      ) : (
+                        <ThemeIcon variant="light" color="gray" size={40} radius="xl">
+                          <ImageIcon size={20} />
+                        </ThemeIcon>
+                      )}
+                    </Table.Td>
+                    <Table.Td fw={500}>
+                      {user.name || '-'}
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {user.email}
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {user.phoneNumber || '-'}
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      <Text span size="sm">
+                        {user.buildingNumber ? `${user.buildingNumber}동` : ''}
+                        {user.unit ? ` ${user.unit}호` : ''}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {getUserRole(user.user_roles)}
+                    </Table.Td>
+                    <Table.Td>
+                      {getApprovalBadge(user.approvalStatus)}
+                    </Table.Td>
+                    <Table.Td ta="center" c="dimmed">
+                      {user.openDoorCount !== null && user.openDoorCount !== undefined ? (
+                        <span>{user.openDoorCount}회</span>
+                      ) : (
+                        <span>-</span>
+                      )}
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {formatDate(user.createdAt)}
+                    </Table.Td>
+                    <Table.Td>
+                      <Group justify="flex-end">
+                        <Menu position="bottom-end" withinPortal>
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" color="gray" aria-label="작업">
+                              <MoreVertical size={16} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
                             {user.confirmImageUrl && (
-                              <DropdownMenuItem onClick={() => setImagePreview(user.confirmImageUrl)}>
-                                <Eye className='mr-2 h-4 w-4' />
+                              <Menu.Item
+                                leftSection={<Eye size={16} />}
+                                onClick={() => setImagePreview(user.confirmImageUrl)}
+                              >
                                 인증 사진 보기
-                              </DropdownMenuItem>
+                              </Menu.Item>
                             )}
                             {user.approvalStatus !== 'approve' ? (
-                              <DropdownMenuItem
+                              <Menu.Item
+                                color="green"
+                                leftSection={<Check size={16} />}
                                 onClick={() => handleApprovalStatusChange(user.id, 'approve')}
-                                className='text-green-600'
                               >
-                                <Check className='mr-2 h-4 w-4' />
                                 승인하기
-                              </DropdownMenuItem>
+                              </Menu.Item>
                             ) : (
-                              <DropdownMenuItem
+                              <Menu.Item
+                                color="orange"
+                                leftSection={<X size={16} />}
                                 onClick={() => handleApprovalStatusChange(user.id, 'pending')}
-                                className='text-orange-600'
                               >
-                                <X className='mr-2 h-4 w-4' />
                                 승인 취소
-                              </DropdownMenuItem>
+                              </Menu.Item>
                             )}
-                            <DropdownMenuItem
+                            <Menu.Item
+                              color="red"
+                              leftSection={<Trash2 size={16} />}
                               onClick={() => handleDeleteClick(user)}
-                              className='text-destructive'
                             >
-                              <Trash2 className='mr-2 h-4 w-4' />
                               삭제
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            이전
-          </Button>
-          <div className="flex gap-1">
-            {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
-              let pageNum;
-              if (totalPages <= 10) {
-                pageNum = i + 1;
-              } else if (currentPage <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage >= totalPages - 4) {
-                pageNum = totalPages - 9 + i;
-              } else {
-                pageNum = currentPage - 4 + i;
-              }
-
-              return (
-                <Button
-                  key={pageNum}
-                  variant={currentPage === pageNum ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handlePageChange(pageNum)}
-                  className="w-10"
-                >
-                  {pageNum}
-                </Button>
-              );
-            })}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            다음
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))
+              )}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+        )}
+      </DataTableShell>
 
       {/* Image Preview Modal */}
       {imagePreview && (
-        <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8"
+        <Overlay
+          fixed
+          center
+          zIndex={300}
+          backgroundOpacity={0.8}
+          p="xl"
           onClick={() => setImagePreview(null)}
         >
-          <div className="relative max-w-4xl max-h-[85vh] flex items-center justify-center">
+          <Box pos="relative" maw={896} mah="85vh" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img
               src={imagePreview}
               alt="인증 사진"
               className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
             />
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute top-4 right-4 rounded-full shadow-lg"
+            <ActionIcon
+              variant="default"
+              size="lg"
+              radius="xl"
+              aria-label="닫기"
+              pos="absolute"
+              top={16}
+              right={16}
               onClick={(e) => {
                 e.stopPropagation();
                 setImagePreview(null);
               }}
             >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
+              <X size={20} />
+            </ActionIcon>
+          </Box>
+        </Overlay>
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>회원 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingUser?.name || deletingUser?.email}</strong>님을 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없으며, 해당 회원의 모든 데이터가 삭제됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDeleteDialog(false)}>
-              취소
-            </Button>
-            <Button variant='destructive' onClick={handleDeleteConfirm}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <Modal opened={deleteDialog} onClose={() => setDeleteDialog(false)} title="회원 삭제">
+        <Text size="sm" c="dimmed">
+          정말로 <strong>{deletingUser?.name || deletingUser?.email}</strong>님을 삭제하시겠습니까?
+          <br />
+          이 작업은 되돌릴 수 없으며, 해당 회원의 모든 데이터가 삭제됩니다.
+        </Text>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => setDeleteDialog(false)}>
+            취소
+          </Button>
+          <Button color="red" onClick={handleDeleteConfirm}>
+            삭제
+          </Button>
+        </Group>
+      </Modal>
+    </PageShell>
   );
 }

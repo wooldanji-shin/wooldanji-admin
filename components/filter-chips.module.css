@@ -1,0 +1,63 @@
+/* 목록 필터용 알약 칩 — 선택: 연한 주색 배경 + 주색 글자, 개수는 이름 옆 작은 숫자 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2.25rem; /* 36px */
+  padding: 0 0.875rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--mantine-color-default);
+  color: var(--mantine-color-text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.chip:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.chip[data-active] {
+  background: var(--mantine-color-blue-light);
+  color: var(--mantine-color-blue-light-color);
+  font-weight: 600;
+}
+
+.count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--mantine-color-dimmed);
+}
+
+.chip[data-active] .count {
+  color: inherit;
+}
+
+.count[data-zero] {
+  opacity: 0.55;
+}
+
+.rowLabel {
+  flex-shrink: 0;
+  width: 6.5rem;
+  padding-top: 0.4rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--mantine-color-dimmed);
+}
+
+/* 휴대폰: 이름표를 칩 위로 올려 칩이 전체 폭을 쓰게 한다 */
+@media (max-width: 48em) {
+  .row {
+    flex-direction: column;
+    gap: 0.5rem !important;
+  }
+
+  .rowLabel {
+    width: auto;
+    padding-top: 0;
+  }
+}

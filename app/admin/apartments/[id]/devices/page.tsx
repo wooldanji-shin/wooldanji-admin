@@ -1,10 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Edit2,
   Trash2,
   ChevronRight,
@@ -15,41 +13,28 @@ import {
   Trash,
   AlertCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Menu,
+  Modal,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
+  SimpleGrid,
+  Skeleton,
+  Stack,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Text,
+  TextInput,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
+import { PageShell } from '@/components/page-shell';
+import { HeaderTitle } from '@/components/header-title';
 import { formatLineRange } from '@/lib/utils/line';
 import { useDevicesPage, formatMacAddress } from './useDevicesPage';
 
@@ -85,7 +70,7 @@ export default function DevicesManagementPage({
   const page = useDevicesPage(params);
 
   return (
-    <div className='flex w-full flex-col gap-6 px-6 py-6 md:py-8'>
+    <PageShell>
       {/* Header */}
       <Header
         apartmentName={page.fetch.apartment?.name}
@@ -101,10 +86,7 @@ export default function DevicesManagementPage({
             page.selection.clearSelection();
             page.commonDevices.clearSelection();
           }}
-          onDelete={() => {
-            if (page.selection.selectedDevices.size > 0) page.selection.handleBulkDelete();
-            if (page.commonDevices.selectedDevices.size > 0) page.commonDevices.handleBulkDelete();
-          }}
+          onDelete={page.handleBulkDelete}
         />
       )}
 
@@ -122,13 +104,15 @@ export default function DevicesManagementPage({
 
       {/* Content */}
       {page.fetch.loading ? (
-        <Card>
-          <CardContent className='p-12 text-center text-muted-foreground'>
-  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
-          </CardContent>
-        </Card>
+        <Paper withBorder radius="md" p="xl">
+          <Stack gap="sm" py={4} align="center">
+            <Skeleton h={16} w="66%" />
+            <Skeleton h={16} w="100%" />
+            <Skeleton h={16} w="80%" />
+          </Stack>
+        </Paper>
       ) : page.viewMode === 'tree' ? (
-        <div className='space-y-4'>
+        <Stack gap="md">
           <CommonDevicesSection
             commonDevices={page.filteredCommonDevices}
             hook={page.commonDevices}
@@ -144,7 +128,7 @@ export default function DevicesManagementPage({
             getBuildingAdmins={page.getBuildingAdmins}
             getLineAdmins={page.getLineAdmins}
           />
-        </div>
+        </Stack>
       ) : (
         <TableView
           filteredDevices={page.filteredDevices}
@@ -168,24 +152,20 @@ export default function DevicesManagementPage({
         deviceToDelete={page.selection.deviceToDelete}
         devices={page.fetch.devices}
         onConfirm={page.selection.confirmDeleteDevice}
+        deleting={page.selection.deleting}
       />
       <BulkDeleteDialog
-        open={page.selection.bulkDeleteDialog}
-        onOpenChange={page.selection.setBulkDeleteDialog}
-        count={page.selection.selectedDevices.size}
-        onConfirm={page.selection.confirmBulkDelete}
+        open={page.bulkDeleteDialog}
+        onOpenChange={page.setBulkDeleteDialog}
+        count={page.bulkDeleteCount}
+        onConfirm={page.confirmBulkDelete}
+        deleting={page.bulkDeleting}
       />
 
       {/* Common Device Dialogs */}
       <CommonDeviceEditDialog hook={page.commonDevices} />
       <CommonDeviceDeleteDialog hook={page.commonDevices} />
-      <BulkDeleteDialog
-        open={page.commonDevices.bulkDeleteDialog}
-        onOpenChange={page.commonDevices.setBulkDeleteDialog}
-        count={page.commonDevices.selectedDevices.size}
-        onConfirm={page.commonDevices.confirmBulkDelete}
-      />
-    </div>
+    </PageShell>
   );
 }
 
@@ -203,29 +183,19 @@ function Header({
   onBack: () => void;
 }): React.ReactElement {
   return (
-    <div>
-      <Button
-        variant='ghost'
-        size='sm'
-        onClick={onBack}
-        className='-ml-2 mb-3 text-muted-foreground hover:text-foreground'
-      >
-        <ArrowLeft className='h-4 w-4 mr-1.5' />
-        뒤로
-      </Button>
-      <div className='flex flex-wrap items-center gap-3'>
-        <h1 className='text-2xl font-semibold tracking-tight md:text-[1.625rem]'>장치 관리</h1>
+    <>
+      <HeaderTitle title="장치 관리" onBack={onBack} />
+      <Group gap="sm">
+        <Text size="sm" c="dimmed">
+          {apartmentName || '아파트'}의 모든 장치를 관리합니다
+        </Text>
         {brokenDeviceCount > 0 && (
-          <Badge variant='destructive' className='text-xs'>
-            <AlertCircle className='h-3 w-3 mr-1' />
+          <Badge variant="light" color="red" leftSection={<AlertCircle size={12} />}>
             고장 {brokenDeviceCount}개
           </Badge>
         )}
-      </div>
-      <p className='mt-1.5 text-sm text-muted-foreground'>
-        {apartmentName || '아파트'}의 모든 장치를 관리합니다
-      </p>
-    </div>
+      </Group>
+    </>
   );
 }
 
@@ -243,22 +213,25 @@ function BulkActionsBar({
   onDelete: () => void;
 }): React.ReactElement {
   return (
-    <Card className='mb-6 border-blue-200 bg-blue-50'>
-      <CardContent>
-        <div className='flex items-center justify-between'>
-          <span className='text-sm font-medium'>{count}개 선택됨</span>
-          <div className='flex gap-2'>
-            <Button variant='outline' size='sm' onClick={onClear}>
-              선택 해제
-            </Button>
-            <Button variant='destructive' size='sm' onClick={onDelete}>
-              <Trash className='h-4 w-4 mr-2' />
-              선택 삭제
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <Paper
+      withBorder
+      radius="md"
+      p="md"
+      bg="var(--mantine-color-blue-light)"
+      style={{ borderColor: 'var(--mantine-color-blue-outline)' }}
+    >
+      <Group justify="space-between">
+        <Text size="sm" fw={500}>{count}개 선택됨</Text>
+        <Group gap="xs">
+          <Button variant="default" size="xs" onClick={onClear}>
+            선택 해제
+          </Button>
+          <Button color="red" size="xs" leftSection={<Trash size={16} />} onClick={onDelete}>
+            선택 삭제
+          </Button>
+        </Group>
+      </Group>
+    </Paper>
   );
 }
 
@@ -286,56 +259,57 @@ function SearchBar({
   brokenCount: number;
 }): React.ReactElement {
   return (
-    <div className='flex flex-col gap-4 mb-6'>
-      <div className='flex gap-4'>
-        <div className='flex-1 relative'>
-          <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-          <Input
-            placeholder='MAC 주소, 장소, 동, 라인으로 검색...'
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className='pl-10'
-          />
-        </div>
-        <div className='flex gap-2'>
+    <Stack gap="md">
+      <Group gap="md" wrap="nowrap">
+        <TextInput
+          placeholder="MAC 주소, 장소, 동, 라인으로 검색..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          leftSection={<Search size={16} />}
+          style={{ flex: 1 }}
+        />
+        <Button.Group>
           <Button
-            variant={viewMode === 'tree' ? 'default' : 'outline'}
-            size='sm'
+            variant={viewMode === 'tree' ? 'filled' : 'default'}
             onClick={() => setViewMode('tree')}
           >
             트리 뷰
           </Button>
           <Button
-            variant={viewMode === 'table' ? 'default' : 'outline'}
-            size='sm'
+            variant={viewMode === 'table' ? 'filled' : 'default'}
             onClick={() => setViewMode('table')}
           >
             테이블 뷰
           </Button>
-        </div>
-      </div>
-      <div className='flex items-center justify-between'>
+        </Button.Group>
+      </Group>
+      <Group justify="space-between">
         <Button
-          variant={showBrokenOnly ? 'destructive' : 'outline'}
-          size='sm'
+          variant={showBrokenOnly ? 'filled' : 'default'}
+          color={showBrokenOnly ? 'red' : undefined}
+          size="sm"
+          leftSection={<AlertCircle size={16} />}
+          rightSection={
+            showBrokenOnly ? (
+              <Badge variant="white" color="red" size="sm">
+                {brokenCount}
+              </Badge>
+            ) : undefined
+          }
           onClick={() => setShowBrokenOnly(!showBrokenOnly)}
         >
-          <AlertCircle className='h-4 w-4 mr-2' />
           고장난 기기만 보기
-          {showBrokenOnly && (
-            <Badge variant='secondary' className='ml-2'>
-              {brokenCount}
-            </Badge>
-          )}
         </Button>
-        <div className='text-sm text-muted-foreground'>
+        <Text size="sm" c="dimmed">
           전체 {totalCount}개 기기
           {brokenCount > 0 && (
-            <span className='text-destructive ml-2'>· 고장 {brokenCount}개</span>
+            <Text span c="red" ml="xs" inherit>
+              · 고장 {brokenCount}개
+            </Text>
           )}
-        </div>
-      </div>
-    </div>
+        </Text>
+      </Group>
+    </Stack>
   );
 }
 
@@ -365,82 +339,85 @@ function TreeView({
   getLineAdmins: (id: string) => AdminScope[];
 }): React.ReactElement {
   return (
-    <Card>
-      <CardContent className='p-6'>
-        {!apartment?.buildings || apartment.buildings.length === 0 ? (
-          <p className='text-center text-muted-foreground py-8'>등록된 동이 없습니다</p>
-        ) : (
-          <div className='space-y-4'>
-            {apartment.buildings.map((building) => {
-              const buildingDevices = groupedDevices[building.buildingNumber] || {};
-              const totalDevices = Object.values(buildingDevices).flat().length;
-              const brokenDevices = Object.values(buildingDevices)
-                .flat()
-                .filter((d) => d.isWorking === false).length;
+    <Paper withBorder radius="md" p="lg">
+      {!apartment?.buildings || apartment.buildings.length === 0 ? (
+        <Text ta="center" c="dimmed" py="xl">등록된 동이 없습니다</Text>
+      ) : (
+        <Stack gap="md">
+          {apartment.buildings.map((building) => {
+            const buildingDevices = groupedDevices[building.buildingNumber] || {};
+            const totalDevices = Object.values(buildingDevices).flat().length;
+            const brokenDevices = Object.values(buildingDevices)
+              .flat()
+              .filter((d) => d.isWorking === false).length;
 
-              return (
-                <div key={building.id} className='border rounded-lg'>
-                  {/* Building Header */}
-                  <div
-                    className='flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50'
-                    onClick={() => tree.toggleBuilding(building.id)}
+            return (
+              <Paper key={building.id} withBorder radius="md">
+                {/* Building Header */}
+                <UnstyledButton
+                  w="100%"
+                  p="md"
+                  onClick={() => tree.toggleBuilding(building.id)}
+                >
+                  <Group gap="xs">
+                    {tree.expandedBuildings.includes(building.id) ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronRight size={16} />
+                    )}
+                    <Text fw={600}>{building.buildingNumber}동</Text>
+                    {totalDevices === 0 ? (
+                      <Badge variant="light" color="gray">
+                        등록된 기기 없음
+                      </Badge>
+                    ) : (
+                      <Badge variant="light" color="gray">{totalDevices} 기기</Badge>
+                    )}
+                    {brokenDevices > 0 && (
+                      <Badge variant="light" color="red">
+                        고장 {brokenDevices}
+                      </Badge>
+                    )}
+                    <AdminBadge admins={getBuildingAdmins(building.id)} />
+                  </Group>
+                </UnstyledButton>
+
+                {/* Lines */}
+                {tree.expandedBuildings.includes(building.id) && (
+                  <Box
+                    px="md"
+                    pb="md"
+                    style={{ borderTop: '1px solid var(--app-divider)' }}
                   >
-                    <div className='flex items-center gap-2'>
-                      {tree.expandedBuildings.includes(building.id) ? (
-                        <ChevronDown className='h-4 w-4' />
-                      ) : (
-                        <ChevronRight className='h-4 w-4' />
-                      )}
-                      <span className='font-semibold'>{building.buildingNumber}동</span>
-                      {totalDevices === 0 ? (
-                        <Badge variant='secondary' className='text-muted-foreground'>
-                          등록된 기기 없음
-                        </Badge>
-                      ) : (
-                        <Badge variant='outline'>{totalDevices} 기기</Badge>
-                      )}
-                      {brokenDevices > 0 && (
-                        <Badge variant='destructive' className='text-xs'>
-                          고장 {brokenDevices}
-                        </Badge>
-                      )}
-                      <AdminBadge admins={getBuildingAdmins(building.id)} />
-                    </div>
-                  </div>
-
-                  {/* Lines */}
-                  {tree.expandedBuildings.includes(building.id) && (
-                    <div className='border-t px-4 pb-4'>
-                      {building.lines && building.lines.length > 0 ? (
-                        building.lines.map((line) => (
-                          <LineSection
-                            key={`${building.id}-${line.id}`}
-                            building={building}
-                            line={line}
-                            lineDevices={buildingDevices[line.id] || []}
-                            lineKey={`${building.id}-${line.id}`}
-                            tree={tree}
-                            quickAdd={quickAdd}
-                            selection={selection}
-                            dialog={dialog}
-                            handleToggleDeviceWorking={handleToggleDeviceWorking}
-                            lineAdmins={getLineAdmins(line.id)}
-                          />
-                        ))
-                      ) : (
-                        <p className='text-sm text-muted-foreground py-4 text-center'>
-                          등록된 라인이 없습니다
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                    {building.lines && building.lines.length > 0 ? (
+                      building.lines.map((line) => (
+                        <LineSection
+                          key={`${building.id}-${line.id}`}
+                          building={building}
+                          line={line}
+                          lineDevices={buildingDevices[line.id] || []}
+                          lineKey={`${building.id}-${line.id}`}
+                          tree={tree}
+                          quickAdd={quickAdd}
+                          selection={selection}
+                          dialog={dialog}
+                          handleToggleDeviceWorking={handleToggleDeviceWorking}
+                          lineAdmins={getLineAdmins(line.id)}
+                        />
+                      ))
+                    ) : (
+                      <Text size="sm" c="dimmed" py="md" ta="center">
+                        등록된 라인이 없습니다
+                      </Text>
+                    )}
+                  </Box>
+                )}
+              </Paper>
+            );
+          })}
+        </Stack>
+      )}
+    </Paper>
   );
 }
 
@@ -475,47 +452,50 @@ function LineSection({
   const lineBrokenDevices = lineDevices.filter((d) => d.isWorking === false).length;
 
   return (
-    <div className='mt-4'>
+    <Box mt="md">
       {/* Line Header */}
-      <div className='flex items-center justify-between py-2 rounded px-2'>
-        <div
-          className='flex items-center gap-2 flex-1 cursor-pointer hover:bg-muted/30 rounded-l py-1 px-1'
+      <Group justify="space-between" wrap="nowrap" py={4}>
+        <UnstyledButton
+          style={{ flex: 1 }}
+          py={4}
+          px={4}
           onClick={() => tree.toggleLine(lineKey)}
         >
-          {tree.expandedLines.includes(lineKey) ? (
-            <ChevronDown className='h-4 w-4' />
-          ) : (
-            <ChevronRight className='h-4 w-4' />
-          )}
-          <span className='font-medium'>{lineRange}라인</span>
-          {lineDevices.length === 0 ? (
-            <Badge variant='secondary' className='text-xs text-muted-foreground'>
-              등록된 기기 없음
-            </Badge>
-          ) : (
-            <Badge variant='secondary' className='text-xs'>
-              {lineDevices.length} 기기
-            </Badge>
-          )}
-          {lineBrokenDevices > 0 && (
-            <Badge variant='destructive' className='text-xs'>
-              고장 {lineBrokenDevices}
-            </Badge>
-          )}
-          <AdminBadge admins={lineAdmins} />
-        </div>
+          <Group gap="xs">
+            {tree.expandedLines.includes(lineKey) ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )}
+            <Text fw={500}>{lineRange}라인</Text>
+            {lineDevices.length === 0 ? (
+              <Badge variant="light" color="gray" size="sm">
+                등록된 기기 없음
+              </Badge>
+            ) : (
+              <Badge variant="light" color="gray" size="sm">
+                {lineDevices.length} 기기
+              </Badge>
+            )}
+            {lineBrokenDevices > 0 && (
+              <Badge variant="light" color="red" size="sm">
+                고장 {lineBrokenDevices}
+              </Badge>
+            )}
+            <AdminBadge admins={lineAdmins} />
+          </Group>
+        </UnstyledButton>
         <Button
-          variant={quickAdd.quickAddLineKey === lineKey ? 'outline' : 'default'}
-          size='sm'
+          variant={quickAdd.quickAddLineKey === lineKey ? 'default' : 'filled'}
+          size="xs"
           onClick={(e) => {
             e.stopPropagation();
             quickAdd.handleToggleQuickAdd(lineKey);
           }}
-          className={`text-xs h-8 ${quickAdd.quickAddLineKey !== lineKey ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
         >
           {quickAdd.quickAddLineKey === lineKey ? '닫기' : '기기 추가'}
         </Button>
-      </div>
+      </Group>
 
       {/* Quick Add Form */}
       {quickAdd.quickAddLineKey === lineKey && (
@@ -530,22 +510,23 @@ function LineSection({
 
       {/* Device List */}
       {tree.expandedLines.includes(lineKey) && (
-        <div className='ml-6 mt-2 space-y-2'>
+        <Stack gap="xs" ml="lg" mt="xs">
           {lineDevices.length === 0 ? (
-            <p className='text-sm text-muted-foreground py-3 pl-4'>등록된 기기가 없습니다</p>
+            <Text size="sm" c="dimmed" py="sm" pl="md">등록된 기기가 없습니다</Text>
           ) : (
             <>
-              <div className='flex items-center gap-2 px-2 py-1'>
+              <Group gap="xs" px="xs" py={4}>
                 <Checkbox
+                  size="xs"
                   checked={lineDevices.every((d) => selection.selectedDevices.has(d.id))}
-                  onCheckedChange={() => selection.handleSelectAllInLine(lineDevices)}
+                  onChange={() => selection.handleSelectAllInLine(lineDevices)}
                 />
-                <span className='text-xs text-muted-foreground'>
+                <Text size="xs" c="dimmed">
                   전체 선택 (
                   {lineDevices.filter((d) => selection.selectedDevices.has(d.id)).length}/
                   {lineDevices.length})
-                </span>
-              </div>
+                </Text>
+              </Group>
               {lineDevices.map((device) => (
                 <DeviceCard
                   key={device.id}
@@ -559,9 +540,9 @@ function LineSection({
               ))}
             </>
           )}
-        </div>
+        </Stack>
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -583,77 +564,78 @@ function QuickAddForm({
   quickAdd: UseQuickAddReturn;
 }): React.ReactElement {
   return (
-    <div className='ml-6 mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg'>
-      <div className='flex items-center gap-2 mb-3'>
-        <span className='font-medium text-blue-900'>기기 추가</span>
-        <span className='text-sm text-blue-700'>
+    <Paper
+      withBorder
+      radius="md"
+      p="md"
+      ml="lg"
+      mt="sm"
+      bg="var(--mantine-color-blue-light)"
+      style={{ borderColor: 'var(--mantine-color-blue-outline)' }}
+    >
+      <Group gap="xs" mb="sm">
+        <Text fw={500} c="blue">기기 추가</Text>
+        <Text size="sm" c="blue">
           {buildingNumber}동 · {lineRange}라인
-        </span>
-      </div>
-      <div className='grid grid-cols-3 gap-3 mb-3'>
-        <div>
-          <Label className='text-xs mb-1'>설치 장소</Label>
-          <Input
-            placeholder='예: B1 전기실'
-            value={quickAdd.quickAddForm.placeName}
-            onChange={(e) =>
-              quickAdd.setQuickAddForm({ ...quickAdd.quickAddForm, placeName: e.target.value })
-            }
-            onKeyDown={(e) => quickAdd.handleQuickAddKeyPress(e, buildingId, lineId)}
-            className='h-9'
-            autoFocus
-          />
-        </div>
-        <div>
-          <Label className='text-xs mb-1'>MAC Address</Label>
-          <Input
-            placeholder='AABBCCDDEEFF'
-            value={quickAdd.quickAddForm.macAddress}
-            onChange={(e) =>
-              quickAdd.setQuickAddForm({
-                ...quickAdd.quickAddForm,
-                macAddress: formatMacAddress(e.target.value),
-              })
-            }
-            onKeyDown={(e) => quickAdd.handleQuickAddKeyPress(e, buildingId, lineId)}
-            className='h-9 font-mono'
-          />
-        </div>
-        <div>
-          <Label className='text-xs mb-1'>비밀번호</Label>
-          <Input
-            placeholder='00000000'
-            value={quickAdd.quickAddForm.devicePassword}
-            onChange={(e) =>
-              quickAdd.setQuickAddForm({
-                ...quickAdd.quickAddForm,
-                devicePassword: e.target.value,
-              })
-            }
-            onKeyDown={(e) => quickAdd.handleQuickAddKeyPress(e, buildingId, lineId)}
-            className='h-9'
-          />
-        </div>
-      </div>
-      <div className='flex gap-2'>
+        </Text>
+      </Group>
+      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm" mb="sm">
+        <TextInput
+          label="설치 장소"
+          size="xs"
+          placeholder="예: B1 전기실"
+          value={quickAdd.quickAddForm.placeName}
+          onChange={(e) =>
+            quickAdd.setQuickAddForm({ ...quickAdd.quickAddForm, placeName: e.target.value })
+          }
+          onKeyDown={(e) => quickAdd.handleQuickAddKeyPress(e, buildingId, lineId)}
+          autoFocus
+        />
+        <TextInput
+          label="MAC Address"
+          size="xs"
+          placeholder="AABBCCDDEEFF"
+          value={quickAdd.quickAddForm.macAddress}
+          onChange={(e) =>
+            quickAdd.setQuickAddForm({
+              ...quickAdd.quickAddForm,
+              macAddress: formatMacAddress(e.target.value),
+            })
+          }
+          onKeyDown={(e) => quickAdd.handleQuickAddKeyPress(e, buildingId, lineId)}
+          styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+        />
+        <TextInput
+          label="비밀번호"
+          size="xs"
+          placeholder="00000000"
+          value={quickAdd.quickAddForm.devicePassword}
+          onChange={(e) =>
+            quickAdd.setQuickAddForm({
+              ...quickAdd.quickAddForm,
+              devicePassword: e.target.value,
+            })
+          }
+          onKeyDown={(e) => quickAdd.handleQuickAddKeyPress(e, buildingId, lineId)}
+        />
+      </SimpleGrid>
+      <Group gap="xs">
         <Button
-          size='sm'
+          size="xs"
           onClick={() => quickAdd.handleQuickSave(buildingId, lineId)}
           disabled={!quickAdd.quickAddForm.placeName || !quickAdd.quickAddForm.macAddress}
-          className='h-8'
         >
           추가
         </Button>
         <Button
-          size='sm'
-          variant='outline'
+          size="xs"
+          variant="default"
           onClick={() => quickAdd.handleToggleQuickAdd('')}
-          className='h-8'
         >
           닫기
         </Button>
-      </div>
-    </div>
+      </Group>
+    </Paper>
   );
 }
 
@@ -677,51 +659,52 @@ function DeviceCard({
   onRestore: () => void;
 }): React.ReactElement {
   return (
-    <div
-      className={`flex items-center gap-3 p-3 rounded-lg ${
+    <Paper
+      radius="md"
+      p="sm"
+      withBorder={device.isWorking === false}
+      bg={device.isWorking === false ? 'var(--mantine-color-red-light)' : 'var(--mantine-color-default-hover)'}
+      style={
         device.isWorking === false
-          ? 'bg-destructive/10 border border-destructive/20'
-          : 'bg-muted/20'
-      }`}
+          ? { borderColor: 'var(--mantine-color-red-outline)' }
+          : undefined
+      }
     >
-      <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
-      <div className='space-y-1 flex-1'>
-        <div className='flex items-center gap-2'>
-          <p className='font-medium'>{device.apartment_line_places?.placeName}</p>
+      <Group gap="sm" wrap="nowrap">
+        <Checkbox checked={selected} onChange={() => onToggleSelect()} />
+        <Stack gap={4} style={{ flex: 1 }}>
+          <Group gap="xs">
+            <Text fw={500}>{device.apartment_line_places?.placeName}</Text>
+            {device.isWorking === false && (
+              <Badge variant="light" color="red" size="sm">
+                고장
+              </Badge>
+            )}
+          </Group>
+          <Stack gap={4}>
+            <Group gap="xs">
+              <Smartphone size={12} color="var(--mantine-color-dimmed)" />
+              <Text size="sm" c="dimmed">MAC: {device.macAddress}</Text>
+            </Group>
+            <Text size="sm" c="dimmed">Password: {device.devicePassword}</Text>
+            <Text size="sm" c="dimmed">마지막 문연 시간: {formatLastOpenedAt(device.lastOpenedAt)}</Text>
+          </Stack>
+        </Stack>
+        <Group gap="xs" wrap="nowrap">
           {device.isWorking === false && (
-            <Badge variant='destructive' className='text-xs'>
-              고장
-            </Badge>
+            <Button variant="light" color="green" size="xs" onClick={onRestore}>
+              복구
+            </Button>
           )}
-        </div>
-        <div className='text-sm text-muted-foreground space-y-1'>
-          <div className='flex items-center gap-2'>
-            <Smartphone className='h-3 w-3' />
-            <span>MAC: {device.macAddress}</span>
-          </div>
-          <p>Password: {device.devicePassword}</p>
-          <p>마지막 문연 시간: {formatLastOpenedAt(device.lastOpenedAt)}</p>
-        </div>
-      </div>
-      <div className='flex gap-2'>
-        {device.isWorking === false && (
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={onRestore}
-            className='text-green-600 border-green-600 hover:bg-green-50'
-          >
-            복구
-          </Button>
-        )}
-        <Button variant='ghost' size='sm' onClick={onEdit}>
-          <Edit2 className='h-4 w-4' />
-        </Button>
-        <Button variant='ghost' size='sm' onClick={onDelete}>
-          <Trash2 className='h-4 w-4 text-destructive' />
-        </Button>
-      </div>
-    </div>
+          <ActionIcon variant="subtle" color="gray" aria-label="수정" onClick={onEdit}>
+            <Edit2 size={16} />
+          </ActionIcon>
+          <ActionIcon variant="subtle" color="red" aria-label="삭제" onClick={onDelete}>
+            <Trash2 size={16} />
+          </ActionIcon>
+        </Group>
+      </Group>
+    </Paper>
   );
 }
 
@@ -732,9 +715,9 @@ function DeviceCard({
 function AdminBadge({ admins }: { admins: AdminScope[] }): React.ReactElement | null {
   if (admins.length === 0) return null;
   return (
-    <>
-      <UserCog className='h-3 w-3 text-muted-foreground ml-2' />
-      <span className='text-xs text-muted-foreground'>
+    <Group gap={4} ml="xs" wrap="nowrap">
+      <UserCog size={12} color="var(--mantine-color-dimmed)" />
+      <Text size="xs" c="dimmed">
         관리자:{' '}
         {admins
           .map(
@@ -742,8 +725,8 @@ function AdminBadge({ admins }: { admins: AdminScope[] }): React.ReactElement | 
               `${s.user?.name}${s.user?.phoneNumber ? ` ${s.user.phoneNumber}` : ''}`,
           )
           .join(', ')}
-      </span>
-    </>
+      </Text>
+    </Group>
   );
 }
 
@@ -771,97 +754,96 @@ function TableView({
   const isEmpty = filteredDevices.length === 0 && filteredCommonDevices.length === 0;
 
   return (
-    <Card>
-      <CardContent className='p-0'>
-        <div className='overflow-x-auto'>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>동</TableHead>
-              <TableHead>라인</TableHead>
-              <TableHead>설치 장소</TableHead>
-              <TableHead>MAC Address</TableHead>
-              <TableHead>비밀번호</TableHead>
-              <TableHead>마지막 문연 시간</TableHead>
-              <TableHead>등록일</TableHead>
-              <TableHead className='text-right'>관리</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+    <Paper withBorder radius="md">
+      <Table.ScrollContainer minWidth={900}>
+        <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>동</Table.Th>
+              <Table.Th>라인</Table.Th>
+              <Table.Th>설치 장소</Table.Th>
+              <Table.Th>MAC Address</Table.Th>
+              <Table.Th>비밀번호</Table.Th>
+              <Table.Th>마지막 문연 시간</Table.Th>
+              <Table.Th>등록일</Table.Th>
+              <Table.Th ta="right">관리</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
             {isEmpty ? (
-              <TableRow>
-                <TableCell colSpan={8} className='text-center py-8'>
+              <Table.Tr>
+                <Table.Td colSpan={8} ta="center" py="xl">
                   {searchTerm ? '검색 결과가 없습니다' : '등록된 기기가 없습니다'}
-                </TableCell>
-              </TableRow>
+                </Table.Td>
+              </Table.Tr>
             ) : (
               <>
                 {filteredCommonDevices.map((device) => (
-                  <TableRow
+                  <Table.Tr
                     key={device.id}
-                    className={device.isWorking === false ? 'bg-destructive/5' : ''}
+                    bg={device.isWorking === false ? 'var(--mantine-color-red-light)' : undefined}
                   >
-                    <TableCell>
-                      <Badge variant='secondary'>공동출입문</Badge>
-                    </TableCell>
-                    <TableCell>-</TableCell>
-                    <TableCell>
-                      <div className='flex items-center gap-2'>
+                    <Table.Td>
+                      <Badge variant="light" color="gray">공동출입문</Badge>
+                    </Table.Td>
+                    <Table.Td>-</Table.Td>
+                    <Table.Td>
+                      <Group gap="xs">
                         {device.placeName || '-'}
                         {device.isWorking === false && (
-                          <Badge variant='destructive' className='text-xs'>
+                          <Badge variant="light" color="red" size="sm">
                             고장
                           </Badge>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className='font-mono text-sm'>{device.macAddress}</TableCell>
-                    <TableCell>{device.devicePassword}</TableCell>
-                    <TableCell className='text-sm text-muted-foreground'>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td ff="monospace" fz="sm">{device.macAddress}</Table.Td>
+                    <Table.Td>{device.devicePassword}</Table.Td>
+                    <Table.Td fz="sm" c="dimmed">
                       {formatLastOpenedAt(device.lastOpenedAt)}
-                    </TableCell>
-                    <TableCell>
+                    </Table.Td>
+                    <Table.Td>
                       {new Date(device.createdAt).toLocaleDateString('ko-KR')}
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <div className='flex items-center justify-end gap-2'>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs" justify="flex-end" wrap="nowrap">
                         {device.isWorking === false && (
                           <Button
-                            variant='outline'
-                            size='sm'
+                            variant="light"
+                            color="green"
+                            size="xs"
                             onClick={() =>
                               commonDevicesHook.handleToggleWorking(device.id, device.isWorking)
                             }
-                            className='text-green-600 border-green-600 hover:bg-green-50'
                           >
                             복구
                           </Button>
                         )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant='ghost' size='sm'>
+                        <Menu position="bottom-end">
+                          <Menu.Target>
+                            <Button variant="subtle" color="gray" size="xs">
                               •••
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align='end'>
-                            <DropdownMenuItem
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item
+                              leftSection={<Edit2 size={16} />}
                               onClick={() => commonDevicesHook.handleEditDevice(device)}
                             >
-                              <Edit2 className='h-4 w-4 mr-2' />
                               수정
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
+                            </Menu.Item>
+                            <Menu.Item
+                              color="red"
+                              leftSection={<Trash2 size={16} />}
                               onClick={() => commonDevicesHook.handleDeleteDevice(device.id)}
-                              className='text-destructive'
                             >
-                              <Trash2 className='h-4 w-4 mr-2' />
                               삭제
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
                 {filteredDevices.map((device) => {
                   const line = device.apartment_line_places?.apartment_lines?.line;
@@ -871,78 +853,77 @@ function TableView({
                       ?.buildingNumber;
 
                   return (
-                    <TableRow
+                    <Table.Tr
                       key={device.id}
-                      className={device.isWorking === false ? 'bg-destructive/5' : ''}
+                      bg={device.isWorking === false ? 'var(--mantine-color-red-light)' : undefined}
                     >
-                      <TableCell>{building}동</TableCell>
-                      <TableCell>{lineRange}라인</TableCell>
-                      <TableCell>
-                        <div className='flex items-center gap-2'>
+                      <Table.Td>{building}동</Table.Td>
+                      <Table.Td>{lineRange}라인</Table.Td>
+                      <Table.Td>
+                        <Group gap="xs">
                           {device.apartment_line_places?.placeName}
                           {device.isWorking === false && (
-                            <Badge variant='destructive' className='text-xs'>
+                            <Badge variant="light" color="red" size="sm">
                               고장
                             </Badge>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell className='font-mono text-sm'>{device.macAddress}</TableCell>
-                      <TableCell>{device.devicePassword}</TableCell>
-                      <TableCell className='text-sm text-muted-foreground'>
+                        </Group>
+                      </Table.Td>
+                      <Table.Td ff="monospace" fz="sm">{device.macAddress}</Table.Td>
+                      <Table.Td>{device.devicePassword}</Table.Td>
+                      <Table.Td fz="sm" c="dimmed">
                         {formatLastOpenedAt(device.lastOpenedAt)}
-                      </TableCell>
-                      <TableCell>
+                      </Table.Td>
+                      <Table.Td>
                         {new Date(device.createdAt).toLocaleDateString('ko-KR')}
-                      </TableCell>
-                      <TableCell className='text-right'>
-                        <div className='flex items-center justify-end gap-2'>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap="xs" justify="flex-end" wrap="nowrap">
                           {device.isWorking === false && (
                             <Button
-                              variant='outline'
-                              size='sm'
+                              variant="light"
+                              color="green"
+                              size="xs"
                               onClick={() =>
                                 handleToggleDeviceWorking(device.id, device.isWorking)
                               }
-                              className='text-green-600 border-green-600 hover:bg-green-50'
                             >
                               복구
                             </Button>
                           )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant='ghost' size='sm'>
+                          <Menu position="bottom-end">
+                            <Menu.Target>
+                              <Button variant="subtle" color="gray" size="xs">
                                 •••
                               </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align='end'>
-                              <DropdownMenuItem
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item
+                                leftSection={<Edit2 size={16} />}
                                 onClick={() => dialog.handleEditDevice(device)}
                               >
-                                <Edit2 className='h-4 w-4 mr-2' />
                                 수정
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
+                              </Menu.Item>
+                              <Menu.Item
+                                color="red"
+                                leftSection={<Trash2 size={16} />}
                                 onClick={() => selection.handleDeleteDevice(device.id)}
-                                className='text-destructive'
                               >
-                                <Trash2 className='h-4 w-4 mr-2' />
                                 삭제
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
                   );
                 })}
               </>
             )}
-          </TableBody>
+          </Table.Tbody>
         </Table>
-        </div>
-      </CardContent>
-    </Card>
+      </Table.ScrollContainer>
+    </Paper>
   );
 }
 
@@ -960,124 +941,114 @@ function DeviceDialog({
   const { deviceDialog, setDeviceDialog, editingDevice, deviceForm, setDeviceForm } = dialog;
 
   return (
-    <Dialog open={deviceDialog} onOpenChange={setDeviceDialog}>
-      <DialogContent className='max-w-2xl'>
-        <DialogHeader>
-          <DialogTitle>{editingDevice ? '기기 수정' : '기기 추가'}</DialogTitle>
-          <DialogDescription>기기 정보를 입력해주세요</DialogDescription>
-        </DialogHeader>
-        <div className='space-y-4 py-4'>
-          {!editingDevice && deviceForm.buildingId && deviceForm.lineId && (
-            <div className='p-4 bg-muted rounded-lg'>
-              <p className='text-sm'>
-                <strong>
-                  {apartment?.buildings?.find((b) => b.id === deviceForm.buildingId)?.buildingNumber}
-                  동 · {formatLineRange(dialog.getSelectedLine()?.line || [])}라인
-                </strong>
-                에 기기를 추가합니다
-              </p>
-            </div>
-          )}
+    <Modal
+      opened={deviceDialog}
+      onClose={() => setDeviceDialog(false)}
+      title={editingDevice ? '기기 수정' : '기기 추가'}
+      size="lg"
+    >
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">기기 정보를 입력해주세요</Text>
 
-          {(!deviceForm.buildingId || !deviceForm.lineId) && (
-            <div className='grid grid-cols-2 gap-4'>
-              <div className='space-y-2'>
-                <Label>동</Label>
-                <Select
-                  value={deviceForm.buildingId}
-                  onValueChange={(v) =>
-                    setDeviceForm({ ...deviceForm, buildingId: v, lineId: '', linePlaceId: '' })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='동을 선택하세요' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {apartment?.buildings?.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.buildingNumber}동
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className='space-y-2'>
-                <Label>라인</Label>
-                <Select
-                  value={deviceForm.lineId}
-                  onValueChange={(v) =>
-                    setDeviceForm({ ...deviceForm, lineId: v, linePlaceId: '' })
-                  }
-                  disabled={!deviceForm.buildingId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='라인을 선택하세요' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dialog.getSelectedBuilding()?.lines?.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {formatLineRange(l.line)}라인
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
+        {!editingDevice && deviceForm.buildingId && deviceForm.lineId && (
+          <Paper bg="var(--mantine-color-default-hover)" radius="md" p="md">
+            <Text size="sm">
+              <strong>
+                {apartment?.buildings?.find((b) => b.id === deviceForm.buildingId)?.buildingNumber}
+                동 · {formatLineRange(dialog.getSelectedLine()?.line || [])}라인
+              </strong>
+              에 기기를 추가합니다
+            </Text>
+          </Paper>
+        )}
 
-          <div className='space-y-2'>
-            <Label>설치 장소</Label>
-            <Input
-              placeholder='예: B1 전기실, 1F 엘리베이터홀, 각 층 현관문'
-              value={deviceForm.placeName}
-              onChange={(e) => setDeviceForm({ ...deviceForm, placeName: e.target.value })}
-            />
-            <p className='text-xs text-muted-foreground'>기기가 설치된 장소를 입력하세요</p>
-          </div>
-
-          <div className='space-y-2'>
-            <Label>MAC Address</Label>
-            <Input
-              placeholder='예: AA:BB:CC:DD:EE:FF'
-              value={deviceForm.macAddress}
-              onChange={(e) =>
-                setDeviceForm({ ...deviceForm, macAddress: e.target.value.toUpperCase() })
+        {(!deviceForm.buildingId || !deviceForm.lineId) && (
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Select
+              label="동"
+              placeholder="동을 선택하세요"
+              data={
+                apartment?.buildings?.map((b) => ({
+                  value: b.id,
+                  label: `${b.buildingNumber}동`,
+                })) ?? []
               }
+              value={deviceForm.buildingId || null}
+              onChange={(v) => {
+                if (v === null) return;
+                setDeviceForm({ ...deviceForm, buildingId: v, lineId: '', linePlaceId: '' });
+              }}
+              allowDeselect={false}
             />
-            <p className='text-xs text-muted-foreground'>기기의 MAC 주소를 입력하세요</p>
-          </div>
-
-          <div className='space-y-2'>
-            <Label>비밀번호</Label>
-            <Input
-              type='text'
-              placeholder='00000000'
-              value={deviceForm.devicePassword}
-              onChange={(e) =>
-                setDeviceForm({ ...deviceForm, devicePassword: e.target.value })
+            <Select
+              label="라인"
+              placeholder="라인을 선택하세요"
+              data={
+                dialog.getSelectedBuilding()?.lines?.map((l) => ({
+                  value: l.id,
+                  label: `${formatLineRange(l.line)}라인`,
+                })) ?? []
               }
+              value={deviceForm.lineId || null}
+              onChange={(v) => {
+                if (v === null) return;
+                setDeviceForm({ ...deviceForm, lineId: v, linePlaceId: '' });
+              }}
+              disabled={!deviceForm.buildingId}
+              allowDeselect={false}
             />
-            <p className='text-xs text-muted-foreground'>기본값: 00000000 (0이 8개)</p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant='outline' onClick={() => setDeviceDialog(false)}>
-            취소
-          </Button>
-          <Button
-            onClick={dialog.handleSaveDevice}
-            disabled={
-              !deviceForm.lineId ||
-              !deviceForm.placeName ||
-              !deviceForm.macAddress ||
-              !deviceForm.devicePassword
-            }
-          >
-            저장
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </SimpleGrid>
+        )}
+
+        <TextInput
+          label="설치 장소"
+          description="기기가 설치된 장소를 입력하세요"
+          inputWrapperOrder={['label', 'input', 'description', 'error']}
+          placeholder="예: B1 전기실, 1F 엘리베이터홀, 각 층 현관문"
+          value={deviceForm.placeName}
+          onChange={(e) => setDeviceForm({ ...deviceForm, placeName: e.target.value })}
+        />
+
+        <TextInput
+          label="MAC Address"
+          description="기기의 MAC 주소를 입력하세요"
+          inputWrapperOrder={['label', 'input', 'description', 'error']}
+          placeholder="예: AA:BB:CC:DD:EE:FF"
+          value={deviceForm.macAddress}
+          onChange={(e) =>
+            setDeviceForm({ ...deviceForm, macAddress: e.target.value.toUpperCase() })
+          }
+        />
+
+        <TextInput
+          label="비밀번호"
+          description="기본값: 00000000 (0이 8개)"
+          inputWrapperOrder={['label', 'input', 'description', 'error']}
+          type="text"
+          placeholder="00000000"
+          value={deviceForm.devicePassword}
+          onChange={(e) =>
+            setDeviceForm({ ...deviceForm, devicePassword: e.target.value })
+          }
+        />
+      </Stack>
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={() => setDeviceDialog(false)}>
+          취소
+        </Button>
+        <Button
+          onClick={dialog.handleSaveDevice}
+          disabled={
+            !deviceForm.lineId ||
+            !deviceForm.placeName ||
+            !deviceForm.macAddress ||
+            !deviceForm.devicePassword
+          }
+        >
+          저장
+        </Button>
+      </Group>
+    </Modal>
   );
 }
 
@@ -1087,48 +1058,47 @@ function DeleteDialog({
   deviceToDelete,
   devices,
   onConfirm,
+  deleting,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   deviceToDelete: string | null;
   devices: Device[];
   onConfirm: () => Promise<void>;
+  deleting: boolean;
 }): React.ReactElement {
   const device = deviceToDelete ? devices.find((d) => d.id === deviceToDelete) : null;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>기기 삭제</DialogTitle>
-          <DialogDescription>정말로 이 기기를 삭제하시겠습니까?</DialogDescription>
-        </DialogHeader>
-        {device && (
-          <div className='py-4'>
-            <div className='p-4 bg-muted rounded-lg space-y-2'>
-              <p className='text-sm'>
+    <Modal opened={open} onClose={() => onOpenChange(false)} title="기기 삭제" closeOnClickOutside={!deleting} closeOnEscape={!deleting}>
+      <Text size="sm" c="dimmed">정말로 이 기기를 삭제하시겠습니까?</Text>
+      {device && (
+        <Stack gap="md" mt="md">
+          <Paper bg="var(--mantine-color-default-hover)" radius="md" p="md">
+            <Stack gap="xs">
+              <Text size="sm">
                 <strong>장소:</strong> {device.apartment_line_places?.placeName}
-              </p>
-              <p className='text-sm'>
+              </Text>
+              <Text size="sm">
                 <strong>MAC:</strong> {device.macAddress}
-              </p>
-              <p className='text-sm'>
+              </Text>
+              <Text size="sm">
                 <strong>동:</strong>{' '}
                 {device.apartment_line_places?.apartment_lines?.apartment_buildings?.buildingNumber}동
-              </p>
-            </div>
-            <p className='text-sm text-destructive mt-4'>삭제된 기기는 복구할 수 없습니다.</p>
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)}>
-            취소
-          </Button>
-          <Button variant='destructive' onClick={onConfirm}>
-            삭제
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              </Text>
+            </Stack>
+          </Paper>
+          <Text size="sm" c="red">삭제된 기기는 복구할 수 없습니다.</Text>
+        </Stack>
+      )}
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={() => onOpenChange(false)} disabled={deleting}>
+          취소
+        </Button>
+        <Button color="red" onClick={onConfirm} disabled={deleting}>
+          {deleting ? '삭제 중...' : '삭제'}
+        </Button>
+      </Group>
+    </Modal>
   );
 }
 
@@ -1137,34 +1107,36 @@ function BulkDeleteDialog({
   onOpenChange,
   count,
   onConfirm,
+  deleting,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   count: number;
   onConfirm: () => Promise<void>;
+  deleting: boolean;
 }): React.ReactElement {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>일괄 삭제</DialogTitle>
-          <DialogDescription>선택한 {count}개의 기기를 삭제하시겠습니까?</DialogDescription>
-        </DialogHeader>
-        <div className='py-4'>
-          <div className='p-4 bg-destructive/10 border border-destructive/20 rounded-lg'>
-            <p className='text-sm text-destructive'>삭제된 기기는 복구할 수 없습니다.</p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant='outline' onClick={() => onOpenChange(false)}>
-            취소
-          </Button>
-          <Button variant='destructive' onClick={onConfirm}>
-            {count}개 삭제
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Modal opened={open} onClose={() => onOpenChange(false)} title="일괄 삭제" closeOnClickOutside={!deleting} closeOnEscape={!deleting}>
+      <Text size="sm" c="dimmed">선택한 {count}개의 기기를 삭제하시겠습니까?</Text>
+      <Paper
+        withBorder
+        radius="md"
+        p="md"
+        mt="md"
+        bg="var(--mantine-color-red-light)"
+        style={{ borderColor: 'var(--mantine-color-red-outline)' }}
+      >
+        <Text size="sm" c="red">삭제된 기기는 복구할 수 없습니다.</Text>
+      </Paper>
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={() => onOpenChange(false)} disabled={deleting}>
+          취소
+        </Button>
+        <Button color="red" onClick={onConfirm} disabled={deleting}>
+          {deleting ? '삭제 중...' : `${count}개 삭제`}
+        </Button>
+      </Group>
+    </Modal>
   );
 }
 
@@ -1183,93 +1155,98 @@ function CommonDevicesSection({
   const brokenCount = commonDevices.filter((d) => d.isWorking === false).length;
 
   return (
-    <Card>
-      <CardContent className='p-6'>
-        <div className='border rounded-lg'>
-          {/* Header */}
-          <div
-            className='flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50'
-            onClick={() => setExpanded((prev) => !prev)}
+    <Paper withBorder radius="md" p="lg">
+      <Paper withBorder radius="md">
+        {/* Header */}
+        <Group
+          justify="space-between"
+          wrap="nowrap"
+          p="md"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          <Group gap="xs">
+            {expanded ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )}
+            <Text fw={600}>공동출입문</Text>
+            {commonDevices.length === 0 ? (
+              <Badge variant="light" color="gray">
+                등록된 기기 없음
+              </Badge>
+            ) : (
+              <Badge variant="light" color="gray">{commonDevices.length} 기기</Badge>
+            )}
+            {brokenCount > 0 && (
+              <Badge variant="light" color="red">
+                고장 {brokenCount}
+              </Badge>
+            )}
+          </Group>
+          <Button
+            variant={hook.showQuickAdd ? 'default' : 'filled'}
+            size="xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              hook.toggleQuickAdd();
+            }}
           >
-            <div className='flex items-center gap-2'>
-              {expanded ? (
-                <ChevronDown className='h-4 w-4' />
-              ) : (
-                <ChevronRight className='h-4 w-4' />
-              )}
-              <span className='font-semibold'>공동출입문</span>
+            {hook.showQuickAdd ? '닫기' : '기기 추가'}
+          </Button>
+        </Group>
+
+        {/* Quick Add Form */}
+        {hook.showQuickAdd && (
+          <Box px="md" pb="md">
+            <CommonDeviceQuickAddForm hook={hook} />
+          </Box>
+        )}
+
+        {/* Device List */}
+        {expanded && (
+          <Box
+            px="md"
+            pb="md"
+            style={{ borderTop: '1px solid var(--app-divider)' }}
+          >
+            <Stack gap="xs" mt="md">
               {commonDevices.length === 0 ? (
-                <Badge variant='secondary' className='text-muted-foreground'>
-                  등록된 기기 없음
-                </Badge>
+                <Text size="sm" c="dimmed" py="sm" ta="center">
+                  등록된 공동출입문 기기가 없습니다
+                </Text>
               ) : (
-                <Badge variant='outline'>{commonDevices.length} 기기</Badge>
+                <>
+                  <Group gap="xs" px="xs" py={4}>
+                    <Checkbox
+                      size="xs"
+                      checked={commonDevices.every((d) => hook.selectedDevices.has(d.id))}
+                      onChange={() => hook.handleSelectAll()}
+                    />
+                    <Text size="xs" c="dimmed">
+                      전체 선택 (
+                      {commonDevices.filter((d) => hook.selectedDevices.has(d.id)).length}/
+                      {commonDevices.length})
+                    </Text>
+                  </Group>
+                  {commonDevices.map((device) => (
+                    <CommonDeviceCard
+                      key={device.id}
+                      device={device}
+                      selected={hook.selectedDevices.has(device.id)}
+                      onToggleSelect={() => hook.handleToggleSelect(device.id)}
+                      onEdit={() => hook.handleEditDevice(device)}
+                      onDelete={() => hook.handleDeleteDevice(device.id)}
+                    />
+                  ))}
+                </>
               )}
-              {brokenCount > 0 && (
-                <Badge variant='destructive' className='text-xs'>
-                  고장 {brokenCount}
-                </Badge>
-              )}
-            </div>
-            <Button
-              variant={hook.showQuickAdd ? 'outline' : 'default'}
-              size='sm'
-              onClick={(e) => {
-                e.stopPropagation();
-                hook.toggleQuickAdd();
-              }}
-              className={`text-xs h-8 ${!hook.showQuickAdd ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-            >
-              {hook.showQuickAdd ? '닫기' : '기기 추가'}
-            </Button>
-          </div>
-
-          {/* Quick Add Form */}
-          {hook.showQuickAdd && (
-            <div className='px-4 pb-4'>
-              <CommonDeviceQuickAddForm hook={hook} />
-            </div>
-          )}
-
-          {/* Device List */}
-          {expanded && (
-            <div className='border-t px-4 pb-4'>
-              <div className='mt-4 space-y-2'>
-                {commonDevices.length === 0 ? (
-                  <p className='text-sm text-muted-foreground py-3 text-center'>
-                    등록된 공동출입문 기기가 없습니다
-                  </p>
-                ) : (
-                  <>
-                    <div className='flex items-center gap-2 px-2 py-1'>
-                      <Checkbox
-                        checked={commonDevices.every((d) => hook.selectedDevices.has(d.id))}
-                        onCheckedChange={() => hook.handleSelectAll()}
-                      />
-                      <span className='text-xs text-muted-foreground'>
-                        전체 선택 (
-                        {commonDevices.filter((d) => hook.selectedDevices.has(d.id)).length}/
-                        {commonDevices.length})
-                      </span>
-                    </div>
-                    {commonDevices.map((device) => (
-                      <CommonDeviceCard
-                        key={device.id}
-                        device={device}
-                        selected={hook.selectedDevices.has(device.id)}
-                        onToggleSelect={() => hook.handleToggleSelect(device.id)}
-                        onEdit={() => hook.handleEditDevice(device)}
-                        onDelete={() => hook.handleDeleteDevice(device.id)}
-                      />
-                    ))}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            </Stack>
+          </Box>
+        )}
+      </Paper>
+    </Paper>
   );
 }
 
@@ -1283,78 +1260,78 @@ function CommonDeviceQuickAddForm({
   hook: UseCommonDevicesReturn;
 }): React.ReactElement {
   return (
-    <div className='mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg'>
-      <div className='flex items-center gap-2 mb-3'>
-        <span className='font-medium text-blue-900'>공동출입문 기기 추가</span>
-      </div>
-      <div className='grid grid-cols-3 gap-3 mb-3'>
-        <div>
-          <Label className='text-xs mb-1'>설치 장소</Label>
-          <Input
-            data-common-quick-add-place
-            placeholder='예: 정문, 후문'
-            value={hook.quickAddForm.placeName}
-            onChange={(e) =>
-              hook.setQuickAddForm({
-                ...hook.quickAddForm,
-                placeName: e.target.value,
-              })
-            }
-            onKeyDown={hook.handleQuickAddKeyPress}
-            className='h-9'
-            autoFocus
-          />
-        </div>
-        <div>
-          <Label className='text-xs mb-1'>MAC Address</Label>
-          <Input
-            placeholder='AABBCCDDEEFF'
-            value={hook.quickAddForm.macAddress}
-            onChange={(e) =>
-              hook.setQuickAddForm({
-                ...hook.quickAddForm,
-                macAddress: formatMacAddress(e.target.value),
-              })
-            }
-            onKeyDown={hook.handleQuickAddKeyPress}
-            className='h-9 font-mono'
-          />
-        </div>
-        <div>
-          <Label className='text-xs mb-1'>비밀번호</Label>
-          <Input
-            placeholder='00000000'
-            value={hook.quickAddForm.devicePassword}
-            onChange={(e) =>
-              hook.setQuickAddForm({
-                ...hook.quickAddForm,
-                devicePassword: e.target.value,
-              })
-            }
-            onKeyDown={hook.handleQuickAddKeyPress}
-            className='h-9'
-          />
-        </div>
-      </div>
-      <div className='flex gap-2'>
+    <Paper
+      withBorder
+      radius="md"
+      p="md"
+      mt="sm"
+      bg="var(--mantine-color-blue-light)"
+      style={{ borderColor: 'var(--mantine-color-blue-outline)' }}
+    >
+      <Group gap="xs" mb="sm">
+        <Text fw={500} c="blue">공동출입문 기기 추가</Text>
+      </Group>
+      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm" mb="sm">
+        <TextInput
+          data-common-quick-add-place
+          label="설치 장소"
+          size="xs"
+          placeholder="예: 정문, 후문"
+          value={hook.quickAddForm.placeName}
+          onChange={(e) =>
+            hook.setQuickAddForm({
+              ...hook.quickAddForm,
+              placeName: e.target.value,
+            })
+          }
+          onKeyDown={hook.handleQuickAddKeyPress}
+          autoFocus
+        />
+        <TextInput
+          label="MAC Address"
+          size="xs"
+          placeholder="AABBCCDDEEFF"
+          value={hook.quickAddForm.macAddress}
+          onChange={(e) =>
+            hook.setQuickAddForm({
+              ...hook.quickAddForm,
+              macAddress: formatMacAddress(e.target.value),
+            })
+          }
+          onKeyDown={hook.handleQuickAddKeyPress}
+          styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+        />
+        <TextInput
+          label="비밀번호"
+          size="xs"
+          placeholder="00000000"
+          value={hook.quickAddForm.devicePassword}
+          onChange={(e) =>
+            hook.setQuickAddForm({
+              ...hook.quickAddForm,
+              devicePassword: e.target.value,
+            })
+          }
+          onKeyDown={hook.handleQuickAddKeyPress}
+        />
+      </SimpleGrid>
+      <Group gap="xs">
         <Button
-          size='sm'
+          size="xs"
           onClick={() => hook.handleQuickSave()}
           disabled={!hook.quickAddForm.macAddress}
-          className='h-8'
         >
           추가
         </Button>
         <Button
-          size='sm'
-          variant='outline'
+          size="xs"
+          variant="default"
           onClick={() => hook.toggleQuickAdd()}
-          className='h-8'
         >
           닫기
         </Button>
-      </div>
-    </div>
+      </Group>
+    </Paper>
   );
 }
 
@@ -1376,41 +1353,47 @@ function CommonDeviceCard({
   onDelete: () => void;
 }): React.ReactElement {
   return (
-    <div
-      className={`flex items-center gap-3 p-3 rounded-lg ${
+    <Paper
+      radius="md"
+      p="sm"
+      withBorder={device.isWorking === false}
+      bg={device.isWorking === false ? 'var(--mantine-color-red-light)' : 'var(--mantine-color-default-hover)'}
+      style={
         device.isWorking === false
-          ? 'bg-destructive/10 border border-destructive/20'
-          : 'bg-muted/20'
-      }`}
+          ? { borderColor: 'var(--mantine-color-red-outline)' }
+          : undefined
+      }
     >
-      <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
-      <div className='space-y-1 flex-1'>
-        <div className='flex items-center gap-2'>
-          <p className='font-medium'>{device.placeName || '(장소 미지정)'}</p>
-          {device.isWorking === false && (
-            <Badge variant='destructive' className='text-xs'>
-              고장
-            </Badge>
-          )}
-        </div>
-        <div className='text-sm text-muted-foreground space-y-1'>
-          <div className='flex items-center gap-2'>
-            <Smartphone className='h-3 w-3' />
-            <span>MAC: {device.macAddress}</span>
-          </div>
-          <p>Password: {device.devicePassword}</p>
-          <p>마지막 문연 시간: {formatLastOpenedAt(device.lastOpenedAt)}</p>
-        </div>
-      </div>
-      <div className='flex gap-2'>
-        <Button variant='ghost' size='sm' onClick={onEdit}>
-          <Edit2 className='h-4 w-4' />
-        </Button>
-        <Button variant='ghost' size='sm' onClick={onDelete}>
-          <Trash2 className='h-4 w-4 text-destructive' />
-        </Button>
-      </div>
-    </div>
+      <Group gap="sm" wrap="nowrap">
+        <Checkbox checked={selected} onChange={() => onToggleSelect()} />
+        <Stack gap={4} style={{ flex: 1 }}>
+          <Group gap="xs">
+            <Text fw={500}>{device.placeName || '(장소 미지정)'}</Text>
+            {device.isWorking === false && (
+              <Badge variant="light" color="red" size="sm">
+                고장
+              </Badge>
+            )}
+          </Group>
+          <Stack gap={4}>
+            <Group gap="xs">
+              <Smartphone size={12} color="var(--mantine-color-dimmed)" />
+              <Text size="sm" c="dimmed">MAC: {device.macAddress}</Text>
+            </Group>
+            <Text size="sm" c="dimmed">Password: {device.devicePassword}</Text>
+            <Text size="sm" c="dimmed">마지막 문연 시간: {formatLastOpenedAt(device.lastOpenedAt)}</Text>
+          </Stack>
+        </Stack>
+        <Group gap="xs" wrap="nowrap">
+          <ActionIcon variant="subtle" color="gray" aria-label="수정" onClick={onEdit}>
+            <Edit2 size={16} />
+          </ActionIcon>
+          <ActionIcon variant="subtle" color="red" aria-label="삭제" onClick={onDelete}>
+            <Trash2 size={16} />
+          </ActionIcon>
+        </Group>
+      </Group>
+    </Paper>
   );
 }
 
@@ -1424,68 +1407,61 @@ function CommonDeviceEditDialog({
   hook: UseCommonDevicesReturn;
 }): React.ReactElement {
   return (
-    <Dialog open={hook.editDialog} onOpenChange={hook.setEditDialog}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>공동출입문 기기 수정</DialogTitle>
-          <DialogDescription>기기 정보를 수정해주세요</DialogDescription>
-        </DialogHeader>
-        <div className='space-y-4 py-4'>
-          <div className='space-y-2'>
-            <Label>설치 장소</Label>
-            <Input
-              placeholder='예: 정문, 후문, 지하주차장'
-              value={hook.editForm.placeName}
-              onChange={(e) =>
-                hook.setEditForm({
-                  ...hook.editForm,
-                  placeName: e.target.value,
-                })
-              }
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label>MAC Address</Label>
-            <Input
-              placeholder='예: AA:BB:CC:DD:EE:FF'
-              value={hook.editForm.macAddress}
-              onChange={(e) =>
-                hook.setEditForm({
-                  ...hook.editForm,
-                  macAddress: formatMacAddress(e.target.value),
-                })
-              }
-              className='font-mono'
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label>비밀번호</Label>
-            <Input
-              type='text'
-              placeholder='00000000'
-              value={hook.editForm.devicePassword}
-              onChange={(e) =>
-                hook.setEditForm({
-                  ...hook.editForm,
-                  devicePassword: e.target.value,
-                })
-              }
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant='outline' onClick={() => hook.setEditDialog(false)}>
-            취소
-          </Button>
-          <Button
-            onClick={hook.handleSaveEdit}
-            disabled={!hook.editForm.macAddress || !hook.editForm.devicePassword}
-          >
-            저장
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Modal
+      opened={hook.editDialog}
+      onClose={() => hook.setEditDialog(false)}
+      title="공동출입문 기기 수정"
+    >
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">기기 정보를 수정해주세요</Text>
+        <TextInput
+          label="설치 장소"
+          placeholder="예: 정문, 후문, 지하주차장"
+          value={hook.editForm.placeName}
+          onChange={(e) =>
+            hook.setEditForm({
+              ...hook.editForm,
+              placeName: e.target.value,
+            })
+          }
+        />
+        <TextInput
+          label="MAC Address"
+          placeholder="예: AA:BB:CC:DD:EE:FF"
+          value={hook.editForm.macAddress}
+          onChange={(e) =>
+            hook.setEditForm({
+              ...hook.editForm,
+              macAddress: formatMacAddress(e.target.value),
+            })
+          }
+          styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+        />
+        <TextInput
+          label="비밀번호"
+          type="text"
+          placeholder="00000000"
+          value={hook.editForm.devicePassword}
+          onChange={(e) =>
+            hook.setEditForm({
+              ...hook.editForm,
+              devicePassword: e.target.value,
+            })
+          }
+        />
+      </Stack>
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={() => hook.setEditDialog(false)}>
+          취소
+        </Button>
+        <Button
+          onClick={hook.handleSaveEdit}
+          disabled={!hook.editForm.macAddress || !hook.editForm.devicePassword}
+        >
+          저장
+        </Button>
+      </Group>
+    </Modal>
   );
 }
 
@@ -1503,39 +1479,42 @@ function CommonDeviceDeleteDialog({
     : null;
 
   return (
-    <Dialog open={hook.deleteDialog} onOpenChange={hook.setDeleteDialog}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>공동출입문 기기 삭제</DialogTitle>
-          <DialogDescription>정말로 이 기기를 삭제하시겠습니까?</DialogDescription>
-        </DialogHeader>
-        {device && (
-          <div className='py-4'>
-            <div className='p-4 bg-muted rounded-lg space-y-2'>
+    <Modal
+      opened={hook.deleteDialog}
+      onClose={() => hook.setDeleteDialog(false)}
+      title="공동출입문 기기 삭제"
+      closeOnClickOutside={!hook.deleting}
+      closeOnEscape={!hook.deleting}
+    >
+      <Text size="sm" c="dimmed">정말로 이 기기를 삭제하시겠습니까?</Text>
+      {device && (
+        <Stack gap="md" mt="md">
+          <Paper bg="var(--mantine-color-default-hover)" radius="md" p="md">
+            <Stack gap="xs">
               {device.placeName && (
-                <p className='text-sm'>
+                <Text size="sm">
                   <strong>장소:</strong> {device.placeName}
-                </p>
+                </Text>
               )}
-              <p className='text-sm'>
+              <Text size="sm">
                 <strong>MAC:</strong> {device.macAddress}
-              </p>
-              <p className='text-sm'>
+              </Text>
+              <Text size="sm">
                 <strong>비밀번호:</strong> {device.devicePassword}
-              </p>
-            </div>
-            <p className='text-sm text-destructive mt-4'>삭제된 기기는 복구할 수 없습니다.</p>
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant='outline' onClick={() => hook.setDeleteDialog(false)}>
-            취소
-          </Button>
-          <Button variant='destructive' onClick={hook.confirmDeleteDevice}>
-            삭제
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              </Text>
+            </Stack>
+          </Paper>
+          <Text size="sm" c="red">삭제된 기기는 복구할 수 없습니다.</Text>
+        </Stack>
+      )}
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={() => hook.setDeleteDialog(false)} disabled={hook.deleting}>
+          취소
+        </Button>
+        <Button color="red" onClick={hook.confirmDeleteDevice} disabled={hook.deleting}>
+          {hook.deleting ? '삭제 중...' : '삭제'}
+        </Button>
+      </Group>
+    </Modal>
   );
 }

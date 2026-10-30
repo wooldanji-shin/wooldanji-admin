@@ -1,0 +1,8 @@
+/* 페이지가 HeaderTitle로 제목을 넣으면 그 자리에 제목을 보여주고 브레드크럼은 숨긴다 */
+.titleSlot:empty {
+  display: none;
+}
+
+.titleSlot:not(:empty) + .crumbs {
+  display: none;
+}

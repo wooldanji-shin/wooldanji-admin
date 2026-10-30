@@ -1,13 +1,11 @@
 'use client';
 
 import { useState, useEffect, use, useCallback } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Building2,
   MapPin,
-  Settings,
   Shield,
   Plus,
   Edit2,
@@ -19,41 +17,30 @@ import {
   BarChart2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Modal,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { toast } from 'sonner';
+  SimpleGrid,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  ThemeIcon,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
+import { PageShell } from '@/components/page-shell';
+import { HeaderTitle } from '@/components/header-title';
+import { DetailSkeleton, TableSkeleton } from '@/components/skeletons';
+import { confirmModal } from '@/components/confirm-modal';
 
 interface Device {
   id: string;
@@ -402,9 +389,9 @@ export default function ApartmentDetailPage({ params }: PageProps) {
     setDeviceDialog(false);
   };
 
-  const handleDeleteDevice = (lineId: string, deviceId: string) => {
+  const handleDeleteDevice = async (lineId: string, deviceId: string): Promise<void> => {
     if (!apartment) return;
-    if (!confirm('정말로 이 기기를 삭제하시겠습니까?')) return;
+    if (!(await confirmModal({ title: '기기 삭제', message: '정말로 이 기기를 삭제하시겠습니까?', confirmLabel: '삭제', danger: true }))) return;
 
     // TODO: Supabase 연동
     const updatedBuildings = apartment.buildings.map(building => ({
@@ -425,9 +412,7 @@ export default function ApartmentDetailPage({ params }: PageProps) {
   };
 
   if (loading) {
-    return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8"><div className="space-y-3"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-72" /></div><div className="flex flex-col gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div></div>
-    );
+    return <DetailSkeleton sections={6} />;
   }
 
   if (!apartment) {
@@ -435,511 +420,466 @@ export default function ApartmentDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-      {/* Header */}
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/admin/apartments')}
-          className="-ml-2 mb-3 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
-          뒤로가기
-        </Button>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight md:text-[1.625rem]">{apartment.name}</h1>
-          <Badge variant={apartment.status === 'active' ? 'default' : 'secondary'}>
-            {apartment.status === 'active' ? '활성' : '비활성'}
-          </Badge>
-        </div>
-        <p className="mt-1.5 text-sm text-muted-foreground">{apartment.address}</p>
-      </div>
+    <PageShell>
+      <HeaderTitle title={apartment.name} onBack={() => router.push('/admin/apartments')} />
+      <Group gap="sm" wrap="wrap">
+        <Badge variant="light" color={apartment.status === 'active' ? 'green' : 'gray'}>
+          {apartment.status === 'active' ? '활성' : '비활성'}
+        </Badge>
+        <Text size="sm" c="dimmed">{apartment.address}</Text>
+      </Group>
 
       {/* Tabs */}
-      <Tabs defaultValue="basic" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="basic">기본 정보</TabsTrigger>
-          <TabsTrigger value="buildings">동 관리</TabsTrigger>
-          <TabsTrigger value="devices">기기 관리</TabsTrigger>
-          <TabsTrigger value="permissions">권한 설정</TabsTrigger>
-          <TabsTrigger value="ads">광고 현황</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="basic">
+        <Tabs.List grow>
+          <Tabs.Tab value="basic">기본 정보</Tabs.Tab>
+          <Tabs.Tab value="buildings">동 관리</Tabs.Tab>
+          <Tabs.Tab value="devices">기기 관리</Tabs.Tab>
+          <Tabs.Tab value="permissions">권한 설정</Tabs.Tab>
+          <Tabs.Tab value="ads">광고 현황</Tabs.Tab>
+        </Tabs.List>
 
         {/* Tab 1: 기본 정보 */}
-        <TabsContent value="basic">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>
-                    <MapPin className="inline-block mr-2 h-5 w-5" />
-                    기본 정보
-                  </CardTitle>
-                  <CardDescription>
+        <Tabs.Panel value="basic" pt="lg">
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="lg">
+              <Group justify="space-between" align="flex-start">
+                <Stack gap={4}>
+                  <Group gap="xs">
+                    <MapPin size={20} />
+                    <Title order={4}>기본 정보</Title>
+                  </Group>
+                  <Text size="sm" c="dimmed">
                     아파트의 기본 정보를 확인하고 수정할 수 있습니다
-                  </CardDescription>
-                </div>
+                  </Text>
+                </Stack>
                 {!editMode ? (
-                  <Button onClick={() => setEditMode(true)}>
-                    <Edit2 className="h-4 w-4 mr-2" />
+                  <Button leftSection={<Edit2 size={16} />} onClick={() => setEditMode(true)}>
                     수정
                   </Button>
                 ) : (
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setEditMode(false)}>
+                  <Group gap="xs">
+                    <Button variant="default" onClick={() => setEditMode(false)}>
                       취소
                     </Button>
-                    <Button onClick={handleSaveBasicInfo}>
-                      <Save className="h-4 w-4 mr-2" />
+                    <Button leftSection={<Save size={16} />} onClick={handleSaveBasicInfo}>
                       저장
                     </Button>
-                  </div>
+                  </Group>
                 )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label>아파트명</Label>
-                  <Input
-                    value={apartment.name}
-                    onChange={(e) => setApartment({ ...apartment, name: e.target.value })}
-                    disabled={!editMode}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>상태</Label>
-                  <Select
-                    value={apartment.status}
-                    onValueChange={(value: any) => setApartment({ ...apartment, status: value })}
-                    disabled={!editMode}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">활성</SelectItem>
-                      <SelectItem value="inactive">비활성</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              </Group>
 
-              <div className="space-y-2">
-                <Label>주소</Label>
-                <Input
-                  value={apartment.address}
-                  disabled
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>상세주소</Label>
-                <Input
-                  value={apartment.detailAddress || ''}
-                  onChange={(e) => setApartment({ ...apartment, detailAddress: e.target.value })}
+              <SimpleGrid cols={2} spacing="lg">
+                <TextInput
+                  label="아파트명"
+                  value={apartment.name}
+                  onChange={(e) => setApartment({ ...apartment, name: e.target.value })}
                   disabled={!editMode}
                 />
-              </div>
+                <Select
+                  label="상태"
+                  data={[
+                    { value: 'active', label: '활성' },
+                    { value: 'inactive', label: '비활성' },
+                  ]}
+                  value={apartment.status || null}
+                  onChange={(value) => {
+                    if (value === null) return;
+                    setApartment({ ...apartment, status: value as any });
+                  }}
+                  allowDeselect={false}
+                  disabled={!editMode}
+                />
+              </SimpleGrid>
 
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <Label>총 동수</Label>
-                  <p className="text-2xl font-bold mt-1">{apartment.buildings.length}동</p>
-                </div>
-                <div>
-                  <Label>총 세대수</Label>
-                  <p className="text-2xl font-bold mt-1">
+              <TextInput label="주소" value={apartment.address} disabled />
+
+              <TextInput
+                label="상세주소"
+                value={apartment.detailAddress || ''}
+                onChange={(e) => setApartment({ ...apartment, detailAddress: e.target.value })}
+                disabled={!editMode}
+              />
+
+              <SimpleGrid cols={3} spacing="lg">
+                <Stack gap={4}>
+                  <Text size="sm" fw={500}>총 동수</Text>
+                  <Text fz="1.5rem" fw={700}>{apartment.buildings.length}동</Text>
+                </Stack>
+                <Stack gap={4}>
+                  <Text size="sm" fw={500}>총 세대수</Text>
+                  <Text fz="1.5rem" fw={700}>
                     {apartment.buildings.reduce((acc, b) => acc + b.householdsCount, 0)}세대
-                  </p>
-                </div>
-                <div>
-                  <Label>등록일</Label>
-                  <p className="text-2xl font-bold mt-1">{apartment.createdAt}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </Text>
+                </Stack>
+                <Stack gap={4}>
+                  <Text size="sm" fw={500}>등록일</Text>
+                  <Text fz="1.5rem" fw={700}>{apartment.createdAt}</Text>
+                </Stack>
+              </SimpleGrid>
+            </Stack>
+          </Paper>
+        </Tabs.Panel>
 
         {/* Tab 2: 동 관리 */}
-        <TabsContent value="buildings">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>
-                    <Building2 className="inline-block mr-2 h-5 w-5" />
-                    동 관리
-                  </CardTitle>
-                  <CardDescription>
+        <Tabs.Panel value="buildings" pt="lg">
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="lg">
+              <Group justify="space-between" align="flex-start">
+                <Stack gap={4}>
+                  <Group gap="xs">
+                    <Building2 size={20} />
+                    <Title order={4}>동 관리</Title>
+                  </Group>
+                  <Text size="sm" c="dimmed">
                     각 동의 정보와 라인을 관리합니다
-                  </CardDescription>
-                </div>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  동 추가
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {apartment.buildings.map((building) => (
-                  <Card key={building.id}>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                          <h3 className="text-lg font-semibold">{building.number}동</h3>
-                          <Badge variant="outline">{building.householdsCount}세대</Badge>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm">
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
+                  </Text>
+                </Stack>
+                {/* 동 추가 버튼은 기능 구현 전까지 숨김 */}
+              </Group>
 
-                      <div className="space-y-2">
-                        <Label>라인 설정</Label>
-                        <div className="flex gap-3">
-                          {AVAILABLE_LINES.map((line) => (
-                            <div key={line.value} className="flex items-center space-x-2">
-                              <Checkbox
-                                checked={building.lines.some(l => l.line === line.value)}
-                                disabled
-                              />
-                              <Label className="text-sm font-normal">
-                                {line.label}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <Stack gap="md">
+                {apartment.buildings.map((building) => (
+                  <Paper key={building.id} withBorder radius="md" p="md">
+                    <Group justify="space-between" mb="md">
+                      <Group gap="md">
+                        <Text size="lg" fw={600}>{building.number}동</Text>
+                        <Badge variant="light" color="gray">{building.householdsCount}세대</Badge>
+                      </Group>
+                      {/* 동 수정/삭제 버튼은 기능 구현 전까지 숨김 */}
+                    </Group>
+
+                    <Stack gap="xs">
+                      <Text size="sm" fw={500}>라인 설정</Text>
+                      <Group gap="md">
+                        {AVAILABLE_LINES.map((line) => (
+                          <Checkbox
+                            key={line.value}
+                            checked={building.lines.some(l => l.line === line.value)}
+                            disabled
+                            label={line.label}
+                          />
+                        ))}
+                      </Group>
+                    </Stack>
+                  </Paper>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </Stack>
+            </Stack>
+          </Paper>
+        </Tabs.Panel>
 
         {/* Tab 3: 기기 관리 */}
-        <TabsContent value="devices">
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>
-                  <Cpu className="inline-block mr-2 h-5 w-5" />
-                  기기 관리
-                </CardTitle>
-                <CardDescription>
+        <Tabs.Panel value="devices" pt="lg">
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="lg">
+              <Stack gap={4}>
+                <Group gap="xs">
+                  <Cpu size={20} />
+                  <Title order={4}>기기 관리</Title>
+                </Group>
+                <Text size="sm" c="dimmed">
                   각 라인에 설치된 기기를 관리합니다
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+                </Text>
+              </Stack>
+
+              <Stack gap="md">
                 {apartment.buildings.map((building) => (
-                  <div key={building.id} className="border rounded-lg">
-                    <div
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
+                  <Paper key={building.id} withBorder radius="md">
+                    <UnstyledButton
+                      w="100%"
+                      p="md"
                       onClick={() => toggleBuilding(building.id)}
                     >
-                      <div className="flex items-center gap-2">
+                      <Group gap="xs">
                         {expandedBuildings.includes(building.id) ? (
-                          <ChevronDown className="h-4 w-4" />
+                          <ChevronDown size={16} />
                         ) : (
-                          <ChevronRight className="h-4 w-4" />
+                          <ChevronRight size={16} />
                         )}
-                        <span className="font-semibold">{building.number}동</span>
-                        <Badge variant="outline">
+                        <Text fw={600}>{building.number}동</Text>
+                        <Badge variant="light" color="gray">
                           {building.lines.reduce((acc, l) => acc + l.devices.length, 0)} 기기
                         </Badge>
-                      </div>
-                    </div>
+                      </Group>
+                    </UnstyledButton>
 
                     {expandedBuildings.includes(building.id) && (
-                      <div className="border-t px-4 pb-4">
+                      <Box
+                        px="md"
+                        pb="md"
+                        style={{ borderTop: '1px solid var(--app-divider)' }}
+                      >
                         {building.lines.map((line) => (
-                          <div key={line.id} className="mt-4">
-                            <div
-                              className="flex items-center justify-between py-2 cursor-pointer hover:bg-muted/30 rounded px-2"
+                          <Box key={line.id} mt="md">
+                            <Group
+                              justify="space-between"
+                              py="xs"
+                              px="xs"
+                              style={{ cursor: 'pointer', borderRadius: 'var(--mantine-radius-sm)' }}
                               onClick={() => toggleLine(line.id)}
                             >
-                              <div className="flex items-center gap-2">
+                              <Group gap="xs">
                                 {expandedLines.includes(line.id) ? (
-                                  <ChevronDown className="h-4 w-4" />
+                                  <ChevronDown size={16} />
                                 ) : (
-                                  <ChevronRight className="h-4 w-4" />
+                                  <ChevronRight size={16} />
                                 )}
-                                <span className="font-medium">{line.line}라인</span>
-                                <Badge variant="secondary">
+                                <Text fw={500}>{line.line}라인</Text>
+                                <Badge variant="light" color="gray">
                                   {line.devices.length} 기기
                                 </Badge>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                              </Group>
+                              <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                aria-label="기기 추가"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleAddDevice(line.id);
                                 }}
                               >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
+                                <Plus size={16} />
+                              </ActionIcon>
+                            </Group>
 
                             {expandedLines.includes(line.id) && (
-                              <div className="ml-6 mt-2 space-y-2">
+                              <Stack gap="xs" ml="xl" mt="xs">
                                 {line.devices.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground py-2">
+                                  <Text size="sm" c="dimmed" py="xs">
                                     등록된 기기가 없습니다
-                                  </p>
+                                  </Text>
                                 ) : (
                                   line.devices.map((device) => (
-                                    <div
+                                    <Group
                                       key={device.id}
-                                      className="flex items-center justify-between p-3 bg-muted/20 rounded-lg"
+                                      justify="space-between"
+                                      p="sm"
+                                      bg="var(--app-bg-muted)"
+                                      style={{ borderRadius: 'var(--mantine-radius-md)' }}
                                     >
-                                      <div className="space-y-1">
-                                        <p className="font-medium">{device.placeName}</p>
-                                        <div className="text-sm text-muted-foreground">
-                                          <p>MAC: {device.macAddress}</p>
-                                          <p>Password: {device.password}</p>
-                                        </div>
-                                      </div>
-                                      <div className="flex gap-2">
-                                        <Button variant="ghost" size="sm">
-                                          <Edit2 className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
+                                      <Stack gap={4}>
+                                        <Text fw={500}>{device.placeName}</Text>
+                                        <Box>
+                                          <Text size="sm" c="dimmed">MAC: {device.macAddress}</Text>
+                                          <Text size="sm" c="dimmed">Password: {device.password}</Text>
+                                        </Box>
+                                      </Stack>
+                                      <Group gap={4}>
+                                        {/* 기기 수정 버튼은 기능 구현 전까지 숨김 */}
+                                        <ActionIcon
+                                          variant="subtle"
+                                          color="red"
+                                          aria-label="삭제"
                                           onClick={() => handleDeleteDevice(line.id, device.id)}
                                         >
-                                          <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                      </div>
-                                    </div>
+                                          <Trash2 size={16} />
+                                        </ActionIcon>
+                                      </Group>
+                                    </Group>
                                   ))
                                 )}
-                              </div>
+                              </Stack>
                             )}
-                          </div>
+                          </Box>
                         ))}
-                      </div>
+                      </Box>
                     )}
-                  </div>
+                  </Paper>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </Stack>
+            </Stack>
+          </Paper>
+        </Tabs.Panel>
 
         {/* Tab 4: 권한 설정 */}
-        <TabsContent value="permissions">
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>
-                  <Shield className="inline-block mr-2 h-5 w-5" />
-                  권한 설정
-                </CardTitle>
-                <CardDescription>
+        <Tabs.Panel value="permissions" pt="lg">
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="lg">
+              <Stack gap={4}>
+                <Group gap="xs">
+                  <Shield size={20} />
+                  <Title order={4}>권한 설정</Title>
+                </Group>
+                <Text size="sm" c="dimmed">
                   아파트 관리자 권한을 설정합니다
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">권한 설정 기능은 준비 중입니다.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </Text>
+              </Stack>
+              <Text c="dimmed">권한 설정 기능은 준비 중입니다.</Text>
+            </Stack>
+          </Paper>
+        </Tabs.Panel>
 
         {/* Tab 5: 광고 현황 */}
-        <TabsContent value="ads" className="space-y-6">
-          {/* 기본광고 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <BarChart2 className="inline-block mr-2 h-5 w-5" />
-                기본광고 진행 중
-                <Badge variant="secondary" className="ml-2">{runningBasicAds.length}</Badge>
-              </CardTitle>
-              <CardDescription>이 아파트에서 현재 running 상태인 기본광고입니다</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {adsLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : runningBasicAds.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">진행 중인 기본광고가 없습니다</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-muted-foreground text-left">
-                      <th className="py-2 pr-4 font-medium">상호명</th>
-                      <th className="py-2 pr-4 font-medium">광고 제목</th>
-                      <th className="py-2 pr-4 font-medium">카테고리</th>
-                      <th className="py-2 pr-4 font-medium">시작일</th>
-                      <th className="py-2 pr-4 font-medium text-center">무료</th>
-                      <th className="py-2 pr-4 font-medium text-right">노출수</th>
-                      <th className="py-2 font-medium text-right">클릭수</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runningBasicAds.map((ad) => (
-                      <tr key={ad.id} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="py-2.5 pr-4 font-medium">{ad.businessName}</td>
-                        <td className="py-2.5 pr-4 text-muted-foreground max-w-[200px] truncate">{ad.title ?? '-'}</td>
-                        <td className="py-2.5 pr-4 text-muted-foreground">{ad.categoryName ?? '-'}</td>
-                        <td className="py-2.5 pr-4 text-muted-foreground">
-                          {ad.activatedAt ? new Date(ad.activatedAt).toLocaleDateString('ko-KR') : '-'}
-                        </td>
-                        <td className="py-2.5 pr-4 text-center">
-                          {ad.freeMonths > 0 ? (
-                            <Badge variant="outline" className="text-xs">{ad.freeMonths}개월</Badge>
-                          ) : '-'}
-                        </td>
-                        <td className="py-2.5 pr-4 text-right tabular-nums">
-                          {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}
-                        </td>
-                        <td className="py-2.5 text-right tabular-nums">
-                          {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
+        <Tabs.Panel value="ads" pt="lg">
+          <Stack gap="lg">
+            {/* 기본광고 */}
+            <Paper withBorder radius="md" p="lg">
+              <Stack gap="lg">
+                <Stack gap={4}>
+                  <Group gap="xs">
+                    <BarChart2 size={20} />
+                    <Title order={4}>기본광고 진행 중</Title>
+                    <Badge variant="light" color="gray">{runningBasicAds.length}</Badge>
+                  </Group>
+                  <Text size="sm" c="dimmed">이 아파트에서 현재 running 상태인 기본광고입니다</Text>
+                </Stack>
+                {adsLoading ? (
+                  <TableSkeleton rows={3} columns={7} />
+                ) : runningBasicAds.length === 0 ? (
+                  <Text size="sm" c="dimmed" py="md" ta="center">진행 중인 기본광고가 없습니다</Text>
+                ) : (
+                  <Table.ScrollContainer minWidth={640}>
+                    <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>상호명</Table.Th>
+                          <Table.Th>광고 제목</Table.Th>
+                          <Table.Th>카테고리</Table.Th>
+                          <Table.Th>시작일</Table.Th>
+                          <Table.Th ta="center">무료</Table.Th>
+                          <Table.Th ta="right">노출수</Table.Th>
+                          <Table.Th ta="right">클릭수</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {runningBasicAds.map((ad) => (
+                          <Table.Tr key={ad.id}>
+                            <Table.Td fw={500}>{ad.businessName}</Table.Td>
+                            <Table.Td>
+                              <Text size="sm" c="dimmed" maw={200} truncate>{ad.title ?? '-'}</Text>
+                            </Table.Td>
+                            <Table.Td c="dimmed">{ad.categoryName ?? '-'}</Table.Td>
+                            <Table.Td c="dimmed">
+                              {ad.activatedAt ? new Date(ad.activatedAt).toLocaleDateString('ko-KR') : '-'}
+                            </Table.Td>
+                            <Table.Td ta="center">
+                              {ad.freeMonths > 0 ? (
+                                <Badge variant="light" color="gray" size="sm">{ad.freeMonths}개월</Badge>
+                              ) : '-'}
+                            </Table.Td>
+                            <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}
+                            </Table.Td>
+                            <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                )}
+              </Stack>
+            </Paper>
 
-          {/* 프리미엄광고 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <BarChart2 className="inline-block mr-2 h-5 w-5 text-amber-500" />
-                프리미엄광고 진행 중
-                <Badge variant="secondary" className="ml-2">{runningPremiumAds.length}</Badge>
-              </CardTitle>
-              <CardDescription>이 아파트에서 현재 running 상태인 프리미엄광고입니다</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {adsLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : runningPremiumAds.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">진행 중인 프리미엄광고가 없습니다</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-muted-foreground text-left">
-                      <th className="py-2 pr-4 font-medium">상호명</th>
-                      <th className="py-2 pr-4 font-medium">광고 제목</th>
-                      <th className="py-2 pr-4 font-medium">기간</th>
-                      <th className="py-2 pr-4 font-medium">주수</th>
-                      <th className="py-2 pr-4 font-medium text-right">금액</th>
-                      <th className="py-2 pr-4 font-medium text-right">노출수</th>
-                      <th className="py-2 font-medium text-right">클릭수</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {runningPremiumAds.map((ad) => (
-                      <tr key={ad.id} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="py-2.5 pr-4 font-medium">{ad.businessName}</td>
-                        <td className="py-2.5 pr-4 text-muted-foreground max-w-[200px] truncate">{ad.title ?? '-'}</td>
-                        <td className="py-2.5 pr-4 text-muted-foreground tabular-nums text-xs">
-                          {ad.startedAt && ad.endedAt ? (
-                            <>
-                              {new Date(ad.startedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
-                              {' ~ '}
-                              {new Date(ad.endedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
-                            </>
-                          ) : '-'}
-                        </td>
-                        <td className="py-2.5 pr-4 text-muted-foreground">{ad.weeks}주</td>
-                        <td className="py-2.5 pr-4 text-right tabular-nums">
-                          {ad.totalAmount != null ? `${ad.totalAmount.toLocaleString()}원` : '-'}
-                        </td>
-                        <td className="py-2.5 pr-4 text-right tabular-nums">
-                          {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}
-                        </td>
-                        <td className="py-2.5 text-right tabular-nums">
-                          {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            {/* 프리미엄광고 */}
+            <Paper withBorder radius="md" p="lg">
+              <Stack gap="lg">
+                <Stack gap={4}>
+                  <Group gap="xs">
+                    <ThemeIcon variant="transparent" color="yellow" size="sm">
+                      <BarChart2 size={20} />
+                    </ThemeIcon>
+                    <Title order={4}>프리미엄광고 진행 중</Title>
+                    <Badge variant="light" color="gray">{runningPremiumAds.length}</Badge>
+                  </Group>
+                  <Text size="sm" c="dimmed">이 아파트에서 현재 running 상태인 프리미엄광고입니다</Text>
+                </Stack>
+                {adsLoading ? (
+                  <TableSkeleton rows={3} columns={7} />
+                ) : runningPremiumAds.length === 0 ? (
+                  <Text size="sm" c="dimmed" py="md" ta="center">진행 중인 프리미엄광고가 없습니다</Text>
+                ) : (
+                  <Table.ScrollContainer minWidth={640}>
+                    <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>상호명</Table.Th>
+                          <Table.Th>광고 제목</Table.Th>
+                          <Table.Th>기간</Table.Th>
+                          <Table.Th>주수</Table.Th>
+                          <Table.Th ta="right">금액</Table.Th>
+                          <Table.Th ta="right">노출수</Table.Th>
+                          <Table.Th ta="right">클릭수</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {runningPremiumAds.map((ad) => (
+                          <Table.Tr key={ad.id}>
+                            <Table.Td fw={500}>{ad.businessName}</Table.Td>
+                            <Table.Td>
+                              <Text size="sm" c="dimmed" maw={200} truncate>{ad.title ?? '-'}</Text>
+                            </Table.Td>
+                            <Table.Td c="dimmed" fz="xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {ad.startedAt && ad.endedAt ? (
+                                <>
+                                  {new Date(ad.startedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
+                                  {' ~ '}
+                                  {new Date(ad.endedAt).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
+                                </>
+                              ) : '-'}
+                            </Table.Td>
+                            <Table.Td c="dimmed">{ad.weeks}주</Table.Td>
+                            <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {ad.totalAmount != null ? `${ad.totalAmount.toLocaleString()}원` : '-'}
+                            </Table.Td>
+                            <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {ad.totalImpressions > 0 ? ad.totalImpressions.toLocaleString() : '-'}
+                            </Table.Td>
+                            <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {ad.totalClicks > 0 ? ad.totalClicks.toLocaleString() : '-'}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                )}
+              </Stack>
+            </Paper>
+          </Stack>
+        </Tabs.Panel>
       </Tabs>
 
       {/* Device Dialog */}
-      <Dialog open={deviceDialog} onOpenChange={setDeviceDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>기기 추가</DialogTitle>
-            <DialogDescription>
-              새로운 기기 정보를 입력해주세요
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>설치 장소</Label>
-              <Select
-                value={deviceForm.placeName}
-                onValueChange={(value) => setDeviceForm({ ...deviceForm, placeName: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="장소를 선택하세요" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PLACE_OPTIONS.map((place) => (
-                    <SelectItem key={place} value={place}>
-                      {place}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>MAC Address</Label>
-              <Input
-                placeholder="예: AA:BB:CC:DD:EE:FF"
-                value={deviceForm.macAddress}
-                onChange={(e) => setDeviceForm({ ...deviceForm, macAddress: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>비밀번호</Label>
-              <Input
-                type="password"
-                placeholder="기기 비밀번호"
-                value={deviceForm.password}
-                onChange={(e) => setDeviceForm({ ...deviceForm, password: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeviceDialog(false)}>
-              취소
-            </Button>
-            <Button onClick={handleSaveDevice}>저장</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <Modal opened={deviceDialog} onClose={() => setDeviceDialog(false)} title="기기 추가">
+        <Text size="sm" c="dimmed">
+          새로운 기기 정보를 입력해주세요
+        </Text>
+        <Stack gap="md" py="md">
+          <Select
+            label="설치 장소"
+            placeholder="장소를 선택하세요"
+            data={PLACE_OPTIONS}
+            value={deviceForm.placeName || null}
+            onChange={(value) => {
+              if (value === null) return;
+              setDeviceForm({ ...deviceForm, placeName: value });
+            }}
+            allowDeselect={false}
+          />
+          <TextInput
+            label="MAC Address"
+            placeholder="예: AA:BB:CC:DD:EE:FF"
+            value={deviceForm.macAddress}
+            onChange={(e) => setDeviceForm({ ...deviceForm, macAddress: e.target.value })}
+          />
+          <TextInput
+            label="비밀번호"
+            type="password"
+            placeholder="기기 비밀번호"
+            value={deviceForm.password}
+            onChange={(e) => setDeviceForm({ ...deviceForm, password: e.target.value })}
+          />
+        </Stack>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => setDeviceDialog(false)}>
+            취소
+          </Button>
+          <Button onClick={handleSaveDevice}>저장</Button>
+        </Group>
+      </Modal>
+    </PageShell>
   );
 }

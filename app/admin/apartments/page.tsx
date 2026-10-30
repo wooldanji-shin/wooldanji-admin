@@ -16,20 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import {
   PageContent,
   PageHeader,
@@ -38,25 +25,24 @@ import {
   PageShell,
 } from '@/components/page-shell';
 import { DataTableShell } from '@/components/data-table-shell';
-import { DataToolbar, DataToolbarSearch, DataToolbarActions } from '@/components/data-toolbar';
+import { DataToolbarSearch } from '@/components/data-toolbar';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
+import { StatCard } from '@/components/stat-card';
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Menu,
+  Modal,
+  SimpleGrid,
+  Switch,
+  Table,
+  Text,
+} from '@mantine/core';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
 import { getUserRoles } from '@/lib/auth';
 
@@ -92,6 +78,7 @@ export default function ApartmentsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingApartment, setDeletingApartment] = useState<Apartment | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
   const currentPage = parseInt(searchParams.get('page') || '1');
   const setCurrentPage = (p: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -296,10 +283,10 @@ export default function ApartmentsPage() {
 
   // 정렬 아이콘 렌더링
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
+    if (sortField !== field) return <ArrowUpDown size={16} style={{ marginLeft: 4 }} />;
     return sortDirection === 'asc'
-      ? <ArrowUp className="h-4 w-4 ml-1" />
-      : <ArrowDown className="h-4 w-4 ml-1" />;
+      ? <ArrowUp size={16} style={{ marginLeft: 4 }} />
+      : <ArrowDown size={16} style={{ marginLeft: 4 }} />;
   };
 
   // 필터링 및 정렬
@@ -347,6 +334,7 @@ export default function ApartmentsPage() {
   const handleDeleteConfirm = async () => {
     if (!deletingApartment) return;
 
+    setDeleting(true);
     try {
       const { error } = await supabase
         .from('apartments')
@@ -368,6 +356,8 @@ export default function ApartmentsPage() {
           ? '이 아파트를 참조하는 데이터가 남아 있어 삭제할 수 없습니다. 소속 회원을 먼저 다른 아파트로 이동시켜 주세요.'
           : '아파트 삭제 중 오류가 발생했습니다.'
       );
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -396,16 +386,10 @@ export default function ApartmentsPage() {
           description="등록된 아파트 정보를 관리합니다."
         />
         <PageHeaderActions>
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Checkbox
-              id="hide-open-door-column"
-              checked={hideOpenDoorColumn}
-              onCheckedChange={(checked) => handleHideOpenDoorColumnChange(checked === true)}
-            />
-            문 연 횟수 숨기기
-          </label>
-          <Button onClick={() => router.push('/admin/apartments/new')}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Button
+            leftSection={<Plus size={16} />}
+            onClick={() => router.push('/admin/apartments/new')}
+          >
             새 아파트 등록
           </Button>
         </PageHeaderActions>
@@ -413,342 +397,298 @@ export default function ApartmentsPage() {
 
       <PageContent>
         {/* 전체 합계 통계 카드 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <Home className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">총 세대수</p>
-                <p className="text-2xl font-bold">
-                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalUnits, 0).toLocaleString()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <Cpu className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">총 기기수</p>
-                <p className="text-2xl font-bold">
-                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalDevices, 0).toLocaleString()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="p-2 rounded-lg bg-green-100">
-                <Users className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">총 회원수</p>
-                <p className="text-2xl font-bold">
-                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.memberCount, 0).toLocaleString()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="p-2 rounded-lg bg-orange-100">
-                <DoorOpen className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">총 문 연 횟수</p>
-                <p className="text-2xl font-bold">
-                  {loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalOpenDoorCount, 0).toLocaleString()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <SimpleGrid cols={{ base: 2, md: 4 }} spacing="md">
+          <StatCard
+            label="총 세대수"
+            icon={Home}
+            accent="primary"
+            value={loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalUnits, 0).toLocaleString()}
+          />
+          <StatCard
+            label="총 기기수"
+            icon={Cpu}
+            accent="info"
+            value={loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalDevices, 0).toLocaleString()}
+          />
+          <StatCard
+            label="총 회원수"
+            icon={Users}
+            accent="success"
+            value={loading ? '-' : apartments.reduce((sum, apt) => sum + apt.memberCount, 0).toLocaleString()}
+          />
+          <StatCard
+            label="총 문 연 횟수"
+            icon={DoorOpen}
+            accent="warning"
+            value={loading ? '-' : apartments.reduce((sum, apt) => sum + apt.totalOpenDoorCount, 0).toLocaleString()}
+          />
+        </SimpleGrid>
 
-      <DataTableShell
-        toolbar={
-          <DataToolbar>
-            <DataToolbarSearch
-              value={searchTerm}
-              onChange={setSearchTerm}
-              placeholder="아파트명 또는 주소로 검색..."
-            />
-            <DataToolbarActions>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                총 {filteredApartments.length.toLocaleString()}개
-              </span>
-            </DataToolbarActions>
-          </DataToolbar>
-        }
-        pagination={
-          !loading && totalPages > 1 ? (
-            <ApartmentsPagination
-              page={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          ) : undefined
-        }
-      >
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead
-                    className="text-muted-foreground cursor-pointer hover:text-foreground"
-                    onClick={() => handleSort('name')}
+        <DataTableShell
+          toolbar={
+            <Group gap="xs" justify="space-between">
+              <DataToolbarSearch
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="아파트명 또는 주소로 검색..."
+              />
+              <Checkbox
+                id="hide-open-door-column"
+                label="문 연 횟수 숨기기"
+                checked={hideOpenDoorColumn}
+                onChange={(e) => handleHideOpenDoorColumnChange(e.currentTarget.checked)}
+                styles={{ label: { color: 'var(--mantine-color-dimmed)' } }}
+              />
+            </Group>
+          }
+          summary={
+            <Text size="sm" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              총 <Text span fw={700} c="var(--mantine-color-text)">{filteredApartments.length.toLocaleString()}</Text>개
+            </Text>
+          }
+          pagination={
+            !loading && totalPages > 1 ? (
+              <ApartmentsPagination
+                page={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            ) : undefined
+          }
+        >
+          <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                  <Group gap={0} wrap="nowrap">
+                    아파트명
+                    {getSortIcon('name')}
+                  </Group>
+                </Table.Th>
+                <Table.Th>주소</Table.Th>
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('buildingCount')}>
+                  <Group gap={0} justify="center" wrap="nowrap">
+                    동수
+                    {getSortIcon('buildingCount')}
+                  </Group>
+                </Table.Th>
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('totalUnits')}>
+                  <Group gap={0} justify="center" wrap="nowrap">
+                    세대수
+                    {getSortIcon('totalUnits')}
+                  </Group>
+                </Table.Th>
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('totalDevices')}>
+                  <Group gap={0} justify="center" wrap="nowrap">
+                    기기수
+                    {getSortIcon('totalDevices')}
+                  </Group>
+                </Table.Th>
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('memberCount')}>
+                  <Group gap={0} justify="center" wrap="nowrap">
+                    회원수
+                    {getSortIcon('memberCount')}
+                  </Group>
+                </Table.Th>
+                {!hideOpenDoorColumn && (
+                  <Table.Th ta="center">
+                    문 연 횟수
+                  </Table.Th>
+                )}
+                <Table.Th ta="center">
+                  기본광고
+                </Table.Th>
+                <Table.Th ta="center">
+                  프리미엄
+                </Table.Th>
+                <Table.Th ta="center">
+                  광고
+                </Table.Th>
+                <Table.Th ta="center">
+                  매니저
+                </Table.Th>
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('createdAt')}>
+                  <Group gap={0} justify="center" wrap="nowrap">
+                    등록일
+                    {getSortIcon('createdAt')}
+                  </Group>
+                </Table.Th>
+                <Table.Th ta="right">관리</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {loading ? (
+                <Table.Tr>
+                  <Table.Td colSpan={hideOpenDoorColumn ? 12 : 13} p={0}>
+                    <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 11 : 12} showHeader={false} />
+                  </Table.Td>
+                </Table.Tr>
+              ) : filteredApartments.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={hideOpenDoorColumn ? 12 : 13} p={0}>
+                    <EmptyState
+                      icon={Building2}
+                      title={searchTerm ? '검색 결과가 없습니다' : '등록된 아파트가 없습니다'}
+                      description={
+                        searchTerm
+                          ? '다른 검색어로 다시 시도해보세요.'
+                          : '새 아파트를 등록하여 관리할 수 있습니다.'
+                      }
+                      size="sm"
+                    />
+                  </Table.Td>
+                </Table.Tr>
+              ) : (
+                paginatedApartments.map((apartment) => (
+                  <Table.Tr
+                    key={apartment.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => router.push(`/admin/apartments/${apartment.id}/view`)}
                   >
-                    <div className="flex items-center">
-                      아파트명
-                      {getSortIcon('name')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">주소</TableHead>
-                  <TableHead
-                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
-                    onClick={() => handleSort('buildingCount')}
-                  >
-                    <div className="flex items-center justify-center">
-                      동수
-                      {getSortIcon('buildingCount')}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
-                    onClick={() => handleSort('totalUnits')}
-                  >
-                    <div className="flex items-center justify-center">
-                      세대수
-                      {getSortIcon('totalUnits')}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
-                    onClick={() => handleSort('totalDevices')}
-                  >
-                    <div className="flex items-center justify-center">
-                      기기수
-                      {getSortIcon('totalDevices')}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
-                    onClick={() => handleSort('memberCount')}
-                  >
-                    <div className="flex items-center justify-center">
-                      회원수
-                      {getSortIcon('memberCount')}
-                    </div>
-                  </TableHead>
-                  {!hideOpenDoorColumn && (
-                    <TableHead className="text-muted-foreground text-center">
-                      문 연 횟수
-                    </TableHead>
-                  )}
-                  <TableHead className="text-muted-foreground text-center">
-                    기본광고
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-center">
-                    프리미엄
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-center">
-                    광고
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-center">
-                    매니저
-                  </TableHead>
-                  <TableHead
-                    className="text-muted-foreground cursor-pointer hover:text-foreground text-center"
-                    onClick={() => handleSort('createdAt')}
-                  >
-                    <div className="flex items-center justify-center">
-                      등록일
-                      {getSortIcon('createdAt')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-right">관리</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 12 : 13} className="p-0">
-                      <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 11 : 12} showHeader={false} />
-                    </TableCell>
-                  </TableRow>
-                ) : filteredApartments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={hideOpenDoorColumn ? 12 : 13} className="p-0">
-                      <EmptyState
-                        icon={Building2}
-                        title={searchTerm ? '검색 결과가 없습니다' : '등록된 아파트가 없습니다'}
-                        description={
-                          searchTerm
-                            ? '다른 검색어로 다시 시도해보세요.'
-                            : '새 아파트를 등록하여 관리할 수 있습니다.'
-                        }
-                        size="sm"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedApartments.map((apartment) => (
-                    <TableRow
-                      key={apartment.id}
-                      className="border-border hover:bg-secondary/50 cursor-pointer"
-                      onClick={() => router.push(`/admin/apartments/${apartment.id}/view`)}
-                    >
-                      <TableCell className="font-medium">
-                        {apartment.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-xs truncate">
+                    <Table.Td fw={500}>
+                      {apartment.name}
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed" maw={320} truncate title={apartment.address}>
                         {apartment.address}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className="font-normal">
-                          {apartment.buildingCount}동
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="font-normal">
-                          {apartment.totalUnits}세대
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="font-normal">
-                          {apartment.totalDevices}대
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="font-normal">
-                          {apartment.memberCount}명
-                        </Badge>
-                      </TableCell>
-                      {!hideOpenDoorColumn && (
-                        <TableCell className="text-center text-muted-foreground">
-                          {apartment.totalOpenDoorCount > 0 ? (
-                            <span>{apartment.totalOpenDoorCount}회</span>
-                          ) : (
-                            <span>-</span>
-                          )}
-                        </TableCell>
+                      </Text>
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      <Badge variant="light" color="gray">
+                        {apartment.buildingCount}동
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      <Badge variant="light" color="gray">
+                        {apartment.totalUnits}세대
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      <Badge variant="light" color="gray">
+                        {apartment.totalDevices}대
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      <Badge variant="light" color="gray">
+                        {apartment.memberCount}명
+                      </Badge>
+                    </Table.Td>
+                    {!hideOpenDoorColumn && (
+                      <Table.Td ta="center" c="dimmed">
+                        {apartment.totalOpenDoorCount > 0 ? (
+                          <span>{apartment.totalOpenDoorCount}회</span>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </Table.Td>
+                    )}
+                    <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {apartment.basicAdCount > 0 ? apartment.basicAdCount : (
+                        <Text span size="sm" c="dimmed">-</Text>
                       )}
-                      <TableCell className="text-center tabular-nums text-sm">
-                        {apartment.basicAdCount > 0 ? apartment.basicAdCount : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums text-sm">
-                        {apartment.premiumAdCount > 0 ? apartment.premiumAdCount : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                    </Table.Td>
+                    <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {apartment.premiumAdCount > 0 ? apartment.premiumAdCount : (
+                        <Text span size="sm" c="dimmed">-</Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td onClick={(e) => e.stopPropagation()}>
+                      <Group justify="center">
                         <Switch
                           checked={apartment.isAdEnabled}
-                          onCheckedChange={(checked) => handleToggleAdEnabled(apartment.id, checked)}
+                          onChange={(e) => handleToggleAdEnabled(apartment.id, e.currentTarget.checked)}
                         />
-                      </TableCell>
-                      <TableCell className="text-center text-sm">
-                        {apartment.createdByName ? (
-                          <span className="font-medium">{apartment.createdByName}</span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center text-sm text-muted-foreground">
-                        {apartment.createdAt}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/admin/apartments/${apartment.id}/view`)}
-                          >
-                            <Users className="h-4 w-4 mr-1" />
-                            회원
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/admin/apartments/${apartment.id}/devices`)}
-                          >
-                            <Cpu className="h-4 w-4 mr-1" />
-                            장치
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/admin/apartments/${apartment.id}/edit`)}
-                              >
-                                <Building2 className="h-4 w-4 mr-2" />
-                                아파트 설정
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(apartment)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                삭제
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-      </DataTableShell>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>아파트 삭제</DialogTitle>
-            <DialogDescription>
-              {hasMembers ? (
-                <>
-                  <strong>{deletingApartment?.name}</strong> 아파트에 회원{' '}
-                  {deletingApartment?.memberCount.toLocaleString()}명이 소속되어 있어 삭제할 수 없습니다.
-                  <br />
-                  소속 회원을 다른 아파트로 이동시킨 뒤 다시 시도해 주세요.
-                </>
-              ) : (
-                <>
-                  정말로 <strong>{deletingApartment?.name}</strong> 아파트를 삭제하시겠습니까?
-                  <br />
-                  이 작업은 되돌릴 수 없으며, 해당 아파트의 모든 데이터가 삭제됩니다.
-                </>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      {apartment.createdByName ? (
+                        <Text span size="sm" fw={500}>{apartment.createdByName}</Text>
+                      ) : (
+                        <Text span size="sm" c="dimmed">-</Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td ta="center" c="dimmed">
+                      {apartment.createdAt}
+                    </Table.Td>
+                    <Table.Td onClick={(e) => e.stopPropagation()}>
+                      <Group gap="xs" justify="flex-end" wrap="nowrap">
+                        <Button
+                          variant="default"
+                          size="xs"
+                          leftSection={<Users size={16} />}
+                          onClick={() => router.push(`/admin/apartments/${apartment.id}/view`)}
+                        >
+                          회원
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="xs"
+                          leftSection={<Cpu size={16} />}
+                          onClick={() => router.push(`/admin/apartments/${apartment.id}/devices`)}
+                        >
+                          장치
+                        </Button>
+                        <Menu position="bottom-end" withinPortal>
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" color="gray" aria-label="더보기">
+                              <MoreVertical size={16} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item
+                              leftSection={<Building2 size={16} />}
+                              onClick={() => router.push(`/admin/apartments/${apartment.id}/edit`)}
+                            >
+                              아파트 설정
+                            </Menu.Item>
+                            <Menu.Divider />
+                            <Menu.Item
+                              color="red"
+                              leftSection={<Trash2 size={16} />}
+                              onClick={() => handleDeleteClick(apartment)}
+                            >
+                              삭제
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))
               )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog(false)}>
+            </Table.Tbody>
+          </Table>
+        </DataTableShell>
+
+        {/* Delete Confirmation Dialog */}
+        <Modal opened={deleteDialog} onClose={() => setDeleteDialog(false)} title="아파트 삭제" closeOnClickOutside={!deleting} closeOnEscape={!deleting}>
+          <Text size="sm" c="dimmed">
+            {hasMembers ? (
+              <>
+                <strong>{deletingApartment?.name}</strong> 아파트에 회원{' '}
+                {deletingApartment?.memberCount.toLocaleString()}명이 소속되어 있어 삭제할 수 없습니다.
+                <br />
+                소속 회원을 다른 아파트로 이동시킨 뒤 다시 시도해 주세요.
+              </>
+            ) : (
+              <>
+                정말로 <strong>{deletingApartment?.name}</strong> 아파트를 삭제하시겠습니까?
+                <br />
+                이 작업은 되돌릴 수 없으며, 해당 아파트의 모든 데이터가 삭제됩니다.
+              </>
+            )}
+          </Text>
+          <Group justify="flex-end" mt="lg">
+            <Button variant="default" onClick={() => setDeleteDialog(false)} disabled={deleting}>
               {hasMembers ? '확인' : '취소'}
             </Button>
             {!hasMembers && (
-              <Button variant="destructive" onClick={handleDeleteConfirm}>
-                삭제
+              <Button color="red" onClick={handleDeleteConfirm} disabled={deleting}>
+                {deleting ? '삭제 중...' : '삭제'}
               </Button>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </Group>
+        </Modal>
       </PageContent>
     </PageShell>
   );
@@ -764,17 +704,23 @@ function ApartmentsPagination({
   onPageChange: (page: number) => void;
 }): React.ReactElement {
   return (
-    <div className="flex items-center justify-center gap-2 border-t border-border/60 px-4 py-3">
+    <Group
+      justify="center"
+      gap="xs"
+      px="md"
+      py="sm"
+      style={{ borderTop: '1px solid var(--app-divider)' }}
+    >
       <Button
-        variant="outline"
-        size="sm"
+        variant="default"
+        size="xs"
+        leftSection={<ChevronLeft size={16} />}
         onClick={() => onPageChange(page - 1)}
         disabled={page === 1}
       >
-        <ChevronLeft className="h-4 w-4" />
         이전
       </Button>
-      <div className="flex gap-1">
+      <Group gap={4}>
         {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
           let pageNum;
           if (totalPages <= 10) {
@@ -789,25 +735,26 @@ function ApartmentsPagination({
           return (
             <Button
               key={pageNum}
-              variant={page === pageNum ? 'default' : 'outline'}
-              size="sm"
+              variant={page === pageNum ? 'filled' : 'default'}
+              size="xs"
               onClick={() => onPageChange(pageNum)}
-              className="w-10"
+              w={36}
+              px={0}
             >
               {pageNum}
             </Button>
           );
         })}
-      </div>
+      </Group>
       <Button
-        variant="outline"
-        size="sm"
+        variant="default"
+        size="xs"
+        rightSection={<ChevronRight size={16} />}
         onClick={() => onPageChange(page + 1)}
         disabled={page === totalPages}
       >
         다음
-        <ChevronRight className="h-4 w-4" />
       </Button>
-    </div>
+    </Group>
   );
 }

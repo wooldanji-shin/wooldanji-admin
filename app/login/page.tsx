@@ -1,19 +1,16 @@
+import { Center, Stack, Text, Title } from '@mantine/core';
 import { LoginForm } from '@/components/login-form';
 
 export default function LoginPage() {
   return (
-    <div className='min-h-screen flex items-center justify-center bg-background p-4'>
-      <div className='w-full max-w-md'>
-        <div className='text-center mb-8'>
-          <h1 className='text-3xl font-bold text-foreground mb-2'>
-            Wooldanji
-          </h1>
-          <p className='text-muted-foreground'>
-            관리자 시스템에 오신 것을 환영합니다
-          </p>
-        </div>
+    <Center mih='100vh' p='md' bg='var(--app-bg-muted)'>
+      <Stack w='100%' maw={448} gap='xl'>
+        <Stack gap={4} ta='center'>
+          <Title order={1}>Wooldanji</Title>
+          <Text c='dimmed'>관리자 시스템에 오신 것을 환영합니다</Text>
+        </Stack>
         <LoginForm />
-      </div>
-    </div>
+      </Stack>
+    </Center>
   );
 }

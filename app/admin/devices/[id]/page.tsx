@@ -1,27 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader } from '@/components/admin-header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { HeaderTitle } from '@/components/header-title';
+import { PageShell } from '@/components/page-shell';
+import { EmptyState } from '@/components/empty-state';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
+  Button,
+  Group,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  Title,
+} from '@mantine/core';
 import { ChevronLeft, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 // Mock device data
 const deviceData = {
@@ -124,11 +120,28 @@ export default function DeviceDetailPage() {
   const deviceId = params.id as string;
   const device = deviceData[deviceId as keyof typeof deviceData];
 
+  const router = useRouter();
   const [selectedDong, setSelectedDong] = useState<string>('all');
   const [selectedLine, setSelectedLine] = useState<'12' | '34'>('12');
 
   if (!device) {
-    return <div>기기를 찾을 수 없습니다.</div>;
+    return (
+      <PageShell>
+        <EmptyState
+          title="기기를 찾을 수 없습니다."
+          action={
+            <Button
+              component={Link}
+              href="/admin/devices"
+              variant="default"
+              leftSection={<ChevronLeft size={16} />}
+            >
+              기기 목록으로
+            </Button>
+          }
+        />
+      </PageShell>
+    );
   }
 
   // Filter users by selected dong
@@ -137,185 +150,149 @@ export default function DeviceDetailPage() {
   );
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-      <div className='flex items-center gap-2'>
-        <Link href='/admin/devices'>
-          <Button variant='ghost' size='icon-sm' aria-label='뒤로가기'>
-            <ChevronLeft className='h-5 w-5' />
-          </Button>
-        </Link>
-        <AdminHeader title='기기 상세보기' className='flex-1' />
-      </div>
+    <PageShell>
+      <HeaderTitle title="기기 상세보기" onBack={() => router.push('/admin/devices')} />
 
-      <div className="flex flex-col gap-6">
+      {/* Device Information */}
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">
+          기기 정보
+        </Title>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              주소
+            </Text>
+            <Text fw={500}>{device.address}</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              아파트명
+            </Text>
+            <Text fw={500}>{device.apartmentName}</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              동
+            </Text>
+            <Text fw={500}>{device.dong}동</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              세대수
+            </Text>
+            <Text fw={500}>{device.households}세대</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              등록일시
+            </Text>
+            <Text fw={500}>{device.registeredDate}</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              설치장소
+            </Text>
+            <Text fw={500}>{device.installLocation}</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              공동현관문 번호
+            </Text>
+            <Text fw={500}>{device.entranceDoorNumber}</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              출입문 장치 비밀번호
+            </Text>
+            <Text fw={500} ff="monospace">{device.doorPassword}</Text>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              MAC 주소
+            </Text>
+            <Text fw={500} ff="monospace">{device.macAddress}</Text>
+          </Stack>
+        </SimpleGrid>
+      </Paper>
 
-        {/* Device Information */}
-        <Card className='bg-card border-border'>
-          <CardHeader>
-            <CardTitle className='text-foreground'>기기 정보</CardTitle>
-          </CardHeader>
-          <CardContent className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>주소</p>
-              <p className='text-foreground font-medium'>{device.address}</p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>아파트명</p>
-              <p className='text-foreground font-medium'>
-                {device.apartmentName}
-              </p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>동</p>
-              <p className='text-foreground font-medium'>{device.dong}동</p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>세대수</p>
-              <p className='text-foreground font-medium'>
-                {device.households}세대
-              </p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>등록일시</p>
-              <p className='text-foreground font-medium'>
-                {device.registeredDate}
-              </p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>설치장소</p>
-              <p className='text-foreground font-medium'>
-                {device.installLocation}
-              </p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>공동현관문 번호</p>
-              <p className='text-foreground font-medium'>
-                {device.entranceDoorNumber}
-              </p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>
-                출입문 장치 비밀번호
-              </p>
-              <p className='text-foreground font-medium font-mono'>
-                {device.doorPassword}
-              </p>
-            </div>
-            <div className='space-y-1'>
-              <p className='text-sm text-muted-foreground'>MAC 주소</p>
-              <p className='text-foreground font-medium font-mono'>
-                {device.macAddress}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Line Selection and Dong Filter */}
+      <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+        <Group justify="space-between" align="center" gap="md" p="lg">
+          <Group gap="xs">
+            <Users size={20} />
+            <Title order={4}>등록된 사용자</Title>
+          </Group>
+          <Group gap="sm">
+            <Select
+              data={[
+                { value: '12', label: '12 라인' },
+                { value: '34', label: '34 라인' },
+              ]}
+              value={selectedLine}
+              onChange={(value) => {
+                if (value === null) return;
+                setSelectedLine(value as '12' | '34');
+              }}
+              allowDeselect={false}
+              w={140}
+            />
+            <Select
+              placeholder="동 선택"
+              data={[
+                { value: 'all', label: '전체 동' },
+                ...device.buildings.map((building) => ({
+                  value: building,
+                  label: `${building}동`,
+                })),
+              ]}
+              value={selectedDong || null}
+              onChange={(value) => {
+                if (value === null) return;
+                setSelectedDong(value);
+              }}
+              allowDeselect={false}
+              w={140}
+            />
+          </Group>
+        </Group>
+        <Table.ScrollContainer minWidth={0} type="native">
+          <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>이름</Table.Th>
+                <Table.Th>동</Table.Th>
+                <Table.Th>호수</Table.Th>
+                <Table.Th>전화번호</Table.Th>
+                <Table.Th>등록일</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {filteredUsers.map((user) => (
+                <Table.Tr key={user.id}>
+                  <Table.Td fw={500}>{user.name}</Table.Td>
+                  <Table.Td c="dimmed">{user.dong}동</Table.Td>
+                  <Table.Td c="dimmed">{user.ho}</Table.Td>
+                  <Table.Td c="dimmed">{user.phone}</Table.Td>
+                  <Table.Td c="dimmed">{user.registeredDate}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
 
-        {/* Line Selection and Dong Filter */}
-        <Card className='bg-card border-border'>
-          <CardHeader>
-            <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between'>
-              <CardTitle className='text-foreground flex items-center gap-2'>
-                <Users className='h-5 w-5' />
-                등록된 사용자
-              </CardTitle>
-              <div className='flex gap-3'>
-                <Select
-                  value={selectedLine}
-                  onValueChange={(value) =>
-                    setSelectedLine(value as '12' | '34')
-                  }
-                >
-                  <SelectTrigger className='w-[140px] bg-secondary border-border'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='12'>12 라인</SelectItem>
-                    <SelectItem value='34'>34 라인</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={selectedDong}
-                  onValueChange={setSelectedDong}
-                >
-                  <SelectTrigger className='w-[140px] bg-secondary border-border'>
-                    <SelectValue placeholder='동 선택' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='all'>전체 동</SelectItem>
-                    {device.buildings.map((building) => (
-                      <SelectItem
-                        key={building}
-                        value={building}
-                      >
-                        {building}동
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className='p-0'>
-            <div className='overflow-x-auto'>
-              <Table>
-                <TableHeader>
-                  <TableRow className='border-border hover:bg-transparent'>
-                    <TableHead className='text-muted-foreground'>
-                      이름
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>동</TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      호수
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      전화번호
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      등록일
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow
-                      key={user.id}
-                      className='border-border hover:bg-secondary/50'
-                    >
-                      <TableCell className='font-medium text-card-foreground'>
-                        {user.name}
-                      </TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {user.dong}동
-                      </TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {user.ho}
-                      </TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {user.phone}
-                      </TableCell>
-                      <TableCell className='text-muted-foreground'>
-                        {user.registeredDate}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+        {filteredUsers.length === 0 && (
+          <Text ta="center" py={48} c="dimmed">
+            등록된 사용자가 없습니다.
+          </Text>
+        )}
+      </Paper>
 
-            {filteredUsers.length === 0 && (
-              <div className='text-center py-12 text-muted-foreground'>
-                등록된 사용자가 없습니다.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Summary */}
-        <div className='text-sm text-muted-foreground'>
-          {selectedLine} 라인 - 총 {filteredUsers.length}명의 사용자{' '}
-          {selectedDong !== 'all' && `(${selectedDong}동)`}
-        </div>
-      </div>
-    </div>
+      {/* Summary */}
+      <Text size="sm" c="dimmed">
+        {selectedLine} 라인 - 총 {filteredUsers.length}명의 사용자{' '}
+        {selectedDong !== 'all' && `(${selectedDong}동)`}
+      </Text>
+    </PageShell>
   );
 }

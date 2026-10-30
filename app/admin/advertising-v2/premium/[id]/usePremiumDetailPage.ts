@@ -211,6 +211,7 @@ export interface UsePremiumDetailPageReturn {
   handleRejectModification: () => Promise<void>;
   autoApproveToggling: boolean;
   handleToggleAutoApprove: (next: boolean) => Promise<void>;
+  savingMemo: boolean;
   handleUpdateMemo: () => Promise<void>;
   // 삭제 — 되돌릴 수 없어 두 번 확인받는다
   deleteDialog: boolean;
@@ -247,6 +248,7 @@ export function usePremiumDetailPage(
   const [modificationRejectDialog, setModificationRejectDialog] = useState<boolean>(false);
   const [modificationRejectReason, setModificationRejectReason] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
+  const [savingMemo, setSavingMemo] = useState<boolean>(false);
   const [deleteDialog, setDeleteDialog] = useState<boolean>(false);
   const [deleteFinalDialog, setDeleteFinalDialog] = useState<boolean>(false);
 
@@ -559,7 +561,7 @@ export function usePremiumDetailPage(
 
   const handleUpdateMemo = async (): Promise<void> => {
     if (!detail) return;
-    setProcessing(true);
+    setSavingMemo(true);
     try {
       const res = await fetch(`/api/advertising-v2/premium/${detail.id}/memo`, {
         method: 'PATCH',
@@ -576,7 +578,7 @@ export function usePremiumDetailPage(
       console.error('메모 업데이트 실패:', err);
       toast.error(networkFailedMessage('메모를 저장하지 못했습니다.'));
     } finally {
-      setProcessing(false);
+      setSavingMemo(false);
     }
   };
 
@@ -704,6 +706,7 @@ export function usePremiumDetailPage(
     handleRejectModification,
     autoApproveToggling,
     handleToggleAutoApprove,
+    savingMemo,
     handleUpdateMemo,
     deleteDialog,
     setDeleteDialog,

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 interface ImageThumbnailProps {
   src: string;
   alt?: string;
-  /** 썸네일 크기 (Tailwind class로 override). 기본 180x180. */
+  /** 썸네일 크기 (Tailwind class로 override). 기본 180x180, 휴대폰에서는 96x96. */
   className?: string;
   onClick?: () => void;
 }
@@ -27,9 +27,14 @@ export function ImageThumbnail({
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative h-[180px] w-[180px] shrink-0 overflow-hidden rounded-md border border-border bg-muted transition-all hover:border-primary/40 hover:shadow-card-hover',
+        'group relative h-[180px] w-[180px] max-md:h-24 max-md:w-24 shrink-0 overflow-hidden transition-shadow hover:shadow-md',
         className
       )}
+      style={{
+        border: '1px solid var(--app-divider)',
+        borderRadius: 'var(--mantine-radius-md)',
+        background: 'var(--app-bg-subtle)',
+      }}
       aria-label={alt || '이미지 크게 보기'}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

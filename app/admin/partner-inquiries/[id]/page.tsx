@@ -1,12 +1,25 @@
 'use client';
 
 import { AdminHeader } from '@/components/admin-header';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { HeaderTitle } from '@/components/header-title';
+import { PageShell } from '@/components/page-shell';
+import { DetailSkeleton } from '@/components/skeletons';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Divider,
+  Flex,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
 import {
@@ -19,12 +32,13 @@ import {
   Edit,
   Trash2,
 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
+import { confirmModal } from '@/components/confirm-modal';
 import { useRouter, useParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
+import { StatusBadge } from '@/components/status-badge';
 
 interface PartnerInquiry {
   id: string;
@@ -250,7 +264,7 @@ export default function PartnerInquiryDetailPage() {
   };
 
   const handleDeleteReply = async (replyId: string) => {
-    if (!confirm('이 답변을 삭제하시겠습니까?')) return;
+    if (!(await confirmModal({ title: '답변 삭제', message: '이 답변을 삭제하시겠습니까?', confirmLabel: '삭제', danger: true }))) return;
 
     try {
       const { error: deleteError } = await supabase
@@ -280,118 +294,91 @@ export default function PartnerInquiryDetailPage() {
     return format(new Date(dateString), 'yyyy.MM.dd HH:mm', { locale: ko });
   };
 
-  const getStatusBadge = (status: 'PENDING' | 'ANSWERED') => {
-    if (status === 'PENDING') {
-      return (
-        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-          답변 대기
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
-        답변 완료
-      </Badge>
-    );
-  };
-
   if (loading) {
-    return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-        <div className='flex items-center gap-2'>
-          <Button variant='ghost' size='icon-sm' onClick={() => router.back()} aria-label='뒤로가기'>
-            <ChevronLeft className='h-5 w-5' />
-          </Button>
-          <AdminHeader title='파트너 문의 상세' className='flex-1' />
-        </div>
-        <Skeleton className='h-32 w-full' />
-      </div>
-    );
+    return <DetailSkeleton sections={3} />;
   }
 
   if (!inquiry) {
     return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-        <div className='flex items-center gap-2'>
-          <Button variant='ghost' size='icon-sm' onClick={() => router.back()} aria-label='뒤로가기'>
-            <ChevronLeft className='h-5 w-5' />
-          </Button>
-          <AdminHeader title='파트너 문의 상세' className='flex-1' />
-        </div>
-        <p className='py-12 text-center text-muted-foreground'>문의를 찾을 수 없습니다.</p>
-      </div>
+      <PageShell>
+        <Group gap="xs" wrap="nowrap">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            onClick={() => router.back()}
+            aria-label="뒤로가기"
+          >
+            <ChevronLeft size={20} />
+          </ActionIcon>
+          <AdminHeader title="파트너 문의 상세" className="flex-1" />
+        </Group>
+        <Text py={48} ta="center" c="dimmed">
+          문의를 찾을 수 없습니다.
+        </Text>
+      </PageShell>
     );
   }
 
   const hasAdminReply = replies.some((r) => r.isAdmin);
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-      <div className='flex items-center gap-2'>
-        <Button variant='ghost' size='icon-sm' onClick={() => router.back()} aria-label='뒤로가기'>
-          <ChevronLeft className='h-5 w-5' />
-        </Button>
-        <AdminHeader title='파트너 문의 상세' className='flex-1' />
-      </div>
+    <PageShell>
+      <HeaderTitle title="파트너 문의 상세" onBack={() => router.back()} />
 
-      <div className="flex flex-col gap-6">
-        <div className='space-y-6'>
-
-          <Card className='bg-card border-border'>
-            <CardHeader>
-              <div className='flex items-start justify-between gap-4'>
-                <div className='flex-1 space-y-2'>
-                  <div className='flex items-center gap-2'>
-                    <CardTitle className='text-card-foreground'>
-                      {inquiry.partner?.businessName ?? '파트너 문의'}
-                    </CardTitle>
-                    {getStatusBadge(inquiry.status)}
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className='space-y-6'>
-              {inquiry.partner && <PartnerInfoGrid partner={inquiry.partner} />}
-
-              <Separator />
+      <Flex direction={{ base: 'column', lg: 'row' }} gap="lg" align={{ base: 'stretch', lg: 'flex-start' }}>
+        <Stack gap="lg" miw={0} style={{ flex: 1 }}>
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="lg">
+              <Group gap="xs">
+                <Title order={4}>{inquiry.partner?.businessName ?? '파트너 문의'}</Title>
+                <StatusBadge.Inquiry
+                  status={inquiry.status === 'PENDING' ? 'pending' : 'answered'}
+                />
+              </Group>
 
               {/* Q. 본문 */}
-              <div className='space-y-4'>
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center'>
-                      <User className='h-4 w-4' />
-                    </div>
+              <Stack gap="md">
+                <Group justify="space-between">
+                  <Group gap="xs">
+                    <ThemeIcon variant="light" radius="xl" size={32}>
+                      <User size={16} />
+                    </ThemeIcon>
                     <div>
-                      <p className='text-sm font-semibold'>
+                      <Text size="sm" fw={600}>
                         {inquiry.partner?.businessName ?? '파트너'}
-                      </p>
-                      <p className='text-xs text-muted-foreground'>문의 작성자</p>
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        문의 작성자
+                      </Text>
                     </div>
-                  </div>
-                  <div className='flex items-center gap-1 text-sm text-muted-foreground'>
-                    <Calendar className='h-4 w-4' />
-                    <span>{formatDate(inquiry.createdAt)}</span>
-                  </div>
-                </div>
+                  </Group>
+                  <Group gap={4} c="dimmed">
+                    <Calendar size={16} />
+                    <Text size="sm" c="dimmed">
+                      {formatDate(inquiry.createdAt)}
+                    </Text>
+                  </Group>
+                </Group>
 
-                <div className='pl-10 space-y-2'>
-                  <div className='flex items-start gap-2'>
-                    <span className='font-bold text-primary text-lg'>Q.</span>
-                    <p className='text-sm whitespace-pre-wrap leading-relaxed flex-1'>
-                      {inquiry.content}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                <Group gap="xs" align="flex-start" wrap="nowrap" pl={40}>
+                  <Text fw={700} size="lg" c="blue">
+                    Q.
+                  </Text>
+                  <Text size="sm" lh={1.65} style={{ whiteSpace: 'pre-wrap', flex: 1 }}>
+                    {inquiry.content}
+                  </Text>
+                </Group>
+              </Stack>
 
               {inquiry.imageUrls && inquiry.imageUrls.length > 0 && (
-                <div className='space-y-3'>
-                  <h3 className='font-semibold text-sm flex items-center gap-2'>
-                    <ImageIcon className='h-4 w-4' />
-                    첨부 이미지 ({inquiry.imageUrls.length}개)
-                  </h3>
-                  <div className='flex flex-wrap gap-2'>
+                <Stack gap="sm">
+                  <Group gap="xs">
+                    <ImageIcon size={16} />
+                    <Text size="sm" fw={600}>
+                      첨부 이미지 ({inquiry.imageUrls.length}개)
+                    </Text>
+                  </Group>
+                  <Group gap="xs">
                     {inquiry.imageUrls.map((url, index) => (
                       <ImageThumbnail
                         key={index}
@@ -400,121 +387,143 @@ export default function PartnerInquiryDetailPage() {
                         onClick={() => imgLb.open(index)}
                       />
                     ))}
-                  </div>
-                </div>
+                  </Group>
+                </Stack>
               )}
-            </CardContent>
-          </Card>
+            </Stack>
+          </Paper>
 
           {replies.length > 0 && (
-            <Card className='bg-card border-border'>
-              <CardHeader>
-                <CardTitle className='text-card-foreground'>답변 내역 ({replies.length})</CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-4'>
+            <Paper withBorder radius="md" p="lg">
+              <Title order={4} mb="md">
+                답변 내역 ({replies.length})
+              </Title>
+              <Stack gap="md">
                 {replies.map((reply, index) => (
                   <div key={reply.id}>
-                    {index > 0 && <Separator className='my-4' />}
-                    <div className='space-y-3'>
-                      <div className='flex items-start justify-between gap-4'>
-                        <div className='flex items-center gap-2'>
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              reply.isAdmin
-                                ? 'bg-primary/10 text-primary'
-                                : 'bg-muted text-muted-foreground'
-                            }`}
+                    {index > 0 && <Divider mb="md" />}
+                    <Stack gap="sm">
+                      <Group justify="space-between" align="flex-start" gap="md">
+                        <Group gap="xs">
+                          <ThemeIcon
+                            variant="light"
+                            color={reply.isAdmin ? 'blue' : 'gray'}
+                            radius="xl"
+                            size={32}
                           >
-                            <User className='h-4 w-4' />
-                          </div>
+                            <User size={16} />
+                          </ThemeIcon>
                           <div>
-                            <p className='text-sm font-medium'>
-                              {reply.isAdmin ? '관리자' : inquiry?.partner?.representativeName || '파트너'}
+                            <Group gap="xs">
+                              <Text size="sm" fw={500}>
+                                {reply.isAdmin ? '관리자' : inquiry?.partner?.representativeName || '파트너'}
+                              </Text>
                               {reply.isAdmin && (
-                                <Badge variant='outline' className='ml-2 text-xs'>
+                                <Badge variant="light" size="xs">
                                   관리자
                                 </Badge>
                               )}
-                            </p>
-                            <p className='text-xs text-muted-foreground'>
+                            </Group>
+                            <Text size="xs" c="dimmed">
                               {formatDate(reply.createdAt)}
-                            </p>
+                            </Text>
                           </div>
-                        </div>
+                        </Group>
                         {reply.isAdmin && (
-                          <div className='flex items-center gap-2'>
-                            <Button variant='ghost' size='sm' onClick={() => handleEditReply(reply)}>
-                              <Edit className='h-4 w-4' />
-                            </Button>
-                            <Button
-                              variant='ghost'
-                              size='sm'
-                              onClick={() => handleDeleteReply(reply.id)}
+                          <Group gap="xs">
+                            <ActionIcon
+                              variant="subtle"
+                              color="gray"
+                              onClick={() => handleEditReply(reply)}
+                              aria-label="답변 수정"
                             >
-                              <Trash2 className='h-4 w-4 text-destructive' />
-                            </Button>
-                          </div>
+                              <Edit size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={() => handleDeleteReply(reply.id)}
+                              aria-label="답변 삭제"
+                            >
+                              <Trash2 size={16} />
+                            </ActionIcon>
+                          </Group>
                         )}
-                      </div>
-                      <div
-                        className={`ml-10 p-4 rounded-lg ${
-                          reply.isAdmin ? 'bg-primary/5 border border-primary/10' : 'bg-muted'
-                        }`}
+                      </Group>
+                      <Paper
+                        ml={40}
+                        p="md"
+                        radius="md"
+                        bg={reply.isAdmin ? 'var(--mantine-color-blue-light)' : 'var(--app-bg-muted)'}
+                        withBorder={reply.isAdmin}
                       >
-                        <p className='text-sm whitespace-pre-wrap leading-relaxed'>
+                        <Text size="sm" lh={1.65} style={{ whiteSpace: 'pre-wrap' }}>
                           {reply.content}
-                        </p>
-                      </div>
-                    </div>
+                        </Text>
+                      </Paper>
+                    </Stack>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </Stack>
+            </Paper>
           )}
 
           {/* 답변 작성 폼: 관리자 답변이 없거나 수정 모드일 때만 */}
           {(!hasAdminReply || isEditing) && (
-            <Card className='bg-card border-border'>
-              <CardHeader>
-                <CardTitle className='text-card-foreground'>
-                  {isEditing ? '답변 수정' : '답변 작성'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-4'>
+            <Paper withBorder radius="md" p="lg">
+              <Title order={4} mb="md">
+                {isEditing ? '답변 수정' : '답변 작성'}
+              </Title>
+              <Stack gap="md">
                 <Textarea
-                  placeholder='답변 내용을 입력하세요...'
+                  placeholder="답변 내용을 입력하세요..."
                   value={replyContent}
                   onChange={(e) => setReplyContent(e.target.value)}
                   rows={6}
-                  className='resize-none'
                 />
-                <div className='flex justify-end gap-2'>
+                <Group justify="flex-end" gap="xs">
                   {isEditing && (
-                    <Button variant='outline' onClick={handleCancelEdit} disabled={sending}>
+                    <Button variant="default" onClick={handleCancelEdit} disabled={sending}>
                       취소
                     </Button>
                   )}
-                  <Button onClick={handleSendReply} disabled={sending || !replyContent.trim()}>
-                    {sending ? (
-                      <>
-                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                        {isEditing ? '수정 중...' : '전송 중...'}
-                      </>
-                    ) : (
-                      <>
-                        <Send className='mr-2 h-4 w-4' />
-                        {isEditing ? '답변 수정' : '답변 보내기'}
-                      </>
-                    )}
+                  <Button
+                    onClick={handleSendReply}
+                    disabled={sending || !replyContent.trim()}
+                    leftSection={
+                      sending ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Send size={16} />
+                      )
+                    }
+                  >
+                    {sending
+                      ? isEditing
+                        ? '수정 중...'
+                        : '전송 중...'
+                      : isEditing
+                        ? '답변 수정'
+                        : '답변 보내기'}
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </Group>
+              </Stack>
+            </Paper>
           )}
-        </div>
-      </div>
+        </Stack>
+
+        {/* 우측: 문의한 파트너 정보 */}
+        {inquiry.partner && (
+          <Box component="aside" w={{ base: '100%', lg: 400 }} style={{ flexShrink: 0 }}>
+            <Paper withBorder radius="md" p="lg">
+              <Title order={4} mb="md">파트너 정보</Title>
+              <PartnerInfoGrid partner={inquiry.partner} />
+            </Paper>
+          </Box>
+        )}
+      </Flex>
       <ImageLightbox {...imgLb.props} />
-    </div>
+    </PageShell>
   );
 }
 
@@ -525,8 +534,12 @@ export default function PartnerInquiryDetailPage() {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <div className='text-xs text-muted-foreground mb-0.5'>{label}</div>
-      <div className='text-sm'>{value ?? '-'}</div>
+      <Text size="xs" c="dimmed" mb={2}>
+        {label}
+      </Text>
+      <Text size="sm" component="div">
+        {value ?? '-'}
+      </Text>
     </div>
   );
 }
@@ -553,17 +566,17 @@ function PartnerInfoGrid({
     .join(' ');
 
   return (
-    <div className='space-y-3'>
-      <div className='grid grid-cols-2 gap-3'>
+    <Stack gap="sm">
+      <SimpleGrid cols={2} spacing="sm">
         <Field label='상호명' value={partner.businessName} />
         <Field label='대표자명' value={partner.representativeName} />
         <Field label='전화번호' value={partner.displayPhoneNumber} />
         <Field label='카테고리' value={partner.category?.categoryName} />
-      </div>
+      </SimpleGrid>
       <Field label='사업장 주소' value={fullAddress || undefined} />
       <Field label='주차 안내' value={partner.parkingInfo || undefined} />
       <Field label='오시는길' value={partner.directionsInfo || undefined} />
-      <div className='grid grid-cols-2 gap-3'>
+      <SimpleGrid cols={2} spacing="sm">
         <Field label='사업자등록번호' value={partner.businessRegistrationNumber} />
         <Field
           label='가입일'
@@ -573,7 +586,7 @@ function PartnerInfoGrid({
               : undefined
           }
         />
-      </div>
-    </div>
+      </SimpleGrid>
+    </Stack>
   );
 }

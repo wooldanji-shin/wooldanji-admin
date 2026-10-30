@@ -3,56 +3,38 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DataTableShell } from '@/components/data-table-shell';
+import { TableSkeleton } from '@/components/skeletons';
+import { FilterChips, FilterRow } from '@/components/filter-chips';
+import { EmptyState } from '@/components/empty-state';
+import { PageContent, PageShell } from '@/components/page-shell';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
+  ActionIcon,
+  Anchor,
+  Badge,
+  Box,
+  Button,
+  Center,
+  Checkbox,
+  CloseButton,
+  Divider,
+  Group,
+  HoverCard,
+  Input,
+  Modal,
+  Paper,
+  ScrollArea,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
   Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+  UnstyledButton,
+} from '@mantine/core';
 import {
   Search,
   Plus,
@@ -63,16 +45,13 @@ import {
   Building2,
   Calendar,
   Tag,
-  TrendingUp,
   Clock,
   CheckCircle,
   XCircle,
-  Check,
   X,
   Filter,
   ChevronDown,
   ChevronUp,
-  ChevronsUpDown,
   Image as ImageIcon,
   ExternalLink,
   Loader2,
@@ -82,7 +61,6 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { getCurrentUser, getUserRoles } from '@/lib/auth';
-import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/image-upload';
 import { deleteFolderFromStorage } from '@/lib/utils/storage';
 import { format, parseISO } from 'date-fns';
@@ -359,7 +337,7 @@ export default function AdsManagementPage() {
   const [imageUploadFolderId, setImageUploadFolderId] = useState('');
 
   // 업로드된 이미지 URL 추적 (취소 시 삭제용)
-  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
+  const [, setUploadedImageUrls] = useState<string[]>([]);
 
   // 지역 선택 상태
   const [regionSido, setRegionSido] = useState('');
@@ -1194,27 +1172,22 @@ export default function AdsManagementPage() {
     const statusConfig = {
       scheduled: {
         label: '예정',
-        className: 'bg-blue-500 hover:bg-blue-600',
         icon: Calendar
       },
       pending: {
         label: '대기중',
-        className: 'bg-gray-500 hover:bg-gray-600',
         icon: Clock
       },
       active: {
         label: '진행중',
-        className: 'bg-green-500 hover:bg-green-600',
         icon: CheckCircle
       },
       expiring: {
         label: '만료예정',
-        className: 'bg-orange-500 hover:bg-orange-600',
         icon: AlertCircle
       },
       expired: {
         label: '만료',
-        className: 'bg-red-500 hover:bg-red-600',
         icon: XCircle
       },
     };
@@ -1223,17 +1196,14 @@ export default function AdsManagementPage() {
     const Icon = config.icon;
 
     return (
-      <Badge className={cn('text-white font-medium', config.className)}>
-        <Icon className='mr-1 h-3 w-3' />
+      <Badge
+        variant='light'
+        color={{ scheduled: 'blue', pending: 'gray', active: 'green', expiring: 'yellow', expired: 'red' }[status as keyof typeof statusConfig]}
+        leftSection={<Icon size={12} />}
+      >
         {config.label}
       </Badge>
     );
-  };
-
-  // 텍스트 자르기 유틸리티
-  const truncateText = (text: string, maxLength: number = 30) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
   };
 
   // CSV 내보내기 함수
@@ -1340,7 +1310,7 @@ export default function AdsManagementPage() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `광고목록_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `광고목록_${format(new Date(), 'yyyy-MM-dd')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -1349,918 +1319,872 @@ export default function AdsManagementPage() {
     toast.success(`${dataToExport.length}개의 광고를 CSV로 내보냈습니다.`);
   };
 
-  if (loading) {
-    return (
-      <div className='flex h-full items-center justify-center'>
-        <div className='text-center space-y-4'>
-          <Loader2 className='h-12 w-12 animate-spin mx-auto text-primary' />
-          <div className='text-lg font-medium'>데이터를 불러오는 중...</div>
-          <div className='text-sm text-muted-foreground'>잠시만 기다려주세요</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <TooltipProvider>
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-        <AdminHeader
-          title='광고 등록/수정'
-        />
+    <PageShell>
+      <AdminHeader
+        title='광고 등록/수정'
+        actions={
+          <>
+            <Button
+              variant='default'
+              leftSection={<Download size={16} />}
+              onClick={handleExportCSV}
+              disabled={filteredAds.length === 0}
+            >
+              CSV 내보내기
+            </Button>
+            <Button
+              leftSection={<Plus size={16} />}
+              onClick={() => handleOpenDialog()}
+            >
+              광고 등록
+            </Button>
+          </>
+        }
+      />
 
-        <div className="flex flex-col gap-4">
-          {/* 상태 탭 */}
-          <Card>
-            <CardContent className='pt-6'>
-              <Tabs
-                value={activeTab}
-                onValueChange={(value) => setActiveTab(value as AdStatus)}
-              >
-                <TabsList className='grid w-full grid-cols-6 h-auto'>
-                  <TabsTrigger
-                    value='all'
-                    className='flex flex-col gap-1 py-3'
-                  >
-                    <Package className='h-4 w-4' />
-                    <div className='font-medium'>전체</div>
-                    <div className='text-xs text-muted-foreground'>
-                      {getStatusCount('all')}개
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value='pending'
-                    className='flex flex-col gap-1 py-3'
-                  >
-                    <Clock className='h-4 w-4' />
-                    <div className='font-medium'>대기중</div>
-                    <div className='text-xs text-muted-foreground'>
-                      {getStatusCount('pending')}개
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value='scheduled'
-                    className='flex flex-col gap-1 py-3'
-                  >
-                    <Calendar className='h-4 w-4' />
-                    <div className='font-medium'>예정</div>
-                    <div className='text-xs text-muted-foreground'>
-                      {getStatusCount('scheduled')}개
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value='active'
-                    className='flex flex-col gap-1 py-3'
-                  >
-                    <TrendingUp className='h-4 w-4' />
-                    <div className='font-medium'>진행중</div>
-                    <div className='text-xs text-muted-foreground'>
-                      {getStatusCount('active')}개
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value='expiring'
-                    className='flex flex-col gap-1 py-3'
-                  >
-                    <AlertCircle className='h-4 w-4' />
-                    <div className='font-medium'>만료예정</div>
-                    <div className='text-xs text-muted-foreground'>
-                      {getStatusCount('expiring')}개
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value='expired'
-                    className='flex flex-col gap-1 py-3'
-                  >
-                    <XCircle className='h-4 w-4' />
-                    <div className='font-medium'>만료</div>
-                    <div className='text-xs text-muted-foreground'>
-                      {getStatusCount('expired')}개
-                    </div>
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </CardContent>
-          </Card>
+      <PageContent>
+        {/* 검색 및 필터 */}
+        <Paper p={{ base: 'md', sm: 'lg' }} className='app-filter-card'>
+          <Stack gap='md'>
+            <Group gap='xs' justify='space-between' wrap='wrap'>
+              <Group gap='xs' wrap='wrap' style={{ flex: 1 }}>
+                <TextInput
+                  placeholder='광고 제목, 광고주명으로 검색...'
+                  leftSection={<Search size={16} />}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ flex: 1 }}
+                  miw={240}
+                />
+                <Button
+                  variant='default'
+                  leftSection={<Filter size={16} />}
+                  rightSection={
+                    isFilterExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+                  }
+                  onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                >
+                  필터
+                  {getActiveFilterCount() > 0 && (
+                    <Badge ml='xs' variant='light' color='blue' size='sm'>
+                      {getActiveFilterCount()}
+                    </Badge>
+                  )}
+                </Button>
+              </Group>
+              <Checkbox
+                id='hide-click-column'
+                label='클릭수 숨기기'
+                checked={hideClickColumn}
+                onChange={(e) => setHideClickColumn(e.currentTarget.checked === true)}
+              />
+            </Group>
 
-          {/* 검색 및 필터 */}
-          <Card>
-            <CardContent className='pt-6'>
-              <div className='space-y-4'>
-                {/* 검색 바 */}
-                <div className='flex gap-3'>
-                  <div className='relative flex-1'>
-                    <Search className='absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground' />
-                    <Input
-                      placeholder='광고 제목, 광고주명으로 검색...'
-                      className='pl-10 h-11 text-base'
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    variant='outline'
-                    size='lg'
-                    className='px-4'
-                    onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-                  >
-                    <Filter className='mr-2 h-4 w-4' />
-                    필터
-                    {getActiveFilterCount() > 0 && (
-                      <Badge
-                        className='ml-2'
-                        variant='secondary'
-                      >
-                        {getActiveFilterCount()}
-                      </Badge>
-                    )}
-                    {isFilterExpanded ? (
-                      <ChevronUp className='ml-2 h-4 w-4' />
-                    ) : (
-                      <ChevronDown className='ml-2 h-4 w-4' />
-                    )}
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='lg'
-                    className='px-4'
-                    onClick={handleExportCSV}
-                    disabled={filteredAds.length === 0}
-                  >
-                    <Download className='mr-2 h-4 w-4' />
-                    CSV 내보내기
-                  </Button>
-                  <div className='flex items-center gap-2'>
-                    <Checkbox
-                      id='hide-click-column'
-                      checked={hideClickColumn}
-                      onCheckedChange={(checked) => setHideClickColumn(checked === true)}
-                    />
-                  </div>
-                  <Button
-                    onClick={() => handleOpenDialog()}
-                    size='lg'
-                    className='px-6'
-                  >
-                    <Plus className='mr-2 h-5 w-5' />
-                    광고 등록
-                  </Button>
-                </div>
+            {/* 필터 영역 */}
+            {isFilterExpanded && (
+              <Group gap='xs' wrap='wrap'>
+                <Select
+                  w={200}
+                  placeholder='광고 타입'
+                  data={[
+                    { value: 'all', label: '전체 타입' },
+                    { value: 'NEIGHBORHOOD', label: '동네 광고' },
+                    { value: 'REGION', label: '지역 광고' },
+                  ]}
+                  value={filterAdType || null}
+                  onChange={(v) => {
+                    if (v === null) return;
+                    setFilterAdType(v);
+                  }}
+                  allowDeselect={false}
+                />
 
-                {/* 필터 영역 */}
-                {isFilterExpanded && (
-                  <div className='flex flex-wrap gap-3 justify-start p-4 bg-muted/30 rounded-lg animate-in slide-in-from-top'>
-                    <Select
-                      value={filterAdType}
-                      onValueChange={setFilterAdType}
-                    >
-                      <SelectTrigger className='w-[200px]'>
-                        <SelectValue placeholder='광고 타입' />
-                      </SelectTrigger>
-                      <SelectContent align='start'>
-                        <SelectItem value='all'>
-                          <div className='flex items-center gap-2'>
-                            <Package className='h-4 w-4' />
-                            전체 타입
-                          </div>
-                        </SelectItem>
-                        <SelectItem value='NEIGHBORHOOD'>
-                          <div className='flex items-center gap-2'>
-                            <Building2 className='h-4 w-4' />
-                            동네 광고
-                          </div>
-                        </SelectItem>
-                        <SelectItem value='REGION'>
-                          <div className='flex items-center gap-2'>
-                            <MapPin className='h-4 w-4' />
-                            지역 광고
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                <Select
+                  w={200}
+                  placeholder='광고주'
+                  data={[
+                    { value: 'all', label: '전체 광고주' },
+                    ...advertisers.map((adv) => ({
+                      value: adv.id,
+                      label: adv.businessName,
+                    })),
+                  ]}
+                  value={filterAdvertiser || null}
+                  onChange={(v) => {
+                    if (v === null) return;
+                    setFilterAdvertiser(v);
+                  }}
+                  allowDeselect={false}
+                />
 
-                    <Select
-                      value={filterCategory}
-                      onValueChange={setFilterCategory}
-                    >
-                      <SelectTrigger className='w-[200px]'>
-                        <SelectValue placeholder='카테고리' />
-                      </SelectTrigger>
-                      <SelectContent align='start'>
-                        <SelectItem value='all'>전체 카테고리</SelectItem>
-                        {categories.map((cat) => (
-                          <SelectItem
-                            key={cat.id}
-                            value={cat.id}
-                          >
-                            {cat.categoryName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select
-                      value={filterAdvertiser}
-                      onValueChange={setFilterAdvertiser}
-                    >
-                      <SelectTrigger className='w-[200px]'>
-                        <SelectValue placeholder='광고주' />
-                      </SelectTrigger>
-                      <SelectContent align='start'>
-                        <SelectItem value='all'>전체 광고주</SelectItem>
-                        {advertisers.map((adv) => (
-                          <SelectItem
-                            key={adv.id}
-                            value={adv.id}
-                          >
-                            {adv.businessName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {/* 게시자 필터 (SUPER_ADMIN만 표시) */}
-                    {userRoles.includes('SUPER_ADMIN') && (
-                      <Select
-                        value={filterCreator}
-                        onValueChange={setFilterCreator}
-                      >
-                        <SelectTrigger className='w-[200px]'>
-                          <SelectValue placeholder='게시자' />
-                        </SelectTrigger>
-                        <SelectContent align='start'>
-                          <SelectItem value='all'>전체 등록자</SelectItem>
-                          {creators.map((creator) => (
-                            <SelectItem
-                              key={creator.id}
-                              value={creator.id}
-                            >
-                              {creator.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    <Button
-                      variant='outline'
-                      onClick={() => {
-                        setSearchTerm('');
-                        setFilterAdType('all');
-                        setFilterCategory('all');
-                        setFilterAdvertiser('all');
-                        setFilterCreator('all');
-                      }}
-                      className='w-[120px]'
-                    >
-                      <X className='mr-2 h-4 w-4' />
-                      초기화
-                    </Button>
-                  </div>
+                {/* 게시자 필터 (SUPER_ADMIN만 표시) */}
+                {userRoles.includes('SUPER_ADMIN') && (
+                  <Select
+                    w={200}
+                    placeholder='게시자'
+                    data={[
+                      { value: 'all', label: '전체 등록자' },
+                      ...creators.map((creator) => ({
+                        value: creator.id,
+                        label: creator.name,
+                      })),
+                    ]}
+                    value={filterCreator || null}
+                    onChange={(v) => {
+                      if (v === null) return;
+                      setFilterCreator(v);
+                    }}
+                    allowDeselect={false}
+                  />
                 )}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* 광고 목록 - 카테고리별로 분리 */}
-          <div className='space-y-6'>
-            {Object.keys(groupedAdsByCategory).length === 0 ? (
-              <Card>
-                <CardContent className='pt-6'>
-                  <div className='flex flex-col items-center justify-center py-16 text-center'>
-                    <Package className='h-16 w-16 text-muted-foreground mb-4' />
-                    <h3 className='text-lg font-medium mb-2'>광고가 없습니다</h3>
-                    <p className='text-sm text-muted-foreground mb-6'>
-                      {searchTerm || getActiveFilterCount() > 0
-                        ? '검색 조건에 맞는 광고가 없습니다. 다른 조건으로 시도해보세요.'
-                        : '새로운 광고를 등록하여 시작하세요.'}
-                    </p>
-                    {!searchTerm && getActiveFilterCount() === 0 && (
-                      <Button
-                        onClick={() => handleOpenDialog()}
-                        size='lg'
-                      >
-                        <Plus className='mr-2 h-5 w-5' />첫 광고 등록하기
-                      </Button>
+                <Button
+                  variant='default'
+                  w={120}
+                  leftSection={<X size={16} />}
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterAdType('all');
+                    setFilterCategory('all');
+                    setFilterAdvertiser('all');
+                    setFilterCreator('all');
+                  }}
+                >
+                  초기화
+                </Button>
+              </Group>
+            )}
+
+            <Divider />
+
+            <FilterRow label='상태'>
+              <FilterChips
+                options={(
+                  [
+                    { value: 'all', label: '전체' },
+                    { value: 'pending', label: '대기중' },
+                    { value: 'scheduled', label: '예정' },
+                    { value: 'active', label: '진행중' },
+                    { value: 'expiring', label: '만료예정' },
+                    { value: 'expired', label: '만료' },
+                  ] as const
+                ).map(({ value, label }) => ({
+                  value,
+                  label,
+                  count: getStatusCount(value),
+                }))}
+                value={activeTab}
+                onChange={setActiveTab}
+              />
+            </FilterRow>
+
+            {categories.length > 0 && (
+              <FilterRow label='카테고리'>
+                <FilterChips
+                  options={[
+                    { value: 'all', label: '전체 카테고리' },
+                    ...categories.map((cat) => ({
+                      value: cat.id,
+                      label: cat.categoryName,
+                    })),
+                  ]}
+                  value={filterCategory || null}
+                  onChange={setFilterCategory}
+                />
+              </FilterRow>
+            )}
+          </Stack>
+        </Paper>
+
+        {/* 광고 목록 - 카테고리별로 분리 */}
+        {loading ? (
+          <DataTableShell>
+            <TableSkeleton rows={8} columns={hideClickColumn ? 12 : 14} />
+          </DataTableShell>
+        ) : Object.keys(groupedAdsByCategory).length === 0 ? (
+          <Paper withBorder radius='md'>
+            <EmptyState
+              icon={Package}
+              title='광고가 없습니다'
+              description={
+                searchTerm || getActiveFilterCount() > 0
+                  ? '검색 조건에 맞는 광고가 없습니다. 다른 조건으로 시도해보세요.'
+                  : '새로운 광고를 등록하여 시작하세요.'
+              }
+              action={
+                !searchTerm && getActiveFilterCount() === 0 && (
+                  <Button
+                    leftSection={<Plus size={16} />}
+                    onClick={() => handleOpenDialog()}
+                  >
+                    첫 광고 등록하기
+                  </Button>
+                )
+              }
+            />
+          </Paper>
+        ) : (
+          Object.entries(groupedAdsByCategory).map(([categoryId, { categoryName, ads }]) => (
+            <DataTableShell
+              key={categoryId}
+              // 카테고리 제목은 표 카드 안 맨 위에 둔다 (필터 카드와 구분)
+              summary={
+                <Group gap='xs'>
+                  <Title order={4}>{categoryName}</Title>
+                  <Badge variant='light' color='gray'>
+                    {ads.length}개
+                  </Badge>
+                </Group>
+              }
+            >
+              <Table
+                miw={1600}
+                highlightOnHover
+                verticalSpacing='sm'
+                horizontalSpacing='md'
+              >
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th w={80}>이미지</Table.Th>
+                    <Table.Th w={100}>상태</Table.Th>
+                    <Table.Th w={200}>광고 제목</Table.Th>
+                    <Table.Th w={150}>광고주</Table.Th>
+                    <Table.Th w={140}>연락처</Table.Th>
+                    <Table.Th w={120}>카테고리</Table.Th>
+                    <Table.Th w={100}>타입</Table.Th>
+                    <Table.Th w={180}>범위</Table.Th>
+                    <Table.Th w={180}>게시 기간</Table.Th>
+                    <Table.Th w={150}>등록자</Table.Th>
+                    <Table.Th w={200}>계약메모</Table.Th>
+                    {!hideClickColumn && (
+                      <>
+                        <Table.Th w={100} ta='center'>광고 클릭수</Table.Th>
+                        <Table.Th w={100} ta='center'>클릭 수</Table.Th>
+                      </>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              Object.entries(groupedAdsByCategory).map(([categoryId, { categoryName, ads }]) => (
-                <Card key={categoryId}>
-                  <CardContent className='pt-6'>
-                    <div className='mb-4 flex items-center justify-between'>
-                      <div className='flex items-center gap-2'>
-                        <div className='text-lg font-semibold'>{categoryName}</div>
-                        <Badge variant='secondary' className='text-sm'>
-                          {ads.length}개
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className='rounded-lg border overflow-x-auto'>
-                      <Table>
-                    <TableHeader>
-                      <TableRow className='bg-muted/50'>
-                        <TableHead className='w-[80px]'>이미지</TableHead>
-                        <TableHead className='w-[100px]'>상태</TableHead>
-                        <TableHead className='w-[200px]'>광고 제목</TableHead>
-                        <TableHead className='w-[150px]'>광고주</TableHead>
-                        <TableHead className='w-[140px]'>연락처</TableHead>
-                        <TableHead className='w-[120px]'>카테고리</TableHead>
-                        <TableHead className='w-[100px]'>타입</TableHead>
-                        <TableHead className='w-[180px]'>범위</TableHead>
-                        <TableHead className='w-[180px]'>게시 기간</TableHead>
-                        <TableHead className='w-[150px]'>등록자</TableHead>
-                        <TableHead className='w-[200px]'>계약메모</TableHead>
-                        {!hideClickColumn && (
-                          <>
-                            <TableHead className='w-[100px] text-center'>광고 클릭수</TableHead>
-                            <TableHead className='w-[100px] text-center'>클릭 수</TableHead>
-                          </>
+                    <Table.Th w={120} ta='right'>
+                      작업
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {ads.map((ad) => (
+                    <Table.Tr key={ad.id}>
+                      <Table.Td>
+                        {ad.imageUrl ? (
+                          <UnstyledButton
+                            w={56}
+                            h={56}
+                            bg='var(--app-bg-subtle)'
+                            style={{
+                              borderRadius: 'var(--mantine-radius-md)',
+                              overflow: 'hidden',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            onClick={() =>
+                              ad.imageUrl &&
+                              window.open(ad.imageUrl, '_blank')
+                            }
+                            title='이미지 크게 보기'
+                          >
+                            <img
+                              src={ad.imageUrl}
+                              alt={ad.title}
+                              className='w-full h-full object-cover'
+                            />
+                          </UnstyledButton>
+                        ) : (
+                          <Center
+                            w={56}
+                            h={56}
+                            bg='var(--app-bg-subtle)'
+                            style={{ borderRadius: 'var(--mantine-radius-md)' }}
+                          >
+                            <ImageIcon size={24} color='var(--mantine-color-dimmed)' />
+                          </Center>
                         )}
-                        <TableHead className='text-right w-[120px]'>
-                          작업
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {ads.map((ad) => (
-                        <TableRow
-                          key={ad.id}
-                          className='hover:bg-muted/50 transition-colors'
-                        >
-                          <TableCell>
-                            <div
-                              className='w-14 h-14 rounded-lg overflow-hidden bg-muted flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary transition-all'
-                              onClick={() =>
-                                ad.imageUrl &&
-                                window.open(ad.imageUrl, '_blank')
-                              }
-                              title={
-                                ad.imageUrl ? '이미지 크게 보기' : '이미지 없음'
-                              }
+                      </Table.Td>
+                      <Table.Td>
+                        <Stack gap='xs' align='flex-start'>
+                          <StatusBadge ad={ad} />
+                          {ad.isEvent && (
+                            <Badge
+                              variant='light'
+                              color='grape'
+                              leftSection={<Tag size={12} />}
                             >
-                              {ad.imageUrl ? (
-                                <img
-                                  src={ad.imageUrl}
-                                  alt={ad.title}
-                                  className='w-full h-full object-cover'
-                                />
-                              ) : (
-                                <ImageIcon className='h-6 w-6 text-muted-foreground' />
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className='space-y-2 flex flex-col'>
-                              <StatusBadge ad={ad} />
-                              {ad.isEvent && (
-                                <Badge className='bg-purple-500 hover:bg-purple-600 text-white font-medium'>
-                                  <Tag className='mr-1 h-3 w-3' />
-                                  이벤트
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className='max-w-[200px]'>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className='font-medium cursor-default truncate'>
-                                  {ad.title}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{ad.title}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            {ad.linkUrl && (
-                              <a
-                                href={ad.linkUrl}
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                className='text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1'
-                              >
-                                <ExternalLink className='h-3 w-3' />
-                                링크
-                              </a>
-                            )}
-                          </TableCell>
-                          <TableCell className='max-w-[150px]'>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className='cursor-default truncate'>
-                                  {ad.advertisers?.businessName || '-'}
-                                </div>
-                              </TooltipTrigger>
-                              {ad.advertisers?.businessName && (
-                                <TooltipContent>
-                                  <p>{ad.advertisers.businessName}</p>
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
-                          </TableCell>
-                          <TableCell>
-                            <div className='space-y-1 text-sm'>
-                              {ad.advertisers?.displayPhoneNumber && (
-                                <div className='font-medium truncate'>
-                                  <span className='text-xs text-muted-foreground'>표시용: </span>
-                                  {ad.advertisers.displayPhoneNumber}
-                                </div>
-                              )}
-                              <div className='text-xs text-muted-foreground truncate'>
-                                <span>연락처: </span>
-                                {ad.advertisers?.contactPhoneNumber || '-'}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {ad.ad_categories ? (
-                              <Badge
-                                variant='outline'
-                                className='font-normal max-w-full'
-                              >
-                                <Tag className='mr-1 h-3 w-3 flex-shrink-0' />
-                                <span className='truncate'>{ad.ad_categories.categoryName}</span>
-                              </Badge>
-                            ) : (
-                              <span className='text-sm text-muted-foreground'>
-                                미분류
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {ad.adType === 'NEIGHBORHOOD' ? (
-                              <Badge
-                                variant='secondary'
-                                className='font-normal'
-                              >
-                                <Building2 className='mr-1 h-3 w-3' />
-                                동네
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant='secondary'
-                                className='font-normal'
-                              >
-                                <MapPin className='mr-1 h-3 w-3' />
-                                지역
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {ad.adType === 'NEIGHBORHOOD' ? (
-                              ad.advertisement_apartments && ad.advertisement_apartments.length > 0 ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className='text-sm cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors'>
-                                      <div className='flex items-center gap-1'>
-                                        <Building2 className='h-3 w-3 text-muted-foreground' />
-                                        <span className='truncate max-w-[120px]'>
-                                          {ad.advertisement_apartments[0].apartments.name}
-                                        </span>
-                                        {ad.advertisement_apartments.length > 1 && (
-                                          <Badge variant='secondary' className='text-xs'>
-                                            +{ad.advertisement_apartments.length - 1}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent className='max-w-xs max-h-64 overflow-y-auto bg-white text-black border border-gray-200 shadow-lg'>
-                                    <div className='space-y-1'>
-                                      {ad.advertisement_apartments.map((aa, idx) => (
-                                        <div key={idx} className='text-sm py-1'>
-                                          <div className='font-medium'>{aa.apartments.name}</div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <span className='text-sm text-muted-foreground'>-</span>
-                              )
-                            ) : (
-                              ad.advertisement_regions && ad.advertisement_regions.length > 0 ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className='text-sm cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors'>
-                                      <div className='flex items-center gap-1'>
-                                        <MapPin className='h-3 w-3 text-muted-foreground' />
-                                        <span className='truncate max-w-[120px]'>
-                                          {ad.advertisement_regions[0].regionSido}
-                                          {ad.advertisement_regions[0].regionSigungu && ` ${ad.advertisement_regions[0].regionSigungu}`}
-                                          {ad.advertisement_regions[0].regionDong && ` ${ad.advertisement_regions[0].regionDong}`}
-                                        </span>
-                                        {ad.advertisement_regions.length > 1 && (
-                                          <Badge variant='secondary' className='text-xs'>
-                                            +{ad.advertisement_regions.length - 1}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent className='max-w-xs max-h-64 overflow-y-auto bg-white text-black border border-gray-200 shadow-lg'>
-                                    <div className='space-y-1'>
-                                      {ad.advertisement_regions.map((region, idx) => (
-                                        <div key={idx} className='text-sm py-1'>
-                                          {region.regionSido}
-                                          {region.regionSigungu && ` > ${region.regionSigungu}`}
-                                          {region.regionDong && ` > ${region.regionDong}`}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <span className='text-sm text-muted-foreground'>-</span>
-                              )
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className='space-y-2'>
-                              <div className='space-y-1 text-sm'>
-                                <div className='flex items-center gap-1 text-muted-foreground'>
-                                  <Calendar className='h-3 w-3' />
-                                  {formatDisplayDate(ad.startDate)}
-                                </div>
-                                <div className='flex items-center gap-1 text-muted-foreground'>
-                                  <Calendar className='h-3 w-3' />
-                                  {formatDisplayDate(ad.endDate)}
-                                </div>
-                              </div>
-                              {ad.isEvent && ad.eventStartDate && ad.eventEndDate && (
-                                <div className='space-y-1 text-xs pt-1 border-t'>
-                                  <div className='text-purple-600 font-medium'>
-                                    이벤트 기간:
-                                  </div>
-                                  <div className='flex items-center gap-1 text-purple-600'>
-                                    <Calendar className='h-3 w-3' />
-                                    {formatDisplayDate(ad.eventStartDate)}
-                                  </div>
-                                  <div className='flex items-center gap-1 text-purple-600'>
-                                    <Calendar className='h-3 w-3' />
-                                    {formatDisplayDate(ad.eventEndDate)}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className='text-sm'>
-                              <div className='font-medium truncate'>
-                                {ad.user?.name || '-'}
-                              </div>
-                              {ad.user?.phoneNumber && (
-                                <div className='text-xs text-muted-foreground truncate'>
-                                  {ad.user.phoneNumber}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {editingMemoId === ad.advertiserId ? (
-                              <div className='space-y-2'>
-                                <Textarea
-                                  value={editingMemoValue}
-                                  onChange={(e) =>
-                                    setEditingMemoValue(e.target.value)
-                                  }
-                                  className='min-h-[60px] text-sm'
-                                  placeholder='계약 메모를 입력하세요'
-                                />
-                                <div className='flex gap-1'>
-                                  <Button
-                                    size='sm'
-                                    onClick={() =>
-                                      handleMemoSave(ad.advertiserId)
-                                    }
-                                    className='h-7 px-2'
-                                  >
-                                    저장
-                                  </Button>
-                                  <Button
-                                    size='sm'
-                                    variant='outline'
-                                    onClick={handleMemoCancel}
-                                    className='h-7 px-2'
-                                  >
-                                    취소
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                className='text-sm cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors'
-                                onClick={() =>
-                                  handleMemoEdit(
-                                    ad.advertiserId,
-                                    ad.advertisers?.contractMemo
-                                  )
-                                }
-                                title='클릭하여 수정'
-                              >
-                                {ad.advertisers?.contractMemo ? (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className='truncate'>
-                                        {ad.advertisers.contractMemo}
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className='max-w-xs whitespace-pre-wrap'>
-                                        {ad.advertisers.contractMemo}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                ) : (
-                                  <span className='text-muted-foreground italic'>
-                                    메모 없음
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </TableCell>
-                          {!hideClickColumn && (
-                            <>
-                              <TableCell className='text-center'>
-                                <span>
-                                  {ad.adClickCount?.toLocaleString() || '0'}
-                                </span>
-                              </TableCell>
-                              <TableCell className='text-center'>
-                                <span>
-                                  {ad.clickCount?.toLocaleString() || '0'}
-                                </span>
-                              </TableCell>
-                            </>
+                              이벤트
+                            </Badge>
                           )}
-                          <TableCell>
-                            <div className='flex justify-end gap-2 items-center'>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant='ghost'
-                                    size='icon-sm'
-                                    onClick={() => handleOpenDialog(ad)}
-                                  >
-                                    <Edit className='h-4 w-4' />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>수정</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant='ghost'
-                                    size='icon-sm'
-                                    onClick={() => {
-                                      setSelectedAd(ad);
-                                      setIsResetClickDialogOpen(true);
-                                    }}
-                                  >
-                                    <RotateCcw className='h-4 w-4' />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>클릭수 초기화</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant='ghost'
-                                    size='icon-sm'
-                                    onClick={() => {
-                                      setSelectedAd(ad);
-                                      setIsDeleteDialogOpen(true);
-                                    }}
-                                    className='text-destructive hover:text-destructive'
-                                  >
-                                    <Trash2 className='h-4 w-4' />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>삭제</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-        </div>
-
-        {/* 광고 등록/수정 다이얼로그 */}
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              handleCloseDialog();
-            }
-          }}
-        >
-          <DialogContent className='max-h-[90vh] w-[95vw] max-w-3xl sm:max-w-3xl overflow-y-auto'>
-            <DialogHeader>
-              <DialogTitle className='text-2xl'>
-                {selectedAd ? '광고 수정' : '새 광고 등록'}
-              </DialogTitle>
-              <DialogDescription>
-                광고주를 선택하고 광고 내용을 입력하세요. 모든 필수 항목(*)을
-                입력해야 합니다.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className='space-y-6'>
-              {/* 광고주 선택 */}
-              <div className='space-y-2'>
-                <Label className='text-sm font-medium flex items-center gap-2'>
-                  <Building2 className='h-4 w-4' />
-                  광고주 선택 <span className='text-destructive'>*</span>
-                </Label>
-                <Popover open={advertiserPopoverOpen} onOpenChange={setAdvertiserPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant='outline'
-                      role='combobox'
-                      aria-expanded={advertiserPopoverOpen}
-                      className='w-full justify-between font-normal'
-                    >
-                      {selectedAdvertiserId
-                        ? availableAdvertisers.find((adv) => adv.id === selectedAdvertiserId)
-                          ? `${availableAdvertisers.find((adv) => adv.id === selectedAdvertiserId)?.businessName} (${availableAdvertisers.find((adv) => adv.id === selectedAdvertiserId)?.representativeName})`
-                          : '광고주를 선택하세요'
-                        : '광고주를 선택하세요'}
-                      <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className='w-[400px] p-0' align='start'>
-                    <Command>
-                      <CommandInput placeholder='광고주 검색...' />
-                      <CommandList>
-                        <CommandEmpty>선택 가능한 광고주가 없습니다.</CommandEmpty>
-                        <CommandGroup>
-                          {availableAdvertisers.map((adv) => (
-                            <CommandItem
-                              key={adv.id}
-                              value={`${adv.businessName} ${adv.representativeName}`}
-                              onSelect={() => {
-                                setSelectedAdvertiserId(adv.id);
-                                // 광고주의 카테고리 자동 적용
-                                if (adv.categoryId) {
-                                  setAdFormData(prev => ({
-                                    ...prev,
-                                    categoryId: adv.categoryId || '',
-                                  }));
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td maw={200}>
+                        <Tooltip label={ad.title} multiline maw={320}>
+                          <Text size='sm' fw={500} truncate>
+                            {ad.title}
+                          </Text>
+                        </Tooltip>
+                        {ad.linkUrl && (
+                          <Anchor
+                            href={ad.linkUrl}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            size='xs'
+                            mt={4}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          >
+                            <ExternalLink size={12} />
+                            링크
+                          </Anchor>
+                        )}
+                      </Table.Td>
+                      <Table.Td maw={150}>
+                        <Tooltip
+                          label={ad.advertisers?.businessName}
+                          disabled={!ad.advertisers?.businessName}
+                          multiline
+                          maw={320}
+                        >
+                          <Text size='sm' truncate>
+                            {ad.advertisers?.businessName || '-'}
+                          </Text>
+                        </Tooltip>
+                      </Table.Td>
+                      <Table.Td>
+                        <Stack gap={4}>
+                          {ad.advertisers?.displayPhoneNumber && (
+                            <Text size='sm' fw={500} truncate>
+                              <Text span size='xs' c='dimmed'>표시용: </Text>
+                              {ad.advertisers.displayPhoneNumber}
+                            </Text>
+                          )}
+                          <Text size='xs' c='dimmed' truncate>
+                            <span>연락처: </span>
+                            {ad.advertisers?.contactPhoneNumber || '-'}
+                          </Text>
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td>
+                        {ad.ad_categories ? (
+                          <Badge
+                            variant='light'
+                            color='gray'
+                            maw='100%'
+                            tt='none'
+                            leftSection={<Tag size={12} />}
+                          >
+                            {ad.ad_categories.categoryName}
+                          </Badge>
+                        ) : (
+                          <Text size='sm' c='dimmed'>
+                            미분류
+                          </Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {ad.adType === 'NEIGHBORHOOD' ? (
+                          <Badge
+                            variant='light'
+                            color='gray'
+                            leftSection={<Building2 size={12} />}
+                          >
+                            동네
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant='light'
+                            color='gray'
+                            leftSection={<MapPin size={12} />}
+                          >
+                            지역
+                          </Badge>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {ad.adType === 'NEIGHBORHOOD' ? (
+                          ad.advertisement_apartments && ad.advertisement_apartments.length > 0 ? (
+                            <HoverCard shadow='md' withinPortal openDelay={100}>
+                              <HoverCard.Target>
+                                <Group gap={4} wrap='nowrap' style={{ cursor: 'pointer' }}>
+                                  <Building2 size={12} color='var(--mantine-color-dimmed)' />
+                                  <Text size='sm' maw={120} truncate>
+                                    {ad.advertisement_apartments[0].apartments.name}
+                                  </Text>
+                                  {ad.advertisement_apartments.length > 1 && (
+                                    <Badge variant='light' color='gray' size='sm'>
+                                      +{ad.advertisement_apartments.length - 1}
+                                    </Badge>
+                                  )}
+                                </Group>
+                              </HoverCard.Target>
+                              <HoverCard.Dropdown maw={320} p='xs'>
+                                <ScrollArea.Autosize mah={256}>
+                                  <Stack gap={4}>
+                                    {ad.advertisement_apartments.map((aa, idx) => (
+                                      <Text key={idx} size='sm' fw={500} py={2}>
+                                        {aa.apartments.name}
+                                      </Text>
+                                    ))}
+                                  </Stack>
+                                </ScrollArea.Autosize>
+                              </HoverCard.Dropdown>
+                            </HoverCard>
+                          ) : (
+                            <Text size='sm' c='dimmed'>-</Text>
+                          )
+                        ) : (
+                          ad.advertisement_regions && ad.advertisement_regions.length > 0 ? (
+                            <HoverCard shadow='md' withinPortal openDelay={100}>
+                              <HoverCard.Target>
+                                <Group gap={4} wrap='nowrap' style={{ cursor: 'pointer' }}>
+                                  <MapPin size={12} color='var(--mantine-color-dimmed)' />
+                                  <Text size='sm' maw={120} truncate>
+                                    {ad.advertisement_regions[0].regionSido}
+                                    {ad.advertisement_regions[0].regionSigungu && ` ${ad.advertisement_regions[0].regionSigungu}`}
+                                    {ad.advertisement_regions[0].regionDong && ` ${ad.advertisement_regions[0].regionDong}`}
+                                  </Text>
+                                  {ad.advertisement_regions.length > 1 && (
+                                    <Badge variant='light' color='gray' size='sm'>
+                                      +{ad.advertisement_regions.length - 1}
+                                    </Badge>
+                                  )}
+                                </Group>
+                              </HoverCard.Target>
+                              <HoverCard.Dropdown maw={320} p='xs'>
+                                <ScrollArea.Autosize mah={256}>
+                                  <Stack gap={4}>
+                                    {ad.advertisement_regions.map((region, idx) => (
+                                      <Text key={idx} size='sm' py={2}>
+                                        {region.regionSido}
+                                        {region.regionSigungu && ` > ${region.regionSigungu}`}
+                                        {region.regionDong && ` > ${region.regionDong}`}
+                                      </Text>
+                                    ))}
+                                  </Stack>
+                                </ScrollArea.Autosize>
+                              </HoverCard.Dropdown>
+                            </HoverCard>
+                          ) : (
+                            <Text size='sm' c='dimmed'>-</Text>
+                          )
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Stack gap='xs'>
+                          <Stack gap={4}>
+                            <Group gap={4} wrap='nowrap'>
+                              <Calendar size={12} color='var(--mantine-color-dimmed)' />
+                              <Text size='sm' c='dimmed'>
+                                {formatDisplayDate(ad.startDate)}
+                              </Text>
+                            </Group>
+                            <Group gap={4} wrap='nowrap'>
+                              <Calendar size={12} color='var(--mantine-color-dimmed)' />
+                              <Text size='sm' c='dimmed'>
+                                {formatDisplayDate(ad.endDate)}
+                              </Text>
+                            </Group>
+                          </Stack>
+                          {ad.isEvent && ad.eventStartDate && ad.eventEndDate && (
+                            <Stack
+                              gap={4}
+                              pt={4}
+                              style={{ borderTop: '1px solid var(--app-divider)' }}
+                            >
+                              <Text size='xs' fw={500} c='grape'>
+                                이벤트 기간:
+                              </Text>
+                              <Group gap={4} wrap='nowrap'>
+                                <Calendar size={12} color='var(--mantine-color-grape-6)' />
+                                <Text size='xs' c='grape'>
+                                  {formatDisplayDate(ad.eventStartDate)}
+                                </Text>
+                              </Group>
+                              <Group gap={4} wrap='nowrap'>
+                                <Calendar size={12} color='var(--mantine-color-grape-6)' />
+                                <Text size='xs' c='grape'>
+                                  {formatDisplayDate(ad.eventEndDate)}
+                                </Text>
+                              </Group>
+                            </Stack>
+                          )}
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size='sm' fw={500} truncate>
+                          {ad.user?.name || '-'}
+                        </Text>
+                        {ad.user?.phoneNumber && (
+                          <Text size='xs' c='dimmed' truncate>
+                            {ad.user.phoneNumber}
+                          </Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {editingMemoId === ad.advertiserId ? (
+                          <Stack gap='xs'>
+                            <Textarea
+                              value={editingMemoValue}
+                              onChange={(e) =>
+                                setEditingMemoValue(e.target.value)
+                              }
+                              size='sm'
+                              autosize
+                              minRows={2}
+                              placeholder='계약 메모를 입력하세요'
+                            />
+                            <Group gap={4}>
+                              <Button
+                                size='compact-sm'
+                                onClick={() =>
+                                  handleMemoSave(ad.advertiserId)
                                 }
-                                setAdvertiserPopoverOpen(false);
+                              >
+                                저장
+                              </Button>
+                              <Button
+                                size='compact-sm'
+                                variant='default'
+                                onClick={handleMemoCancel}
+                              >
+                                취소
+                              </Button>
+                            </Group>
+                          </Stack>
+                        ) : (
+                          <UnstyledButton
+                            w='100%'
+                            p='xs'
+                            style={{ borderRadius: 'var(--mantine-radius-sm)' }}
+                            onClick={() =>
+                              handleMemoEdit(
+                                ad.advertiserId,
+                                ad.advertisers?.contractMemo
+                              )
+                            }
+                            title='클릭하여 수정'
+                          >
+                            {ad.advertisers?.contractMemo ? (
+                              <Tooltip
+                                label={ad.advertisers.contractMemo}
+                                multiline
+                                maw={320}
+                                style={{ whiteSpace: 'pre-wrap' }}
+                              >
+                                <Text size='sm' truncate>
+                                  {ad.advertisers.contractMemo}
+                                </Text>
+                              </Tooltip>
+                            ) : (
+                              <Text size='sm' c='dimmed' fs='italic'>
+                                메모 없음
+                              </Text>
+                            )}
+                          </UnstyledButton>
+                        )}
+                      </Table.Td>
+                      {!hideClickColumn && (
+                        <>
+                          <Table.Td ta='center' style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            <span>
+                              {ad.adClickCount?.toLocaleString() || '0'}
+                            </span>
+                          </Table.Td>
+                          <Table.Td ta='center' style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            <span>
+                              {ad.clickCount?.toLocaleString() || '0'}
+                            </span>
+                          </Table.Td>
+                        </>
+                      )}
+                      <Table.Td>
+                        <Group gap={4} justify='flex-end' wrap='nowrap'>
+                          <Tooltip label='수정'>
+                            <ActionIcon
+                              variant='subtle'
+                              color='gray'
+                              aria-label='수정'
+                              onClick={() => handleOpenDialog(ad)}
+                            >
+                              <Edit size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label='클릭수 초기화'>
+                            <ActionIcon
+                              variant='subtle'
+                              color='gray'
+                              aria-label='클릭수 초기화'
+                              onClick={() => {
+                                setSelectedAd(ad);
+                                setIsResetClickDialogOpen(true);
                               }}
                             >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  selectedAdvertiserId === adv.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              {adv.businessName} ({adv.representativeName})
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <p className='text-xs text-muted-foreground'>
-                  이미 광고가 등록된 광고주는 선택할 수 없습니다.
-                </p>
-              </div>
+                              <RotateCcw size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label='삭제'>
+                            <ActionIcon
+                              variant='subtle'
+                              color='red'
+                              aria-label='삭제'
+                              onClick={() => {
+                                setSelectedAd(ad);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </DataTableShell>
+          ))
+        )}
+      </PageContent>
 
-              {/* 광고 정보 */}
-              <div className='space-y-4'>
-                  <div className='grid grid-cols-2 gap-3'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='title'>
-                        광고 제목 <span className='text-destructive'>*</span>
-                      </Label>
-                      <Input
-                        id='title'
-                        value={adFormData.title}
+      {/* 광고 등록/수정 다이얼로그 */}
+      <Modal
+        // 위에 클릭수 초기화 모달이 떠 있으면 ESC는 그 모달만 닫는다 (Radix와 동일)
+        closeOnEscape={!isResetClickDialogOpen}
+        opened={isDialogOpen}
+        onClose={() => {
+          handleCloseDialog();
+        }}
+        title={
+          <Text span size='xl' fw={600}>
+            {selectedAd ? '광고 수정' : '새 광고 등록'}
+          </Text>
+        }
+        size={768}
+      >
+        <Stack gap='lg'>
+          <Text size='sm' c='dimmed'>
+            광고주를 선택하고 광고 내용을 입력하세요. 모든 필수 항목(*)을
+            입력해야 합니다.
+          </Text>
+
+          {/* 광고주 선택 */}
+          <Select
+            label={
+              <Group gap={6} component='span' style={{ display: 'inline-flex' }}>
+                <Building2 size={16} />
+                광고주 선택
+              </Group>
+            }
+            withAsterisk
+            description='이미 광고가 등록된 광고주는 선택할 수 없습니다.'
+            inputWrapperOrder={['label', 'input', 'description', 'error']}
+            placeholder='광고주를 검색하거나 선택하세요'
+            searchable
+            nothingFoundMessage='선택 가능한 광고주가 없습니다.'
+            data={availableAdvertisers.map((adv) => ({
+              value: adv.id,
+              label: `${adv.businessName} (${adv.representativeName})`,
+            }))}
+            value={selectedAdvertiserId || null}
+            // cmdk onSelect처럼 같은 광고주를 다시 골라도 매번 실행되도록 onOptionSubmit 사용
+            onOptionSubmit={(v) => {
+              const adv = availableAdvertisers.find((a) => a.id === v);
+              if (!adv) return;
+              setSelectedAdvertiserId(adv.id);
+              // 광고주의 카테고리 자동 적용
+              if (adv.categoryId) {
+                setAdFormData(prev => ({
+                  ...prev,
+                  categoryId: adv.categoryId || '',
+                }));
+              }
+              setAdvertiserPopoverOpen(false);
+            }}
+            dropdownOpened={advertiserPopoverOpen}
+            onDropdownOpen={() => setAdvertiserPopoverOpen(true)}
+            onDropdownClose={() => setAdvertiserPopoverOpen(false)}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true }}
+          />
+
+          {/* 광고 정보 */}
+          <SimpleGrid cols={2} spacing='sm'>
+            <TextInput
+              id='title'
+              label='광고 제목'
+              withAsterisk
+              value={adFormData.title}
+              onChange={(e) =>
+                setAdFormData({
+                  ...adFormData,
+                  title: e.target.value,
+                })
+              }
+              placeholder='광고 제목을 입력해주세요'
+            />
+            <TextInput
+              id='categoryId'
+              label='카테고리'
+              value={categories.find(c => c.id === adFormData.categoryId)?.categoryName || ''}
+              disabled
+              placeholder='광고주 선택 시 자동 설정'
+              styles={{ input: { opacity: 1, color: 'var(--mantine-color-text)', cursor: 'default' } }}
+            />
+          </SimpleGrid>
+
+          <Textarea
+            id='description'
+            label='소개내용'
+            withAsterisk
+            value={adFormData.description}
+            onChange={(e) =>
+              setAdFormData({
+                ...adFormData,
+                description: e.target.value,
+              })
+            }
+            placeholder='광고 소개 내용을 입력하세요'
+            rows={3}
+            styles={{ input: { resize: 'none' } }}
+          />
+
+          <Input.Wrapper label='광고 이미지' withAsterisk>
+            <ImageUpload
+              value={adFormData.imageUrl}
+              onChange={(url) =>
+                setAdFormData({ ...adFormData, imageUrl: url })
+              }
+              bucket='advertisements'
+              storagePath={`ads/${imageUploadFolderId}/ad-image`}
+            />
+          </Input.Wrapper>
+
+          <TextInput
+            id='linkUrl'
+            label='링크 URL'
+            type='url'
+            value={adFormData.linkUrl}
+            onChange={(e) =>
+              setAdFormData({
+                ...adFormData,
+                linkUrl: e.target.value,
+              })
+            }
+            placeholder='https://example.com'
+          />
+
+          <Stack gap='xs'>
+            <SimpleGrid cols={2} spacing='sm'>
+              <TextInput
+                id='startDate'
+                label='게시 시작일'
+                withAsterisk
+                type='date'
+                value={adFormData.startDate}
+                onChange={(e) =>
+                  setAdFormData({
+                    ...adFormData,
+                    startDate: e.target.value,
+                  })
+                }
+              />
+              <TextInput
+                id='endDate'
+                label='게시 종료일'
+                withAsterisk
+                type='date'
+                value={adFormData.endDate}
+                onChange={(e) =>
+                  setAdFormData({
+                    ...adFormData,
+                    endDate: e.target.value,
+                  })
+                }
+              />
+            </SimpleGrid>
+            <Group gap='xs'>
+              {[
+                { days: 14, label: '14일' },
+                { days: 30, label: '1개월' },
+                { days: 180, label: '6개월' },
+                { days: 365, label: '12개월' },
+              ].map(({ days, label }) => (
+                <Button
+                  key={days}
+                  type='button'
+                  variant='default'
+                  size='xs'
+                  onClick={() => {
+                    const today = new Date();
+                    const endDate = new Date();
+                    endDate.setDate(today.getDate() + days);
+                    setAdFormData({
+                      ...adFormData,
+                      startDate: format(today, 'yyyy-MM-dd'),
+                      endDate: format(endDate, 'yyyy-MM-dd'),
+                    });
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Group>
+          </Stack>
+
+          {/* 이벤트 설정 */}
+          <Paper withBorder radius='md' p='md' bg='var(--app-bg-muted)'>
+            <Stack gap='sm'>
+              <Checkbox
+                id='isEvent'
+                label='이벤트로 등록'
+                fw={500}
+                checked={adFormData.isEvent}
+                onChange={(e) =>
+                  setAdFormData({
+                    ...adFormData,
+                    isEvent: e.target.checked,
+                  })
+                }
+              />
+
+              {adFormData.isEvent && (
+                <>
+                  <Text size='sm' c='dimmed'>
+                    이벤트 기간 동안만 이벤트 섹션에 표시됩니다
+                  </Text>
+                  <Stack gap='xs'>
+                    <SimpleGrid cols={2} spacing='sm'>
+                      <TextInput
+                        id='eventStartDate'
+                        label='이벤트 시작일'
+                        withAsterisk
+                        type='date'
+                        value={adFormData.eventStartDate}
                         onChange={(e) =>
                           setAdFormData({
                             ...adFormData,
-                            title: e.target.value,
+                            eventStartDate: e.target.value,
                           })
                         }
-                        placeholder='광고 제목을 입력해주세요'
                       />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='categoryId'>
-                        카테고리
-                      </Label>
-                      <Input
-                        id='categoryId'
-                        value={categories.find(c => c.id === adFormData.categoryId)?.categoryName || ''}
-                        disabled
-                        placeholder='광고주 선택 시 자동 설정'
-                        className='bg-muted'
+                      <TextInput
+                        id='eventEndDate'
+                        label='이벤트 종료일'
+                        withAsterisk
+                        type='date'
+                        value={adFormData.eventEndDate}
+                        onChange={(e) =>
+                          setAdFormData({
+                            ...adFormData,
+                            eventEndDate: e.target.value,
+                          })
+                        }
                       />
-                    </div>
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='description'>
-                      소개내용<span className='text-destructive'>*</span>
-                    </Label>
-                    <Textarea
-                      id='description'
-                      value={adFormData.description}
-                      onChange={(e) =>
-                        setAdFormData({
-                          ...adFormData,
-                          description: e.target.value,
-                        })
-                      }
-                      placeholder='광고 소개 내용을 입력하세요'
-                      rows={3}
-                      className='resize-none'
-                    />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label>
-                      광고 이미지 <span className='text-destructive'>*</span>
-                    </Label>
-                    <ImageUpload
-                      value={adFormData.imageUrl}
-                      onChange={(url) =>
-                        setAdFormData({ ...adFormData, imageUrl: url })
-                      }
-                      bucket='advertisements'
-                      storagePath={`ads/${imageUploadFolderId}/ad-image`}
-                    />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='linkUrl'>링크 URL</Label>
-                    <Input
-                      id='linkUrl'
-                      type='url'
-                      value={adFormData.linkUrl}
-                      onChange={(e) =>
-                        setAdFormData({
-                          ...adFormData,
-                          linkUrl: e.target.value,
-                        })
-                      }
-                      placeholder='https://example.com'
-                    />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <div className='grid grid-cols-2 gap-3'>
-                      <div className='space-y-2'>
-                        <Label htmlFor='startDate'>
-                          게시 시작일 <span className='text-destructive'>*</span>
-                        </Label>
-                        <Input
-                          id='startDate'
-                          type='date'
-                          value={adFormData.startDate}
-                          onChange={(e) =>
-                            setAdFormData({
-                              ...adFormData,
-                              startDate: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className='space-y-2'>
-                        <Label htmlFor='endDate'>
-                          게시 종료일 <span className='text-destructive'>*</span>
-                        </Label>
-                        <Input
-                          id='endDate'
-                          type='date'
-                          value={adFormData.endDate}
-                          onChange={(e) =>
-                            setAdFormData({
-                              ...adFormData,
-                              endDate: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className='flex gap-2'>
+                    </SimpleGrid>
+                    <Group gap='xs'>
                       {[
                         { days: 14, label: '14일' },
                         { days: 30, label: '1개월' },
@@ -2270,550 +2194,420 @@ export default function AdsManagementPage() {
                         <Button
                           key={days}
                           type='button'
-                          variant='outline'
-                          size='sm'
+                          variant='default'
+                          size='xs'
                           onClick={() => {
                             const today = new Date();
                             const endDate = new Date();
                             endDate.setDate(today.getDate() + days);
                             setAdFormData({
                               ...adFormData,
-                              startDate: today.toISOString().split('T')[0],
-                              endDate: endDate.toISOString().split('T')[0],
+                              eventStartDate: format(today, 'yyyy-MM-dd'),
+                              eventEndDate: format(endDate, 'yyyy-MM-dd'),
                             });
                           }}
                         >
                           {label}
                         </Button>
                       ))}
-                    </div>
-                  </div>
+                    </Group>
+                  </Stack>
+                  <Textarea
+                    id='eventDescription'
+                    label='이벤트 소개글'
+                    value={adFormData.eventDescription}
+                    onChange={(e) =>
+                      setAdFormData({
+                        ...adFormData,
+                        eventDescription: e.target.value,
+                      })
+                    }
+                    placeholder='이벤트에 대한 소개글을 입력하세요'
+                    minRows={4}
+                    autosize
+                  />
+                </>
+              )}
+            </Stack>
+          </Paper>
 
-                  {/* 이벤트 설정 */}
-                  <div className='space-y-3 p-4 border rounded-lg bg-muted/30'>
-                    <div className='flex items-center space-x-2'>
-                      <input
-                        type='checkbox'
-                        id='isEvent'
-                        checked={adFormData.isEvent}
-                        onChange={(e) =>
-                          setAdFormData({
-                            ...adFormData,
-                            isEvent: e.target.checked,
-                          })
-                        }
-                        className='h-4 w-4 rounded border-gray-300'
-                      />
-                      <Label htmlFor='isEvent' className='font-medium cursor-pointer'>
-                        이벤트로 등록
-                      </Label>
-                    </div>
+          <Select
+            label='광고 타입'
+            withAsterisk
+            data={[
+              { value: 'NEIGHBORHOOD', label: '동네 광고 (특정 아파트)' },
+              { value: 'REGION', label: '지역 광고 (시/군/구)' },
+            ]}
+            value={adFormData.adType}
+            onChange={(value) => {
+              if (value === null) return;
+              setAdFormData({ ...adFormData, adType: value as 'NEIGHBORHOOD' | 'REGION' });
+            }}
+            allowDeselect={false}
+            leftSection={
+              adFormData.adType === 'NEIGHBORHOOD' ? <Building2 size={16} /> : <MapPin size={16} />
+            }
+          />
 
-                    {adFormData.isEvent && (
-                      <>
-                        <p className='text-sm text-muted-foreground'>
-                          이벤트 기간 동안만 이벤트 섹션에 표시됩니다
-                        </p>
-                        <div className='space-y-2'>
-                          <div className='grid grid-cols-2 gap-3'>
-                            <div className='space-y-2'>
-                              <Label htmlFor='eventStartDate'>
-                                이벤트 시작일 <span className='text-destructive'>*</span>
-                              </Label>
-                              <Input
-                                id='eventStartDate'
-                                type='date'
-                                value={adFormData.eventStartDate}
-                                onChange={(e) =>
-                                  setAdFormData({
-                                    ...adFormData,
-                                    eventStartDate: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                            <div className='space-y-2'>
-                              <Label htmlFor='eventEndDate'>
-                                이벤트 종료일 <span className='text-destructive'>*</span>
-                              </Label>
-                              <Input
-                                id='eventEndDate'
-                                type='date'
-                                value={adFormData.eventEndDate}
-                                onChange={(e) =>
-                                  setAdFormData({
-                                    ...adFormData,
-                                    eventEndDate: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-                          <div className='flex gap-2'>
-                            {[
-                              { days: 14, label: '14일' },
-                              { days: 30, label: '1개월' },
-                              { days: 180, label: '6개월' },
-                              { days: 365, label: '12개월' },
-                            ].map(({ days, label }) => (
-                              <Button
-                                key={days}
-                                type='button'
-                                variant='outline'
-                                size='sm'
-                                onClick={() => {
-                                  const today = new Date();
-                                  const endDate = new Date();
-                                  endDate.setDate(today.getDate() + days);
-                                  setAdFormData({
-                                    ...adFormData,
-                                    eventStartDate: today.toISOString().split('T')[0],
-                                    eventEndDate: endDate.toISOString().split('T')[0],
-                                  });
-                                }}
-                              >
-                                {label}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className='space-y-2'>
-                          <Label htmlFor='eventDescription'>
-                            이벤트 소개글
-                          </Label>
-                          <Textarea
-                            id='eventDescription'
-                            value={adFormData.eventDescription}
-                            onChange={(e) =>
-                              setAdFormData({
-                                ...adFormData,
-                                eventDescription: e.target.value,
-                              })
-                            }
-                            placeholder='이벤트에 대한 소개글을 입력하세요'
-                            className='min-h-[100px]'
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label>
-                      광고 타입 <span className='text-destructive'>*</span>
-                    </Label>
-                    <Select
-                      value={adFormData.adType}
-                      onValueChange={(value: 'NEIGHBORHOOD' | 'REGION') =>
-                        setAdFormData({ ...adFormData, adType: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='NEIGHBORHOOD'>
-                          <div className='flex items-center gap-2'>
-                            <Building2 className='h-4 w-4' />
-                            동네 광고 (특정 아파트)
-                          </div>
-                        </SelectItem>
-                        <SelectItem value='REGION'>
-                          <div className='flex items-center gap-2'>
-                            <MapPin className='h-4 w-4' />
-                            지역 광고 (시/군/구)
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* 동네 광고 - 아파트 선택 */}
-                  {adFormData.adType === 'NEIGHBORHOOD' && (
-                    <div className='space-y-2'>
-                      <Label>
-                        노출 아파트 <span className='text-destructive'>*</span>
-                      </Label>
-                      <div className='text-sm text-muted-foreground'>
-                        {adFormData.selectedApartments.length > 0
-                          ? `${adFormData.selectedApartments.length}개 아파트 선택됨`
-                          : '아파트를 선택하세요'}
-                      </div>
-                      <div className='flex gap-2'>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() => {
-                            const filteredApts = apartments.filter(apt =>
-                              apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
-                              apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
-                            );
-                            setAdFormData({
-                              ...adFormData,
-                              selectedApartments: filteredApts.map(apt => apt.id),
-                            });
-                          }}
-                        >
-                          전체 선택
-                        </Button>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() => {
-                            setAdFormData({
-                              ...adFormData,
-                              selectedApartments: [],
-                            });
-                          }}
-                        >
-                          전체 해제
-                        </Button>
-                      </div>
-                      <div className='border rounded-md'>
-                        <div className='p-2 border-b'>
-                          <div className='relative'>
-                            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                            <Input
-                              placeholder='아파트명 또는 주소 검색...'
-                              value={apartmentSearch}
-                              onChange={(e) => setApartmentSearch(e.target.value)}
-                              className='pl-9'
-                            />
-                          </div>
-                        </div>
-                        <div className='h-[200px] overflow-y-auto'>
-                          {apartments
-                            .filter(apt =>
-                              apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
-                              apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
-                            )
-                            .map((apt) => (
-                              <label
-                                key={apt.id}
-                                className='flex items-start gap-2 px-3 py-2 hover:bg-muted cursor-pointer'
-                              >
-                                <Checkbox
-                                  checked={adFormData.selectedApartments.includes(apt.id)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setAdFormData({
-                                        ...adFormData,
-                                        selectedApartments: [...adFormData.selectedApartments, apt.id],
-                                      });
-                                    } else {
-                                      setAdFormData({
-                                        ...adFormData,
-                                        selectedApartments: adFormData.selectedApartments.filter(id => id !== apt.id),
-                                      });
-                                    }
-                                  }}
-                                  className='mt-0.5'
-                                />
-                                <div className='flex flex-col'>
-                                  <span className='text-sm font-medium'>{apt.name}</span>
-                                  <span className='text-xs text-muted-foreground'>{apt.address}</span>
-                                </div>
-                              </label>
-                            ))}
-                          {apartments.filter(apt =>
-                            apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
-                            apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
-                          ).length === 0 && (
-                            <div className='px-3 py-4 text-sm text-muted-foreground text-center'>
-                              검색 결과가 없습니다.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {/* 선택된 아파트 뱃지 */}
-                      {adFormData.selectedApartments.length > 0 && (
-                        <div className='flex flex-wrap gap-2 pt-2'>
-                          {adFormData.selectedApartments.map((aptId) => {
-                            const apt = apartments.find((a) => a.id === aptId);
-                            return apt ? (
-                              <Badge
-                                key={aptId}
-                                variant='secondary'
-                                className='font-normal gap-1'
-                              >
-                                {apt.name}
-                                <button
-                                  type='button'
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setAdFormData({
-                                      ...adFormData,
-                                      selectedApartments: adFormData.selectedApartments.filter(
-                                        (id) => id !== aptId
-                                      ),
-                                    });
-                                  }}
-                                  className='ml-1 rounded-full hover:bg-muted-foreground/20'
-                                >
-                                  <X className='h-3 w-3' />
-                                </button>
-                              </Badge>
-                            ) : null;
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 지역 광고 - 지역 선택 */}
-                  {adFormData.adType === 'REGION' && (
-                    <div className='space-y-2'>
-                      <Label>
-                        노출 지역 <span className='text-destructive'>*</span>
-                      </Label>
-                      <div className='space-y-3 rounded-lg border p-4 bg-muted/30'>
-                        {/* 주소 검색으로 추가 */}
-                        <div className='space-y-2'>
-                          <Button
-                            type='button'
-                            variant='default'
-                            size='sm'
-                            onClick={handleRegionAddressSearch}
-                            className='w-full'
-                          >
-                            <MapPin className='mr-2 h-4 w-4' />
-                            주소 검색으로 지역 추가 (권장)
-                          </Button>
-                          <p className='text-xs text-muted-foreground text-center'>
-                            표준화된 지역명으로 정확하게 매칭됩니다
-                          </p>
-                        </div>
-
-                        {/* 구분선 */}
-                        <div className='relative'>
-                          <div className='absolute inset-0 flex items-center'>
-                            <span className='w-full border-t' />
-                          </div>
-                          <div className='relative flex justify-center text-xs uppercase'>
-                            <span className='bg-muted/30 px-2 text-muted-foreground'>
-                              또는 직접 입력
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* 수동 입력 */}
-                        <div className='grid grid-cols-3 gap-2'>
-                          <Input
-                            placeholder='시/도 *'
-                            value={regionSido}
-                            onChange={(e) => setRegionSido(e.target.value)}
-                          />
-                          <Input
-                            placeholder='시/군/구'
-                            value={regionSigungu}
-                            onChange={(e) => setRegionSigungu(e.target.value)}
-                          />
-                          <Input
-                            placeholder='읍/면/동'
-                            value={regionDong}
-                            onChange={(e) => setRegionDong(e.target.value)}
-                          />
-                        </div>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={handleAddRegion}
-                          className='w-full'
-                        >
-                          <Plus className='mr-2 h-4 w-4' />
-                          수동으로 지역 추가
-                        </Button>
-                        {adFormData.selectedRegions.length > 0 && (
-                          <div className='space-y-2'>
-                            <div className='text-sm font-medium'>
-                              선택된 지역 ({adFormData.selectedRegions.length}
-                              개):
-                            </div>
-                            <div className='space-y-1.5'>
-                              {adFormData.selectedRegions.map(
-                                (region, index) => (
-                                  <div
-                                    key={index}
-                                    className='flex items-center justify-between rounded-md border bg-background p-2.5'
-                                  >
-                                    <span className='text-sm font-medium'>
-                                      {region.regionSido}
-                                      {region.regionSigungu &&
-                                        ` > ${region.regionSigungu}`}
-                                      {region.regionDong &&
-                                        ` > ${region.regionDong}`}
-                                    </span>
-                                    <Button
-                                      type='button'
-                                      variant='ghost'
-                                      size='sm'
-                                      onClick={() => handleRemoveRegion(index)}
-                                      className='h-7 w-7 p-0'
-                                    >
-                                      <X className='h-4 w-4' />
-                                    </Button>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className='flex items-center space-x-2 p-4 rounded-lg bg-muted/30 border'>
-                    <input
-                      type='checkbox'
-                      id='isActive'
-                      checked={adFormData.isActive}
-                      onChange={(e) =>
-                        setAdFormData({
-                          ...adFormData,
-                          isActive: e.target.checked,
-                        })
-                      }
-                      className='h-4 w-4 rounded border-gray-300'
+          {/* 동네 광고 - 아파트 선택 */}
+          {adFormData.adType === 'NEIGHBORHOOD' && (
+            <Input.Wrapper label='노출 아파트' withAsterisk>
+              <Stack gap='xs' mt={4}>
+                <Text size='sm' c='dimmed'>
+                  {adFormData.selectedApartments.length > 0
+                    ? `${adFormData.selectedApartments.length}개 아파트 선택됨`
+                    : '아파트를 선택하세요'}
+                </Text>
+                <Group gap='xs'>
+                  <Button
+                    type='button'
+                    variant='default'
+                    size='xs'
+                    onClick={() => {
+                      const filteredApts = apartments.filter(apt =>
+                        apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                        apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                      );
+                      setAdFormData({
+                        ...adFormData,
+                        selectedApartments: filteredApts.map(apt => apt.id),
+                      });
+                    }}
+                  >
+                    전체 선택
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='default'
+                    size='xs'
+                    onClick={() => {
+                      setAdFormData({
+                        ...adFormData,
+                        selectedApartments: [],
+                      });
+                    }}
+                  >
+                    전체 해제
+                  </Button>
+                </Group>
+                <Paper withBorder radius='md'>
+                  <Box
+                    p='xs'
+                    style={{ borderBottom: '1px solid var(--app-divider)' }}
+                  >
+                    <TextInput
+                      placeholder='아파트명 또는 주소 검색...'
+                      leftSection={<Search size={16} />}
+                      value={apartmentSearch}
+                      onChange={(e) => setApartmentSearch(e.target.value)}
                     />
-                    <Label
-                      htmlFor='isActive'
-                      className='cursor-pointer font-medium'
-                    >
-                      광고 즉시 활성화 (체크하면 설정한 게시 기간에 노출됩니다)
-                    </Label>
-                  </div>
-
-                  {/* 클릭수 초기화 (수정 모드에만 표시) */}
-                  {selectedAd && (
-                    <div className='space-y-2 p-4 rounded-lg bg-orange-50 border border-orange-200'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <Label className='text-sm font-semibold text-orange-900'>
-                            클릭수 통계
-                          </Label>
-                          <p className='text-xs text-orange-700 mt-1'>
-                            광고 클릭수: {selectedAd.adClickCount?.toLocaleString() || '0'} /
-                            클릭 수: {selectedAd.clickCount?.toLocaleString() || '0'}
-                          </p>
-                        </div>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() => setIsResetClickDialogOpen(true)}
-                          className='text-orange-700 border-orange-300 hover:bg-orange-100'
+                  </Box>
+                  <ScrollArea h={200}>
+                    {apartments
+                      .filter(apt =>
+                        apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                        apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                      )
+                      .map((apt) => (
+                        <Box key={apt.id} px='sm' py='xs'>
+                          <Checkbox
+                            checked={adFormData.selectedApartments.includes(apt.id)}
+                            onChange={(e) => {
+                              const checked = e.currentTarget.checked;
+                              if (checked) {
+                                setAdFormData({
+                                  ...adFormData,
+                                  selectedApartments: [...adFormData.selectedApartments, apt.id],
+                                });
+                              } else {
+                                setAdFormData({
+                                  ...adFormData,
+                                  selectedApartments: adFormData.selectedApartments.filter(id => id !== apt.id),
+                                });
+                              }
+                            }}
+                            label={
+                              <>
+                                <Text span display='block' size='sm' fw={500}>{apt.name}</Text>
+                                <Text span display='block' size='xs' c='dimmed'>{apt.address}</Text>
+                              </>
+                            }
+                            styles={{ label: { cursor: 'pointer' } }}
+                          />
+                        </Box>
+                      ))}
+                    {apartments.filter(apt =>
+                      apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                      apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                    ).length === 0 && (
+                      <Text size='sm' c='dimmed' ta='center' px='sm' py='md'>
+                        검색 결과가 없습니다.
+                      </Text>
+                    )}
+                  </ScrollArea>
+                </Paper>
+                {/* 선택된 아파트 뱃지 */}
+                {adFormData.selectedApartments.length > 0 && (
+                  <Group gap='xs' pt='xs'>
+                    {adFormData.selectedApartments.map((aptId) => {
+                      const apt = apartments.find((a) => a.id === aptId);
+                      return apt ? (
+                        <Badge
+                          key={aptId}
+                          variant='light'
+                          color='gray'
+                          tt='none'
+                          rightSection={
+                            <CloseButton
+                              size='xs'
+                              aria-label={`${apt.name} 제거`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setAdFormData({
+                                  ...adFormData,
+                                  selectedApartments: adFormData.selectedApartments.filter(
+                                    (id) => id !== aptId
+                                  ),
+                                });
+                              }}
+                            />
+                          }
                         >
-                          <X className='mr-1 h-3 w-3' />
-                          초기화
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-              </div>
-            </div>
-
-            <DialogFooter className='gap-2'>
-              <Button
-                variant='outline'
-                onClick={handleCloseDialog}
-                disabled={isSaving}
-              >
-                취소
-              </Button>
-              <Button
-                onClick={handleSaveAd}
-                disabled={isSaving || !isFormValid()}
-                className='min-w-[100px]'
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    저장 중...
-                  </>
-                ) : (
-                  <>{selectedAd ? '수정 완료' : '등록 완료'}</>
+                          {apt.name}
+                        </Badge>
+                      ) : null;
+                    })}
+                  </Group>
                 )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              </Stack>
+            </Input.Wrapper>
+          )}
 
-        {/* 삭제 확인 다이얼로그 */}
-        <Dialog
-          open={isDeleteDialogOpen}
-          onOpenChange={setIsDeleteDialogOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className='flex items-center gap-2'>
-                <AlertCircle className='h-5 w-5 text-destructive' />
-                광고 삭제
-              </DialogTitle>
-              <DialogDescription className='pt-2'>
-                <span className='font-semibold'>{selectedAd?.title}</span>{' '}
-                광고를 정말 삭제하시겠습니까?
-                <br />이 작업은 취소할 수 없으며, 광고주 정보는 유지됩니다.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant='outline'
-                onClick={() => setIsDeleteDialogOpen(false)}
-              >
-                취소
-              </Button>
-              <Button
-                variant='destructive'
-                onClick={handleDelete}
-              >
-                <Trash2 className='mr-2 h-4 w-4' />
-                삭제
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          {/* 지역 광고 - 지역 선택 */}
+          {adFormData.adType === 'REGION' && (
+            <Input.Wrapper label='노출 지역' withAsterisk>
+              <Paper withBorder radius='md' p='md' bg='var(--app-bg-muted)' mt={4}>
+                <Stack gap='sm'>
+                  {/* 주소 검색으로 추가 */}
+                  <Stack gap={6}>
+                    <Button
+                      type='button'
+                      size='sm'
+                      fullWidth
+                      leftSection={<MapPin size={16} />}
+                      onClick={handleRegionAddressSearch}
+                    >
+                      주소 검색으로 지역 추가 (권장)
+                    </Button>
+                    <Text size='xs' c='dimmed' ta='center'>
+                      표준화된 지역명으로 정확하게 매칭됩니다
+                    </Text>
+                  </Stack>
 
-        {/* 클릭수 초기화 확인 다이얼로그 */}
-        <Dialog
-          open={isResetClickDialogOpen}
-          onOpenChange={setIsResetClickDialogOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className='flex items-center gap-2'>
-                <AlertCircle className='h-5 w-5 text-blue-500' />
-                클릭수 초기화
-              </DialogTitle>
-              <DialogDescription className='pt-2'>
-                <span className='font-semibold'>{selectedAd?.title}</span> 광고의 클릭수를 0으로 초기화하시겠습니까?
-                <br />
-                <span className='text-blue-600 mt-2 block'>
-                  현재: 광고 클릭수 {selectedAd?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {selectedAd?.clickCount?.toLocaleString() || '0'}
-                </span>
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant='outline'
-                onClick={() => setIsResetClickDialogOpen(false)}
-              >
-                취소
-              </Button>
-              <Button
-                variant='default'
-                className='bg-blue-500 hover:bg-blue-600'
-                onClick={handleResetClickCount}
-              >
-                초기화
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </TooltipProvider>
+                  {/* 구분선 */}
+                  <Divider label='또는 직접 입력' labelPosition='center' />
+
+                  {/* 수동 입력 */}
+                  <SimpleGrid cols={3} spacing='xs'>
+                    <TextInput
+                      placeholder='시/도 *'
+                      value={regionSido}
+                      onChange={(e) => setRegionSido(e.target.value)}
+                    />
+                    <TextInput
+                      placeholder='시/군/구'
+                      value={regionSigungu}
+                      onChange={(e) => setRegionSigungu(e.target.value)}
+                    />
+                    <TextInput
+                      placeholder='읍/면/동'
+                      value={regionDong}
+                      onChange={(e) => setRegionDong(e.target.value)}
+                    />
+                  </SimpleGrid>
+                  <Button
+                    type='button'
+                    variant='default'
+                    size='sm'
+                    fullWidth
+                    leftSection={<Plus size={16} />}
+                    onClick={handleAddRegion}
+                  >
+                    수동으로 지역 추가
+                  </Button>
+                  {adFormData.selectedRegions.length > 0 && (
+                    <Stack gap='xs'>
+                      <Text size='sm' fw={500}>
+                        선택된 지역 ({adFormData.selectedRegions.length}
+                        개):
+                      </Text>
+                      <Stack gap={6}>
+                        {adFormData.selectedRegions.map(
+                          (region, index) => (
+                            <Paper key={index} withBorder radius='sm' p='xs'>
+                              <Group justify='space-between' wrap='nowrap'>
+                                <Text size='sm' fw={500}>
+                                  {region.regionSido}
+                                  {region.regionSigungu &&
+                                    ` > ${region.regionSigungu}`}
+                                  {region.regionDong &&
+                                    ` > ${region.regionDong}`}
+                                </Text>
+                                <ActionIcon
+                                  type='button'
+                                  variant='subtle'
+                                  color='gray'
+                                  aria-label='지역 삭제'
+                                  onClick={() => handleRemoveRegion(index)}
+                                >
+                                  <X size={16} />
+                                </ActionIcon>
+                              </Group>
+                            </Paper>
+                          )
+                        )}
+                      </Stack>
+                    </Stack>
+                  )}
+                </Stack>
+              </Paper>
+            </Input.Wrapper>
+          )}
+
+          <Paper withBorder radius='md' p='md' bg='var(--app-bg-muted)'>
+            <Checkbox
+              id='isActive'
+              label='광고 즉시 활성화 (체크하면 설정한 게시 기간에 노출됩니다)'
+              fw={500}
+              checked={adFormData.isActive}
+              onChange={(e) =>
+                setAdFormData({
+                  ...adFormData,
+                  isActive: e.target.checked,
+                })
+              }
+            />
+          </Paper>
+
+          {/* 클릭수 초기화 (수정 모드에만 표시) */}
+          {selectedAd && (
+            <Paper withBorder radius='md' p='md' bg='var(--mantine-color-orange-light)'>
+              <Group justify='space-between' wrap='nowrap'>
+                <div>
+                  <Text size='sm' fw={600} c='orange'>
+                    클릭수 통계
+                  </Text>
+                  <Text size='xs' mt={4} c='orange'>
+                    광고 클릭수: {selectedAd.adClickCount?.toLocaleString() || '0'} /
+                    클릭 수: {selectedAd.clickCount?.toLocaleString() || '0'}
+                  </Text>
+                </div>
+                <Button
+                  type='button'
+                  variant='light'
+                  color='orange'
+                  size='xs'
+                  leftSection={<X size={12} />}
+                  onClick={() => setIsResetClickDialogOpen(true)}
+                >
+                  초기화
+                </Button>
+              </Group>
+            </Paper>
+          )}
+        </Stack>
+
+        <Group justify='flex-end' mt='lg'>
+          <Button
+            variant='default'
+            onClick={handleCloseDialog}
+            disabled={isSaving}
+          >
+            취소
+          </Button>
+          <Button
+            onClick={handleSaveAd}
+            disabled={isSaving || !isFormValid()}
+            miw={100}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 size={16} className='mr-2 animate-spin' />
+                저장 중...
+              </>
+            ) : (
+              <>{selectedAd ? '수정 완료' : '등록 완료'}</>
+            )}
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Modal
+        opened={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        title={
+          <Group component='span' gap='xs'>
+            <AlertCircle size={20} color='var(--mantine-color-red-6)' />
+            <Text span fw={600}>광고 삭제</Text>
+          </Group>
+        }
+      >
+        <Text size='sm' c='dimmed'>
+          <Text span fw={600} c='var(--mantine-color-text)'>{selectedAd?.title}</Text>{' '}
+          광고를 정말 삭제하시겠습니까?
+          <br />이 작업은 취소할 수 없으며, 광고주 정보는 유지됩니다.
+        </Text>
+        <Group justify='flex-end' mt='lg'>
+          <Button
+            variant='default'
+            onClick={() => setIsDeleteDialogOpen(false)}
+          >
+            취소
+          </Button>
+          <Button
+            color='red'
+            leftSection={<Trash2 size={16} />}
+            onClick={handleDelete}
+          >
+            삭제
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* 클릭수 초기화 확인 다이얼로그 */}
+      <Modal
+        opened={isResetClickDialogOpen}
+        onClose={() => setIsResetClickDialogOpen(false)}
+        title={
+          <Group component='span' gap='xs'>
+            <AlertCircle size={20} color='var(--mantine-color-blue-6)' />
+            <Text span fw={600}>클릭수 초기화</Text>
+          </Group>
+        }
+      >
+        <Text size='sm' c='dimmed'>
+          <Text span fw={600} c='var(--mantine-color-text)'>{selectedAd?.title}</Text> 광고의 클릭수를 0으로 초기화하시겠습니까?
+        </Text>
+        <Text size='sm' c='blue' mt='xs'>
+          현재: 광고 클릭수 {selectedAd?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {selectedAd?.clickCount?.toLocaleString() || '0'}
+        </Text>
+        <Group justify='flex-end' mt='lg'>
+          <Button
+            variant='default'
+            onClick={() => setIsResetClickDialogOpen(false)}
+          >
+            취소
+          </Button>
+          <Button
+            color='blue'
+            onClick={handleResetClickCount}
+          >
+            초기화
+          </Button>
+        </Group>
+      </Modal>
+    </PageShell>
   );
 }

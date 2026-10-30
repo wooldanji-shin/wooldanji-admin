@@ -2,15 +2,7 @@
 
 import { useState } from 'react';
 import { AddDeviceDialog } from '@/components/add-device-dialog';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Button, Table, Text } from '@mantine/core';
 import { Eye, HardDrive } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -108,10 +100,10 @@ export default function DevicesPage() {
                 placeholder="주소, 아파트명, 동으로 검색..."
               />
               <DataToolbarActions>
-                <span className="text-xs text-muted-foreground tabular-nums">
+                <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   총 {filteredDevices.length.toLocaleString()}개
                   {searchQuery && ` / ${devices.length.toLocaleString()}`}
-                </span>
+                </Text>
               </DataToolbarActions>
             </DataToolbar>
           }
@@ -123,46 +115,50 @@ export default function DevicesPage() {
               description="다른 검색어로 다시 시도해 보세요."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>주소</TableHead>
-                  <TableHead>아파트명</TableHead>
-                  <TableHead>동</TableHead>
-                  <TableHead>세대수</TableHead>
-                  <TableHead>등록일시</TableHead>
-                  <TableHead>MAC 주소</TableHead>
-                  <TableHead className="text-right">작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>주소</Table.Th>
+                  <Table.Th>아파트명</Table.Th>
+                  <Table.Th>동</Table.Th>
+                  <Table.Th>세대수</Table.Th>
+                  <Table.Th>등록일시</Table.Th>
+                  <Table.Th>MAC 주소</Table.Th>
+                  <Table.Th ta="right">작업</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {filteredDevices.map((device) => (
-                  <TableRow key={device.id}>
-                    <TableCell className="max-w-[200px] truncate text-muted-foreground">
-                      {device.address}
-                    </TableCell>
-                    <TableCell className="font-medium">{device.apartmentName}</TableCell>
-                    <TableCell className="text-muted-foreground">{device.dong}동</TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">
+                  <Table.Tr key={device.id}>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed" maw={200} truncate title={device.address}>
+                        {device.address}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td fw={500}>{device.apartmentName}</Table.Td>
+                    <Table.Td c="dimmed">{device.dong}동</Table.Td>
+                    <Table.Td c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {device.households}세대
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {device.registeredDate}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    </Table.Td>
+                    <Table.Td c="dimmed">{device.registeredDate}</Table.Td>
+                    <Table.Td c="dimmed" fz="xs" ff="monospace">
                       {device.macAddress}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/admin/devices/${device.id}`}>
-                        <Button variant="ghost" size="sm" className="gap-2">
-                          <Eye className="h-4 w-4" />
-                          상세보기
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      <Button
+                        component={Link}
+                        href={`/admin/devices/${device.id}`}
+                        variant="subtle"
+                        color="gray"
+                        size="xs"
+                        leftSection={<Eye size={16} />}
+                      >
+                        상세보기
+                      </Button>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </TableBody>
+              </Table.Tbody>
             </Table>
           )}
         </DataTableShell>

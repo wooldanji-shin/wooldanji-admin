@@ -6,14 +6,13 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { InlineLoadingSkeleton } from '@/components/skeletons';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { DetailSkeleton } from '@/components/skeletons';
+import { Box, Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/supabase';
-import { cn } from '@/lib/utils';
 import { Loader2, RotateCcw, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { confirmModal } from '@/components/confirm-modal';
 
 /** 앱의 단독 팝업 광고 소개 이미지 슬롯 키 */
 const IMAGE_KEY = 'solo_popup_ad_intro';
@@ -218,7 +217,7 @@ export default function SoloPopupAdIntroImagePage() {
   /** 행을 지우면 앱이 내장 기본 이미지로 되돌아간다 */
   const handleResetToDefault = async () => {
     if (!image) return;
-    if (!confirm('업로드한 이미지를 삭제합니다. 앱의 소개 이미지 영역이 비게 됩니다.')) {
+    if (!(await confirmModal({ title: '이미지 삭제', message: '업로드한 이미지를 삭제합니다. 앱의 소개 이미지 영역이 비게 됩니다.', confirmLabel: '삭제', danger: true }))) {
       return;
     }
 
@@ -245,14 +244,7 @@ export default function SoloPopupAdIntroImagePage() {
   };
 
   if (loading) {
-    return (
-      <PageShell>
-        <PageHeader>
-          <PageHeaderTitle title="단독 팝업 소개 이미지" />
-        </PageHeader>
-        <InlineLoadingSkeleton />
-      </PageShell>
-    );
+    return <DetailSkeleton sections={1} />;
   }
 
   return (
@@ -262,72 +254,91 @@ export default function SoloPopupAdIntroImagePage() {
       </PageHeader>
 
       <PageContent>
-        <Card className='bg-card border-border max-w-2xl'>
-          <CardHeader>
-            <CardTitle className='text-card-foreground'>
-              파트너 앱 단독 팝업 소개 이미지
-            </CardTitle>
-          </CardHeader>
+        <Paper withBorder radius="md" p="lg" maw={672}>
+          <Stack gap="lg">
+            <Title order={4}>파트너 앱 단독 팝업 소개 이미지</Title>
 
-          <CardContent className='space-y-6'>
-            <div className='rounded-md bg-muted/50 p-4 text-sm text-muted-foreground space-y-1'>
-              <p>
+            <Stack gap={4} p="md" bg="var(--app-bg-muted)" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+              <Text size="sm" c="dimmed">
                 파트너 앱의 <strong>단독 팝업 광고 소개</strong> 화면에 표시됩니다.
                 이미지를 올리기 전에는 이미지 영역이 비어 있고 신청 버튼만 보입니다.
-              </p>
-              <p>
+              </Text>
+              <Text size="sm" c="dimmed">
                 세로로 긴 이미지, 가로 {RECOMMENDED_MIN_WIDTH}px 이상 권장 (최대{' '}
                 {MAX_SIZE_MB}MB). 올린 이미지는 화질 손실 없이 원본 그대로
                 사용됩니다.
-              </p>
-            </div>
+              </Text>
+            </Stack>
 
-            <div className='space-y-2'>
-              <p className='text-sm font-medium'>현재 이미지</p>
+            <Stack gap="xs">
+              <Text size="sm" fw={500}>
+                현재 이미지
+              </Text>
 
               {/* 영역 전체가 드롭존 — 파일을 끌어다 놓으면 바로 교체된다 */}
-              <div
+              <Box
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onClick={() => !saving && fileInputRef.current?.click()}
-                className={cn(
-                  'rounded-md border-2 border-dashed transition-colors cursor-pointer',
-                  isDragging
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50',
-                  saving && 'opacity-50 pointer-events-none'
-                )}
+                role="button"
+                tabIndex={0}
+                aria-label="이미지 파일 선택"
+                onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>): void => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
+                  if (!saving) fileInputRef.current?.click();
+                }}
+                bg={isDragging ? 'var(--mantine-color-blue-light)' : undefined}
+                style={{
+                  border: `2px dashed ${
+                    isDragging
+                      ? 'var(--mantine-color-blue-filled)'
+                      : 'var(--app-divider)'
+                  }`,
+                  borderRadius: 'var(--mantine-radius-md)',
+                  cursor: 'pointer',
+                  transition: 'border-color 150ms, background-color 150ms',
+                  opacity: saving ? 0.5 : 1,
+                  pointerEvents: saving ? 'none' : undefined,
+                }}
               >
                 {image ? (
-                  <div className='max-h-[480px] overflow-y-auto rounded-md'>
+                  <Box mah={480} style={{ overflowY: 'auto', borderRadius: 'var(--mantine-radius-md)' }}>
                     {/* 세로로 긴 원본을 그대로 확인할 수 있도록 스크롤 영역에 넣는다 */}
                     <img
                       src={image.imageUrl}
                       alt='단독 팝업 소개 이미지'
                       className='w-full'
                     />
-                  </div>
+                  </Box>
                 ) : (
-                  <div className='p-8 text-center text-sm text-muted-foreground'>
+                  <Text p="xl" ta="center" size="sm" c="dimmed">
                     올린 이미지가 없어 앱에서 이미지 영역이 비어 있습니다.
-                  </div>
+                  </Text>
                 )}
 
-                <div className='border-t border-border px-4 py-3 text-center text-xs text-muted-foreground'>
+                <Text
+                  px="md"
+                  py="sm"
+                  ta="center"
+                  size="xs"
+                  c="dimmed"
+                  style={{ borderTop: '1px solid var(--app-divider)' }}
+                >
                   {isDragging
                     ? '여기에 놓으면 교체됩니다'
                     : '클릭하거나 이미지를 이 영역에 끌어다 놓으세요'}
-                </div>
-              </div>
+                </Text>
+              </Box>
 
               {image && (
-                <p className='text-xs text-muted-foreground'>
+                <Text size="xs" c="dimmed">
                   {image.width} × {image.height}px · 최종 수정{' '}
                   {new Date(image.updatedAt).toLocaleString('ko-KR')}
-                </p>
+                </Text>
               )}
-            </div>
+            </Stack>
 
             <input
               ref={fileInputRef}
@@ -337,36 +348,33 @@ export default function SoloPopupAdIntroImagePage() {
               className='hidden'
             />
 
-            <div className='flex justify-end gap-3 pt-2'>
+            <Group justify="flex-end" gap="sm">
               {image && (
                 <Button
-                  variant='outline'
+                  variant="default"
+                  leftSection={<RotateCcw size={16} />}
                   onClick={handleResetToDefault}
                   disabled={saving}
                 >
-                  <RotateCcw className='mr-2 h-4 w-4' />
                   이미지 삭제
                 </Button>
               )}
               <Button
+                leftSection={
+                  saving ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Upload size={16} />
+                  )
+                }
                 onClick={() => fileInputRef.current?.click()}
                 disabled={saving}
               >
-                {saving ? (
-                  <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    처리 중...
-                  </>
-                ) : (
-                  <>
-                    <Upload className='mr-2 h-4 w-4' />
-                    {image ? '이미지 교체' : '이미지 올리기'}
-                  </>
-                )}
+                {saving ? '처리 중...' : image ? '이미지 교체' : '이미지 올리기'}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </Group>
+          </Stack>
+        </Paper>
       </PageContent>
     </PageShell>
   );

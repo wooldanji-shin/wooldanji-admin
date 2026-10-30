@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Input } from '@/components/ui/input';
+import { TextInput } from '@mantine/core';
 import { formatDateSlash } from '@/lib/utils/format';
 
 interface DateInputProps {
@@ -47,7 +47,7 @@ export function DateInput({ value, onChange, onKeyDown, className }: DateInputPr
   };
 
   return (
-    <Input
+    <TextInput
       type="text"
       inputMode="numeric"
       value={text}

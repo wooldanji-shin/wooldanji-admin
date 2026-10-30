@@ -1,54 +1,39 @@
 import type { ReactNode } from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
+import { Badge, type BadgeProps, type MantineColor } from '@mantine/core';
 
-const statusBadgeVariants = cva(
-  'inline-flex items-center gap-1.5 rounded-[4px] border px-2.5 py-0.5 text-[14px] leading-5 font-medium transition-colors',
-  {
-    variants: {
-      variant: {
-        active:
-          'border-success/30 bg-success/10 text-success-foreground [&>span:first-child]:bg-success',
-        success:
-          'border-success/30 bg-success/10 text-success-foreground [&>span:first-child]:bg-success',
-        pending:
-          'border-warning/30 bg-warning/10 text-warning-foreground [&>span:first-child]:bg-warning',
-        inactive:
-          'border-border bg-muted text-muted-foreground [&>span:first-child]:bg-muted-foreground/60',
-        error:
-          'border-destructive/30 bg-destructive/10 text-destructive [&>span:first-child]:bg-destructive',
-        info:
-          'border-info/30 bg-info/10 text-info-foreground [&>span:first-child]:bg-info',
-        primary:
-          'border-primary/30 bg-primary/10 text-primary [&>span:first-child]:bg-primary',
-        // 무료체험 전용 — 같은 셀에 서는 진행중(파랑)·수정신청(보라)과 색조를 띄운다
-        free:
-          'border-free/30 bg-free/12 text-free-foreground [&>span:first-child]:bg-free',
-      },
-      size: {
-        sm: 'px-2 py-0 text-[14px]',
-        md: 'px-2.5 py-0.5 text-[14px]',
-        lg: 'px-3 py-1 text-[14px]',
-      },
-      withDot: {
-        true: '',
-        false: '',
-      },
-    },
-    defaultVariants: {
-      variant: 'inactive',
-      size: 'md',
-      withDot: true,
-    },
-  }
-);
+type StatusBadgeVariant =
+  | 'active'
+  | 'success'
+  | 'pending'
+  | 'inactive'
+  | 'error'
+  | 'info'
+  | 'primary'
+  | 'free';
+type StatusBadgeSize = 'sm' | 'md' | 'lg';
 
-type StatusBadgeVariant = NonNullable<VariantProps<typeof statusBadgeVariants>['variant']>;
-type StatusBadgeSize = NonNullable<VariantProps<typeof statusBadgeVariants>['size']>;
+const VARIANT_COLOR: Record<StatusBadgeVariant, MantineColor> = {
+  active: 'green',
+  success: 'green',
+  pending: 'yellow',
+  inactive: 'gray',
+  error: 'red',
+  info: 'blue',
+  primary: 'violet',
+  // 무료체험 전용 — 같은 셀에 서는 진행중(파랑)·수정신청(보라)과 색조를 띄운다
+  free: 'pink',
+};
 
-interface BaseStatusBadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof statusBadgeVariants> {
+const SIZE_MAP: Record<StatusBadgeSize, BadgeProps['size']> = {
+  sm: 'sm',
+  md: 'md',
+  lg: 'lg',
+};
+
+interface BaseStatusBadgeProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'color'> {
+  variant?: StatusBadgeVariant | null;
+  size?: StatusBadgeSize | null;
+  withDot?: boolean | null;
   children: ReactNode;
 }
 
@@ -60,16 +45,32 @@ function BaseStatusBadge({
   children,
   ...props
 }: BaseStatusBadgeProps): React.ReactElement {
+  const color = VARIANT_COLOR[variant ?? 'inactive'];
   return (
-    <span
-      data-slot="status-badge"
-      data-size={size ?? 'md'}
-      className={cn(statusBadgeVariants({ variant, size, withDot }), className)}
+    <Badge
+      variant="light"
+      color={color}
+      size={SIZE_MAP[size ?? 'md']}
+      radius="sm"
+      className={className}
+      leftSection={
+        withDot ? (
+          <span
+            aria-hidden
+            style={{
+              display: 'block',
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: `var(--mantine-color-${color}-filled)`,
+            }}
+          />
+        ) : undefined
+      }
       {...props}
     >
-      {withDot && <span className="h-1.5 w-1.5 rounded-full" aria-hidden />}
       {children}
-    </span>
+    </Badge>
   );
 }
 

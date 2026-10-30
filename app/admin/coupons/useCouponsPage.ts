@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { confirmModal } from '@/components/confirm-modal';
 
 /** 한 페이지에 표시할 쿠폰 수 */
 export const COUPONS_PAGE_SIZE = 20;
@@ -139,7 +140,12 @@ export function useCouponsPage(): UseCouponsPageReturn {
 
   const deleteCoupon = useCallback(
     async (id: string): Promise<void> => {
-      const confirmed = window.confirm('이 쿠폰을 비활성화하시겠습니까?\n이미 받은 유저의 쿠폰함에서 사라집니다.');
+      const confirmed = await confirmModal({
+        title: '쿠폰 비활성화',
+        message: '이 쿠폰을 비활성화하시겠습니까?\n이미 받은 유저의 쿠폰함에서 사라집니다.',
+        confirmLabel: '비활성화',
+        danger: true,
+      });
       if (!confirmed) return;
 
       const { error } = await supabase

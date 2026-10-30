@@ -1,13 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select } from '@mantine/core';
 import { fetchSelectableSalesReps, type SalesRep } from '@/lib/ads/sales-reps';
 
 /** "지정 안 함"을 나타내는 값 — Select는 빈 문자열을 값으로 쓸 수 없다 */
@@ -40,20 +34,17 @@ export function SalesRepSelect({
   return (
     <Select
       value={value ?? NONE_VALUE}
-      onValueChange={(v) => onChange(v === NONE_VALUE ? null : v)}
-    >
-      <SelectTrigger className={className}>
-        <SelectValue placeholder="영업 담당자 선택" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE_VALUE}>지정 안 함</SelectItem>
-        {reps.map((rep) => (
-          <SelectItem key={rep.id} value={rep.id}>
-            {rep.name}
-            {!rep.isActive && ' (비활성)'}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      onChange={(v) => onChange(v === null || v === NONE_VALUE ? null : v)}
+      allowDeselect={false}
+      placeholder="영업 담당자 선택"
+      data={[
+        { value: NONE_VALUE, label: '지정 안 함' },
+        ...reps.map((rep) => ({
+          value: rep.id,
+          label: `${rep.name}${!rep.isActive ? ' (비활성)' : ''}`,
+        })),
+      ]}
+      className={className}
+    />
   );
 }

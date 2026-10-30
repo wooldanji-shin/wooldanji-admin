@@ -1,20 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { AdminHeader } from '@/components/admin-header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { HeaderTitle } from '@/components/header-title';
+import { PageShell } from '@/components/page-shell';
+import { DetailSkeleton } from '@/components/skeletons';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Modal,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { ChevronLeft, Check, X } from 'lucide-react';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
 import { createClient } from '@/lib/supabase/client';
@@ -202,65 +207,44 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
   };
 
   if (loading) {
-    return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-        <AdminHeader title='재신청 상세' />
-        <div className="flex w-full items-center justify-center py-20">
-          <div className="flex w-full max-w-sm flex-col gap-3 mx-auto"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div>
-        </div>
-      </div>
-    );
+    return <DetailSkeleton sections={2} />;
   }
 
   if (!reconfirm) {
     return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+      <PageShell>
         <AdminHeader title='재신청 상세' />
-        <div className="flex w-full items-center justify-center py-20">
-          <div className='text-muted-foreground'>재신청 정보를 찾을 수 없습니다.</div>
-        </div>
-      </div>
+        <Text c="dimmed" ta="center" py={80}>재신청 정보를 찾을 수 없습니다.</Text>
+      </PageShell>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-      <div className='flex items-center gap-2'>
-        <Button
-          variant='ghost'
-          size='icon-sm'
-          onClick={() => router.push('/admin/user-reconfirm')}
-          aria-label='뒤로가기'
-        >
-          <ChevronLeft className='h-5 w-5' />
-        </Button>
-        <AdminHeader title='재신청 상세' className='flex-1' />
-      </div>
+    <PageShell>
+      <HeaderTitle title='재신청 상세' onBack={() => router.push('/admin/user-reconfirm')} />
 
-      <div className="flex flex-col gap-6">
+      <Stack gap="lg">
 
         {/* User Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle>회원 정보</CardTitle>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='grid grid-cols-2 gap-4'>
+        <Paper withBorder radius="md" p="lg">
+          <Title order={4} mb="md">회원 정보</Title>
+          <Stack gap="md">
+            <SimpleGrid cols={2} spacing="md">
               <div>
-                <div className='text-sm text-muted-foreground'>이름</div>
-                <div className='font-medium'>{reconfirm.user.name}</div>
+                <Text size="sm" c="dimmed">이름</Text>
+                <Text fw={500}>{reconfirm.user.name}</Text>
               </div>
               <div>
-                <div className='text-sm text-muted-foreground'>이메일</div>
-                <div className='font-medium'>{reconfirm.user.email}</div>
+                <Text size="sm" c="dimmed">이메일</Text>
+                <Text fw={500}>{reconfirm.user.email}</Text>
               </div>
               <div>
-                <div className='text-sm text-muted-foreground'>전화번호</div>
-                <div className='font-medium'>{reconfirm.user.phoneNumber || '-'}</div>
+                <Text size="sm" c="dimmed">전화번호</Text>
+                <Text fw={500}>{reconfirm.user.phoneNumber || '-'}</Text>
               </div>
               <div>
-                <div className='text-sm text-muted-foreground'>아파트/동/호</div>
-                <div className='font-medium'>
+                <Text size="sm" c="dimmed">아파트/동/호</Text>
+                <Text fw={500}>
                   {reconfirm.user.apartments ? (
                     <>
                       {reconfirm.user.apartments.name}
@@ -270,134 +254,127 @@ export default function UserReconfirmDetailPage({ params }: { params: Promise<{ 
                   ) : (
                     '-'
                   )}
-                </div>
+                </Text>
               </div>
               <div>
-                <div className='text-sm text-muted-foreground'>이전 상태</div>
+                <Text size="sm" c="dimmed">이전 상태</Text>
                 <div>
                   {reconfirm.previousStatus === 'suspended' ? (
-                    <Badge variant="secondary">보류</Badge>
+                    <Badge variant="light" color="orange">보류</Badge>
                   ) : reconfirm.previousStatus === 'inactive' ? (
-                    <Badge variant="secondary">비활성</Badge>
+                    <Badge variant="light" color="gray">비활성</Badge>
                   ) : (
-                    <Badge variant="outline">{reconfirm.previousStatus}</Badge>
+                    <Badge variant="light" color="gray">{reconfirm.previousStatus}</Badge>
                   )}
                 </div>
               </div>
               <div>
-                <div className='text-sm text-muted-foreground'>재신청일</div>
-                <div className='font-medium'>{formatDate(reconfirm.createdAt)}</div>
+                <Text size="sm" c="dimmed">재신청일</Text>
+                <Text fw={500}>{formatDate(reconfirm.createdAt)}</Text>
               </div>
-            </div>
+            </SimpleGrid>
             {(reconfirm.user.suspensionReason || reconfirm.previousStatus === 'inactive') && (
               <div>
-                <div className='text-sm text-muted-foreground'>보류 사유</div>
-                <div className='mt-1 p-3 bg-secondary rounded-md'>
-                  {reconfirm.previousStatus === 'inactive'
-                    ? '30일동안 이용내역이 없어 비활성화 되었습니다.'
-                    : reconfirm.user.suspensionReason}
-                </div>
+                <Text size="sm" c="dimmed">이전 보류 사유</Text>
+                <Paper mt={4} p="sm" radius="sm" bg="var(--app-bg-muted)">
+                  <Text size="sm">
+                    {reconfirm.previousStatus === 'inactive'
+                      ? '30일동안 이용내역이 없어 비활성화 되었습니다.'
+                      : reconfirm.user.suspensionReason}
+                  </Text>
+                </Paper>
               </div>
             )}
             {reconfirm.rejectionReason && (
               <div>
-                <div className='text-sm text-muted-foreground'>보류 사유</div>
-                <div className='mt-1 p-3 bg-red-50 border border-red-200 rounded-md text-red-900'>
-                  {reconfirm.rejectionReason}
-                </div>
+                <Text size="sm" c="dimmed">재신청 보류 사유</Text>
+                <Paper mt={4} p="sm" radius="sm" bg="var(--mantine-color-red-light)">
+                  <Text size="sm" c="red">
+                    {reconfirm.rejectionReason}
+                  </Text>
+                </Paper>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </Stack>
+        </Paper>
 
         {/* Images Comparison */}
-        <Card>
-          <CardHeader>
-            <CardTitle>인증 사진 비교</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='flex flex-wrap gap-6'>
-              <div className='flex flex-col gap-2'>
-                <span className='text-sm font-medium text-muted-foreground'>원래 사진</span>
-                {reconfirm.user.confirmImageUrl ? (
-                  <ImageThumbnail
-                    src={reconfirm.user.confirmImageUrl}
-                    alt='원래 인증 사진'
-                    onClick={() => imgLb.open(0)}
-                  />
-                ) : (
-                  <p className='text-sm text-muted-foreground'>사진 없음</p>
-                )}
-              </div>
-              <div className='flex flex-col gap-2'>
-                <span className='text-sm font-medium text-muted-foreground'>재신청 사진</span>
+        <Paper withBorder radius="md" p="lg">
+          <Title order={4} mb="md">인증 사진 비교</Title>
+          <Group gap="lg" align="flex-start">
+            <Stack gap="xs">
+              <Text size="sm" fw={500} c="dimmed">원래 사진</Text>
+              {reconfirm.user.confirmImageUrl ? (
                 <ImageThumbnail
-                  src={reconfirm.reConfirmImageUrl}
-                  alt='재신청 사진'
-                  onClick={() => imgLb.open(reconfirm.user.confirmImageUrl ? 1 : 0)}
+                  src={reconfirm.user.confirmImageUrl}
+                  alt='원래 인증 사진'
+                  onClick={() => imgLb.open(0)}
                 />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              ) : (
+                <Text size="sm" c="dimmed">사진 없음</Text>
+              )}
+            </Stack>
+            <Stack gap="xs">
+              <Text size="sm" fw={500} c="dimmed">재신청 사진</Text>
+              <ImageThumbnail
+                src={reconfirm.reConfirmImageUrl}
+                alt='재신청 사진'
+                onClick={() => imgLb.open(reconfirm.user.confirmImageUrl ? 1 : 0)}
+              />
+            </Stack>
+          </Group>
+        </Paper>
 
         {/* Action Buttons */}
         {reconfirm.status === 'pending' && (
-          <div className='flex gap-4 justify-end'>
+          <Group justify="flex-end" gap="md">
             <Button
-              variant='destructive'
-              size='lg'
+              color='red'
+              size='md'
               onClick={() => setRejectDialog(true)}
               disabled={processing}
-              className='gap-2'
+              leftSection={<X size={20} />}
             >
-              <X className='h-5 w-5' />
               보류
             </Button>
             <Button
-              variant='default'
-              size='lg'
+              color='green'
+              size='md'
               onClick={handleApprove}
               disabled={processing}
-              className='gap-2 bg-green-600 hover:bg-green-700'
+              leftSection={<Check size={20} />}
             >
-              <Check className='h-5 w-5' />
               승인
             </Button>
-          </div>
+          </Group>
         )}
-      </div>
+      </Stack>
 
       {/* Reject Dialog */}
-      <Dialog open={rejectDialog} onOpenChange={setRejectDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>재신청 보류</DialogTitle>
-            <DialogDescription>
-              <strong>{reconfirm.user.name || reconfirm.user.email}</strong>님의 재신청을 보류 처리하시겠습니까?
-              <br />
-              보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className='py-4'>
-            <textarea
-              className='w-full min-h-[100px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary'
-              placeholder='보류 사유를 입력해주세요...'
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setRejectDialog(false)} disabled={processing}>
-              취소
-            </Button>
-            <Button variant='destructive' onClick={handleReject} disabled={processing}>
-              보류
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={rejectDialog} onClose={() => setRejectDialog(false)} title='재신청 보류'>
+        <Text size='sm' c='dimmed'>
+          <strong>{reconfirm.user.name || reconfirm.user.email}</strong>님의 재신청을 보류 처리하시겠습니까?
+          <br />
+          보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
+        </Text>
+        <Textarea
+          mt='md'
+          minRows={4}
+          autosize
+          placeholder='보류 사유를 입력해주세요...'
+          value={rejectionReason}
+          onChange={(e) => setRejectionReason(e.target.value)}
+        />
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setRejectDialog(false)} disabled={processing}>
+            취소
+          </Button>
+          <Button color='red' onClick={handleReject} disabled={processing}>
+            보류
+          </Button>
+        </Group>
+      </Modal>
       <ImageLightbox {...imgLb.props} />
-    </div>
+    </PageShell>
   );
 }

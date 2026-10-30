@@ -1,5 +1,7 @@
 'use client';
 
+import { READONLY_INPUT_STYLES } from '@/components/readonly-input-styles';
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   PageContent,
@@ -9,39 +11,28 @@ import {
 } from '@/components/page-shell';
 import { TableSkeleton } from '@/components/skeletons';
 import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { DataTableShell } from '@/components/data-table-shell';
+import { DataToolbar } from '@/components/data-toolbar';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Menu,
+  Modal,
+  Overlay,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  Textarea,
+  TextInput,
+  ThemeIcon,
+  UnstyledButton,
+} from '@mantine/core';
 import {
   Search,
   MoreVertical,
@@ -51,7 +42,6 @@ import {
   Building2,
   Home,
   Layers,
-  Plus,
   Shield,
   Eye,
   Image as ImageIcon,
@@ -463,7 +453,7 @@ export default function ManagersPage() {
   // 관리 범위 표시
   const getScopeDisplay = (scopes?: AdminScope[]) => {
     if (!scopes || scopes.length === 0) {
-      return <Badge variant="outline">미지정</Badge>;
+      return <Badge variant="light" color="gray">미지정</Badge>;
     }
 
     const scope = scopes[0];
@@ -473,53 +463,53 @@ export default function ManagersPage() {
 
     if (scope.scopeLevel === 'APARTMENT' && apartment) {
       return (
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">{apartment.name} 전체</span>
-        </div>
+        <Group gap="xs" wrap="nowrap">
+          <Building2 size={16} color="var(--mantine-color-dimmed)" />
+          <Text size="sm">{apartment.name} 전체</Text>
+        </Group>
       );
     } else if (scope.scopeLevel === 'BUILDING' && apartment && building) {
       return (
-        <div className="flex items-center gap-2">
-          <Home className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">{apartment.name} {building.buildingNumber}동</span>
-        </div>
+        <Group gap="xs" wrap="nowrap">
+          <Home size={16} color="var(--mantine-color-dimmed)" />
+          <Text size="sm">{apartment.name} {building.buildingNumber}동</Text>
+        </Group>
       );
     } else if (scope.scopeLevel === 'LINE' && apartment && building && line) {
       return (
-        <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">{apartment.name} {building.buildingNumber}동 {formatLineRange(line.line)}라인</span>
-        </div>
+        <Group gap="xs" wrap="nowrap">
+          <Layers size={16} color="var(--mantine-color-dimmed)" />
+          <Text size="sm">{apartment.name} {building.buildingNumber}동 {formatLineRange(line.line)}라인</Text>
+        </Group>
       );
     }
 
-    return <Badge variant="outline">미지정</Badge>;
+    return <Badge variant="light" color="gray">미지정</Badge>;
   };
 
   const getApprovalBadge = (status: string | null) => {
     switch (status) {
       case 'approve':
-        return <Badge className="bg-green-500 text-white">승인</Badge>;
+        return <Badge variant="light" color="green">승인</Badge>;
       case 'pending':
-        return <Badge variant="secondary">대기</Badge>;
+        return <Badge variant="light" color="yellow">대기</Badge>;
       case 'suspended':
-        return <Badge className="bg-yellow-500 text-white">보류</Badge>;
+        return <Badge variant="light" color="orange">보류</Badge>;
       case 'inactive':
-        return <Badge className="bg-gray-500 text-white">비활성</Badge>;
+        return <Badge variant="light" color="gray">비활성</Badge>;
       default:
-        return <Badge variant="secondary">-</Badge>;
+        return <Badge variant="light" color="gray">-</Badge>;
     }
   };
 
   const getRegisterMethodBadge = (method: string | null | undefined) => {
     switch (method?.toLowerCase()) {
       case 'google':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Google</Badge>;
+        return <Badge variant="light" color="red" size="sm">Google</Badge>;
       case 'kakao':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Kakao</Badge>;
+        return <Badge variant="light" color="yellow" size="sm">Kakao</Badge>;
       case 'local':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Email</Badge>;
+        return <Badge variant="light" color="blue" size="sm">Email</Badge>;
       default:
         return null;
     }
@@ -597,494 +587,456 @@ export default function ManagersPage() {
       </PageHeader>
 
       <PageContent>
-        {/* Search and Filters */}
-        <div className='space-y-4'>
-          <div className='relative w-full'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-            <Input
-              placeholder='이름, 이메일, 전화번호로 검색...'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className='pl-10 w-full'
+        <DataTableShell
+          toolbar={
+            <DataToolbar>
+              <TextInput
+                placeholder='이름, 이메일, 전화번호로 검색...'
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                leftSection={<Search size={16} />}
+                w={{ base: '100%', sm: 320 }}
+              />
+              <Select
+                placeholder='아파트 선택'
+                data={[
+                  { value: 'all', label: '전체 아파트' },
+                  ...apartments.map((apt) => ({ value: apt.id, label: apt.name })),
+                ]}
+                value={filterApartment}
+                onChange={(v) => {
+                  if (v === null) return;
+                  setFilterApartment(v);
+                }}
+                allowDeselect={false}
+                w={{ base: '100%', sm: 180 }}
+              />
+            </DataToolbar>
+          }
+          summary={
+            <Text size="sm" c="dimmed">
+              전체 <Text span fw={700} c="var(--mantine-color-text)">{filteredManagers.length}</Text>명
+            </Text>
+          }
+        >
+          {loading ? (
+            <TableSkeleton rows={6} columns={9} showHeader={false} />
+          ) : filteredManagers.length === 0 ? (
+            <EmptyState
+              icon={Shield}
+              title={searchQuery ? '검색 결과가 없습니다' : '관리자가 없습니다'}
+              description={searchQuery ? '다른 검색어로 다시 시도해 보세요.' : undefined}
+              size="sm"
             />
-          </div>
-          <div className='flex flex-wrap gap-4 items-center justify-between'>
-            <div className='flex gap-2'>
-              <Select value={filterApartment} onValueChange={setFilterApartment}>
-                <SelectTrigger className='w-[180px]'>
-                  <SelectValue placeholder='아파트 선택' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>전체 아파트</SelectItem>
-                  {apartments.map((apt) => (
-                    <SelectItem key={apt.id} value={apt.id}>
-                      {apt.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='flex items-center gap-2 whitespace-nowrap'>
-              <Shield className='h-4 w-4 text-muted-foreground' />
-              <span className='text-sm text-muted-foreground'>
-                전체 {filteredManagers.length}명
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Managers Table */}
-        <Card className='bg-card border-border'>
-          <CardContent className='p-0'>
-            <div className='overflow-x-auto'>
-              <Table>
-                <TableHeader>
-                  <TableRow className='border-border hover:bg-transparent'>
-                    <TableHead className='text-muted-foreground w-12'>사진</TableHead>
-                    <TableHead className='text-muted-foreground'>이름</TableHead>
-                    <TableHead className='text-muted-foreground'>이메일</TableHead>
-                    <TableHead className='text-muted-foreground'>전화번호</TableHead>
-                    <TableHead className='text-muted-foreground'>관리 범위</TableHead>
-                    <TableHead className='text-muted-foreground'>문 연 횟수</TableHead>
-                    <TableHead className='text-muted-foreground'>승인상태</TableHead>
-                    <TableHead className='text-muted-foreground'>등록일</TableHead>
-                    <TableHead className='text-muted-foreground text-right'>작업</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className='p-0'>
-                        <TableSkeleton rows={6} columns={9} showHeader={false} />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredManagers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className='p-0'>
-                        <EmptyState
-                          icon={Shield}
-                          title={searchQuery ? '검색 결과가 없습니다' : '관리자가 없습니다'}
-                          description={searchQuery ? '다른 검색어로 다시 시도해 보세요.' : undefined}
-                          size="sm"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredManagers.map((manager) => (
-                      <TableRow
-                        key={manager.id}
-                        className='border-border hover:bg-secondary/50 cursor-pointer'
-                        onClick={() => handleDetailClick(manager)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          {manager.confirmImageUrl ? (
-                            <button
-                              onClick={() => setImagePreview(manager.confirmImageUrl || null)}
-                              className='w-10 h-10 rounded-full overflow-hidden bg-secondary flex items-center justify-center hover:opacity-80 transition-opacity'
-                            >
-                              <img
-                                src={manager.confirmImageUrl}
-                                alt={manager.name || ''}
-                                className='w-full h-full object-cover'
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  e.currentTarget.parentElement!.innerHTML = '<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
-                                }}
-                              />
-                            </button>
-                          ) : (
-                            <div className='w-10 h-10 rounded-full bg-secondary flex items-center justify-center'>
-                              <ImageIcon className='w-5 h-5 text-muted-foreground' />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className='font-medium'>{manager.name || '-'}</TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          <div className='flex items-center gap-2'>
-                            <span>{manager.email}</span>
-                            {getRegisterMethodBadge(manager.registerMethod)}
-                          </div>
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>{manager.phoneNumber || '-'}</TableCell>
-                        <TableCell>{getScopeDisplay(manager.admin_scopes)}</TableCell>
-                        <TableCell className='text-muted-foreground'>{manager.openDoorCount || 0}</TableCell>
-                        <TableCell>{getApprovalBadge(manager.approvalStatus)}</TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {new Date(manager.createdAt).toLocaleDateString('ko-KR')}
-                        </TableCell>
-                        <TableCell className='text-right' onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant='ghost' size='icon-sm' className='p-0'>
-                                <MoreVertical className='h-4 w-4' />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align='end'>
-                              {manager.confirmImageUrl && (
-                                <DropdownMenuItem onClick={() => setImagePreview(manager.confirmImageUrl || null)}>
-                                  <Eye className='mr-2 h-4 w-4' />
-                                  인증 사진 보기
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={() => openEditModal(manager)}>
-                                <Edit className='mr-2 h-4 w-4' />
-                                관리 범위 설정
-                              </DropdownMenuItem>
-                              {manager.approvalStatus !== 'approve' ? (
-                                <DropdownMenuItem
-                                  onClick={() => handleApprovalStatusChange(manager.id, 'approve')}
-                                  className='text-green-600'
-                                >
-                                  <Check className='mr-2 h-4 w-4' />
-                                  승인하기
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={() => handleApprovalStatusChange(manager.id, 'pending')}
-                                  className='text-orange-600'
-                                >
-                                  <X className='mr-2 h-4 w-4' />
-                                  승인 취소
-                                </DropdownMenuItem>
-                              )}
-                              {manager.approvalStatus !== 'suspended' && (
-                                <DropdownMenuItem
-                                  onClick={() => handleSuspendClick(manager)}
-                                  className='text-yellow-600'
-                                >
-                                  <Ban className='mr-2 h-4 w-4' />
-                                  승인 보류
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(manager)}
-                                className='text-destructive'
+          ) : (
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w={48}>사진</Table.Th>
+                  <Table.Th>이름</Table.Th>
+                  <Table.Th>이메일</Table.Th>
+                  <Table.Th>전화번호</Table.Th>
+                  <Table.Th>관리 범위</Table.Th>
+                  <Table.Th>문 연 횟수</Table.Th>
+                  <Table.Th>승인상태</Table.Th>
+                  <Table.Th>등록일</Table.Th>
+                  <Table.Th ta="right">작업</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {filteredManagers.map((manager) => (
+                  <Table.Tr
+                    key={manager.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleDetailClick(manager)}
+                  >
+                    <Table.Td onClick={(e) => e.stopPropagation()}>
+                      {manager.confirmImageUrl ? (
+                        <UnstyledButton
+                          onClick={() => setImagePreview(manager.confirmImageUrl || null)}
+                          w={40}
+                          h={40}
+                          bg="var(--app-bg-subtle)"
+                          style={{
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <img
+                            src={manager.confirmImageUrl}
+                            alt={manager.name || ''}
+                            className='w-full h-full object-cover'
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement!.innerHTML = '<svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
+                            }}
+                          />
+                        </UnstyledButton>
+                      ) : (
+                        <ThemeIcon variant="light" color="gray" radius="xl" size={40}>
+                          <ImageIcon size={20} />
+                        </ThemeIcon>
+                      )}
+                    </Table.Td>
+                    <Table.Td fw={500}>{manager.name || '-'}</Table.Td>
+                    <Table.Td c="dimmed">
+                      <Group gap="xs" wrap="nowrap">
+                        <span>{manager.email}</span>
+                        {getRegisterMethodBadge(manager.registerMethod)}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td c="dimmed">{manager.phoneNumber || '-'}</Table.Td>
+                    <Table.Td>{getScopeDisplay(manager.admin_scopes)}</Table.Td>
+                    <Table.Td c="dimmed">{manager.openDoorCount || 0}</Table.Td>
+                    <Table.Td>{getApprovalBadge(manager.approvalStatus)}</Table.Td>
+                    <Table.Td c="dimmed">
+                      {new Date(manager.createdAt).toLocaleDateString('ko-KR')}
+                    </Table.Td>
+                    <Table.Td onClick={(e) => e.stopPropagation()}>
+                      <Group justify="flex-end" wrap="nowrap">
+                        <Menu position='bottom-end'>
+                          <Menu.Target>
+                            <ActionIcon variant='subtle' color='gray' aria-label='더보기'>
+                              <MoreVertical size={16} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            {manager.confirmImageUrl && (
+                              <Menu.Item
+                                leftSection={<Eye size={16} />}
+                                onClick={() => setImagePreview(manager.confirmImageUrl || null)}
                               >
-                                <Trash2 className='mr-2 h-4 w-4' />
-                                삭제
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                                인증 사진 보기
+                              </Menu.Item>
+                            )}
+                            <Menu.Item
+                              leftSection={<Edit size={16} />}
+                              onClick={() => openEditModal(manager)}
+                            >
+                              관리 범위 설정
+                            </Menu.Item>
+                            {manager.approvalStatus !== 'approve' ? (
+                              <Menu.Item
+                                color='green'
+                                leftSection={<Check size={16} />}
+                                onClick={() => handleApprovalStatusChange(manager.id, 'approve')}
+                              >
+                                승인하기
+                              </Menu.Item>
+                            ) : (
+                              <Menu.Item
+                                color='orange'
+                                leftSection={<X size={16} />}
+                                onClick={() => handleApprovalStatusChange(manager.id, 'pending')}
+                              >
+                                승인 취소
+                              </Menu.Item>
+                            )}
+                            {manager.approvalStatus !== 'suspended' && (
+                              <Menu.Item
+                                color='yellow'
+                                leftSection={<Ban size={16} />}
+                                onClick={() => handleSuspendClick(manager)}
+                              >
+                                승인 보류
+                              </Menu.Item>
+                            )}
+                            <Menu.Item
+                              color='red'
+                              leftSection={<Trash2 size={16} />}
+                              onClick={() => handleDeleteClick(manager)}
+                            >
+                              삭제
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+        </DataTableShell>
       </PageContent>
 
       {/* Image Preview Modal */}
       {imagePreview && (
-        <div
-          className='fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8'
+        <Overlay
+          fixed
+          center
+          zIndex={200}
+          backgroundOpacity={0.8}
+          p="xl"
           onClick={() => setImagePreview(null)}
         >
-          <div className='relative max-w-4xl max-h-[85vh] flex items-center justify-center'>
+          <Box
+            pos='relative'
+            maw={896}
+            mah='85vh'
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
             <img
               src={imagePreview}
               alt='인증 사진'
-              className='max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl'
+              className='object-contain'
+              style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 8 }}
             />
-            <Button
-              variant='secondary'
-              size='icon'
-              className='absolute top-4 right-4 rounded-full shadow-lg'
+            <ActionIcon
+              variant='default'
+              radius='xl'
+              size='lg'
+              pos='absolute'
+              top={16}
+              right={16}
+              aria-label='닫기'
               onClick={(e) => {
                 e.stopPropagation();
                 setImagePreview(null);
               }}
             >
-              <X className='h-5 w-5' />
-            </Button>
-          </div>
-        </div>
+              <X size={20} />
+            </ActionIcon>
+          </Box>
+        </Overlay>
       )}
 
       {/* Suspend Confirmation Dialog */}
-      <Dialog open={suspendDialog} onOpenChange={setSuspendDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>승인 보류</DialogTitle>
-            <DialogDescription>
-              <strong>{suspendingManager?.name || suspendingManager?.email}</strong>님의 승인을 보류하시겠습니까?
-              <br />
-              보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className='py-4'>
-            <textarea
-              className='w-full min-h-[100px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary'
-              placeholder='보류 사유를 입력해주세요...'
-              value={suspensionReason}
-              onChange={(e) => setSuspensionReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setSuspendDialog(false)}>
-              취소
-            </Button>
-            <Button variant='default' onClick={handleSuspendConfirm} className='bg-yellow-600 hover:bg-yellow-700'>
-              승인 보류
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={suspendDialog} onClose={() => setSuspendDialog(false)} title='승인 보류'>
+        <Text size='sm' c='dimmed'>
+          <strong>{suspendingManager?.name || suspendingManager?.email}</strong>님의 승인을 보류하시겠습니까?
+          <br />
+          보류 사유를 입력해주세요. 사용자는 이 사유를 확인할 수 있습니다.
+        </Text>
+        <Textarea
+          mt='md'
+          minRows={4}
+          autosize
+          placeholder='보류 사유를 입력해주세요...'
+          value={suspensionReason}
+          onChange={(e) => setSuspensionReason(e.target.value)}
+        />
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setSuspendDialog(false)}>
+            취소
+          </Button>
+          <Button color='yellow' onClick={handleSuspendConfirm}>
+            승인 보류
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>관리자 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingManager?.name || deletingManager?.email}</strong>님을 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없으며, 해당 관리자의 모든 데이터가 삭제됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDeleteDialog(false)}>
-              취소
-            </Button>
-            <Button variant='destructive' onClick={handleDeleteConfirm}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={deleteDialog} onClose={() => setDeleteDialog(false)} title='관리자 삭제'>
+        <Text size='sm' c='dimmed'>
+          정말로 <strong>{deletingManager?.name || deletingManager?.email}</strong>님을 삭제하시겠습니까?
+          <br />
+          이 작업은 되돌릴 수 없으며, 해당 관리자의 모든 데이터가 삭제됩니다.
+        </Text>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setDeleteDialog(false)}>
+            취소
+          </Button>
+          <Button color='red' onClick={handleDeleteConfirm}>
+            삭제
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Edit Modal */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className='sm:max-w-[500px]'>
-          <DialogHeader>
-            <DialogTitle>관리 범위 설정</DialogTitle>
-            <DialogDescription>
-              {selectedManager?.name || selectedManager?.email}님의 관리 권한 범위를 설정합니다.
-            </DialogDescription>
-          </DialogHeader>
+      <Modal
+        opened={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title='관리 범위 설정'
+        size={500}
+      >
+        <Text size='sm' c='dimmed'>
+          {selectedManager?.name || selectedManager?.email}님의 관리 권한 범위를 설정합니다.
+        </Text>
 
-          <div className='space-y-4 py-4'>
-            {/* 관리 레벨 선택 */}
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>관리 레벨</label>
-              <Select value={scopeLevel} onValueChange={(value: any) => setScopeLevel(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='APARTMENT'>아파트 전체</SelectItem>
-                  <SelectItem value='BUILDING'>특정 동</SelectItem>
-                  <SelectItem value='LINE'>특정 라인</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <Stack gap='md' mt='md'>
+          {/* 관리 레벨 선택 */}
+          <Select
+            label='관리 레벨'
+            data={[
+              { value: 'APARTMENT', label: '아파트 전체' },
+              { value: 'BUILDING', label: '특정 동' },
+              { value: 'LINE', label: '특정 라인' },
+            ]}
+            value={scopeLevel}
+            onChange={(value) => {
+              if (value === null) return;
+              setScopeLevel(value as any);
+            }}
+            allowDeselect={false}
+          />
 
-            {/* 아파트 선택 */}
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>아파트</label>
-              <Select value={selectedApartment} onValueChange={setSelectedApartment}>
-                <SelectTrigger>
-                  <SelectValue placeholder='아파트를 선택하세요' />
-                </SelectTrigger>
-                <SelectContent>
-                  {apartments.map((apt) => (
-                    <SelectItem key={apt.id} value={apt.id}>
-                      {apt.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* 아파트 선택 */}
+          <Select
+            label='아파트'
+            placeholder='아파트를 선택하세요'
+            data={apartments.map((apt) => ({ value: apt.id, label: apt.name }))}
+            value={selectedApartment || null}
+            onChange={(v) => {
+              if (v === null) return;
+              setSelectedApartment(v);
+            }}
+            allowDeselect={false}
+          />
 
-            {/* 동 선택 (BUILDING 또는 LINE 레벨일 때) */}
-            {(scopeLevel === 'BUILDING' || scopeLevel === 'LINE') && (
-              <div className='space-y-2'>
-                <label className='text-sm font-medium'>동</label>
-                <Select
-                  value={selectedBuilding}
-                  onValueChange={setSelectedBuilding}
-                  disabled={!selectedApartment}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='동을 선택하세요' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {buildings.map((building) => (
-                      <SelectItem key={building.id} value={building.id}>
-                        {building.buildingNumber}동
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+          {/* 동 선택 (BUILDING 또는 LINE 레벨일 때) */}
+          {(scopeLevel === 'BUILDING' || scopeLevel === 'LINE') && (
+            <Select
+              label='동'
+              placeholder='동을 선택하세요'
+              data={buildings.map((building) => ({ value: building.id, label: `${building.buildingNumber}동` }))}
+              value={selectedBuilding || null}
+              onChange={(v) => {
+                if (v === null) return;
+                setSelectedBuilding(v);
+              }}
+              allowDeselect={false}
+              disabled={!selectedApartment}
+            />
+          )}
 
-            {/* 라인 선택 (LINE 레벨일 때) */}
-            {scopeLevel === 'LINE' && (
-              <div className='space-y-2'>
-                <label className='text-sm font-medium'>라인</label>
-                <Select
-                  value={selectedLine}
-                  onValueChange={setSelectedLine}
-                  disabled={!selectedBuilding}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='라인을 선택하세요' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {lines.map((line) => (
-                      <SelectItem key={line.id} value={line.id}>
-                        {formatLineRange(line.line)}라인
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
+          {/* 라인 선택 (LINE 레벨일 때) */}
+          {scopeLevel === 'LINE' && (
+            <Select
+              label='라인'
+              placeholder='라인을 선택하세요'
+              data={lines.map((line) => ({ value: line.id, label: `${formatLineRange(line.line)}라인` }))}
+              value={selectedLine || null}
+              onChange={(v) => {
+                if (v === null) return;
+                setSelectedLine(v);
+              }}
+              allowDeselect={false}
+              disabled={!selectedBuilding}
+            />
+          )}
+        </Stack>
 
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setIsEditModalOpen(false)}>
-              취소
-            </Button>
-            <Button
-              onClick={handleSaveScope}
-              disabled={
-                !selectedApartment ||
-                (scopeLevel === 'BUILDING' && !selectedBuilding) ||
-                (scopeLevel === 'LINE' && (!selectedBuilding || !selectedLine))
-              }
-            >
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setIsEditModalOpen(false)}>
+            취소
+          </Button>
+          <Button
+            onClick={handleSaveScope}
+            disabled={
+              !selectedApartment ||
+              (scopeLevel === 'BUILDING' && !selectedBuilding) ||
+              (scopeLevel === 'LINE' && (!selectedBuilding || !selectedLine))
+            }
+          >
+            저장
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Detail Dialog */}
-      <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
-        <DialogContent className='sm:max-w-[600px] max-h-[90vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>관리자 상세 정보</DialogTitle>
-            <DialogDescription>
-              관리자 정보를 확인하고 수정할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
+      <Modal
+        opened={detailDialog}
+        onClose={() => setDetailDialog(false)}
+        title='관리자 상세 정보'
+        size={600}
+      >
+        <Text size='sm' c='dimmed'>
+          관리자 정보를 확인하고 수정할 수 있습니다.
+        </Text>
 
-          <div className='grid grid-cols-2 gap-4 py-4'>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>이름</label>
-              <Input
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>이메일</label>
-              <Input
-                value={editForm.email}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>전화번호</label>
-              <Input
-                value={editForm.phoneNumber}
-                onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>생년월일</label>
-              <Input
-                value={editForm.birthDay}
-                onChange={(e) => setEditForm({ ...editForm, birthDay: e.target.value })}
-                placeholder='YYYY-MM-DD'
-              />
-            </div>
+        <SimpleGrid cols={2} spacing='md' mt='md'>
+          <TextInput
+            label='이름'
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+          />
+          <TextInput
+            label='이메일'
+            value={editForm.email}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            label='전화번호'
+            value={editForm.phoneNumber}
+            onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+          />
+          <TextInput
+            label='생년월일'
+            value={editForm.birthDay}
+            onChange={(e) => setEditForm({ ...editForm, birthDay: e.target.value })}
+            placeholder='YYYY-MM-DD'
+          />
 
-            {/* 관리 범위 */}
-            <div className='col-span-2 space-y-2'>
-              <label className='text-sm font-medium'>관리 범위</label>
-              <div className='p-3 bg-muted rounded-md'>
-                {detailManager && getScopeDisplay(detailManager.admin_scopes)}
-              </div>
-            </div>
+          {/* 관리 범위 */}
+          <Stack gap={4} style={{ gridColumn: 'span 2' }}>
+            <Text size='sm' fw={500}>관리 범위</Text>
+            <Paper bg='var(--app-bg-muted)' p='sm' radius='sm'>
+              {detailManager && getScopeDisplay(detailManager.admin_scopes)}
+            </Paper>
+          </Stack>
 
-            {/* 지역 정보 */}
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>주소</label>
-              <Input
-                value={editForm.address}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>시/도</label>
-              <Input
-                value={editForm.regionSido}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>시/군/구</label>
-              <Input
-                value={editForm.regionSigungu}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>읍/면/동</label>
-              <Input
-                value={editForm.regionDong}
-                disabled
-                className='bg-muted text-gray-700 disabled:opacity-100'
-              />
-            </div>
+          {/* 지역 정보 */}
+          <TextInput
+            label='주소'
+            value={editForm.address}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            label='시/도'
+            value={editForm.regionSido}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            label='시/군/구'
+            value={editForm.regionSigungu}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            label='읍/면/동'
+            value={editForm.regionDong}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
 
-            {/* 상태 정보 */}
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>승인상태</label>
-              <Select
-                value={editForm.approvalStatus}
-                disabled
-              >
-                <SelectTrigger className='bg-muted text-gray-700 disabled:opacity-100'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='pending'>대기</SelectItem>
-                  <SelectItem value='approve'>승인</SelectItem>
-                  <SelectItem value='suspended'>보류</SelectItem>
-                  <SelectItem value='inactive'>비활성</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>문 연 횟수</label>
-              <Input
-                type='number'
-                value={editForm.openDoorCount}
-                onChange={(e) => setEditForm({ ...editForm, openDoorCount: e.target.value })}
-              />
-            </div>
-          </div>
+          {/* 상태 정보 */}
+          <Select
+            label='승인상태'
+            data={[
+              { value: 'pending', label: '대기' },
+              { value: 'approve', label: '승인' },
+              { value: 'suspended', label: '보류' },
+              { value: 'inactive', label: '비활성' },
+            ]}
+            value={editForm.approvalStatus || null}
+            allowDeselect={false}
+            disabled
+            styles={READONLY_INPUT_STYLES}
+          />
+          <TextInput
+            label='문 연 횟수'
+            type='number'
+            value={editForm.openDoorCount}
+            onChange={(e) => setEditForm({ ...editForm, openDoorCount: e.target.value })}
+          />
+        </SimpleGrid>
 
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDetailDialog(false)}>
-              취소
-            </Button>
-            <Button onClick={handleDetailSave} disabled={saving}>
-              {saving ? '저장 중...' : '저장'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setDetailDialog(false)}>
+            취소
+          </Button>
+          <Button onClick={handleDetailSave} disabled={saving}>
+            {saving ? '저장 중...' : '저장'}
+          </Button>
+        </Group>
+      </Modal>
     </PageShell>
   );
 }

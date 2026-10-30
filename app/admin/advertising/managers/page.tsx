@@ -1,68 +1,45 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AdminHeader } from '@/components/admin-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PageContent, PageShell } from '@/components/page-shell';
+import { DataTableShell } from '@/components/data-table-shell';
+import { TableSkeleton } from '@/components/skeletons';
+import { DataToolbar, DataToolbarActions } from '@/components/data-toolbar';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Input,
+  Loader,
+  Modal,
+  Paper,
+  PasswordInput,
   Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Label } from '@/components/ui/label';
+  Select,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Textarea,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import {
   Search,
   Plus,
   Edit,
   Trash2,
-  Briefcase,
   Building2,
   Eye,
-  EyeOff,
   FileText,
   MapPin,
   ArrowRightLeft,
-  Check,
-  ChevronsUpDown,
-  X,
-  Loader2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { Textarea } from '@/components/ui/textarea';
 import { ImageUpload } from '@/components/image-upload';
 import { toast } from 'sonner';
 import { networkFailedMessage, readApiErrorMessage } from '@/lib/utils/api-error';
@@ -109,7 +86,7 @@ export default function AdvertisingManagersPage() {
   const supabase = createClient();
 
   const [managers, setManagers] = useState<Manager[]>([]);
-  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [, setApartments] = useState<Apartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [runningAdCounts, setRunningAdCounts] = useState<Record<string, RunningAdCounts>>({});
@@ -126,13 +103,14 @@ export default function AdvertisingManagersPage() {
     memo: '',
     approvalStatus: 'approve' as 'approve' | 'pending',
   });
-  const [tempManagerId, setTempManagerId] = useState<string>('');
+  const [, setTempManagerId] = useState<string>('');
   const [uploadedCreateImage, setUploadedCreateImage] = useState<string>(''); // 업로드된 생성 이미지 추적
   const [showPassword, setShowPassword] = useState(false);
 
   // Delete dialog
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingManager, setDeletingManager] = useState<Manager | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Detail dialog
   const [detailDialog, setDetailDialog] = useState(false);
@@ -151,7 +129,6 @@ export default function AdvertisingManagersPage() {
   });
 
   // 아파트 이전 관련 상태
-  const [transferringApartmentId, setTransferringApartmentId] = useState<string | null>(null);
   const [transferPopoverOpen, setTransferPopoverOpen] = useState<string | null>(null);
   const [transferLoading, setTransferLoading] = useState(false);
 
@@ -359,6 +336,7 @@ export default function AdvertisingManagersPage() {
   const handleDeleteConfirm = async () => {
     if (!deletingManager) return;
 
+    setDeleting(true);
     try {
       const response = await fetch(`/api/advertising/managers/${deletingManager.id}`, {
         method: 'DELETE',
@@ -376,6 +354,8 @@ export default function AdvertisingManagersPage() {
     } catch (err) {
       console.error('Failed to delete manager:', err);
       toast.error(networkFailedMessage('매니저를 삭제하지 못했습니다.'));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -466,508 +446,486 @@ export default function AdvertisingManagersPage() {
       manager.phoneNumber?.includes(searchQuery)
   );
 
+  const handleCreateDialogClose = (): void => {
+    // Radix Dialog의 onOpenChange(false)와 동일한 정리 로직을 그대로 실행
+    void (async (open: boolean) => {
+    if (!open && uploadedCreateImage) {
+      try {
+        const bucket = 'managers';
+        const path = uploadedCreateImage.split('/').slice(-3).join('/');
+        await supabase.storage.from(bucket).remove([path]);
+        console.log('Deleted unused uploaded image:', path);
+      } catch (err) {
+        console.error('Failed to delete uploaded image:', err);
+      }
+      setUploadedCreateImage('');
+    }
+    setIsCreateDialogOpen(open);
+    if (!open) {
+      setCreateForm({
+        email: '',
+        password: '',
+        name: '',
+        phoneNumber: '',
+        address: '',
+        businessRegistration: '',
+        memo: '',
+        approvalStatus: 'approve',
+      });
+      setShowPassword(false);
+      setTempManagerId('');
+    }
+    })(false);
+  };
+
+  const handleEditDialogClose = (): void => {
+    // Radix Dialog의 onOpenChange(false)와 동일한 정리 로직을 그대로 실행
+    void (async (open: boolean) => {
+    if (!open && uploadedEditImage) {
+      try {
+        const bucket = 'managers';
+        const path = uploadedEditImage.split('/').slice(-3).join('/');
+        await supabase.storage.from(bucket).remove([path]);
+        console.log('Deleted unused uploaded image:', path);
+      } catch (err) {
+        console.error('Failed to delete uploaded image:', err);
+      }
+      setUploadedEditImage('');
+    }
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setEditingManagerId('');
+      setEditForm({
+        name: '',
+        phoneNumber: '',
+        address: '',
+        businessRegistration: '',
+        memo: '',
+      });
+    }
+    })(false);
+  };
+
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+    <PageShell>
       <AdminHeader title='매니저 관리' />
 
-      <div className="flex flex-col gap-6">
-        {/* Search & Actions */}
-        <div className='flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between'>
-          <div className='relative flex-1 w-full'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-            <Input
-              placeholder='이름, 이메일, 전화번호로 검색...'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className='pl-10'
-            />
-          </div>
-          <Button onClick={() => {
-            setTempManagerId(crypto.randomUUID());
-            setIsCreateDialogOpen(true);
-          }}>
-            <Plus className='h-4 w-4 mr-2' />
-            매니저 추가
-          </Button>
-        </div>
-
+      <PageContent>
         {/* Managers Table */}
-        <Card className='bg-card border-border'>
-          <CardContent className='p-0'>
-            <div className='overflow-x-auto'>
-              <Table>
-                <TableHeader>
-                  <TableRow className='border-border hover:bg-transparent'>
-                    <TableHead className='text-muted-foreground'>이름</TableHead>
-                    <TableHead className='text-muted-foreground'>이메일</TableHead>
-                    <TableHead className='text-muted-foreground'>전화번호</TableHead>
-                    <TableHead className='text-muted-foreground'>관리 아파트</TableHead>
-                    <TableHead className='text-muted-foreground'>일반/프리미엄</TableHead>
-                    <TableHead className='text-muted-foreground'>등록일</TableHead>
-                    <TableHead className='text-muted-foreground text-right'>작업</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className='text-center py-12 text-muted-foreground'>
-  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredManagers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className='text-center py-12 text-muted-foreground'>
-                        {searchQuery ? '검색 결과가 없습니다.' : '매니저가 없습니다.'}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredManagers.map((manager) => (
-                      <TableRow key={manager.id} className='border-border hover:bg-secondary/50 cursor-pointer'>
-                        <TableCell
-                          className='font-medium'
+        <DataTableShell
+          toolbar={
+            <DataToolbar>
+              {/* Search & Actions */}
+              <TextInput
+                placeholder='이름, 이메일, 전화번호로 검색...'
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                leftSection={<Search size={16} />}
+                style={{ flex: 1 }}
+                miw={240}
+              />
+              <DataToolbarActions>
+                <Button
+                  leftSection={<Plus size={16} />}
+                  onClick={() => {
+                    setTempManagerId(crypto.randomUUID());
+                    setIsCreateDialogOpen(true);
+                  }}
+                >
+                  매니저 추가
+                </Button>
+              </DataToolbarActions>
+            </DataToolbar>
+          }
+        >
+          <Table highlightOnHover verticalSpacing='sm' horizontalSpacing='md'>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>이름</Table.Th>
+                <Table.Th>이메일</Table.Th>
+                <Table.Th>전화번호</Table.Th>
+                <Table.Th>관리 아파트</Table.Th>
+                <Table.Th>일반/프리미엄</Table.Th>
+                <Table.Th>등록일</Table.Th>
+                <Table.Th ta='right'>작업</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {loading ? (
+                <Table.Tr>
+                  <Table.Td colSpan={7} p={0}>
+                    <TableSkeleton rows={8} columns={7} showHeader={false} />
+                  </Table.Td>
+                </Table.Tr>
+              ) : filteredManagers.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={7} ta='center' py={48} c='dimmed'>
+                    {searchQuery ? '검색 결과가 없습니다.' : '매니저가 없습니다.'}
+                  </Table.Td>
+                </Table.Tr>
+              ) : (
+                filteredManagers.map((manager) => (
+                  <Table.Tr key={manager.id} style={{ cursor: 'pointer' }}>
+                    <Table.Td
+                      fw={500}
+                      onClick={() => {
+                        setViewingManager(manager);
+                        setDetailDialog(true);
+                      }}
+                    >
+                      {manager.name || '-'}
+                    </Table.Td>
+                    <Table.Td
+                      c='dimmed'
+                      onClick={() => {
+                        setViewingManager(manager);
+                        setDetailDialog(true);
+                      }}
+                    >
+                      {manager.email}
+                    </Table.Td>
+                    <Table.Td
+                      c='dimmed'
+                      onClick={() => {
+                        setViewingManager(manager);
+                        setDetailDialog(true);
+                      }}
+                    >
+                      {manager.phoneNumber || '-'}
+                    </Table.Td>
+                    <Table.Td
+                      onClick={() => {
+                        setViewingManager(manager);
+                        setDetailDialog(true);
+                      }}
+                    >
+                      {manager.manager_apartments && manager.manager_apartments.length > 0 ? (
+                        <Badge variant='light' color='gray' leftSection={<Building2 size={12} />}>
+                          {manager.manager_apartments.length}개 관리
+                        </Badge>
+                      ) : (
+                        <Text component='span' size='sm' c='dimmed'>미지정</Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td
+                      c='dimmed'
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                      onClick={() => {
+                        setViewingManager(manager);
+                        setDetailDialog(true);
+                      }}
+                    >
+                      {(runningAdCounts[manager.id]?.basic ?? 0)}/{(runningAdCounts[manager.id]?.premium ?? 0)}
+                    </Table.Td>
+                    <Table.Td
+                      c='dimmed'
+                      onClick={() => {
+                        setViewingManager(manager);
+                        setDetailDialog(true);
+                      }}
+                    >
+                      {new Date(manager.createdAt).toLocaleDateString('ko-KR')}
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4} justify='flex-end' wrap='nowrap'>
+                        <ActionIcon
+                          variant='subtle'
+                          color='gray'
+                          aria-label='상세 보기'
                           onClick={() => {
                             setViewingManager(manager);
                             setDetailDialog(true);
                           }}
                         >
-                          {manager.name || '-'}
-                        </TableCell>
-                        <TableCell
-                          className='text-muted-foreground'
-                          onClick={() => {
-                            setViewingManager(manager);
-                            setDetailDialog(true);
+                          <Eye size={16} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant='subtle'
+                          color='red'
+                          aria-label='삭제'
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(manager);
                           }}
                         >
-                          {manager.email}
-                        </TableCell>
-                        <TableCell
-                          className='text-muted-foreground'
-                          onClick={() => {
-                            setViewingManager(manager);
-                            setDetailDialog(true);
-                          }}
-                        >
-                          {manager.phoneNumber || '-'}
-                        </TableCell>
-                        <TableCell
-                          onClick={() => {
-                            setViewingManager(manager);
-                            setDetailDialog(true);
-                          }}
-                        >
-                          {manager.manager_apartments && manager.manager_apartments.length > 0 ? (
-                            <Badge variant="outline">
-                              <Building2 className='h-3 w-3 mr-1' />
-                              {manager.manager_apartments.length}개 관리
-                            </Badge>
-                          ) : (
-                            <span className='text-muted-foreground text-sm'>미지정</span>
-                          )}
-                        </TableCell>
-                        <TableCell
-                          className='text-muted-foreground'
-                          onClick={() => {
-                            setViewingManager(manager);
-                            setDetailDialog(true);
-                          }}
-                        >
-                          {(runningAdCounts[manager.id]?.basic ?? 0)}/{(runningAdCounts[manager.id]?.premium ?? 0)}
-                        </TableCell>
-                        <TableCell
-                          className='text-muted-foreground'
-                          onClick={() => {
-                            setViewingManager(manager);
-                            setDetailDialog(true);
-                          }}
-                        >
-                          {new Date(manager.createdAt).toLocaleDateString('ko-KR')}
-                        </TableCell>
-                        <TableCell className='text-right'>
-                          <div className='flex justify-end gap-2'>
-                            <Button
-                              variant='ghost'
-                              size='sm'
-                              onClick={() => {
-                                setViewingManager(manager);
-                                setDetailDialog(true);
-                              }}
-                            >
-                              <Eye className='h-4 w-4' />
-                            </Button>
-                            <Button
-                              variant='ghost'
-                              size='sm'
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteClick(manager);
-                              }}
-                              className='text-destructive hover:text-destructive'
-                            >
-                              <Trash2 className='h-4 w-4' />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                          <Trash2 size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))
+              )}
+            </Table.Tbody>
+          </Table>
+        </DataTableShell>
+      </PageContent>
 
       {/* Create Dialog */}
-      <Dialog
-        open={isCreateDialogOpen}
-        onOpenChange={async (open) => {
-          if (!open && uploadedCreateImage) {
-            try {
-              const bucket = 'managers';
-              const path = uploadedCreateImage.split('/').slice(-3).join('/');
-              await supabase.storage.from(bucket).remove([path]);
-              console.log('Deleted unused uploaded image:', path);
-            } catch (err) {
-              console.error('Failed to delete uploaded image:', err);
-            }
-            setUploadedCreateImage('');
-          }
-          setIsCreateDialogOpen(open);
-          if (!open) {
-            setCreateForm({
-              email: '',
-              password: '',
-              name: '',
-              phoneNumber: '',
-              address: '',
-              businessRegistration: '',
-              memo: '',
-              approvalStatus: 'approve',
-            });
-            setShowPassword(false);
-            setTempManagerId('');
-          }
-        }}
+      <Modal
+        opened={isCreateDialogOpen}
+        onClose={handleCreateDialogClose}
+        title='매니저 추가'
+        size={500}
       >
-        <DialogContent className='sm:max-w-[500px] max-h-[90vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>매니저 추가</DialogTitle>
-            <DialogDescription>
-              새로운 매니저 계정을 생성합니다.
-            </DialogDescription>
-          </DialogHeader>
+        <Text size='sm' c='dimmed'>
+          새로운 매니저 계정을 생성합니다.
+        </Text>
 
-          <div className='space-y-4 py-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='email'>이메일 *</Label>
-              <Input
-                id='email'
-                type='email'
-                value={createForm.email}
-                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                placeholder='manager@example.com'
-              />
-            </div>
+        <Stack gap='md' mt='md'>
+          <TextInput
+            id='email'
+            label='이메일 *'
+            type='email'
+            value={createForm.email}
+            onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+            placeholder='manager@example.com'
+          />
 
-            <div className='space-y-2'>
-              <Label htmlFor='password'>비밀번호 *</Label>
-              <div className='relative'>
-                <Input
-                  id='password'
-                  type={showPassword ? 'text' : 'password'}
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                  placeholder='최소 8자 이상, 특수문자 1개 포함'
-                  className='pr-10'
-                />
-                <button
-                  type='button'
-                  onClick={() => setShowPassword(!showPassword)}
-                  className='absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors'
-                >
-                  {showPassword ? (
-                    <EyeOff className='h-4 w-4' />
-                  ) : (
-                    <Eye className='h-4 w-4' />
-                  )}
-                </button>
-              </div>
-            </div>
+          <PasswordInput
+            id='password'
+            label='비밀번호 *'
+            visible={showPassword}
+            onVisibilityChange={() => setShowPassword(!showPassword)}
+            value={createForm.password}
+            onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+            placeholder='최소 8자 이상, 특수문자 1개 포함'
+          />
 
-            <div className='space-y-2'>
-              <Label htmlFor='name'>이름 *</Label>
-              <Input
-                id='name'
-                value={createForm.name}
-                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                placeholder='홍길동'
-              />
-            </div>
+          <TextInput
+            id='name'
+            label='이름 *'
+            value={createForm.name}
+            onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+            placeholder='홍길동'
+          />
 
-            <div className='space-y-2'>
-              <Label htmlFor='phoneNumber'>전화번호</Label>
-              <Input
-                id='phoneNumber'
-                value={createForm.phoneNumber}
-                onChange={(e) => setCreateForm({ ...createForm, phoneNumber: formatPhoneNumber(e.target.value) })}
-                placeholder='010-1234-5678'
-                maxLength={13}
-              />
-            </div>
+          <TextInput
+            id='phoneNumber'
+            label='전화번호'
+            value={createForm.phoneNumber}
+            onChange={(e) => setCreateForm({ ...createForm, phoneNumber: formatPhoneNumber(e.target.value) })}
+            placeholder='010-1234-5678'
+            maxLength={13}
+          />
 
-            <div className='space-y-2'>
-              <Label htmlFor='address'>주소</Label>
-              <Input
-                id='address'
-                value={createForm.address}
-                onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
-                placeholder='서울시 강남구...'
-              />
-            </div>
+          <TextInput
+            id='address'
+            label='주소'
+            value={createForm.address}
+            onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
+            placeholder='서울시 강남구...'
+          />
 
-            <div className='space-y-2'>
-              <Label>사업자등록증 (선택)</Label>
-              <ImageUpload
-                bucket='managers'
-                storagePath='business-registrations'
-                value={createForm.businessRegistration}
-                onChange={(url) => {
-                  setCreateForm({ ...createForm, businessRegistration: url });
-                  setUploadedCreateImage(url);
-                }}
-                accept='image/*'
-                maxSizeMB={5}
-                description='이미지 파일, 최대 5MB'
-              />
-            </div>
+          <Input.Wrapper label='사업자등록증 (선택)'>
+            <ImageUpload
+              bucket='managers'
+              storagePath='business-registrations'
+              value={createForm.businessRegistration}
+              onChange={(url) => {
+                setCreateForm({ ...createForm, businessRegistration: url });
+                setUploadedCreateImage(url);
+              }}
+              accept='image/*'
+              maxSizeMB={5}
+              description='이미지 파일, 최대 5MB'
+            />
+          </Input.Wrapper>
 
-            <div className='space-y-2'>
-              <Label htmlFor='memo'>메모</Label>
-              <Textarea
-                id='memo'
-                value={createForm.memo}
-                onChange={(e) => setCreateForm({ ...createForm, memo: e.target.value })}
-                placeholder='영업 담당 지역, 특이사항 등'
-                rows={3}
-              />
-            </div>
-          </div>
+          <Textarea
+            id='memo'
+            label='메모'
+            value={createForm.memo}
+            onChange={(e) => setCreateForm({ ...createForm, memo: e.target.value })}
+            placeholder='영업 담당 지역, 특이사항 등'
+            rows={3}
+          />
+        </Stack>
 
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setIsCreateDialogOpen(false)}>
-              취소
-            </Button>
-            <Button onClick={handleCreateManager}>
-              생성
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={handleCreateDialogClose}>
+            취소
+          </Button>
+          <Button onClick={handleCreateManager}>
+            생성
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>매니저 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingManager?.name || deletingManager?.email}</strong>님을 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없으며, 해당 매니저의 모든 데이터가 삭제됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDeleteDialog(false)}>
-              취소
-            </Button>
-            <Button variant='destructive' onClick={handleDeleteConfirm}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={deleteDialog} onClose={() => setDeleteDialog(false)} title='매니저 삭제' closeOnClickOutside={!deleting} closeOnEscape={!deleting}>
+        <Text size='sm' c='dimmed'>
+          정말로 <strong>{deletingManager?.name || deletingManager?.email}</strong>님을 삭제하시겠습니까?
+          <br />
+          이 작업은 되돌릴 수 없으며, 해당 매니저의 모든 데이터가 삭제됩니다.
+        </Text>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setDeleteDialog(false)} disabled={deleting}>
+            취소
+          </Button>
+          <Button color='red' onClick={handleDeleteConfirm} disabled={deleting}>
+            {deleting ? '삭제 중...' : '삭제'}
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Edit Dialog */}
-      <Dialog
-        open={isEditDialogOpen}
-        onOpenChange={async (open) => {
-          if (!open && uploadedEditImage) {
-            try {
-              const bucket = 'managers';
-              const path = uploadedEditImage.split('/').slice(-3).join('/');
-              await supabase.storage.from(bucket).remove([path]);
-              console.log('Deleted unused uploaded image:', path);
-            } catch (err) {
-              console.error('Failed to delete uploaded image:', err);
-            }
-            setUploadedEditImage('');
-          }
-          setIsEditDialogOpen(open);
-          if (!open) {
-            setEditingManagerId('');
-            setEditForm({
-              name: '',
-              phoneNumber: '',
-              address: '',
-              businessRegistration: '',
-              memo: '',
-            });
-          }
-        }}
+      <Modal
+        opened={isEditDialogOpen}
+        onClose={handleEditDialogClose}
+        title='매니저 수정'
+        size={500}
       >
-        <DialogContent className='sm:max-w-[500px] max-h-[90vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>매니저 수정</DialogTitle>
-            <DialogDescription>
-              매니저 정보를 수정합니다.
-            </DialogDescription>
-          </DialogHeader>
+        <Text size='sm' c='dimmed'>
+          매니저 정보를 수정합니다.
+        </Text>
 
-          <div className='space-y-4 py-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='edit-name'>이름 *</Label>
-              <Input
-                id='edit-name'
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder='홍길동'
-              />
-            </div>
+        <Stack gap='md' mt='md'>
+          <TextInput
+            id='edit-name'
+            label='이름 *'
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            placeholder='홍길동'
+          />
 
-            <div className='space-y-2'>
-              <Label htmlFor='edit-phoneNumber'>전화번호</Label>
-              <Input
-                id='edit-phoneNumber'
-                value={editForm.phoneNumber}
-                onChange={(e) => setEditForm({ ...editForm, phoneNumber: formatPhoneNumber(e.target.value) })}
-                placeholder='010-1234-5678'
-                maxLength={13}
-              />
-            </div>
+          <TextInput
+            id='edit-phoneNumber'
+            label='전화번호'
+            value={editForm.phoneNumber}
+            onChange={(e) => setEditForm({ ...editForm, phoneNumber: formatPhoneNumber(e.target.value) })}
+            placeholder='010-1234-5678'
+            maxLength={13}
+          />
 
-            <div className='space-y-2'>
-              <Label htmlFor='edit-address'>주소</Label>
-              <Input
-                id='edit-address'
-                value={editForm.address}
-                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                placeholder='서울시 강남구...'
-              />
-            </div>
+          <TextInput
+            id='edit-address'
+            label='주소'
+            value={editForm.address}
+            onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+            placeholder='서울시 강남구...'
+          />
 
-            <div className='space-y-2'>
-              <Label>사업자등록증 (선택)</Label>
-              <ImageUpload
-                bucket='managers'
-                storagePath='business-registrations'
-                value={editForm.businessRegistration}
-                onChange={(url) => {
-                  setEditForm({ ...editForm, businessRegistration: url });
-                  setUploadedEditImage(url);
-                }}
-                accept='image/*'
-                maxSizeMB={5}
-                description='이미지 파일, 최대 5MB'
-              />
-            </div>
+          <Input.Wrapper label='사업자등록증 (선택)'>
+            <ImageUpload
+              bucket='managers'
+              storagePath='business-registrations'
+              value={editForm.businessRegistration}
+              onChange={(url) => {
+                setEditForm({ ...editForm, businessRegistration: url });
+                setUploadedEditImage(url);
+              }}
+              accept='image/*'
+              maxSizeMB={5}
+              description='이미지 파일, 최대 5MB'
+            />
+          </Input.Wrapper>
 
-            <div className='space-y-2'>
-              <Label htmlFor='edit-memo'>메모</Label>
-              <Textarea
-                id='edit-memo'
-                value={editForm.memo}
-                onChange={(e) => setEditForm({ ...editForm, memo: e.target.value })}
-                placeholder='영업 담당 지역, 특이사항 등'
-                rows={3}
-              />
-            </div>
-          </div>
+          <Textarea
+            id='edit-memo'
+            label='메모'
+            value={editForm.memo}
+            onChange={(e) => setEditForm({ ...editForm, memo: e.target.value })}
+            placeholder='영업 담당 지역, 특이사항 등'
+            rows={3}
+          />
+        </Stack>
 
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setIsEditDialogOpen(false)}>
-              취소
-            </Button>
-            <Button onClick={handleUpdateManager}>
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={handleEditDialogClose}>
+            취소
+          </Button>
+          <Button onClick={handleUpdateManager}>
+            저장
+          </Button>
+        </Group>
+      </Modal>
 
       {/* Detail Dialog */}
-      <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
-        <DialogContent className='sm:max-w-[700px] max-h-[90vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>매니저 상세 정보</DialogTitle>
-            <DialogDescription>
-              매니저의 상세 정보를 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
+      <Modal
+        // 담당 변경 팝오버가 열려 있으면 ESC는 팝오버만 닫는다 (Radix와 동일)
+        closeOnEscape={transferPopoverOpen === null}
+        opened={detailDialog}
+        onClose={() => setDetailDialog(false)}
+        title='매니저 상세 정보'
+        size={700}
+      >
+        <Text size='sm' c='dimmed'>
+          매니저의 상세 정보를 확인할 수 있습니다.
+        </Text>
 
-          {viewingManager && (
-            <div className='space-y-6 py-4'>
-              {/* 기본 정보 */}
-              <div className='space-y-4'>
-                <h3 className='font-semibold text-lg border-b pb-2'>기본 정보</h3>
-                <div className='grid grid-cols-2 gap-4'>
-                  <div>
-                    <Label className='text-muted-foreground'>이름</Label>
-                    <p className='font-medium'>{viewingManager.name || '-'}</p>
-                  </div>
-                  <div>
-                    <Label className='text-muted-foreground'>이메일</Label>
-                    <p className='font-medium'>{viewingManager.email}</p>
-                  </div>
-                  <div>
-                    <Label className='text-muted-foreground'>전화번호</Label>
-                    <p className='font-medium'>{viewingManager.phoneNumber || '-'}</p>
-                  </div>
-                  <div>
-                    <Label className='text-muted-foreground'>등록일</Label>
-                    <p className='font-medium'>{new Date(viewingManager.createdAt).toLocaleDateString('ko-KR')}</p>
-                  </div>
-                </div>
-
+        {viewingManager && (
+          <Stack gap='xl' mt='md'>
+            {/* 기본 정보 */}
+            <Stack gap='md'>
+              <Box pb='xs' style={{ borderBottom: '1px solid var(--app-divider)' }}>
+                <Title order={4}>기본 정보</Title>
+              </Box>
+              <SimpleGrid cols={2} spacing='md'>
                 <div>
-                  <Label className='text-muted-foreground flex items-center gap-1'>
-                    <MapPin className='h-4 w-4' />
-                    주소
-                  </Label>
-                  <p className='font-medium mt-1'>{viewingManager.manager_profiles?.address || '-'}</p>
+                  <Text size='sm' c='dimmed'>이름</Text>
+                  <Text fw={500}>{viewingManager.name || '-'}</Text>
                 </div>
-
                 <div>
-                  <Label className='text-muted-foreground flex items-center gap-1'>
-                    <FileText className='h-4 w-4' />
-                    메모
-                  </Label>
-                  <p className='mt-1 text-sm bg-muted p-3 rounded-md whitespace-pre-wrap'>
-                    {viewingManager.manager_profiles?.memo || '-'}
-                  </p>
+                  <Text size='sm' c='dimmed'>이메일</Text>
+                  <Text fw={500}>{viewingManager.email}</Text>
                 </div>
+                <div>
+                  <Text size='sm' c='dimmed'>전화번호</Text>
+                  <Text fw={500}>{viewingManager.phoneNumber || '-'}</Text>
+                </div>
+                <div>
+                  <Text size='sm' c='dimmed'>등록일</Text>
+                  <Text fw={500}>{new Date(viewingManager.createdAt).toLocaleDateString('ko-KR')}</Text>
+                </div>
+              </SimpleGrid>
+
+              <div>
+                <Group gap={4} c='dimmed'>
+                  <MapPin size={16} />
+                  <Text size='sm' c='dimmed'>주소</Text>
+                </Group>
+                <Text fw={500} mt={4}>{viewingManager.manager_profiles?.address || '-'}</Text>
               </div>
 
-              {/* 사업자등록증 */}
-              {viewingManager.manager_profiles?.businessRegistration && (
-                <div className='space-y-2'>
-                  <h3 className='font-semibold text-lg border-b pb-2'>사업자등록증</h3>
-                  {viewingManager.manager_profiles.businessRegistration.toLowerCase().endsWith('.pdf') ? (
-                    <div className='border rounded-lg p-4 bg-muted flex items-center justify-between'>
-                      <div className='flex items-center gap-2'>
-                        <FileText className='h-5 w-5 text-primary' />
-                        <span>사업자등록증.pdf</span>
-                      </div>
-                      <div className='flex gap-2'>
+              <div>
+                <Group gap={4} c='dimmed'>
+                  <FileText size={16} />
+                  <Text size='sm' c='dimmed'>메모</Text>
+                </Group>
+                <Paper bg='var(--app-bg-muted)' p='sm' radius='md' mt={4}>
+                  <Text size='sm' style={{ whiteSpace: 'pre-wrap' }}>
+                    {viewingManager.manager_profiles?.memo || '-'}
+                  </Text>
+                </Paper>
+              </div>
+            </Stack>
+
+            {/* 사업자등록증 */}
+            {viewingManager.manager_profiles?.businessRegistration && (
+              <Stack gap='xs'>
+                <Box pb='xs' style={{ borderBottom: '1px solid var(--app-divider)' }}>
+                  <Title order={4}>사업자등록증</Title>
+                </Box>
+                {viewingManager.manager_profiles.businessRegistration.toLowerCase().endsWith('.pdf') ? (
+                  <Paper withBorder radius='md' p='md' bg='var(--app-bg-muted)'>
+                    <Group justify='space-between'>
+                      <Group gap='xs'>
+                        <Text c='blue' component='span' style={{ display: 'flex' }}>
+                          <FileText size={20} />
+                        </Text>
+                        <Text component='span'>사업자등록증.pdf</Text>
+                      </Group>
+                      <Group gap='xs'>
                         <Button
-                          variant='outline'
-                          size='sm'
+                          variant='default'
+                          size='xs'
                           onClick={() => window.open(viewingManager.manager_profiles?.businessRegistration, '_blank')}
                         >
                           열기
                         </Button>
                         <Button
-                          variant='outline'
-                          size='sm'
+                          variant='default'
+                          size='xs'
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = viewingManager.manager_profiles?.businessRegistration || '';
@@ -979,137 +937,164 @@ export default function AdvertisingManagersPage() {
                         >
                           다운로드
                         </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className='border rounded-lg overflow-hidden bg-muted'>
-                      <img
-                        src={viewingManager.manager_profiles.businessRegistration}
-                        alt='사업자등록증'
-                        className='w-full h-auto'
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                      </Group>
+                    </Group>
+                  </Paper>
+                ) : (
+                  <Paper withBorder radius='md' bg='var(--app-bg-muted)' style={{ overflow: 'hidden' }}>
+                    <img
+                      src={viewingManager.manager_profiles.businessRegistration}
+                      alt='사업자등록증'
+                      className='w-full h-auto'
+                    />
+                  </Paper>
+                )}
+              </Stack>
+            )}
 
-              {/* 관리 아파트 */}
-              <div className='space-y-3'>
-                <div className='flex items-center justify-between border-b pb-2'>
-                  <h3 className='font-semibold text-lg'>관리 아파트</h3>
-                  {viewingManager.manager_apartments && viewingManager.manager_apartments.length > 0 && (
-                    <span className='text-sm text-muted-foreground'>
-                      총 {viewingManager.manager_apartments.length}개
-                    </span>
-                  )}
-                </div>
-                {viewingManager.manager_apartments && viewingManager.manager_apartments.length > 0 ? (
-                  <div className='grid gap-2'>
-                    {viewingManager.manager_apartments.map((ma: any) => (
-                      <div
-                        key={ma.id}
-                        className='flex items-center justify-between p-3 bg-muted rounded-lg group hover:bg-muted/80 transition-colors'
-                      >
-                        <div className='flex items-center gap-3'>
-                          <div className='p-2 bg-primary/10 rounded-lg'>
-                            <Building2 className='h-5 w-5 text-primary' />
-                          </div>
+            {/* 관리 아파트 */}
+            <Stack gap='sm'>
+              <Group
+                justify='space-between'
+                pb='xs'
+                style={{ borderBottom: '1px solid var(--app-divider)' }}
+              >
+                <Title order={4}>관리 아파트</Title>
+                {viewingManager.manager_apartments && viewingManager.manager_apartments.length > 0 && (
+                  <Text size='sm' c='dimmed'>
+                    총 {viewingManager.manager_apartments.length}개
+                  </Text>
+                )}
+              </Group>
+              {viewingManager.manager_apartments && viewingManager.manager_apartments.length > 0 ? (
+                <Stack gap='xs'>
+                  {viewingManager.manager_apartments.map((ma: any) => (
+                    <Paper key={ma.id} bg='var(--app-bg-muted)' p='sm' radius='md'>
+                      <Group justify='space-between' wrap='nowrap'>
+                        <Group gap='sm' wrap='nowrap'>
+                          <ThemeIcon variant='light' color='blue' size='lg' radius='md'>
+                            <Building2 size={20} />
+                          </ThemeIcon>
                           <div>
-                            <p className='font-medium'>{ma.apartments?.name}</p>
-                            <p className='text-sm text-muted-foreground'>{ma.apartments?.address}</p>
+                            <Text fw={500}>{ma.apartments?.name}</Text>
+                            <Text size='sm' c='dimmed'>{ma.apartments?.address}</Text>
                           </div>
-                        </div>
+                        </Group>
 
                         {/* 담당자 변경 버튼 */}
                         <Popover
-                          open={transferPopoverOpen === ma.id}
-                          onOpenChange={(open) => setTransferPopoverOpen(open ? ma.id : null)}
+                          opened={transferPopoverOpen === ma.id}
+                          onChange={(open) => setTransferPopoverOpen(open ? ma.id : null)}
+                          position='bottom-end'
+                          width={320}
+                          shadow='md'
                         >
-                          <PopoverTrigger asChild>
+                          <Popover.Target>
                             <Button
-                              variant='outline'
-                              size='sm'
-                              className='opacity-0 group-hover:opacity-100 transition-opacity'
+                              variant='default'
+                              size='xs'
+                              leftSection={<ArrowRightLeft size={16} />}
+                              onClick={() => setTransferPopoverOpen(transferPopoverOpen === ma.id ? null : ma.id)}
                             >
-                              <ArrowRightLeft className='h-4 w-4 mr-2' />
                               담당 변경
                             </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className='w-80 p-0' align='end'>
-                            <div className='p-3 border-b bg-muted/50'>
-                              <p className='font-medium text-sm'>담당 매니저 변경</p>
-                              <p className='text-xs text-muted-foreground mt-1'>
-                                <span className='font-medium'>{ma.apartments?.name}</span>을(를) 다른 매니저에게 이전합니다.
-                              </p>
-                            </div>
-                            <Command>
-                              <CommandInput placeholder='매니저 검색...' />
-                              <CommandList className='max-h-[200px]'>
-                                <CommandEmpty>매니저를 찾을 수 없습니다.</CommandEmpty>
-                                <CommandGroup>
-                                  {otherManagers.map((manager) => (
-                                    <CommandItem
-                                      key={manager.id}
-                                      value={manager.name || manager.email}
-                                      onSelect={() => {
-                                        handleTransferApartment(
-                                          ma.id,
-                                          ma.apartmentId,
-                                          manager.id,
-                                          manager.name || manager.email
-                                        );
-                                      }}
-                                      disabled={transferLoading}
-                                      className='cursor-pointer'
-                                    >
-                                      <div className='flex items-center gap-3 w-full'>
-                                        <div className='flex-1'>
-                                          <p className='font-medium'>{manager.name || '-'}</p>
-                                          <p className='text-xs text-muted-foreground'>{manager.email}</p>
-                                        </div>
-                                        {manager.manager_apartments && manager.manager_apartments.length > 0 && (
-                                          <Badge variant='secondary' className='text-xs'>
-                                            {manager.manager_apartments.length}개 관리중
-                                          </Badge>
-                                        )}
+                          </Popover.Target>
+                          <Popover.Dropdown p={0}>
+                            <Box
+                              p='sm'
+                              bg='var(--app-bg-muted)'
+                              style={{ borderBottom: '1px solid var(--app-divider)' }}
+                            >
+                              <Text size='sm' fw={500}>담당 매니저 변경</Text>
+                              <Text size='xs' c='dimmed' mt={4}>
+                                <Text span inherit fw={500}>{ma.apartments?.name}</Text>을(를) 다른 매니저에게 이전합니다.
+                              </Text>
+                            </Box>
+                            <Box p='sm'>
+                              <Select
+                                searchable
+                                autoFocus
+                                placeholder='매니저 검색...'
+                                nothingFoundMessage='매니저를 찾을 수 없습니다.'
+                                leftSection={<Search size={16} />}
+                                data={otherManagers.map((manager) => ({
+                                  value: manager.id,
+                                  label: manager.name || manager.email,
+                                  disabled: transferLoading,
+                                }))}
+                                value={null}
+                                onChange={(v) => {
+                                  if (v === null) return;
+                                  const manager = otherManagers.find((m) => m.id === v);
+                                  if (!manager) return;
+                                  handleTransferApartment(
+                                    ma.id,
+                                    ma.apartmentId,
+                                    manager.id,
+                                    manager.name || manager.email
+                                  );
+                                }}
+                                allowDeselect={false}
+                                maxDropdownHeight={200}
+                                comboboxProps={{ withinPortal: false }}
+                                renderOption={({ option }) => {
+                                  const manager = otherManagers.find((m) => m.id === option.value);
+                                  if (!manager) return option.label;
+                                  return (
+                                    <Group gap='sm' wrap='nowrap' w='100%'>
+                                      <div style={{ flex: 1 }}>
+                                        <Text size='sm' fw={500}>{manager.name || '-'}</Text>
+                                        <Text size='xs' c='dimmed'>{manager.email}</Text>
                                       </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
+                                      {manager.manager_apartments && manager.manager_apartments.length > 0 && (
+                                        <Badge variant='light' color='gray' size='sm'>
+                                          {manager.manager_apartments.length}개 관리중
+                                        </Badge>
+                                      )}
+                                    </Group>
+                                  );
+                                }}
+                              />
+                            </Box>
                             {transferLoading && (
-                              <div className='p-3 border-t flex items-center justify-center gap-2 text-sm text-muted-foreground'>
-                                <Loader2 className='h-4 w-4 animate-spin' />
-                                이전 중...
-                              </div>
+                              <Group
+                                p='sm'
+                                gap='xs'
+                                justify='center'
+                                style={{ borderTop: '1px solid var(--app-divider)' }}
+                              >
+                                <Loader size={16} />
+                                <Text size='sm' c='dimmed'>이전 중...</Text>
+                              </Group>
                             )}
-                          </PopoverContent>
+                          </Popover.Dropdown>
                         </Popover>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className='text-center py-8 text-muted-foreground'>
-                    <Building2 className='h-12 w-12 mx-auto mb-3 opacity-20' />
-                    <p className='text-sm'>관리 중인 아파트가 없습니다.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+                      </Group>
+                    </Paper>
+                  ))}
+                </Stack>
+              ) : (
+                <Stack align='center' gap='sm' py='xl' c='dimmed'>
+                  <Building2 size={48} style={{ opacity: 0.2 }} />
+                  <Text size='sm' c='dimmed'>관리 중인 아파트가 없습니다.</Text>
+                </Stack>
+              )}
+            </Stack>
+          </Stack>
+        )}
 
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDetailDialog(false)}>
-              닫기
-            </Button>
-            <Button onClick={() => viewingManager && handleEditClick(viewingManager)}>
-              <Edit className='h-4 w-4 mr-2' />
-              수정
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setDetailDialog(false)}>
+            닫기
+          </Button>
+          <Button
+            leftSection={<Edit size={16} />}
+            onClick={() => viewingManager && handleEditClick(viewingManager)}
+          >
+            수정
+          </Button>
+        </Group>
+      </Modal>
+    </PageShell>
   );
 }

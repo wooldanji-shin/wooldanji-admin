@@ -1,14 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { ActionIcon, Divider, Group, Stack, Table, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/supabase';
 import { MessageSquare, Eye, HelpCircle } from 'lucide-react';
@@ -23,11 +15,11 @@ import {
   PageShell,
 } from '@/components/page-shell';
 import { DataTableShell } from '@/components/data-table-shell';
-import { DataToolbar, DataToolbarSearch, DataToolbarFilters } from '@/components/data-toolbar';
+import { DataToolbarSearch } from '@/components/data-toolbar';
+import { FilterChips, FilterRow } from '@/components/filter-chips';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
-import { cn } from '@/lib/utils';
 
 interface PartnerInquiry {
   id: string;
@@ -145,21 +137,6 @@ export default function PartnerInquiriesPage() {
     return format(new Date(dateString), 'yyyy.MM.dd HH:mm', { locale: ko });
   };
 
-  const getStatusBadge = (status: 'PENDING' | 'ANSWERED') => {
-    if (status === 'PENDING') {
-      return (
-        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-          답변 대기
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
-        답변 완료
-      </Badge>
-    );
-  };
-
   const filterOptions: { value: 'ALL' | 'PENDING' | 'ANSWERED'; label: string }[] = [
     { value: 'ALL', label: '전체' },
     { value: 'PENDING', label: '답변 대기' },
@@ -178,44 +155,32 @@ export default function PartnerInquiriesPage() {
       <PageContent>
         <DataTableShell
           toolbar={
-            <DataToolbar>
-              <DataToolbarSearch
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="상호명, 대표자명, 전화번호, 내용 검색..."
-              />
-              <DataToolbarFilters>
-                {filterOptions.map((opt) => {
-                  const count =
-                    opt.value === 'ALL'
-                      ? inquiries.length
-                      : inquiries.filter((i) => i.status === opt.value).length;
-                  const isActive = statusFilter === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => setStatusFilter(opt.value)}
-                      className={cn(
-                        'inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                      )}
-                    >
-                      {opt.label}
-                      <span
-                        className={cn(
-                          'tabular-nums',
-                          isActive ? 'text-primary-foreground' : 'text-muted-foreground'
-                        )}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </DataToolbarFilters>
-            </DataToolbar>
+            <Stack gap="md">
+              <Group gap="xs">
+                <DataToolbarSearch
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="상호명, 대표자명, 전화번호, 내용 검색..."
+                />
+              </Group>
+
+              <Divider />
+
+              <FilterRow label="답변 상태">
+                <FilterChips
+                  options={filterOptions.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                    count:
+                      opt.value === 'ALL'
+                        ? inquiries.length
+                        : inquiries.filter((i) => i.status === opt.value).length,
+                  }))}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                />
+              </FilterRow>
+            </Stack>
           }
         >
           {loading ? (
@@ -230,78 +195,76 @@ export default function PartnerInquiriesPage() {
               }
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-28">상태</TableHead>
-                  <TableHead>내용</TableHead>
-                  <TableHead className="w-44">파트너</TableHead>
-                  <TableHead className="w-44">작성일</TableHead>
-                  <TableHead className="w-24 text-center">답변</TableHead>
-                  <TableHead className="w-20 text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w={112}>상태</Table.Th>
+                  <Table.Th>내용</Table.Th>
+                  <Table.Th w={176}>파트너</Table.Th>
+                  <Table.Th w={176}>작성일</Table.Th>
+                  <Table.Th w={96} ta="center">답변</Table.Th>
+                  <Table.Th w={80} />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {filteredInquiries.map((inquiry) => (
-                  <TableRow
+                  <Table.Tr
                     key={inquiry.id}
-                    className="cursor-pointer"
+                    style={{ cursor: 'pointer' }}
                     onClick={() => handleInquiryClick(inquiry.id)}
                   >
-                    <TableCell>
+                    <Table.Td>
                       <StatusBadge.Inquiry
                         status={inquiry.status === 'PENDING' ? 'pending' : 'answered'}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <span className="line-clamp-2 max-w-md text-sm text-muted-foreground">
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed" maw={448} lineClamp={2}>
                         {inquiry.content}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Stack gap={0}>
+                        <Text size="sm" fw={500}>
                           {inquiry.partner?.businessName || '알 수 없음'}
-                        </span>
+                        </Text>
                         {inquiry.partner?.representativeName && (
-                          <span className="text-xs text-muted-foreground">
+                          <Text size="xs" c="dimmed">
                             {inquiry.partner.representativeName}
-                          </span>
+                          </Text>
                         )}
                         {inquiry.partner?.displayPhoneNumber && (
-                          <span className="text-xs text-muted-foreground">
+                          <Text size="xs" c="dimmed">
                             {inquiry.partner.displayPhoneNumber}
-                          </span>
+                          </Text>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(inquiry.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center gap-1 text-sm">
-                        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-medium tabular-nums">
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td c="dimmed">{formatDate(inquiry.createdAt)}</Table.Td>
+                    <Table.Td ta="center">
+                      <Group gap={4} justify="center" wrap="nowrap">
+                        <MessageSquare size={14} color="var(--mantine-color-dimmed)" />
+                        <Text size="sm" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {inquiry._replyCount || 0}
-                        </span>
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
+                        </Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td ta="right">
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleInquiryClick(inquiry.id);
                         }}
                         aria-label="상세 보기"
                       >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                        <Eye size={16} />
+                      </ActionIcon>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </TableBody>
+              </Table.Tbody>
             </Table>
           )}
         </DataTableShell>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import {
   PageContent,
@@ -9,63 +8,12 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTableShell } from '@/components/data-table-shell';
+import { Badge, Group, Table, Text, Tooltip } from '@mantine/core';
+import { TableSkeleton } from '@/components/skeletons';
 import { createClient } from '@/lib/supabase/client';
 import { getUserRoles } from '@/lib/auth';
 import { toast } from 'sonner';
-
-type UserReconfirmDetails = {
-  id: string;
-  userId: string;
-  reConfirmImageUrl: string;
-  status: string;
-  previousStatus: string;
-  createdAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    phoneNumber: string | null;
-    confirmImageUrl: string | null;
-    buildingNumber: number | null;
-    unit: number | null;
-    apartmentId: string | null;
-    user_roles?: { role: string }[];
-    apartments: {
-      id: string;
-      name: string;
-    } | null;
-  };
-};
-
-// 보류 상태 사용자 (재신청 안 한 사람)
-type SuspendedUser = {
-  id: string;
-  name: string;
-  email: string;
-  phoneNumber: string | null;
-  confirmImageUrl: string | null;
-  buildingNumber: number | null;
-  unit: number | null;
-  apartmentId: string | null;
-  approvalStatus: string;
-  suspensionReason: string | null;
-  createdAt: string;
-  user_roles?: { role: string }[];
-  apartments: {
-    id: string;
-    name: string;
-  } | null;
-};
 
 // 통합 타입
 type CombinedItem = {
@@ -300,15 +248,15 @@ export default function UserReconfirmPage() {
 
   const getStatusBadge = (status: string, type: 'previous' | 'current') => {
     if (status === 'suspended') {
-      return <Badge className="bg-yellow-500 text-white">보류</Badge>;
+      return <Badge variant="light" color="orange">보류</Badge>;
     } else if (status === 'inactive') {
-      return <Badge className="bg-gray-500 text-white">비활성</Badge>;
+      return <Badge variant="light" color="gray">비활성</Badge>;
     } else if (status === 'pending') {
-      return <Badge className="bg-blue-500 text-white">재신청 대기</Badge>;
+      return <Badge variant="light" color="blue">재신청 대기</Badge>;
     } else if (status === 'rejected') {
-      return <Badge className="bg-yellow-500 text-white">보류</Badge>;
+      return <Badge variant="light" color="orange">보류</Badge>;
     }
-    return <Badge variant="outline">{status}</Badge>;
+    return <Badge variant="light" color="gray">{status}</Badge>;
   };
 
   const reconfirmCount = combinedItems.filter(i => i.type === 'reconfirm').length;
@@ -324,116 +272,107 @@ export default function UserReconfirmPage() {
       </PageHeader>
 
       <PageContent>
-        <div className='text-sm text-muted-foreground flex gap-4'>
-          <span>전체 {combinedItems.length}건</span>
-          <span>•</span>
-          <span>재신청 {reconfirmCount}건</span>
-          <span>•</span>
-          <span>보류/비활성 {suspendedCount}건</span>
-        </div>
-
         {/* Combined Table */}
-        <Card className='bg-card border-border'>
-          <CardContent className='p-0'>
-            <div className='overflow-x-auto relative min-h-[400px]'>
-              <Table>
-                <TableHeader>
-                  <TableRow className='border-border hover:bg-transparent'>
-                    <TableHead className='text-muted-foreground'>
-                      구분
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      이름
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      전화번호
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      아파트/동/호
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      권한
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      상태
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      보류사유
-                    </TableHead>
-                    <TableHead className='text-muted-foreground'>
-                      날짜
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
-  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
-                      </TableCell>
-                    </TableRow>
-                  ) : combinedItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
-                        보류 대상이 없습니다.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    combinedItems.map((item) => (
-                      <TableRow
-                        key={`${item.type}-${item.id}`}
-                        className='border-border hover:bg-secondary/50 cursor-pointer'
-                        onClick={() => handleRowClick(item)}
+        <DataTableShell
+          summary={
+            <Group gap="md">
+              <Text size="sm" c="dimmed">전체 {combinedItems.length}건</Text>
+              <Text size="sm" c="dimmed">•</Text>
+              <Text size="sm" c="dimmed">재신청 {reconfirmCount}건</Text>
+              <Text size="sm" c="dimmed">•</Text>
+              <Text size="sm" c="dimmed">보류/비활성 {suspendedCount}건</Text>
+            </Group>
+          }
+        >
+          <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>구분</Table.Th>
+                <Table.Th>이름</Table.Th>
+                <Table.Th>전화번호</Table.Th>
+                <Table.Th>아파트/동/호</Table.Th>
+                <Table.Th>권한</Table.Th>
+                <Table.Th>상태</Table.Th>
+                <Table.Th>보류사유</Table.Th>
+                <Table.Th>날짜</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {loading ? (
+                <Table.Tr>
+                  <Table.Td colSpan={8} p={0}>
+                    <TableSkeleton rows={8} columns={8} showHeader={false} />
+                  </Table.Td>
+                </Table.Tr>
+              ) : combinedItems.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={8} ta="center" py={48} c="dimmed">
+                    보류 대상이 없습니다.
+                  </Table.Td>
+                </Table.Tr>
+              ) : (
+                combinedItems.map((item) => (
+                  <Table.Tr
+                    key={`${item.type}-${item.id}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleRowClick(item)}
+                  >
+                    <Table.Td>
+                      {item.type === 'reconfirm' ? (
+                        <Badge variant="light" color="blue">재신청</Badge>
+                      ) : (
+                        <Badge variant="light" color="orange">보류중</Badge>
+                      )}
+                    </Table.Td>
+                    <Table.Td fw={500}>
+                      <Group gap="xs" wrap="nowrap">
+                        {item.userName}
+                        {item.isPartner && (
+                          <Badge variant="light" color="grape" size="sm">파트너</Badge>
+                        )}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {item.userPhone || '-'}
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {item.apartmentName ? (
+                        <Text size="sm" c="dimmed">
+                          {item.apartmentName}<br/>
+                          {item.buildingNumber ? `${item.buildingNumber}동` : ''}
+                          {item.unit ? ` ${item.unit}호` : ''}
+                        </Text>
+                      ) : (
+                        '-'
+                      )}
+                    </Table.Td>
+                    <Table.Td c="dimmed" fz="sm">
+                      {getUserRole(item.userRoles)}
+                    </Table.Td>
+                    <Table.Td>
+                      {getStatusBadge(item.currentStatus, 'current')}
+                    </Table.Td>
+                    <Table.Td>
+                      <Tooltip
+                        label={item.suspensionReason}
+                        multiline
+                        maw={320}
+                        disabled={!item.suspensionReason}
                       >
-                        <TableCell>
-                          {item.type === 'reconfirm' ? (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">재신청</Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">보류중</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className='font-medium text-card-foreground'>
-                          <div className='flex items-center gap-2'>
-                            {item.userName}
-                            {item.isPartner && (
-                              <Badge className='bg-purple-500 text-white text-xs'>파트너</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {item.userPhone || '-'}
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {item.apartmentName ? (
-                            <span className='text-sm'>
-                              {item.apartmentName}<br/>
-                              {item.buildingNumber ? `${item.buildingNumber}동` : ''}
-                              {item.unit ? ` ${item.unit}호` : ''}
-                            </span>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell className='text-muted-foreground text-sm'>
-                          {getUserRole(item.userRoles)}
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(item.currentStatus, 'current')}
-                        </TableCell>
-                        <TableCell className='text-muted-foreground text-sm max-w-[150px] truncate'>
+                        <Text size="sm" c="dimmed" maw={150} truncate>
                           {item.suspensionReason || '-'}
-                        </TableCell>
-                        <TableCell className='text-muted-foreground'>
-                          {formatDate(item.createdAt)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                        </Text>
+                      </Tooltip>
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {formatDate(item.createdAt)}
+                    </Table.Td>
+                  </Table.Tr>
+                ))
+              )}
+            </Table.Tbody>
+          </Table>
+        </DataTableShell>
       </PageContent>
     </PageShell>
   );

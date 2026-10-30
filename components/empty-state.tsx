@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { LucideProps } from 'lucide-react';
 import { Inbox } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Stack, Text, ThemeIcon } from '@mantine/core';
 
 interface EmptyStateProps {
   icon?: ComponentType<LucideProps>;
@@ -20,36 +20,30 @@ export function EmptyState({
   className,
   size = 'md',
 }: EmptyStateProps): React.ReactElement {
+  const isSmall = size === 'sm';
   return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center text-center',
-        size === 'sm' ? 'gap-2 py-10' : 'gap-3 py-16',
-        className
-      )}
+    <Stack
+      align="center"
+      justify="center"
+      ta="center"
+      gap={isSmall ? 'xs' : 'sm'}
+      py={isSmall ? 40 : 64}
+      className={className}
     >
-      <div
-        className={cn(
-          'flex items-center justify-center rounded-full bg-muted text-muted-foreground',
-          size === 'sm' ? 'h-10 w-10' : 'h-12 w-12'
-        )}
-      >
-        <Icon className={size === 'sm' ? 'h-5 w-5' : 'h-6 w-6'} />
-      </div>
-      <div className="max-w-md">
-        <p
-          className={cn(
-            'font-semibold text-foreground',
-            size === 'sm' ? 'text-sm' : 'text-base'
-          )}
-        >
+      <ThemeIcon variant="light" color="gray" radius="xl" size={isSmall ? 40 : 48}>
+        <Icon size={isSmall ? 20 : 24} />
+      </ThemeIcon>
+      <Stack gap={4} maw={448} align="center">
+        <Text fw={600} size={isSmall ? 'sm' : 'md'}>
           {title}
-        </p>
+        </Text>
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <Text size="sm" c="dimmed">
+            {description}
+          </Text>
         )}
-      </div>
-      {action && <div className="mt-2">{action}</div>}
-    </div>
+      </Stack>
+      {action && <div style={{ marginTop: 8 }}>{action}</div>}
+    </Stack>
   );
 }

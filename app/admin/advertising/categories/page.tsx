@@ -1,31 +1,28 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PageContent, PageShell } from '@/components/page-shell';
+import { DataTableShell } from '@/components/data-table-shell';
+import { TableSkeleton } from '@/components/skeletons';
 import {
+  ActionIcon,
+  Badge,
+  Button,
+  Checkbox,
+  Divider,
+  Group,
+  Input,
+  Modal,
+  Paper,
+  SimpleGrid,
+  Stack,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import {
   Plus,
   Edit,
@@ -121,23 +118,26 @@ function SortableRow({ section, onEdit, onDelete }: {
   };
 
   return (
-    <TableRow
+    <Table.Tr
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className='border-border hover:bg-secondary/50'
     >
-      <TableCell>
-        <div
-          className='flex items-center gap-2 cursor-grab active:cursor-grabbing'
+      <Table.Td>
+        <Group
+          gap='xs'
+          wrap='nowrap'
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           {...listeners}
         >
-          <GripVertical className='h-4 w-4 text-muted-foreground' />
-          <span className='font-medium'>{section.orderIndex}</span>
-        </div>
-      </TableCell>
-      <TableCell className='font-medium'>
-        <div className='flex items-center gap-2'>
+          <Text c='dimmed' component='span' style={{ display: 'flex' }}>
+            <GripVertical size={16} />
+          </Text>
+          <Text component='span' size='sm' fw={500}>{section.orderIndex}</Text>
+        </Group>
+      </Table.Td>
+      <Table.Td fw={500}>
+        <Group gap='xs' wrap='nowrap'>
           {(section.adCategoryIconUrl || section.iconUrl) && (
             <img
               src={section.adCategoryIconUrl || section.iconUrl || ''}
@@ -147,65 +147,70 @@ function SortableRow({ section, onEdit, onDelete }: {
           )}
           {getSectionLabel()}
           {section.isFixed && (
-            <Badge variant='secondary' className='text-xs'>고정</Badge>
+            <Badge variant='light' color='gray' size='sm'>고정</Badge>
           )}
-        </div>
-      </TableCell>
-      <TableCell>
+        </Group>
+      </Table.Td>
+      <Table.Td>
         {section.autoSelectStartTime ? (
-          <div className='flex flex-col text-sm'>
-            <div className='flex items-center gap-1'>
-              <Calendar className='h-3 w-3 text-muted-foreground' />
-              <span>
+          <Stack gap={2}>
+            <Group gap={4} wrap='nowrap'>
+              <Text c='dimmed' component='span' style={{ display: 'flex' }}>
+                <Calendar size={12} />
+              </Text>
+              <Text size='sm' component='span'>
                 {section.autoSelectStartDate || '상시'} ~ {section.autoSelectEndDate || '상시'}
-              </span>
-            </div>
-            <div className='flex items-center gap-1'>
-              <Clock className='h-3 w-3 text-muted-foreground' />
-              <span>
+              </Text>
+            </Group>
+            <Group gap={4} wrap='nowrap'>
+              <Text c='dimmed' component='span' style={{ display: 'flex' }}>
+                <Clock size={12} />
+              </Text>
+              <Text size='sm' component='span'>
                 {formatTime(section.autoSelectStartTime)} ~ {formatTime(section.autoSelectEndTime)}
-              </span>
-            </div>
-          </div>
+              </Text>
+            </Group>
+          </Stack>
         ) : (
-          <span className='text-muted-foreground'>-</span>
+          <Text component='span' size='sm' c='dimmed'>-</Text>
         )}
-      </TableCell>
-      <TableCell>
+      </Table.Td>
+      <Table.Td>
         {section.isActive ? (
-          <Badge className='bg-green-500'>활성</Badge>
+          <Badge variant='light' color='green'>활성</Badge>
         ) : (
-          <Badge variant='secondary'>비활성</Badge>
+          <Badge variant='light' color='gray'>비활성</Badge>
         )}
-      </TableCell>
-      <TableCell className='text-right'>
-        <div className='flex justify-end gap-2' onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant='ghost'
-            size='sm'
+      </Table.Td>
+      <Table.Td>
+        <Group gap={4} justify='flex-end' wrap='nowrap' onClick={(e) => e.stopPropagation()}>
+          <ActionIcon
+            variant='subtle'
+            color='gray'
+            aria-label='수정'
             onClick={(e) => {
               e.stopPropagation();
               onEdit(section);
             }}
           >
-            <Edit className='h-4 w-4' />
-          </Button>
+            <Edit size={16} />
+          </ActionIcon>
           {section.sectionType === 'AD_CATEGORY' && !section.isFixed && (
-            <Button
-              variant='ghost'
-              size='sm'
+            <ActionIcon
+              variant='subtle'
+              color='red'
+              aria-label='삭제'
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(section);
               }}
-              className='text-destructive hover:text-destructive'
             >
-              <Trash2 className='h-4 w-4' />
-            </Button>
+              <Trash2 size={16} />
+            </ActionIcon>
           )}
-        </div>
-      </TableCell>
-    </TableRow>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
   );
 }
 
@@ -224,7 +229,7 @@ export default function AdCategoriesPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<HomeSection | null>(null);
-  const [currentId, setCurrentId] = useState<string>('');
+  const [, setCurrentId] = useState<string>('');
   const [uploadedIconUrl, setUploadedIconUrl] = useState<string>('');
   const [form, setForm] = useState({
     categoryName: '',
@@ -242,6 +247,7 @@ export default function AdCategoriesPage() {
 
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingSection, setDeletingSection] = useState<HomeSection | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchSections = useCallback(async () => {
     setLoading(true);
@@ -471,6 +477,7 @@ export default function AdCategoriesPage() {
   const handleDeleteConfirm = async () => {
     if (!deletingSection || !deletingSection.adCategoryId) return;
 
+    setDeleting(true);
     try {
       // Storage에서 아이콘 이미지 삭제 (있는 경우)
       const iconUrl = deletingSection.iconUrl || deletingSection.adCategoryIconUrl;
@@ -493,6 +500,8 @@ export default function AdCategoriesPage() {
     } catch (err:any) {
       console.error('Failed to delete category:', err);
       toast.error(err.message || '카테고리 삭제에 실패했습니다.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -621,238 +630,212 @@ export default function AdCategoriesPage() {
   };
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+    <PageShell>
       <AdminHeader title='홈 섹션 관리' />
 
-      <div className="flex flex-col gap-6">
-        <div className='flex justify-between items-center'>
-          <p className='text-sm text-muted-foreground'>
+      <PageContent>
+        <Group justify='space-between' align='center'>
+          <Text size='sm' c='dimmed'>
             드래그하여 섹션 순서를 변경할 수 있습니다.
-          </p>
-          <Button onClick={() => {
-            resetForm();
-            setIsDialogOpen(true);
-          }}>
-            <Plus className='h-4 w-4 mr-2' />
+          </Text>
+          <Button
+            leftSection={<Plus size={16} />}
+            onClick={() => {
+              resetForm();
+              setIsDialogOpen(true);
+            }}
+          >
             광고 카테고리 추가
           </Button>
-        </div>
+        </Group>
 
-        <Card className='bg-card border-border'>
-          <CardContent className='p-0'>
-            <div className='overflow-x-auto'>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <Table>
-                  <TableHeader>
-                    <TableRow className='border-border hover:bg-transparent'>
-                      <TableHead className='text-muted-foreground w-32'>순서</TableHead>
-                      <TableHead className='text-muted-foreground'>섹션</TableHead>
-                      <TableHead className='text-muted-foreground'>자동 선택 스케줄</TableHead>
-                      <TableHead className='text-muted-foreground'>상태</TableHead>
-                      <TableHead className='text-muted-foreground text-right'>작업</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className='text-center py-12 text-muted-foreground'>
-  <div className="flex flex-col gap-3 py-2"><Skeleton className="h-4 w-2/3 mx-auto" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5 mx-auto" /></div>
-                        </TableCell>
-                      </TableRow>
-                    ) : sections.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className='text-center py-12 text-muted-foreground'>
-                          섹션이 없습니다.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      <SortableContext
-                        items={sections.map(s => s.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {sections.map((section) => (
-                          <SortableRow
-                            key={section.id}
-                            section={section}
-                            onEdit={handleEditClick}
-                            onDelete={handleDeleteClick}
-                          />
-                        ))}
-                      </SortableContext>
-                    )}
-                  </TableBody>
-                </Table>
-              </DndContext>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <DataTableShell>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <Table highlightOnHover verticalSpacing='sm' horizontalSpacing='md'>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w={128}>순서</Table.Th>
+                  <Table.Th>섹션</Table.Th>
+                  <Table.Th>자동 선택 스케줄</Table.Th>
+                  <Table.Th>상태</Table.Th>
+                  <Table.Th ta='right'>작업</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {loading ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={5} p={0}>
+                      <TableSkeleton rows={8} columns={5} showHeader={false} />
+                    </Table.Td>
+                  </Table.Tr>
+                ) : sections.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={5} ta='center' py={48} c='dimmed'>
+                      섹션이 없습니다.
+                    </Table.Td>
+                  </Table.Tr>
+                ) : (
+                  <SortableContext
+                    items={sections.map(s => s.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {sections.map((section) => (
+                      <SortableRow
+                        key={section.id}
+                        section={section}
+                        onEdit={handleEditClick}
+                        onDelete={handleDeleteClick}
+                      />
+                    ))}
+                  </SortableContext>
+                )}
+              </Table.Tbody>
+            </Table>
+          </DndContext>
+        </DataTableShell>
+      </PageContent>
 
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className='sm:max-w-[600px]'>
-          <DialogHeader>
-            <DialogTitle>
-              {editingSection ? '섹션 수정' : '광고 카테고리 추가'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingSection?.isFixed 
-                ? "고정 섹션의 순서, 아이콘, 스케줄 등을 수정합니다."
-                : "새로운 광고 카테고리를 추가하거나 기존 카테고리 정보를 수정합니다."
-              }
-            </DialogDescription>
-          </DialogHeader>
+      <Modal
+        opened={isDialogOpen}
+        onClose={() => handleDialogClose(false)}
+        title={editingSection ? '섹션 수정' : '광고 카테고리 추가'}
+        size={600}
+      >
+        <Stack gap='md'>
+          <Text size='sm' c='dimmed'>
+            {editingSection?.isFixed 
+              ? "고정 섹션의 순서, 아이콘, 스케줄 등을 수정합니다."
+              : "새로운 광고 카테고리를 추가하거나 기존 카테고리 정보를 수정합니다."
+            }
+          </Text>
 
-          <div className='space-y-4 py-4 max-h-[70vh] overflow-y-auto'>
-            
-            {editingSection?.isFixed ? (
-               <div className='space-y-2'>
-                <Label>섹션 타입</Label>
-                <Input value={editingSection.displayName || ''} disabled className='bg-muted' />
-              </div>
-            ) : (
-              <div className='space-y-2'>
-                <Label htmlFor='categoryName'>카테고리 이름 *</Label>
-                <Input
-                  id='categoryName'
-                  value={form.categoryName}
-                  onChange={(e) => handleFormChange('categoryName', e.target.value)}
-                  placeholder='필라테스, 영어학원 등'
-                  disabled={!!editingSection}
-                />
-                {editingSection && <p className='text-xs text-muted-foreground'>카테고리 이름은 변경할 수 없습니다.</p>}
-              </div>
+          {editingSection?.isFixed ? (
+            <TextInput label='섹션 타입' value={editingSection.displayName || ''} disabled />
+          ) : (
+            <TextInput
+              id='categoryName'
+              label='카테고리 이름 *'
+              value={form.categoryName}
+              onChange={(e) => handleFormChange('categoryName', e.target.value)}
+              placeholder='필라테스, 영어학원 등'
+              disabled={!!editingSection}
+              description={editingSection ? '카테고리 이름은 변경할 수 없습니다.' : undefined}
+              inputWrapperOrder={['label', 'input', 'description', 'error']}
+            />
+          )}
+
+          <Input.Wrapper label='아이콘'>
+            <ImageUpload
+              bucket='advertisements'
+              storagePath={editingSection?.isFixed ? 'sections/icons' : 'categories/icons'}
+              value={form.iconUrl || ''}
+              onChange={(url) => handleFormChange('iconUrl', url)}
+              accept='image/png,image/svg+xml'
+              maxSizeMB={2}
+              previewSize='sm'
+              description='PNG 또는 SVG 파일, 최대 2MB'
+            />
+          </Input.Wrapper>
+
+          <TextInput
+            id='orderIndex'
+            label='표시 순서 *'
+            type='number'
+            value={form.orderIndex || 0}
+            onChange={(e) => handleOrderIndexChange(parseInt(e.target.value) || 0)}
+            placeholder='1'
+            error={orderIndexError}
+          />
+
+          <Checkbox
+            id='isActive'
+            label='활성화'
+            checked={form.isActive}
+            onChange={(e) => handleFormChange('isActive', e.currentTarget.checked)}
+          />
+
+          <Divider />
+
+          <Stack gap='md'>
+            <Title order={5}>자동 선택 스케줄 설정</Title>
+            <Checkbox
+              id='useSchedule'
+              label='스케줄 사용'
+              checked={form.useSchedule}
+              onChange={(e) => handleFormChange('useSchedule', e.currentTarget.checked)}
+            />
+
+            {form.useSchedule && (
+              <Paper withBorder radius='md' p='md'>
+                <Stack gap='md'>
+                  <SimpleGrid cols={2} spacing='md'>
+                    <TextInput
+                      id='autoSelectStartDate'
+                      label='시작 날짜'
+                      type='date'
+                      value={form.autoSelectStartDate || ''}
+                      onChange={(e) => handleFormChange('autoSelectStartDate', e.target.value)}
+                    />
+                    <TextInput
+                      id='autoSelectEndDate'
+                      label='종료 날짜'
+                      type='date'
+                      value={form.autoSelectEndDate || ''}
+                      onChange={(e) => handleFormChange('autoSelectEndDate', e.target.value)}
+                    />
+                  </SimpleGrid>
+                  <SimpleGrid cols={2} spacing='md'>
+                    <TextInput
+                      id='autoSelectStartTime'
+                      label='시작 시간'
+                      type='time'
+                      value={form.autoSelectStartTime || ''}
+                      onChange={(e) => handleFormChange('autoSelectStartTime', e.target.value)}
+                    />
+                    <TextInput
+                      id='autoSelectEndTime'
+                      label='종료 시간'
+                      type='time'
+                      value={form.autoSelectEndTime || ''}
+                      onChange={(e) => handleFormChange('autoSelectEndTime', e.target.value)}
+                    />
+                  </SimpleGrid>
+                  {scheduleError && <Text size='sm' c='red'>{scheduleError}</Text>}
+                </Stack>
+              </Paper>
             )}
+          </Stack>
+        </Stack>
 
-            <div className='space-y-2'>
-              <Label>아이콘</Label>
-              <ImageUpload
-                bucket='advertisements'
-                storagePath={editingSection?.isFixed ? 'sections/icons' : 'categories/icons'}
-                value={form.iconUrl || ''}
-                onChange={(url) => handleFormChange('iconUrl', url)}
-                accept='image/png,image/svg+xml'
-                maxSizeMB={2}
-                previewSize='sm'
-                description='PNG 또는 SVG 파일, 최대 2MB'
-              />
-            </div>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => handleDialogClose(false)}>
+            취소
+          </Button>
+          <Button onClick={handleSave} disabled={!!orderIndexError || !!scheduleError}>
+            {editingSection ? '수정' : '생성'}
+          </Button>
+        </Group>
+      </Modal>
 
-            <div className='space-y-2'>
-              <Label htmlFor='orderIndex'>표시 순서 *</Label>
-              <Input
-                id='orderIndex'
-                type='number'
-                value={form.orderIndex || 0}
-                onChange={(e) => handleOrderIndexChange(parseInt(e.target.value) || 0)}
-                placeholder='1'
-                className={orderIndexError ? 'border-destructive' : ''}
-              />
-              {orderIndexError && <p className='text-xs text-destructive'>{orderIndexError}</p>}
-            </div>
-
-            <div className='flex items-center space-x-2'>
-              <Checkbox
-                id='isActive'
-                checked={form.isActive}
-                onCheckedChange={(checked) => handleFormChange('isActive', checked as boolean)}
-              />
-              <Label htmlFor='isActive'>활성화</Label>
-            </div>
-
-            <div className='border-t pt-4 space-y-4'>
-              <h4 className='font-medium'>자동 선택 스케줄 설정</h4>
-              <div className='flex items-center space-x-2'>
-                <Checkbox
-                  id='useSchedule'
-                  checked={form.useSchedule}
-                  onCheckedChange={(checked) => handleFormChange('useSchedule', checked as boolean)}
-                />
-                <Label htmlFor='useSchedule'>스케줄 사용</Label>
-              </div>
-
-              {form.useSchedule && (
-                <div className='space-y-4 rounded-md border p-4'>
-                  <div className='grid grid-cols-2 gap-4'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='autoSelectStartDate'>시작 날짜</Label>
-                      <Input
-                        id='autoSelectStartDate'
-                        type='date'
-                        value={form.autoSelectStartDate || ''}
-                        onChange={(e) => handleFormChange('autoSelectStartDate', e.target.value)}
-                      />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='autoSelectEndDate'>종료 날짜</Label>
-                      <Input
-                        id='autoSelectEndDate'
-                        type='date'
-                        value={form.autoSelectEndDate || ''}
-                        onChange={(e) => handleFormChange('autoSelectEndDate', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className='grid grid-cols-2 gap-4'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='autoSelectStartTime'>시작 시간</Label>
-                      <Input
-                        id='autoSelectStartTime'
-                        type='time'
-                        value={form.autoSelectStartTime || ''}
-                        onChange={(e) => handleFormChange('autoSelectStartTime', e.target.value)}
-                      />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='autoSelectEndTime'>종료 시간</Label>
-                      <Input
-                        id='autoSelectEndTime'
-                        type='time'
-                        value={form.autoSelectEndTime || ''}
-                        onChange={(e) => handleFormChange('autoSelectEndTime', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  {scheduleError && <p className='text-sm text-destructive'>{scheduleError}</p>}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant='outline' onClick={() => handleDialogClose(false)}>
-              취소
-            </Button>
-            <Button onClick={handleSave} disabled={!!orderIndexError || !!scheduleError}>
-              {editingSection ? '수정' : '생성'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>카테고리 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingSection?.categoryName}</strong> 카테고리를 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없으며, 연관된 홈 섹션도 함께 삭제됩니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDeleteDialog(false)}>
-              취소
-            </Button>
-            <Button variant='destructive' onClick={handleDeleteConfirm}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <Modal opened={deleteDialog} onClose={() => setDeleteDialog(false)} title='카테고리 삭제' closeOnClickOutside={!deleting} closeOnEscape={!deleting}>
+        <Text size='sm' c='dimmed'>
+          정말로 <strong>{deletingSection?.categoryName}</strong> 카테고리를 삭제하시겠습니까?
+          <br />
+          이 작업은 되돌릴 수 없으며, 연관된 홈 섹션도 함께 삭제됩니다.
+        </Text>
+        <Group justify='flex-end' mt='lg'>
+          <Button variant='default' onClick={() => setDeleteDialog(false)} disabled={deleting}>
+            취소
+          </Button>
+          <Button color='red' onClick={handleDeleteConfirm} disabled={deleting}>
+            {deleting ? '삭제 중...' : '삭제'}
+          </Button>
+        </Group>
+      </Modal>
+    </PageShell>
   );
 }

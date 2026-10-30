@@ -20,6 +20,7 @@ import {
   BarChart,
   CartesianGrid,
   ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -32,15 +33,20 @@ import {
 } from '@/components/page-shell';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
+  Box,
+  Button,
+  Grid,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Tabs,
+  Text,
+  ThemeIcon,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
 
 const trendData = [
   { day: '04/22', users: 980, ads: 32, inquiries: 14 },
@@ -121,25 +127,25 @@ export default function DashboardPage(): React.ReactElement {
         />
         <PageHeaderActions>
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
+            leftSection={<Building2 size={16} />}
             onClick={() => router.push('/admin/apartments')}
           >
-            <Building2 className="mr-1.5 h-4 w-4" />
             아파트 목록
           </Button>
           <Button
             size="sm"
+            rightSection={<ArrowUpRight size={16} />}
             onClick={() => router.push('/admin/advertising-v2/applications')}
           >
             광고 검수 시작
-            <ArrowUpRight className="ml-1.5 h-4 w-4" />
           </Button>
         </PageHeaderActions>
       </PageHeader>
 
       <PageContent>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SimpleGrid cols={{ base: 1, sm: 2, xl: 4 }} spacing="md">
           <StatCard
             label="총 회원 수"
             value="1,234"
@@ -172,246 +178,308 @@ export default function DashboardPage(): React.ReactElement {
             deltaLabel="지난 달 대비"
             accent="warning"
           />
-        </div>
+        </SimpleGrid>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="overflow-hidden border-border/70 shadow-card lg:col-span-2">
-            <CardHeader className="flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle className="text-base">최근 7일 추이</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  주요 지표의 일별 변화
-                </p>
-              </div>
+        <Grid gap="md">
+          <Grid.Col span={{ base: 12, lg: 8 }}>
+            <Paper withBorder radius="md" p="lg" h="100%">
               <Tabs defaultValue="users">
-                <TabsList>
-                  <TabsTrigger value="users">
-                    회원
-                  </TabsTrigger>
-                  <TabsTrigger value="ads">
-                    광고
-                  </TabsTrigger>
-                  <TabsTrigger value="inquiries">
-                    문의
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="users" className="mt-4">
-                  <ChartContainer config={chartConfig} className="h-[260px] w-full">
-                    <AreaChart data={trendData}>
-                      <defs>
-                        <linearGradient id="fillUsers" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        className="stroke-border/70"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="day"
-                        className="text-xs"
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: 'oklch(0.5 0.015 260)' }}
-                      />
-                      <YAxis
-                        className="text-xs"
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: 'oklch(0.5 0.015 260)' }}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Area
-                        dataKey="users"
-                        type="monotone"
-                        stroke="var(--color-chart-1)"
-                        strokeWidth={2}
-                        fill="url(#fillUsers)"
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                </TabsContent>
-                <TabsContent value="ads" className="mt-4">
-                  <ChartContainer config={chartConfig} className="h-[260px] w-full">
-                    <AreaChart data={trendData}>
-                      <defs>
-                        <linearGradient id="fillAds" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--color-chart-2)" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="var(--color-chart-2)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        className="stroke-border/70"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="day"
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: 'oklch(0.5 0.015 260)' }}
-                      />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: 'oklch(0.5 0.015 260)' }}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Area
-                        dataKey="ads"
-                        type="monotone"
-                        stroke="var(--color-chart-2)"
-                        strokeWidth={2}
-                        fill="url(#fillAds)"
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                </TabsContent>
-                <TabsContent value="inquiries" className="mt-4">
-                  <ChartContainer config={chartConfig} className="h-[260px] w-full">
-                    <AreaChart data={trendData}>
-                      <defs>
-                        <linearGradient id="fillInq" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--color-chart-4)" stopOpacity={0.45} />
-                          <stop offset="95%" stopColor="var(--color-chart-4)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        className="stroke-border/70"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="day"
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: 'oklch(0.5 0.015 260)' }}
-                      />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fill: 'oklch(0.5 0.015 260)' }}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Area
-                        dataKey="inquiries"
-                        type="monotone"
-                        stroke="var(--color-chart-4)"
-                        strokeWidth={2}
-                        fill="url(#fillInq)"
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                </TabsContent>
+                <Group justify="space-between" align="flex-start" gap="sm" mb="md">
+                  <Stack gap={4}>
+                    <Title order={4}>최근 7일 추이</Title>
+                    <Text size="sm" c="dimmed">
+                      주요 지표의 일별 변화
+                    </Text>
+                  </Stack>
+                  <Tabs.List>
+                    <Tabs.Tab value="users">회원</Tabs.Tab>
+                    <Tabs.Tab value="ads">광고</Tabs.Tab>
+                    <Tabs.Tab value="inquiries">문의</Tabs.Tab>
+                  </Tabs.List>
+                </Group>
+                <Tabs.Panel value="users">
+                  <Box h={260} w="100%">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trendData}>
+                        <defs>
+                          <linearGradient id="fillUsers" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--mantine-color-blue-6)" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="var(--mantine-color-blue-6)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--app-divider)"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="day"
+                          fontSize="0.75rem"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: 'var(--mantine-color-dimmed)' }}
+                        />
+                        <YAxis
+                          fontSize="0.75rem"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: 'var(--mantine-color-dimmed)' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: 'var(--mantine-color-body)',
+                            border: '1px solid var(--app-divider)',
+                            borderRadius: 'var(--mantine-radius-md)',
+                            fontSize: '0.75rem',
+                          }}
+                        />
+                        <Area
+                          dataKey="users"
+                          name={chartConfig.users.label}
+                          type="monotone"
+                          stroke="var(--mantine-color-blue-6)"
+                          strokeWidth={2}
+                          fill="url(#fillUsers)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Tabs.Panel>
+                <Tabs.Panel value="ads">
+                  <Box h={260} w="100%">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trendData}>
+                        <defs>
+                          <linearGradient id="fillAds" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--mantine-color-teal-6)" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="var(--mantine-color-teal-6)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--app-divider)"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="day"
+                          fontSize="0.75rem"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: 'var(--mantine-color-dimmed)' }}
+                        />
+                        <YAxis
+                          fontSize="0.75rem"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: 'var(--mantine-color-dimmed)' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: 'var(--mantine-color-body)',
+                            border: '1px solid var(--app-divider)',
+                            borderRadius: 'var(--mantine-radius-md)',
+                            fontSize: '0.75rem',
+                          }}
+                        />
+                        <Area
+                          dataKey="ads"
+                          name={chartConfig.ads.label}
+                          type="monotone"
+                          stroke="var(--mantine-color-teal-6)"
+                          strokeWidth={2}
+                          fill="url(#fillAds)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Tabs.Panel>
+                <Tabs.Panel value="inquiries">
+                  <Box h={260} w="100%">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trendData}>
+                        <defs>
+                          <linearGradient id="fillInq" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--mantine-color-orange-6)" stopOpacity={0.45} />
+                            <stop offset="95%" stopColor="var(--mantine-color-orange-6)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--app-divider)"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="day"
+                          fontSize="0.75rem"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: 'var(--mantine-color-dimmed)' }}
+                        />
+                        <YAxis
+                          fontSize="0.75rem"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: 'var(--mantine-color-dimmed)' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: 'var(--mantine-color-body)',
+                            border: '1px solid var(--app-divider)',
+                            borderRadius: 'var(--mantine-radius-md)',
+                            fontSize: '0.75rem',
+                          }}
+                        />
+                        <Area
+                          dataKey="inquiries"
+                          name={chartConfig.inquiries.label}
+                          type="monotone"
+                          stroke="var(--mantine-color-orange-6)"
+                          strokeWidth={2}
+                          fill="url(#fillInq)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Tabs.Panel>
               </Tabs>
-            </CardHeader>
-          </Card>
+            </Paper>
+          </Grid.Col>
 
-          <Card className="border-border/70 shadow-card">
-            <CardHeader className="border-b border-border/60 pb-4">
-              <CardTitle className="text-base">처리해야 할 작업</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                지금 확인하면 좋은 항목
-              </p>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ul className="divide-y divide-border/60">
-                {recentActivity.map((item) => (
-                  <li
+          <Grid.Col span={{ base: 12, lg: 4 }}>
+            <Paper withBorder radius="md" h="100%" style={{ overflow: 'hidden' }}>
+              <Stack
+                gap={4}
+                p="lg"
+                style={{ borderBottom: '1px solid var(--app-divider)' }}
+              >
+                <Title order={4}>처리해야 할 작업</Title>
+                <Text size="sm" c="dimmed">
+                  지금 확인하면 좋은 항목
+                </Text>
+              </Stack>
+              <Stack gap={0}>
+                {recentActivity.map((item, index) => (
+                  <UnstyledButton
                     key={item.href}
-                    className="group flex cursor-pointer items-start justify-between gap-3 px-5 py-4 transition-colors duration-150 hover:bg-muted/50"
                     onClick={() => router.push(item.href)}
+                    px="lg"
+                    py="md"
+                    className="hover:bg-[var(--mantine-color-default-hover)]"
+                    style={
+                      index > 0
+                        ? { borderTop: '1px solid var(--app-divider)' }
+                        : undefined
+                    }
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {item.title}
-                        </p>
-                        <StatusBadge variant={item.badge} size="sm">
-                          {item.badgeLabel}
-                        </StatusBadge>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {item.description}
-                      </p>
-                    </div>
-                    <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
-                  </li>
+                    <Group justify="space-between" align="flex-start" gap="sm" wrap="nowrap">
+                      <Box miw={0} style={{ flex: 1 }}>
+                        <Group gap="xs" wrap="nowrap">
+                          <Text size="sm" fw={500} truncate>
+                            {item.title}
+                          </Text>
+                          <StatusBadge variant={item.badge} size="sm">
+                            {item.badgeLabel}
+                          </StatusBadge>
+                        </Group>
+                        <Text size="xs" c="dimmed" mt={4}>
+                          {item.description}
+                        </Text>
+                      </Box>
+                      <Text c="dimmed" mt={4} style={{ flexShrink: 0, display: 'flex' }}>
+                        <ArrowUpRight size={16} />
+                      </Text>
+                    </Group>
+                  </UnstyledButton>
                 ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
+              </Stack>
+            </Paper>
+          </Grid.Col>
+        </Grid>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="border-border/70 shadow-card">
-            <CardHeader className="border-b border-border/60 pb-4">
-              <CardTitle className="text-base">입주민 상태 분포</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
+        <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap={4} mb="lg">
+              <Title order={4}>입주민 상태 분포</Title>
+              <Text size="sm" c="dimmed">
                 전체 가입자의 현재 상태
-              </p>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <ChartContainer config={distributionConfig} className="h-[200px] w-full">
+              </Text>
+            </Stack>
+            <Box h={200} w="100%">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={distribution} barCategoryGap={24}>
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    className="stroke-border/70"
+                    stroke="var(--app-divider)"
                     vertical={false}
                   />
                   <XAxis
                     dataKey="label"
+                    fontSize="0.75rem"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'oklch(0.5 0.015 260)' }}
+                    tick={{ fill: 'var(--mantine-color-dimmed)' }}
                   />
                   <YAxis
+                    fontSize="0.75rem"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'oklch(0.5 0.015 260)' }}
+                    tick={{ fill: 'var(--mantine-color-dimmed)' }}
                   />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="var(--color-chart-1)" />
+                  <Tooltip
+                    cursor={{ fill: 'var(--mantine-color-default-hover)' }}
+                    contentStyle={{
+                      background: 'var(--mantine-color-body)',
+                      border: '1px solid var(--app-divider)',
+                      borderRadius: 'var(--mantine-radius-md)',
+                      fontSize: '0.75rem',
+                    }}
+                  />
+                  <Bar
+                    dataKey="value"
+                    name={distributionConfig.value.label}
+                    radius={[6, 6, 0, 0]}
+                    fill="var(--mantine-color-blue-6)"
+                  />
                 </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
+              </ResponsiveContainer>
+            </Box>
+          </Paper>
 
-          <Card className="border-border/70 shadow-card">
-            <CardHeader className="border-b border-border/60 pb-4">
-              <CardTitle className="text-base">빠른 작업</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap={4} mb="lg">
+              <Title order={4}>빠른 작업</Title>
+              <Text size="sm" c="dimmed">
                 자주 사용하는 메뉴로 바로 이동
-              </p>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {quickActions.map((q) => {
-                  const Icon = q.icon;
-                  return (
-                    <button
-                      key={q.href}
-                      onClick={() => router.push(q.href)}
-                      className={cn(
-                        'group flex flex-col items-start gap-2 rounded-lg border border-border/70 bg-card p-4 text-left transition-all duration-200 ease-spring',
-                        'hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-card-hover'
-                      )}
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <span className="text-sm font-medium text-foreground">
+              </Text>
+            </Stack>
+            <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
+              {quickActions.map((q) => {
+                const Icon = q.icon;
+                return (
+                  <UnstyledButton
+                    key={q.href}
+                    onClick={() => router.push(q.href)}
+                    p="md"
+                    className="hover:bg-[var(--mantine-color-default-hover)]"
+                    style={{
+                      border: '1px solid var(--app-divider)',
+                      borderRadius: 'var(--mantine-radius-md)',
+                    }}
+                  >
+                    <Stack gap="xs" align="flex-start">
+                      <ThemeIcon variant="light" color="blue" size="lg" radius="md">
+                        <Icon size={16} />
+                      </ThemeIcon>
+                      <Text size="sm" fw={500}>
                         {q.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                      </Text>
+                    </Stack>
+                  </UnstyledButton>
+                );
+              })}
+            </SimpleGrid>
+          </Paper>
+        </SimpleGrid>
       </PageContent>
     </PageShell>
   );

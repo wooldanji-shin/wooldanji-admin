@@ -23,6 +23,7 @@ export function useDeviceSelection({
   const [deleteDialog, setDeleteDialog] = useState<boolean>(false);
   const [deviceToDelete, setDeviceToDelete] = useState<string | null>(null);
   const [bulkDeleteDialog, setBulkDeleteDialog] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const clearSelection = (): void => {
     setSelectedDevices(new Set());
@@ -68,6 +69,7 @@ export function useDeviceSelection({
 
     if (deviceToDelete.startsWith('temp-')) return;
 
+    setDeleting(true);
     try {
       const { error } = await supabase
         .from('devices')
@@ -86,6 +88,8 @@ export function useDeviceSelection({
       console.error('Failed to delete device:', err);
       toast.error('기기 삭제에 실패했습니다. 페이지를 새로고침해주세요.');
       await fetchData();
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -137,6 +141,7 @@ export function useDeviceSelection({
     deleteDialog,
     setDeleteDialog,
     deviceToDelete,
+    deleting,
     handleDeleteDevice,
     confirmDeleteDevice,
     bulkDeleteDialog,

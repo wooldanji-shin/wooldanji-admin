@@ -6,12 +6,21 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { InlineLoadingSkeleton } from '@/components/skeletons';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { confirmModal } from '@/components/confirm-modal';
+import { DetailSkeleton } from '@/components/skeletons';
+import {
+  ActionIcon,
+  Box,
+  Button,
+  Group,
+  Input,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/supabase';
 import {
@@ -19,7 +28,6 @@ import {
   Save,
   Upload,
   X,
-  Image as ImageIcon,
   Trash2,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -330,7 +338,7 @@ export default function NotificationSettingsPage() {
       }
 
       // Create new notification
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('home_notifications')
         .insert({
           title: title.trim() || null,
@@ -366,7 +374,7 @@ export default function NotificationSettingsPage() {
       return;
     }
 
-    if (!confirm('현재 알림을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+    if (!(await confirmModal({ title: '알림 삭제', message: '현재 알림을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', confirmLabel: '삭제', danger: true }))) {
       return;
     }
 
@@ -421,14 +429,7 @@ export default function NotificationSettingsPage() {
   };
 
   if (loading) {
-    return (
-      <PageShell>
-        <PageHeader>
-          <PageHeaderTitle title="비활성 아파트 첫 화면" />
-        </PageHeader>
-        <InlineLoadingSkeleton />
-      </PageShell>
-    );
+    return <DetailSkeleton sections={2} />;
   }
 
   return (
@@ -441,196 +442,213 @@ export default function NotificationSettingsPage() {
       </PageHeader>
 
       <PageContent>
-        <div className='space-y-6'>
-          {/* Current Notification Display */}
-          {currentNotification && (
-            <Card className='bg-card border-border'>
-              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-4'>
-                <CardTitle className='text-card-foreground'>현재 등록된 알림</CardTitle>
+        {/* Current Notification Display */}
+        {currentNotification && (
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="md">
+              <Group justify="space-between" wrap="nowrap">
+                <Title order={4}>현재 등록된 알림</Title>
                 <Button
-                  variant='destructive'
-                  size='sm'
+                  color="red"
+                  size="sm"
                   onClick={handleDelete}
                   disabled={deleting}
+                  leftSection={deleting ? undefined : <Trash2 size={16} />}
                 >
-                  {deleting ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <>
-                      <Trash2 className='h-4 w-4 mr-2' />
-                      삭제
-                    </>
-                  )}
+                  {deleting ? <Loader2 size={16} className="animate-spin" /> : '삭제'}
                 </Button>
-              </CardHeader>
-              <CardContent>
-                <div className='space-y-4'>
-                  {currentNotification.imageUrl && (
-                    <div className='relative w-full aspect-video rounded-lg overflow-hidden bg-muted border border-border'>
-                      <Image
-                        src={currentNotification.imageUrl}
-                        alt={currentNotification.title || '알림 이미지'}
-                        fill
-                        className='object-contain'
-                      />
-                    </div>
-                  )}
-                  {currentNotification.title && (
-                    <h3 className='font-semibold text-lg'>{currentNotification.title}</h3>
-                  )}
-                  <p className='text-muted-foreground'>{currentNotification.content}</p>
-                  {currentNotification.linkUrl && (
-                    <p className='text-sm text-primary truncate'>
-                      링크: {currentNotification.linkUrl}
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Notification Form */}
-          <Card className='bg-card border-border'>
-            <CardHeader>
-              <CardTitle className='text-card-foreground'>
-                {currentNotification ? '새 알림으로 교체' : '새 알림 만들기'}
-              </CardTitle>
-              {currentNotification && (
-                <p className='text-sm text-muted-foreground mt-1'>
-                  저장하면 현재 알림이 삭제되고 새 알림으로 교체됩니다.
-                </p>
+              </Group>
+              {currentNotification.imageUrl && (
+                <Box
+                  pos="relative"
+                  w="100%"
+                  bg="var(--app-bg-muted)"
+                  style={{
+                    aspectRatio: '16 / 9',
+                    overflow: 'hidden',
+                    borderRadius: 'var(--mantine-radius-md)',
+                    border: '1px solid var(--app-divider)',
+                  }}
+                >
+                  <Image
+                    src={currentNotification.imageUrl}
+                    alt={currentNotification.title || '알림 이미지'}
+                    fill
+                    className="object-contain"
+                  />
+                </Box>
               )}
-            </CardHeader>
-            <CardContent className='space-y-6'>
-              {/* Image Upload */}
-              <div className='space-y-2'>
-                <Label className='text-sm font-medium'>이미지</Label>
-                {imagePreview ? (
-                  <div className='relative w-full aspect-video rounded-lg overflow-hidden bg-muted border border-border'>
-                    <Image
-                      src={imagePreview}
-                      alt='Preview'
-                      fill
-                      className='object-contain'
-                    />
-                    <Button
-                      variant='destructive'
-                      size='icon'
-                      className='absolute top-2 right-2 z-10'
-                      onClick={removeImage}
-                    >
-                      <X className='h-4 w-4' />
-                    </Button>
-                  </div>
-                ) : (
-                  <div
-                    className={`relative border-2 border-dashed rounded-lg p-8 transition-colors ${dragActive
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                      }`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
+              {currentNotification.title && (
+                <Text fw={600} size="lg">
+                  {currentNotification.title}
+                </Text>
+              )}
+              <Text c="dimmed">{currentNotification.content}</Text>
+              {currentNotification.linkUrl && (
+                <Text size="sm" c="blue" truncate>
+                  링크: {currentNotification.linkUrl}
+                </Text>
+              )}
+            </Stack>
+          </Paper>
+        )}
+
+        {/* Notification Form */}
+        <Paper withBorder radius="md" p="lg">
+          <Stack gap="lg">
+            <Stack gap={4}>
+              <Title order={4}>
+                {currentNotification ? '새 알림으로 교체' : '새 알림 만들기'}
+              </Title>
+              {currentNotification && (
+                <Text size="sm" c="dimmed">
+                  저장하면 현재 알림이 삭제되고 새 알림으로 교체됩니다.
+                </Text>
+              )}
+            </Stack>
+
+            {/* Image Upload */}
+            <Input.Wrapper label="이미지">
+              {imagePreview ? (
+                <Box
+                  pos="relative"
+                  w="100%"
+                  bg="var(--app-bg-muted)"
+                  style={{
+                    aspectRatio: '16 / 9',
+                    overflow: 'hidden',
+                    borderRadius: 'var(--mantine-radius-md)',
+                    border: '1px solid var(--app-divider)',
+                  }}
+                >
+                  <Image src={imagePreview} alt="Preview" fill className="object-contain" />
+                  <ActionIcon
+                    color="red"
+                    size="lg"
+                    aria-label="이미지 제거"
+                    onClick={removeImage}
+                    pos="absolute"
+                    top={8}
+                    right={8}
+                    style={{ zIndex: 10 }}
                   >
-                    <input
-                      type='file'
-                      id='imageUpload'
-                      className='hidden'
-                      accept='image/*'
-                      onChange={handleFileInput}
-                    />
-                    <label
-                      htmlFor='imageUpload'
-                      className='flex flex-col items-center justify-center cursor-pointer'
-                    >
-                      <Upload className='h-12 w-12 text-muted-foreground mb-4' />
-                      <p className='text-sm font-medium text-center mb-1'>
+                    <X size={16} />
+                  </ActionIcon>
+                </Box>
+              ) : (
+                <Box
+                  pos="relative"
+                  p="xl"
+                  bg={dragActive ? 'var(--mantine-color-blue-light)' : undefined}
+                  style={{
+                    border: `2px dashed ${
+                      dragActive
+                        ? 'var(--mantine-color-blue-filled)'
+                        : 'var(--app-divider)'
+                    }`,
+                    borderRadius: 'var(--mantine-radius-md)',
+                    transition: 'border-color 150ms, background-color 150ms',
+                  }}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    type="file"
+                    id="imageUpload"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileInput}
+                  />
+                  <label htmlFor="imageUpload" style={{ cursor: 'pointer', display: 'block' }}>
+                    <Stack align="center" gap={4}>
+                      <Box c="dimmed" mb="sm">
+                        <Upload size={48} />
+                      </Box>
+                      <Text size="sm" fw={500} ta="center">
                         이미지를 드래그하거나 클릭하여 업로드
-                      </p>
-                      <p className='text-xs text-muted-foreground text-center'>
+                      </Text>
+                      <Text size="xs" c="dimmed" ta="center">
                         PNG, JPG, GIF (최대 5MB)
-                      </p>
-                    </label>
-                  </div>
-                )}
-              </div>
+                      </Text>
+                    </Stack>
+                  </label>
+                </Box>
+              )}
+            </Input.Wrapper>
 
-              {/* Title */}
-              <div className='space-y-2'>
-                <Label htmlFor='title' className='text-sm font-medium'>
-                  제목 <span className='text-muted-foreground'>(선택사항)</span>
-                </Label>
-                <Input
-                  id='title'
-                  type='text'
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder='알림 제목'
-                />
-              </div>
+            {/* Title */}
+            <TextInput
+              id="title"
+              type="text"
+              label={
+                <>
+                  제목{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="알림 제목"
+            />
 
-              {/* Content */}
-              <div className='space-y-2'>
-                <Label htmlFor='content' className='text-sm font-medium'>
-                  내용 <span className='text-muted-foreground'>(선택사항)</span>
-                </Label>
-                <Textarea
-                  id='content'
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder='알림 내용을 입력하세요'
-                  rows={4}
-                  className='resize-none'
-                />
-              </div>
+            {/* Content */}
+            <Textarea
+              id="content"
+              label={
+                <>
+                  내용{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="알림 내용을 입력하세요"
+              rows={4}
+              styles={{ input: { resize: 'none' } }}
+            />
 
-              {/* Link URL */}
-              <div className='space-y-2'>
-                <Label htmlFor='linkUrl' className='text-sm font-medium'>
-                  링크 URL <span className='text-muted-foreground'>(선택사항)</span>
-                </Label>
-                <Input
-                  id='linkUrl'
-                  type='url'
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder='https://example.com'
-                />
-                <p className='text-xs text-muted-foreground'>
-                  알림 클릭 시 이동할 URL을 입력하세요.
-                </p>
-              </div>
+            {/* Link URL */}
+            <TextInput
+              id="linkUrl"
+              type="url"
+              label={
+                <>
+                  링크 URL{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://example.com"
+              description="알림 클릭 시 이동할 URL을 입력하세요."
+              inputWrapperOrder={['label', 'input', 'description']}
+            />
 
-              {/* Action Buttons */}
-              <div className='flex justify-end gap-3 pt-4'>
-                <Button
-                  variant='outline'
-                  onClick={resetForm}
-                  disabled={saving}
-                >
-                  초기화
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                      저장 중...
-                    </>
-                  ) : (
-                    <>
-                      <Save className='mr-2 h-4 w-4' />
-                      저장
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            {/* Action Buttons */}
+            <Group justify="flex-end" gap="sm">
+              <Button variant="default" onClick={resetForm} disabled={saving}>
+                되돌리기
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                leftSection={
+                  saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />
+                }
+              >
+                {saving ? '저장 중...' : '저장'}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
       </PageContent>
     </PageShell>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Box, NavLink, Paper, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { createClient } from '@/lib/supabase/client';
 
 /** 배너에 연결할 수 있는 광고 — 기본 광고 또는 프리미엄 광고 */
@@ -116,59 +116,72 @@ export function LinkedAdPicker({
   const hasStaleLink = !loading && !selected && !!(value.linkedAdId || value.linkedPremiumAdId);
 
   return (
-    <div className='space-y-2'>
-      <div className='border rounded-md'>
-        <div className='p-2 border-b'>
-          <div className='relative'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-            <Input
-              placeholder='상호명 또는 광고 제목 검색...'
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className='pl-9'
-            />
-          </div>
-        </div>
-        <div className='h-[200px] overflow-y-auto p-2 space-y-1'>
+    <Stack gap="xs">
+      <Paper withBorder radius="md">
+        <Box p="xs" style={{ borderBottom: '1px solid var(--app-divider)' }}>
+          <TextInput
+            placeholder="상호명 또는 광고 제목 검색..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            leftSection={<Search size={16} />}
+          />
+        </Box>
+        <ScrollArea h={200} p="xs">
           {loading ? (
-            <p className='text-sm text-muted-foreground text-center py-4'>불러오는 중...</p>
+            <Text size="sm" c="dimmed" ta="center" py="md">
+              불러오는 중...
+            </Text>
           ) : filtered.length === 0 ? (
-            <p className='text-sm text-muted-foreground text-center py-4'>노출 중인 광고가 없습니다.</p>
+            <Text size="sm" c="dimmed" ta="center" py="md">
+              노출 중인 광고가 없습니다.
+            </Text>
           ) : (
-            filtered.map((ad) => (
-              <button
-                key={`${ad.kind}-${ad.id}`}
-                type='button'
-                onClick={() => onChange(ad)}
-                className={`w-full rounded p-2 text-left text-sm hover:bg-muted/50 ${
-                  isSameLinkedAd(ad, value) ? 'bg-primary/10 ring-1 ring-primary' : ''
-                }`}
-              >
-                <span className='mr-1 text-xs font-medium text-primary'>
-                  {ad.kind === 'premium' ? '[프리미엄]' : '[기본]'}
-                </span>
-                {ad.businessName} · {ad.title}
-                <span className='ml-1 text-xs text-muted-foreground'>({ad.apartmentIds.length}개 아파트)</span>
-              </button>
-            ))
+            <Stack gap={4}>
+              {filtered.map((ad) => (
+                <NavLink
+                  key={`${ad.kind}-${ad.id}`}
+                  component="button"
+                  type="button"
+                  onClick={() => onChange(ad)}
+                  active={isSameLinkedAd(ad, value)}
+                  variant="light"
+                  style={{ borderRadius: 'var(--mantine-radius-sm)' }}
+                  label={
+                    <Text span size="sm">
+                      <Text span size="xs" fw={500} c="blue" mr={4}>
+                        {ad.kind === 'premium' ? '[프리미엄]' : '[기본]'}
+                      </Text>
+                      {ad.businessName} · {ad.title}
+                      <Text span size="xs" c="dimmed" ml={4}>
+                        ({ad.apartmentIds.length}개 아파트)
+                      </Text>
+                    </Text>
+                  }
+                />
+              ))}
+            </Stack>
           )}
-        </div>
-      </div>
+        </ScrollArea>
+      </Paper>
 
       {hasStaleLink && (
-        <p className='text-xs text-destructive'>
+        <Text size="xs" c="red">
           연결된 광고가 종료되었거나 노출 중이 아닙니다. 앱에서 배너를 눌러도 반응하지 않으니 다른 광고를 연결하거나 배너를 내려주세요.
-        </p>
+        </Text>
       )}
 
       {selected && (
-        <div className='rounded-md border border-border bg-muted/40 p-3 text-sm space-y-1'>
-          <p className='font-medium'>
-            광고 노출 아파트 ({selected.apartmentIds.length}곳) — 배너 대상 아파트는 이 안에서만 고를 수 있습니다
-          </p>
-          <p className='text-muted-foreground'>{selected.apartmentNames.join(', ') || '-'}</p>
-        </div>
+        <Paper withBorder radius="md" p="sm" bg="var(--app-bg-muted)">
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              광고 노출 아파트 ({selected.apartmentIds.length}곳) — 배너 대상 아파트는 이 안에서만 고를 수 있습니다
+            </Text>
+            <Text size="sm" c="dimmed">
+              {selected.apartmentNames.join(', ') || '-'}
+            </Text>
+          </Stack>
+        </Paper>
       )}
-    </div>
+    </Stack>
   );
 }

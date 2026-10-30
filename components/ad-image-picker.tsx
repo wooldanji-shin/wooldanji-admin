@@ -18,7 +18,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button } from '@/components/ui/button';
+import { Badge, Button, Group, Stack, Text } from '@mantine/core';
 import { MAX_AD_IMAGES } from '@/lib/ads/constants';
 
 /** 이미 저장된 이미지(url)와 아직 올리지 않은 이미지(file)를 함께 다룬다 */
@@ -59,14 +59,14 @@ export function AdImagePicker({
   };
 
   return (
-    <div className="space-y-3">
+    <Stack gap="sm" align="flex-start">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={items.map(adImageKey)} strategy={rectSortingStrategy}>
-          <div className="flex flex-wrap gap-3">
+          <Group gap="sm">
             {items.map((item, index) => (
               <SortableImage
                 key={adImageKey(item)}
@@ -75,7 +75,7 @@ export function AdImagePicker({
                 onRemove={onRemove}
               />
             ))}
-          </div>
+          </Group>
         </SortableContext>
       </DndContext>
 
@@ -94,19 +94,19 @@ export function AdImagePicker({
 
       <Button
         type="button"
-        variant="outline"
+        variant="default"
         disabled={isFull}
         onClick={() => inputRef.current?.click()}
+        leftSection={<ImagePlus size={16} />}
       >
-        <ImagePlus className="mr-1.5 h-4 w-4" />
         이미지 추가
       </Button>
 
-      <p className="text-xs text-muted-foreground">
+      <Text size="xs" c="dimmed">
         최소 1장, 최대 {MAX_AD_IMAGES}장. 첫 번째 이미지가 목록의 대표 이미지로 쓰입니다.
         손잡이를 끌어 순서를 바꿀 수 있고, 업로드는 저장할 때 한 번에 처리됩니다.
-      </p>
-    </div>
+      </Text>
+    </Stack>
   );
 }
 
@@ -141,8 +141,12 @@ function SortableImage({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className="relative h-28 w-28 overflow-hidden rounded-lg border border-border"
+      style={{
+        ...style,
+        border: '1px solid var(--app-divider)',
+        borderRadius: 'var(--mantine-radius-md)',
+      }}
+      className="relative h-28 w-28 overflow-hidden"
     >
       {/* 로컬 파일은 blob URL이라 next/image 최적화 대상이 아니다 */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -170,9 +174,14 @@ function SortableImage({
         <X className="h-3.5 w-3.5" />
       </button>
       {isPrimary && (
-        <span className="absolute bottom-0 w-full bg-primary/85 py-0.5 text-center text-[11px] font-medium text-primary-foreground">
+        <Badge
+          variant="filled"
+          radius="sm"
+          size="sm"
+          style={{ position: 'absolute', left: 4, bottom: 4 }}
+        >
           대표사진
-        </span>
+        </Badge>
       )}
     </div>
   );

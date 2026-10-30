@@ -1,32 +1,26 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PageShell } from '@/components/page-shell';
+import { TableSkeleton } from '@/components/skeletons';
 import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Modal,
+  Paper,
+  Skeleton,
+  Stack,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+  Text,
+  Textarea,
+  TextInput,
+} from '@mantine/core';
 import { Plus, Edit, Trash2, GripVertical } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { ImageUpload } from '@/components/image-upload';
@@ -110,104 +104,109 @@ function SortableRow({
     : '-';
 
   return (
-    <TableRow
+    <Table.Tr
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, cursor: 'pointer' }}
       {...attributes}
-      className={`border-border hover:bg-secondary/50 cursor-pointer ${isSelected ? 'bg-muted' : ''}`}
+      bg={isSelected ? 'var(--mantine-color-blue-light)' : undefined}
       onClick={() => onSelect(category)}
     >
       {/* 드래그 핸들 + 순서 */}
-      <TableCell>
-        <div
-          className="flex items-center gap-2 cursor-grab active:cursor-grabbing"
+      <Table.Td>
+        <Group
+          gap="xs"
+          wrap="nowrap"
+          className="cursor-grab active:cursor-grabbing"
           {...listeners}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{category.orderIndex}</span>
-        </div>
-      </TableCell>
+          <GripVertical size={16} color="var(--mantine-color-dimmed)" />
+          <Text size="sm" fw={500}>{category.orderIndex}</Text>
+        </Group>
+      </Table.Td>
 
       {/* 카테고리명 + 아이콘 */}
-      <TableCell className="font-medium">
-        <div className="flex items-center gap-2">
+      <Table.Td fw={500}>
+        <Group gap="xs" wrap="nowrap">
           {category.iconUrl && (
             <img
               src={category.iconUrl}
               alt={`${category.categoryName} 아이콘`}
-              className="w-6 h-6 object-contain"
+              className="object-contain"
+              style={{ width: 24, height: 24 }}
             />
           )}
           {category.categoryName}
-        </div>
-      </TableCell>
+        </Group>
+      </Table.Td>
 
       {/* 소개내용 (20자 말줄임) */}
-      <TableCell className="text-sm text-muted-foreground max-w-[200px]">
+      <Table.Td c="dimmed" maw={200}>
         {truncatedNote}
-      </TableCell>
+      </Table.Td>
 
       {/* 기본광고 수 */}
-      <TableCell className="text-center tabular-nums text-sm">
+      <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
         {category.basicAdCount > 0 ? category.basicAdCount : (
-          <span className="text-muted-foreground">-</span>
+          <Text span size="sm" c="dimmed">-</Text>
         )}
-      </TableCell>
+      </Table.Td>
 
       {/* 프리미엄광고 수 */}
-      <TableCell className="text-center tabular-nums text-sm">
+      <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
         {category.premiumAdCount > 0 ? category.premiumAdCount : (
-          <span className="text-muted-foreground">-</span>
+          <Text span size="sm" c="dimmed">-</Text>
         )}
-      </TableCell>
+      </Table.Td>
 
       {/* 활성 여부 */}
-      <TableCell>
+      <Table.Td>
         {category.isActive ? (
-          <Badge className="bg-green-500">활성</Badge>
+          <Badge variant="light" color="green">활성</Badge>
         ) : (
-          <Badge variant="secondary">비활성</Badge>
+          <Badge variant="light" color="gray">비활성</Badge>
         )}
-      </TableCell>
+      </Table.Td>
 
       {/* 작업 버튼 */}
-      <TableCell className="text-right">
-        <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="sm"
+      <Table.Td>
+        <Group gap={4} justify="flex-end" wrap="nowrap" onClick={(e) => e.stopPropagation()}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
             onClick={(e) => {
               e.stopPropagation();
               onAddSub(category);
             }}
             title="서브카테고리 추가"
+            aria-label="서브카테고리 추가"
           >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+            <Plus size={16} />
+          </ActionIcon>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
             onClick={(e) => {
               e.stopPropagation();
               onEdit(category);
             }}
+            aria-label="수정"
           >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+            <Edit size={16} />
+          </ActionIcon>
+          <ActionIcon
+            variant="subtle"
+            color="red"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(category);
             }}
-            className="text-destructive hover:text-destructive"
+            aria-label="삭제"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
+            <Trash2 size={16} />
+          </ActionIcon>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
   );
 }
 
@@ -237,55 +236,57 @@ function SortableSubRow({
   };
 
   return (
-    <TableRow
+    <Table.Tr
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className="border-border hover:bg-secondary/50"
     >
-      <TableCell>
-        <div
-          className="flex items-center gap-2 cursor-grab active:cursor-grabbing"
+      <Table.Td>
+        <Group
+          gap="xs"
+          wrap="nowrap"
+          className="cursor-grab active:cursor-grabbing"
           {...listeners}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{sub.orderIndex}</span>
-        </div>
-      </TableCell>
-      <TableCell className="font-medium">{sub.subCategoryName}</TableCell>
-      <TableCell>
+          <GripVertical size={16} color="var(--mantine-color-dimmed)" />
+          <Text size="sm" fw={500}>{sub.orderIndex}</Text>
+        </Group>
+      </Table.Td>
+      <Table.Td fw={500}>{sub.subCategoryName}</Table.Td>
+      <Table.Td>
         {sub.isActive ? (
-          <Badge className="bg-green-500">활성</Badge>
+          <Badge variant="light" color="green">활성</Badge>
         ) : (
-          <Badge variant="secondary">비활성</Badge>
+          <Badge variant="light" color="gray">비활성</Badge>
         )}
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="sm"
+      </Table.Td>
+      <Table.Td>
+        <Group gap={4} justify="flex-end" wrap="nowrap" onClick={(e) => e.stopPropagation()}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
             onClick={(e) => {
               e.stopPropagation();
               onEdit(sub);
             }}
+            aria-label="수정"
           >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+            <Edit size={16} />
+          </ActionIcon>
+          <ActionIcon
+            variant="subtle"
+            color="red"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(sub);
             }}
-            className="text-destructive hover:text-destructive"
+            aria-label="삭제"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
+            <Trash2 size={16} />
+          </ActionIcon>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
   );
 }
 
@@ -310,6 +311,7 @@ export default function AdCategoriesV2Page() {
   const [orderIndexError, setOrderIndexError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<AdCategoryV2 | null>(null);
+  const [categoryDeleting, setCategoryDeleting] = useState(false);
 
   // 서브카테고리 state
   const [selectedCategory, setSelectedCategory] = useState<AdCategoryV2 | null>(null);
@@ -320,6 +322,8 @@ export default function AdCategoriesV2Page() {
   const [subForm, setSubForm] = useState({ subCategoryName: '', isActive: true });
   const [deleteSubDialog, setDeleteSubDialog] = useState(false);
   const [deletingSubCategory, setDeletingSubCategory] = useState<AdSubCategoryV2 | null>(null);
+  const [subSaving, setSubSaving] = useState(false);
+  const [subDeleting, setSubDeleting] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -420,6 +424,7 @@ export default function AdCategoriesV2Page() {
       toast.error('서브카테고리 이름을 입력해주세요.');
       return;
     }
+    setSubSaving(true);
     try {
       if (editingSubCategory) {
         const { error } = await (supabase as any)
@@ -452,6 +457,8 @@ export default function AdCategoriesV2Page() {
     } catch (err: any) {
       console.error('서브카테고리 저장 실패:', err);
       toast.error(err.message || '서브카테고리 저장에 실패했습니다.');
+    } finally {
+      setSubSaving(false);
     }
   };
 
@@ -464,6 +471,7 @@ export default function AdCategoriesV2Page() {
   // 서브카테고리 삭제 실행
   const handleSubDeleteConfirm = async () => {
     if (!deletingSubCategory) return;
+    setSubDeleting(true);
     try {
       const { error } = await (supabase as any)
         .from('ad_sub_categories_v2')
@@ -482,6 +490,8 @@ export default function AdCategoriesV2Page() {
           ? '이 서브카테고리를 선택한 광고가 있어 삭제할 수 없습니다.'
           : err.message || '서브카테고리 삭제에 실패했습니다.'
       );
+    } finally {
+      setSubDeleting(false);
     }
   };
 
@@ -602,6 +612,7 @@ export default function AdCategoriesV2Page() {
   const handleDeleteConfirm = async () => {
     if (!deletingCategory) return;
 
+    setCategoryDeleting(true);
     try {
       // Storage 아이콘 파일 삭제 (있는 경우)
       if (deletingCategory.iconUrl) {
@@ -621,6 +632,8 @@ export default function AdCategoriesV2Page() {
     } catch (err: any) {
       console.error('카테고리 삭제 실패:', err);
       toast.error(err.message || '카테고리 삭제에 실패했습니다.');
+    } finally {
+      setCategoryDeleting(false);
     }
   };
 
@@ -710,324 +723,288 @@ export default function AdCategoriesV2Page() {
   };
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+    <PageShell>
       <AdminHeader title="카테고리 관리 v2" />
 
-      <div className="flex flex-col gap-6">
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-muted-foreground">
-            드래그하여 순서 변경, 클릭하여 서브카테고리 펼치기
-          </p>
-          <Button
-            onClick={() => {
-              resetForm();
-              setIsDialogOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            카테고리 추가
-          </Button>
-        </div>
+      <Group justify="space-between" align="center">
+        <Text size="sm" c="dimmed">
+          드래그하여 순서 변경, 클릭하여 서브카테고리 펼치기
+        </Text>
+        <Button
+          onClick={() => {
+            resetForm();
+            setIsDialogOpen(true);
+          }}
+          leftSection={<Plus size={16} />}
+        >
+          카테고리 추가
+        </Button>
+      </Group>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="text-muted-foreground w-32">순서</TableHead>
-                      <TableHead className="text-muted-foreground">카테고리명</TableHead>
-                      <TableHead className="text-muted-foreground">소개내용</TableHead>
-                      <TableHead className="text-muted-foreground text-center">기본광고</TableHead>
-                      <TableHead className="text-muted-foreground text-center">프리미엄</TableHead>
-                      <TableHead className="text-muted-foreground">상태</TableHead>
-                      <TableHead className="text-muted-foreground text-right">작업</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                          <div className="flex flex-col gap-3 py-2">
-                            <Skeleton className="h-4 w-2/3 mx-auto" />
-                            <Skeleton className="h-4 w-full" />
-                            <Skeleton className="h-4 w-4/5 mx-auto" />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : categories.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                          카테고리가 없습니다.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      <SortableContext
-                        items={categories.map((c) => c.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {categories.map((category) => (
-                          <React.Fragment key={category.id}>
-                            <SortableRow
-                              category={category}
-                              isSelected={selectedCategory?.id === category.id}
-                              onEdit={handleEditClick}
-                              onDelete={handleDeleteClick}
-                              onSelect={handleCategorySelect}
-                              onAddSub={handleAddSubClick}
-                            />
-                            {selectedCategory?.id === category.id && (
-                              <TableRow className="hover:bg-transparent">
-                                <TableCell colSpan={7} className="p-0 border-b border-border">
-                                  <div className="bg-muted/30 px-4 py-3">
-                                    <DndContext
-                                      sensors={sensors}
-                                      collisionDetection={closestCenter}
-                                      onDragEnd={handleSubDragEnd}
-                                    >
-                                      <Table>
-                                        <TableHeader>
-                                          <TableRow className="border-border hover:bg-transparent">
-                                            <TableHead className="text-muted-foreground w-32 h-8">순서</TableHead>
-                                            <TableHead className="text-muted-foreground h-8">서브카테고리명</TableHead>
-                                            <TableHead className="text-muted-foreground h-8">상태</TableHead>
-                                            <TableHead className="text-muted-foreground text-right h-8">작업</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {subLoading ? (
-                                            <TableRow>
-                                              <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                                                <Skeleton className="h-4 w-1/2 mx-auto" />
-                                              </TableCell>
-                                            </TableRow>
-                                          ) : subCategories.length === 0 ? (
-                                            <TableRow>
-                                              <TableCell colSpan={4} className="text-center py-6 text-muted-foreground text-sm">
-                                                서브카테고리가 없습니다.
-                                              </TableCell>
-                                            </TableRow>
-                                          ) : (
-                                            <SortableContext
-                                              items={subCategories.map((s) => s.id)}
-                                              strategy={verticalListSortingStrategy}
-                                            >
-                                              {subCategories.map((sub) => (
-                                                <SortableSubRow
-                                                  key={sub.id}
-                                                  sub={sub}
-                                                  onEdit={handleSubEditClick}
-                                                  onDelete={handleSubDeleteClick}
-                                                />
-                                              ))}
-                                            </SortableContext>
-                                          )}
-                                        </TableBody>
-                                      </Table>
-                                    </DndContext>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </SortableContext>
-                    )}
-                  </TableBody>
-                </Table>
-              </DndContext>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Paper withBorder radius="md">
+        <Table.ScrollContainer minWidth={720}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w={128}>순서</Table.Th>
+                  <Table.Th>카테고리명</Table.Th>
+                  <Table.Th>소개내용</Table.Th>
+                  <Table.Th ta="center">기본광고</Table.Th>
+                  <Table.Th ta="center">프리미엄</Table.Th>
+                  <Table.Th>상태</Table.Th>
+                  <Table.Th ta="right">작업</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {loading ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={7} p={0}>
+                      <TableSkeleton rows={8} columns={7} showHeader={false} />
+                    </Table.Td>
+                  </Table.Tr>
+                ) : categories.length === 0 ? (
+                  <Table.Tr>
+                    <Table.Td colSpan={7} ta="center" py={48} c="dimmed">
+                      카테고리가 없습니다.
+                    </Table.Td>
+                  </Table.Tr>
+                ) : (
+                  <SortableContext
+                    items={categories.map((c) => c.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {categories.map((category) => (
+                      <React.Fragment key={category.id}>
+                        <SortableRow
+                          category={category}
+                          isSelected={selectedCategory?.id === category.id}
+                          onEdit={handleEditClick}
+                          onDelete={handleDeleteClick}
+                          onSelect={handleCategorySelect}
+                          onAddSub={handleAddSubClick}
+                        />
+                        {selectedCategory?.id === category.id && (
+                          <Table.Tr>
+                            <Table.Td colSpan={7} p={0}>
+                              <Box bg="var(--app-bg-muted)" px="md" py="sm">
+                                <DndContext
+                                  sensors={sensors}
+                                  collisionDetection={closestCenter}
+                                  onDragEnd={handleSubDragEnd}
+                                >
+                                  <Table verticalSpacing={6} horizontalSpacing="md">
+                                    <Table.Thead>
+                                      <Table.Tr>
+                                        <Table.Th w={128}>순서</Table.Th>
+                                        <Table.Th>서브카테고리명</Table.Th>
+                                        <Table.Th>상태</Table.Th>
+                                        <Table.Th ta="right">작업</Table.Th>
+                                      </Table.Tr>
+                                    </Table.Thead>
+                                    <Table.Tbody>
+                                      {subLoading ? (
+                                        <Table.Tr>
+                                          <Table.Td colSpan={4} py="lg">
+                                            <Skeleton h={16} w="50%" mx="auto" />
+                                          </Table.Td>
+                                        </Table.Tr>
+                                      ) : subCategories.length === 0 ? (
+                                        <Table.Tr>
+                                          <Table.Td colSpan={4} ta="center" py="lg" c="dimmed">
+                                            서브카테고리가 없습니다.
+                                          </Table.Td>
+                                        </Table.Tr>
+                                      ) : (
+                                        <SortableContext
+                                          items={subCategories.map((s) => s.id)}
+                                          strategy={verticalListSortingStrategy}
+                                        >
+                                          {subCategories.map((sub) => (
+                                            <SortableSubRow
+                                              key={sub.id}
+                                              sub={sub}
+                                              onEdit={handleSubEditClick}
+                                              onDelete={handleSubDeleteClick}
+                                            />
+                                          ))}
+                                        </SortableContext>
+                                      )}
+                                    </Table.Tbody>
+                                  </Table>
+                                </DndContext>
+                              </Box>
+                            </Table.Td>
+                          </Table.Tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </SortableContext>
+                )}
+              </Table.Tbody>
+            </Table>
+          </DndContext>
+        </Table.ScrollContainer>
+      </Paper>
 
       {/* 생성/수정 다이얼로그 */}
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-[540px]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingCategory ? '카테고리 수정' : '카테고리 추가'}
-            </DialogTitle>
-            <DialogDescription>
-              광고 카테고리 v2 정보를 입력합니다.
-            </DialogDescription>
-          </DialogHeader>
+      <Modal
+        opened={isDialogOpen}
+        onClose={() => handleDialogClose(false)}
+        title={editingCategory ? '카테고리 수정' : '카테고리 추가'}
+        size={540}
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            광고 카테고리 v2 정보를 입력합니다.
+          </Text>
 
-          <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-            {/* 카테고리명 */}
-            <div className="space-y-2">
-              <Label htmlFor="categoryName">카테고리 이름 *</Label>
-              <Input
-                id="categoryName"
-                value={form.categoryName}
-                onChange={(e) => handleFormChange('categoryName', e.target.value)}
-                placeholder="필라테스, 영어학원 등"
-              />
-            </div>
+          {/* 카테고리명 */}
+          <TextInput
+            id="categoryName"
+            label="카테고리 이름 *"
+            value={form.categoryName}
+            onChange={(e) => handleFormChange('categoryName', e.target.value)}
+            placeholder="필라테스, 영어학원 등"
+          />
 
-            {/* 아이콘 업로드 */}
-            <div className="space-y-2">
-              <Label>아이콘</Label>
-              <ImageUpload
-                bucket="advertisements"
-                storagePath="categories-v2/icons"
-                value={form.iconUrl || ''}
-                onChange={(url) => {
-                  handleFormChange('iconUrl', url ?? '');
-                  setUploadedIconUrl(url ?? '');
-                }}
-                accept="image/png,image/svg+xml"
-                maxSizeMB={2}
-                description="PNG 또는 SVG 파일, 최대 2MB"
-              />
-            </div>
+          {/* 아이콘 업로드 */}
+          <Stack gap={6}>
+            <Text size="sm" fw={500}>아이콘</Text>
+            <ImageUpload
+              bucket="advertisements"
+              storagePath="categories-v2/icons"
+              value={form.iconUrl || ''}
+              onChange={(url) => {
+                handleFormChange('iconUrl', url ?? '');
+                setUploadedIconUrl(url ?? '');
+              }}
+              accept="image/png,image/svg+xml"
+              maxSizeMB={2}
+              description="PNG 또는 SVG 파일, 최대 2MB"
+            />
+          </Stack>
 
-            {/* 소개내용 (note) */}
-            <div className="space-y-2">
-              <Label htmlFor="note">소개내용</Label>
-              <Textarea
-                id="note"
-                value={form.note}
-                onChange={(e) => handleFormChange('note', e.target.value)}
-                placeholder="카테고리에 대한 간단한 소개를 입력하세요."
-                rows={3}
-              />
-            </div>
+          {/* 소개내용 (note) */}
+          <Textarea
+            id="note"
+            label="소개내용"
+            value={form.note}
+            onChange={(e) => handleFormChange('note', e.target.value)}
+            placeholder="카테고리에 대한 간단한 소개를 입력하세요."
+            rows={3}
+          />
 
-            {/* 표시 순서 */}
-            <div className="space-y-2">
-              <Label htmlFor="orderIndex">표시 순서 *</Label>
-              <Input
-                id="orderIndex"
-                type="number"
-                value={form.orderIndex}
-                onChange={(e) => handleOrderIndexChange(parseInt(e.target.value) || 0)}
-                placeholder="1"
-                className={orderIndexError ? 'border-destructive' : ''}
-              />
-              {orderIndexError && (
-                <p className="text-xs text-destructive">{orderIndexError}</p>
-              )}
-            </div>
+          {/* 표시 순서 */}
+          <TextInput
+            id="orderIndex"
+            label="표시 순서 *"
+            type="number"
+            value={form.orderIndex}
+            onChange={(e) => handleOrderIndexChange(parseInt(e.target.value) || 0)}
+            placeholder="1"
+            error={orderIndexError}
+          />
 
-            {/* 활성화 */}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="isActive"
-                checked={form.isActive}
-                onCheckedChange={(checked) =>
-                  handleFormChange('isActive', checked as boolean)
-                }
-              />
-              <Label htmlFor="isActive">활성화</Label>
-            </div>
-          </div>
+          {/* 활성화 */}
+          <Checkbox
+            id="isActive"
+            label="활성화"
+            checked={form.isActive}
+            onChange={(e) => handleFormChange('isActive', e.currentTarget.checked)}
+          />
+        </Stack>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => handleDialogClose(false)}>
-              취소
-            </Button>
-            <Button onClick={handleSave} disabled={!!orderIndexError}>
-              {editingCategory ? '수정' : '생성'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => handleDialogClose(false)}>
+            취소
+          </Button>
+          <Button onClick={handleSave} disabled={!!orderIndexError}>
+            {editingCategory ? '수정' : '생성'}
+          </Button>
+        </Group>
+      </Modal>
 
       {/* 서브카테고리 수정 다이얼로그 */}
-      <Dialog open={isSubDialogOpen} onOpenChange={(open) => {
-        if (!open) setEditingSubCategory(null);
-        setIsSubDialogOpen(open);
-      }}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingSubCategory ? '서브카테고리 수정' : '서브카테고리 추가'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingSubCategory ? '서브카테고리 정보를 수정합니다.' : `${selectedCategory?.categoryName}에 서브카테고리를 추가합니다.`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="subCategoryName">서브카테고리 이름 *</Label>
-              <Input
-                id="subCategoryName"
-                value={subForm.subCategoryName}
-                onChange={(e) => setSubForm((prev) => ({ ...prev, subCategoryName: e.target.value }))}
-                placeholder="서브카테고리 이름"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="subIsActive"
-                checked={subForm.isActive}
-                onCheckedChange={(checked) =>
-                  setSubForm((prev) => ({ ...prev, isActive: checked as boolean }))
-                }
-              />
-              <Label htmlFor="subIsActive">활성화</Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSubDialogOpen(false)}>
-              취소
-            </Button>
-            <Button onClick={handleSubSave}>
-              {editingSubCategory ? '수정' : '추가'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal
+        opened={isSubDialogOpen}
+        onClose={() => {
+          setEditingSubCategory(null);
+          setIsSubDialogOpen(false);
+        }}
+        title={editingSubCategory ? '서브카테고리 수정' : '서브카테고리 추가'}
+        size={400}
+        closeOnClickOutside={!subSaving}
+        closeOnEscape={!subSaving}
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {editingSubCategory ? '서브카테고리 정보를 수정합니다.' : `${selectedCategory?.categoryName}에 서브카테고리를 추가합니다.`}
+          </Text>
+          <TextInput
+            id="subCategoryName"
+            label="서브카테고리 이름 *"
+            value={subForm.subCategoryName}
+            onChange={(e) => setSubForm((prev) => ({ ...prev, subCategoryName: e.target.value }))}
+            placeholder="서브카테고리 이름"
+          />
+          <Checkbox
+            id="subIsActive"
+            label="활성화"
+            checked={subForm.isActive}
+            onChange={(e) => {
+              const checked = e.currentTarget.checked;
+              setSubForm((prev) => ({ ...prev, isActive: checked }));
+            }}
+          />
+        </Stack>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => setIsSubDialogOpen(false)} disabled={subSaving}>
+            취소
+          </Button>
+          <Button onClick={handleSubSave} disabled={subSaving}>
+            {subSaving ? '저장 중...' : editingSubCategory ? '수정' : '추가'}
+          </Button>
+        </Group>
+      </Modal>
 
       {/* 서브카테고리 삭제 확인 다이얼로그 */}
-      <Dialog open={deleteSubDialog} onOpenChange={setDeleteSubDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>서브카테고리 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingSubCategory?.subCategoryName}</strong> 서브카테고리를
-              삭제하시겠습니까?
-              <br />이 작업은 되돌릴 수 없습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteSubDialog(false)}>
-              취소
-            </Button>
-            <Button variant="destructive" onClick={handleSubDeleteConfirm}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal opened={deleteSubDialog} onClose={() => setDeleteSubDialog(false)} title="서브카테고리 삭제" closeOnClickOutside={!subDeleting} closeOnEscape={!subDeleting}>
+        <Text size="sm" c="dimmed">
+          정말로 <Text span fw={700} inherit>{deletingSubCategory?.subCategoryName}</Text> 서브카테고리를
+          삭제하시겠습니까?
+          <br />이 작업은 되돌릴 수 없습니다.
+        </Text>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => setDeleteSubDialog(false)} disabled={subDeleting}>
+            취소
+          </Button>
+          <Button color="red" onClick={handleSubDeleteConfirm} disabled={subDeleting}>
+            {subDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+        </Group>
+      </Modal>
 
       {/* 삭제 확인 다이얼로그 */}
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>카테고리 삭제</DialogTitle>
-            <DialogDescription>
-              정말로 <strong>{deletingCategory?.categoryName}</strong> 카테고리를
-              삭제하시겠습니까?
-              <br />이 작업은 되돌릴 수 없습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog(false)}>
-              취소
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <Modal opened={deleteDialog} onClose={() => setDeleteDialog(false)} title="카테고리 삭제" closeOnClickOutside={!categoryDeleting} closeOnEscape={!categoryDeleting}>
+        <Text size="sm" c="dimmed">
+          정말로 <Text span fw={700} inherit>{deletingCategory?.categoryName}</Text> 카테고리를
+          삭제하시겠습니까?
+          <br />이 작업은 되돌릴 수 없습니다.
+        </Text>
+        <Group justify="flex-end" mt="lg">
+          <Button variant="default" onClick={() => setDeleteDialog(false)} disabled={categoryDeleting}>
+            취소
+          </Button>
+          <Button color="red" onClick={handleDeleteConfirm} disabled={categoryDeleting}>
+            {categoryDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+        </Group>
+      </Modal>
+    </PageShell>
   );
 }

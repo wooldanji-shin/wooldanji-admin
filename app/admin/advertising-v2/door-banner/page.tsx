@@ -3,11 +3,8 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageShell } from '@/components/page-shell';
+import { Badge, Button, Group, Paper, Skeleton, Stack, Switch, Text, TextInput, Title } from '@mantine/core';
 import { createClient } from '@/lib/supabase/client';
 
 // door_popup_settings 에서 관리하는 모드 타입
@@ -129,121 +126,128 @@ export default function DoorBannerPage() {
   };
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+    <PageShell>
       <AdminHeader
         title="공동현관문 팝업관리 v2"
         description="공동현관문이 열릴 때 표시할 팝업 모드를 설정합니다."
       />
 
       {loading ? (
-        <div className="flex flex-col gap-4">
-          <Skeleton className="h-[140px] w-full rounded-xl" />
-          <Skeleton className="h-[140px] w-full rounded-xl" />
-        </div>
+        <Stack gap="md">
+          <Skeleton h={140} radius="md" />
+          <Skeleton h={140} radius="md" />
+        </Stack>
       ) : (
-        <div className="flex flex-col gap-4 max-w-xl">
+        <Stack gap="md" maw={576}>
+          <Text size="sm" c="dimmed">
+            한 번에 하나의 모드만 켤 수 있습니다. 다른 모드를 켜면 기존 모드는 자동으로 꺼집니다.
+          </Text>
           {/* 광고 팝업 카드 */}
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="space-y-1">
-                <CardTitle className="text-base font-semibold">광고 팝업</CardTitle>
-                <CardDescription>
+          <Paper withBorder radius="md" p="lg">
+            <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
+              <Stack gap={4}>
+                <Title order={4}>광고 팝업</Title>
+                <Text size="sm" c="dimmed">
                   활성화된 광고 중 랜덤 1개를 팝업으로 노출합니다.
-                </CardDescription>
-              </div>
+                </Text>
+              </Stack>
               <Switch
                 checked={settings?.mode === 'ad'}
-                onCheckedChange={(checked) => handleToggle('ad', checked)}
+                onChange={(e) => handleToggle('ad', e.currentTarget.checked)}
                 disabled={saving}
                 aria-label="광고 팝업 모드 토글"
               />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                현재 상태:{' '}
-                <span className={settings?.mode === 'ad' ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
-                  {settings?.mode === 'ad' ? 'ON' : 'OFF'}
-                </span>
-              </p>
-            </CardContent>
-          </Card>
+            </Group>
+            <Group gap="xs" mt="sm">
+              <Text size="xs" c="dimmed">
+                현재 상태:
+              </Text>
+              <Badge variant="light" color={settings?.mode === 'ad' ? 'green' : 'gray'}>
+                {settings?.mode === 'ad' ? 'ON' : 'OFF'}
+              </Badge>
+            </Group>
+          </Paper>
 
           {/* 카테고리 팝업 카드 */}
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="space-y-1">
-                <CardTitle className="text-base font-semibold">카테고리 팝업</CardTitle>
-                <CardDescription>
+          <Paper withBorder radius="md" p="lg">
+            <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
+              <Stack gap={4}>
+                <Title order={4}>카테고리 팝업</Title>
+                <Text size="sm" c="dimmed">
                   광고 카테고리 소개를 팝업으로 노출합니다.
-                </CardDescription>
-              </div>
+                </Text>
+              </Stack>
               <Switch
                 checked={settings?.mode === 'category'}
-                onCheckedChange={(checked) => handleToggle('category', checked)}
+                onChange={(e) => handleToggle('category', e.currentTarget.checked)}
                 disabled={saving}
                 aria-label="카테고리 팝업 모드 토글"
               />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                현재 상태:{' '}
-                <span className={settings?.mode === 'category' ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
-                  {settings?.mode === 'category' ? 'ON' : 'OFF'}
-                </span>
-              </p>
-            </CardContent>
-          </Card>
+            </Group>
+            <Group gap="xs" mt="sm">
+              <Text size="xs" c="dimmed">
+                현재 상태:
+              </Text>
+              <Badge variant="light" color={settings?.mode === 'category' ? 'green' : 'gray'}>
+                {settings?.mode === 'category' ? 'ON' : 'OFF'}
+              </Badge>
+            </Group>
+          </Paper>
           {/* 단독 팝업 카드 */}
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="space-y-1">
-                <CardTitle className="text-base font-semibold">단독 팝업</CardTitle>
-                <CardDescription>
+          <Paper withBorder radius="md" p="lg">
+            <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
+              <Stack gap={4}>
+                <Title order={4}>단독 팝업</Title>
+                <Text size="sm" c="dimmed">
                   파트너가 신청한 단독 팝업 광고를 최대 장수(아래 설정)까지 캐러셀로 노출합니다.
-                </CardDescription>
-              </div>
+                </Text>
+              </Stack>
               <Switch
                 checked={settings?.mode === 'solo_popup'}
-                onCheckedChange={(checked) => handleToggle('solo_popup', checked)}
+                onChange={(e) => handleToggle('solo_popup', e.currentTarget.checked)}
                 disabled={saving}
                 aria-label="단독 팝업 모드 토글"
               />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                현재 상태:{' '}
-                <span className={settings?.mode === 'solo_popup' ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
-                  {settings?.mode === 'solo_popup' ? 'ON' : 'OFF'}
-                </span>
-              </p>
-            </CardContent>
-          </Card>
+            </Group>
+            <Group gap="xs" mt="sm">
+              <Text size="xs" c="dimmed">
+                현재 상태:
+              </Text>
+              <Badge variant="light" color={settings?.mode === 'solo_popup' ? 'green' : 'gray'}>
+                {settings?.mode === 'solo_popup' ? 'ON' : 'OFF'}
+              </Badge>
+            </Group>
+          </Paper>
 
           {/* 단독 팝업 모드의 팝업 최대 장수 */}
-          <Card className="bg-card border-border">
-            <CardHeader className="space-y-1 pb-2">
-              <CardTitle className="text-base font-semibold">팝업 최대 장수</CardTitle>
-              <CardDescription>
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap={4}>
+              <Title order={4}>팝업 최대 장수</Title>
+              <Text size="sm" c="dimmed">
                 광고를 먼저 채우고 남은 칸은 채움 이미지로 채워요. 단독 팝업 &apos;첫 화면&apos; 광고 → 팝업 우선 광고 순으로 맨 앞에 나오고, 나머지 순서는 섞여서 랜덤이에요.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-center gap-3">
-              <Input
+              </Text>
+            </Stack>
+            <Group gap="sm" mt="md">
+              <TextInput
                 type="number"
                 min={MAX_CARDS_MIN}
                 max={MAX_CARDS_MAX}
-                className="w-32"
+                w={128}
                 value={maxCardsInput}
                 onChange={(e) => setMaxCardsInput(e.target.value)}
                 disabled={saving}
                 aria-label="팝업 최대 장수"
               />
-              <span className="text-xs text-muted-foreground">{MAX_CARDS_MIN}~{MAX_CARDS_MAX}장 (기본 {MAX_CARDS_DEFAULT})</span>
-              <Button variant="outline" onClick={handleSaveMaxCards} disabled={saving}>저장</Button>
-            </CardContent>
-          </Card>
-        </div>
+              <Text size="xs" c="dimmed">
+                {MAX_CARDS_MIN}~{MAX_CARDS_MAX}장 (기본 {MAX_CARDS_DEFAULT})
+              </Text>
+              <Button variant="default" onClick={handleSaveMaxCards} disabled={saving}>
+                저장
+              </Button>
+            </Group>
+          </Paper>
+        </Stack>
       )}
-    </div>
+    </PageShell>
   );
 }

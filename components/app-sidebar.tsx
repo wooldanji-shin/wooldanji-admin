@@ -2,23 +2,20 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from '@/components/ui/sidebar';
+  AppShell,
+  Avatar,
+  Burger,
+  Divider,
+  Group,
+  NavLink,
+  ScrollArea,
+  Stack,
+  Text,
+  Tooltip,
+} from '@mantine/core';
 import {
   Users,
   LogOut,
-  Settings,
   Bell,
   Palette,
   Building2,
@@ -37,11 +34,12 @@ import {
   BookText,
   PartyPopper,
   type LucideIcon,
+  ChevronRight,
 } from 'lucide-react';
 import { logout, getCurrentUser, getUserRoles } from '@/lib/auth';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { cn } from '@/lib/utils';
+import classes from './app-sidebar.module.css';
 
 // 메뉴별 badgeKey 매핑
 const BADGE_KEYS: Record<string, string> = {
@@ -267,6 +265,20 @@ const v1Items: MenuItem[] = [
   },
 ];
 
+interface MenuSection {
+  label: string;
+  items: MenuItem[];
+}
+
+const MENU_SECTIONS: MenuSection[] = [
+  { label: '아파트 관리', items: navigationItems },
+  { label: '파트너', items: partnerItems },
+  { label: '광고 시스템', items: advertisingItems },
+  { label: '홈화면 수정', items: homeSettingsItems },
+  { label: '콘텐츠 관리', items: settingsItems },
+  { label: 'V1 시스템 관리', items: v1Items },
+];
+
 interface NewCounts {
   inquiries: number;
   users: number;
@@ -292,13 +304,40 @@ interface SidebarUser {
   email: string | null;
 }
 
-export function AppSidebar(): React.ReactElement {
+interface AppSidebarProps {
+  /** 데스크톱에서 사이드바를 접었을 때 — 아이콘만 표시하고 이름은 툴팁으로 보여준다 */
+  collapsed: boolean;
+  onCloseMobile: () => void;
+}
+
+export function AppSidebar({ collapsed, onCloseMobile }: AppSidebarProps): React.ReactElement {
   const pathname = usePathname();
   const router = useRouter();
-  const { setOpenMobile, isMobile } = useSidebar();
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [user, setUser] = useState<SidebarUser | null>(null);
   const [newCounts, setNewCounts] = useState<NewCounts>(INITIAL_COUNTS);
+  // 펼쳐 둔 사이드바 섹션 — 현재 페이지가 속한 섹션은 자동으로 펼친다
+  const [openedSections, setOpenedSections] = useState<string[]>(() => {
+    const current = MENU_SECTIONS.find((section) =>
+      section.items.some((item) => item.href === pathname)
+    );
+    return current ? [current.label] : [];
+  });
+
+  useEffect(() => {
+    const current = MENU_SECTIONS.find((section) =>
+      section.items.some((item) => item.href === pathname)
+    );
+    if (current) {
+      setOpenedSections((prev) => (prev.includes(current.label) ? prev : [...prev, current.label]));
+    }
+  }, [pathname]);
+
+  const toggleSection = (label: string): void => {
+    setOpenedSections((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    );
+  };
 
   const supabase = createClient();
 
@@ -368,7 +407,7 @@ export function AppSidebar(): React.ReactElement {
       localStorage.setItem(`${LAST_READ_PREFIX}${badgeKey}`, new Date().toISOString());
       setNewCounts((prev) => ({ ...prev, [badgeKey]: 0 }));
     }
-    if (isMobile) setOpenMobile(false);
+    onCloseMobile();
     router.push(href);
   };
 
@@ -399,123 +438,141 @@ export function AppSidebar(): React.ReactElement {
     return requiredRoles.some((role) => userRoles.includes(role));
   };
 
-  const getBadgeCount = (href: string): number => {
-    const badgeKey = BADGE_KEYS[href];
-    if (!badgeKey) return 0;
-    return newCounts[badgeKey as keyof NewCounts] || 0;
-  };
-
   const renderMenuGroup = (
     label: string,
     items: MenuItem[]
   ): React.ReactElement | null => {
     const visible = items.filter((item) => hasAccess(item.roles));
     if (visible.length === 0) return null;
-    return (
-      <SidebarGroup className="px-2 py-2">
-        <SidebarGroupLabel className="mb-1 rounded-md bg-primary/10 px-2 py-6 font-semibold uppercase tracking-wider text-primary/70">
-          {label}
-        </SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu className="gap-1">
-            {visible.map((item, index) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
-              const badgeCount = getBadgeCount(item.href);
 
-              return (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={isActive}
-                    onClick={() => handleMenuClick(item.href)}
-                    tooltip={item.name}
-                    className={cn(
-                      'h-12 rounded-lg px-3.5 pr-10 transition-colors duration-150 [&>span]:leading-none',
-                      'data-[active=true]:bg-primary data-[active=true]:text-primary-foreground',
-                      'data-[active=true]:font-semibold data-[active=true]:shadow-sm',
-                      'data-[active=true]:hover:bg-primary/90 data-[active=true]:hover:text-primary-foreground',
-                      'data-[active=true]:active:bg-primary data-[active=true]:active:text-primary-foreground'
-                    )}
-                  >
-                    <span>{index + 1}. {item.name}</span>
-                  </SidebarMenuButton>
-                  {badgeCount > 0 && (
-                    <SidebarMenuBadge
-                      className={cn(
-                        'top-3.5! bg-destructive text-white tabular-nums',
-                        isActive && 'bg-white/25 text-white'
-                      )}
-                    >
-                      {badgeCount > 99 ? '99+' : badgeCount}
-                    </SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
+    const menuItems = (
+      <>
+        {visible.map((item) => {
+          const isActive = pathname === item.href;
+          const Icon = item.icon;
+
+          return (
+            <Tooltip
+              key={item.href}
+              label={item.name}
+              position="right"
+              disabled={!collapsed}
+              withArrow
+            >
+              <NavLink
+                component="button"
+                active={isActive}
+                onClick={() => handleMenuClick(item.href)}
+                aria-label={collapsed ? item.name : undefined}
+                label={collapsed ? undefined : item.name}
+                // 펼친 상태에서는 아이콘 없이 메뉴 이름만, 접힌 상태(아이콘만 보이는 좁은 바)에서만 아이콘을 쓴다
+                leftSection={
+                  collapsed ? (
+                    <Icon size={18} strokeWidth={1.75} className={classes.icon} />
+                  ) : undefined
+                }
+                classNames={{ root: classes.link }}
+              />
+            </Tooltip>
+          );
+        })}
+      </>
+    );
+
+    // 접힌 사이드바(아이콘만): 섹션 구분선 + 아이콘 메뉴
+    if (collapsed) {
+      return (
+        <Stack gap={2}>
+          <Divider my="xs" className={classes.divider} />
+          {menuItems}
+        </Stack>
+      );
+    }
+
+    // 펼친 사이드바: 섹션 제목을 눌러 메뉴를 접고 펼친다
+    const isOpen = openedSections.includes(label);
+    const hasActive = visible.some((item) => item.href === pathname);
+
+    return (
+      <NavLink
+        component="button"
+        label={label}
+        opened={isOpen}
+        onChange={() => toggleSection(label)}
+        childrenOffset={0}
+        disableRightSectionRotation
+        rightSection={
+          <ChevronRight
+            size={16}
+            className={classes.sectionChevron}
+            data-opened={isOpen || undefined}
+          />
+        }
+        data-section-active={hasActive || undefined}
+        classNames={{ root: classes.section, label: classes.sectionLabel, children: classes.sectionChildren }}
+        mt={4}
+      >
+        {menuItems}
+      </NavLink>
     );
   };
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <Building2 className="h-4 w-4" />
+    <>
+      <AppShell.Section px={collapsed ? 0 : 'md'} h={70} style={{ flexShrink: 0, borderBottom: '1px solid var(--app-sidebar-divider)' }}>
+        <Group h="100%" justify={collapsed ? 'center' : 'space-between'} wrap="nowrap">
+          {/* 로고 아이콘 없이 이름만 — 접힌 70px 레일에서는 좌우 여백을 없애 한 줄로 */}
+          <div>
+            <Text fw={700} lh={1.2} c="var(--app-sidebar-active)" style={{ whiteSpace: 'nowrap' }}>울단지</Text>
+            {!collapsed && <Text size="xs" lh={1.2} c="var(--app-sidebar-text)">관리자 콘솔</Text>}
           </div>
-          <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate font-semibold tracking-tight">Wooldanji</span>
-            <span className="truncate text-xs text-muted-foreground">관리자 콘솔</span>
-          </div>
-        </div>
-      </SidebarHeader>
+          <Burger opened onClick={onCloseMobile} hiddenFrom="sm" size="sm" color="var(--app-sidebar-text)" aria-label="메뉴 닫기" />
+        </Group>
+      </AppShell.Section>
 
-      <SidebarContent className="gap-1 py-2">
+      {/* 스크롤은 되지만 스크롤바는 보이지 않게 */}
+      <AppShell.Section grow component={ScrollArea} scrollbars="y" type="never" px="sm" pb="md">
         {renderMenuGroup('아파트 관리', navigationItems)}
         {renderMenuGroup('파트너', partnerItems)}
         {renderMenuGroup('광고 시스템', advertisingItems)}
         {renderMenuGroup('홈화면 수정', homeSettingsItems)}
         {renderMenuGroup('콘텐츠 관리', settingsItems)}
         {renderMenuGroup('V1 시스템 관리', v1Items)}
-      </SidebarContent>
+      </AppShell.Section>
 
-      <SidebarFooter className="border-t border-sidebar-border">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip={user?.name ?? '계정'}
-              className="h-auto cursor-default hover:bg-transparent active:bg-transparent"
-              asChild
-            >
-              <div>
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-foreground">
-                  {user?.name?.charAt(0) ?? '?'}
-                </div>
-                <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate text-sm font-medium">{user?.name ?? '...'}</span>
-                  {user?.email && (
-                    <span className="truncate text-xs text-muted-foreground">
-                      {user.email}
-                    </span>
-                  )}
-                </div>
+      <AppShell.Section p="sm" style={{ flexShrink: 0, borderTop: '1px solid var(--app-sidebar-divider)' }}>
+        <Tooltip label={user?.name ?? '계정'} position="right" disabled={!collapsed} withArrow>
+          <Group gap="sm" px="xs" py={6} wrap="nowrap" justify={collapsed ? 'center' : undefined}>
+            <Avatar radius="xl" color="blue">
+              {user?.name?.charAt(0) ?? '?'}
+            </Avatar>
+            {!collapsed && (
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <Text size="sm" fw={600} truncate c="var(--app-sidebar-active)">
+                  {user?.name ?? '...'}
+                </Text>
+                {user?.email && (
+                  <Text size="xs" c="var(--app-sidebar-text)" truncate>
+                    {user.email}
+                  </Text>
+                )}
               </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="로그아웃"
-              onClick={handleLogout}
-              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            >
-              <LogOut />
-              <span>로그아웃</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </Sidebar>
+            )}
+          </Group>
+        </Tooltip>
+        <Tooltip label="로그아웃" position="right" disabled={!collapsed} withArrow>
+          <NavLink
+            component="button"
+            label={collapsed ? undefined : '로그아웃'}
+            aria-label={collapsed ? '로그아웃' : undefined}
+            leftSection={
+              collapsed ? <LogOut size={18} strokeWidth={1.75} className={classes.icon} /> : undefined
+            }
+            onClick={handleLogout}
+            classNames={{ root: classes.link }}
+          />
+        </Tooltip>
+      </AppShell.Section>
+    </>
   );
 }

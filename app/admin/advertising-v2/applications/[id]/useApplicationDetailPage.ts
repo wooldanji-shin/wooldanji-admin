@@ -211,6 +211,7 @@ export interface UseApplicationDetailPageReturn {
   processing: boolean;
   handleApprove: () => Promise<void>;
   handleReject: () => Promise<void>;
+  savingMemo: boolean;
   handleUpdateMemo: () => Promise<void>;
   // 무료 전환 · 삭제 (광고중/종료 광고)
   convertFreeDialog: boolean;
@@ -273,6 +274,7 @@ export function useApplicationDetailPage(
   const [salesRepId, setSalesRepId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [savingMemo, setSavingMemo] = useState(false);
 
   const [modificationRejectDialog, setModificationRejectDialog] = useState(false);
   const [convertFreeDialog, setConvertFreeDialog] = useState(false);
@@ -678,7 +680,7 @@ export function useApplicationDetailPage(
 
   const handleUpdateMemo = async () => {
     if (!detail) return;
-    setProcessing(true);
+    setSavingMemo(true);
     try {
       const response = await fetch(
         `/api/advertising-v2/applications/${detail.id}/memo`,
@@ -698,7 +700,7 @@ export function useApplicationDetailPage(
       console.error('Failed to update memo:', err);
       toast.error(networkFailedMessage('메모를 저장하지 못했습니다.'));
     } finally {
-      setProcessing(false);
+      setSavingMemo(false);
     }
   };
 
@@ -823,6 +825,7 @@ export function useApplicationDetailPage(
     processing,
     handleApprove,
     handleReject,
+    savingMemo,
     handleUpdateMemo,
     convertFreeDialog,
     setConvertFreeDialog,

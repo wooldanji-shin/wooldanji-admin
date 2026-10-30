@@ -1,7 +1,8 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+/* 레이어 순서: Tailwind preflight(base) < Mantine < Tailwind utilities */
+@layer theme, base, mantine, components, utilities;
 
-@custom-variant dark (&:is(.dark *));
+@import "tailwindcss";
+@import "@mantine/core/styles.layer.css";
 
 @font-face {
   font-family: "Pretendard";
@@ -57,203 +58,203 @@
   src: url("/assets/Pretendard-Black.woff2") format("woff2");
 }
 
-:root {
-  /* Notion/Stripe inspired light admin palette — warm cobalt primary + emerald accent */
-  /* Background = light gray, Card = white → tables/cards stand out */
-  --background: oklch(0.965 0.005 260);
-  --foreground: oklch(0.18 0.01 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.01 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.01 260);
-  --primary: oklch(0.585 0.233 277.117);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.95 0.005 260);
-  --secondary-foreground: oklch(0.22 0.01 260);
-  --muted: oklch(0.95 0.006 260);
-  /* WCAG AAA: ~9:1 on white, ~8:1 on gray (cards & gray bg both pass) */
-  --muted-foreground: oklch(0.3 0.02 260);
-  /* indigo-100 / indigo-700 (Tailwind palette) */
-  --accent: oklch(0.93 0.034 272.788);
-  --accent-foreground: oklch(0.46 0.179 272.788);
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.7 0.14 160);
-  --success-foreground: oklch(0.18 0.04 165);
-  --warning: oklch(0.78 0.16 75);
-  --warning-foreground: oklch(0.28 0.05 75);
-  --info: oklch(0.65 0.13 235);
-  --info-foreground: oklch(0.32 0.09 235);
-  --free: oklch(0.72 0.13 350);
-  --free-foreground: oklch(0.38 0.11 350);
-  --border: oklch(0.92 0.005 260);
-  --input: oklch(0.93 0.005 260);
-  --ring: oklch(0.585 0.233 277.117);
-  --chart-1: oklch(0.585 0.233 277.117);
-  --chart-2: oklch(0.7 0.13 165);
-  --chart-3: oklch(0.65 0.13 235);
-  --chart-4: oklch(0.78 0.16 75);
-  --chart-5: oklch(0.62 0.2 320);
-  --radius: 0.75rem;
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.22 0.01 260);
-  --sidebar-primary: oklch(0.585 0.233 277.117);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.95 0.01 277);
-  --sidebar-accent-foreground: oklch(0.22 0.01 260);
-  --sidebar-border: oklch(0.92 0.005 260);
-  --sidebar-ring: oklch(0.585 0.233 277.117);
-
-  /* Card shadows — slightly stronger so cards stand out on gray background */
-  --shadow-card: 0 1px 2px 0 oklch(0.18 0.01 260 / 0.06),
-    0 1px 3px 0 oklch(0.18 0.01 260 / 0.05);
-  --shadow-card-hover: 0 6px 16px -2px oklch(0.18 0.01 260 / 0.10),
-    0 3px 8px -2px oklch(0.18 0.01 260 / 0.05);
-  --shadow-popover: 0 10px 30px -8px oklch(0.18 0.01 260 / 0.18),
-    0 4px 10px -3px oklch(0.18 0.01 260 / 0.08);
-
-  /* Motion */
-  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
-
-  /* Density */
-  --row-height: 3rem;
-}
-
+/* Tailwind font-sans도 Mantine 테마와 같은 Pretendard를 쓴다 */
 @theme inline {
   --font-sans: "Pretendard", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-  --font-mono: "Pretendard", ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, monospace;
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-free: var(--free);
-  --color-free-foreground: var(--free-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 4px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --shadow-card: var(--shadow-card);
-  --shadow-card-hover: var(--shadow-card-hover);
-  --shadow-popover: var(--shadow-popover);
 }
 
+
+/* 본문 기본 굵기 — theme.fontWeights.regular(500)를 따른다 */
+body {
+  font-weight: var(--mantine-font-weight-regular);
+}
+
+/* 한국어는 단어 중간에서 줄바꿈하지 않는다 ("매출 비/중" 방지) */
+body {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* 사이트 전체 스크롤바(페이지 상하, 다이얼로그, 표 가로 등)를 얇고 연하게.
+   base 레이어에 둬서 Mantine ScrollArea가 기본 스크롤바를 숨기는 설정(mantine 레이어)이 이긴다 —
+   레이어 밖에 두면 ScrollArea에 스크롤바가 두 개 생긴다 */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-scrollbar-thumb) transparent;
   }
-  html {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+
+  /* scrollbar-width를 지원하지 않는 브라우저(Safari 등)용 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "tnum" 1, "ss01" 1, "cv11" 1;
-    /* Minimum font-weight policy: never thinner than 500 (medium) */
-    font-weight: 500;
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--app-scrollbar-thumb);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
-@layer utilities {
-  .shadow-card {
-    box-shadow: var(--shadow-card);
-  }
-  .shadow-card-hover {
-    box-shadow: var(--shadow-card-hover);
-  }
-  .shadow-popover {
-    box-shadow: var(--shadow-popover);
-  }
-  .ease-spring {
-    transition-timing-function: var(--ease-spring);
-  }
-  .ease-emphasized {
-    transition-timing-function: var(--ease-emphasized);
+/* ===== 휴대폰(48em 이하) 반응형 ===== */
+@media (max-width: 48em) {
+  /* 표 → 카드 목록: 한 행이 카드 한 장, 각 칸은 "열 이름 : 값" (열 이름은 useTableCardLabels가 data-label로 단다) */
+  table:not([data-no-cards]),
+  table:not([data-no-cards]) > tbody {
+    display: block;
+    min-width: 0 !important;
+    width: 100% !important;
   }
 
-  /* 글자 크기 최소 정책: 일반 텍스트 ≥ 16px (1rem), 배지 ≥ 12px */
-  .text-xs,
-  .text-sm {
-    font-size: 1rem; /* 16px */
-    line-height: 1.5rem;
-  }
-  .text-\[10px\],
-  .text-\[11px\],
-  .text-\[12px\],
-  .text-\[13px\],
-  .text-\[14px\],
-  .text-\[15px\] {
-    font-size: 1rem; /* 16px */
-    line-height: 1.5rem;
+  .mantine-TableScrollContainer-scrollContainerInner {
+    min-width: 0 !important;
   }
 
-  /* 배지: 14px + radius 4px (모든 배지 통일) */
-  [data-slot="badge"],
-  [data-slot="status-badge"],
-  [data-slot="sidebar-menu-badge"] {
-    font-size: 14px !important;
-    line-height: 1.25rem !important;
-    border-radius: 4px !important;
-  }
-  /* 임의값 text-[14px]도 같은 크기로 */
-  .text-\[14px\] {
-    font-size: 14px;
-    line-height: 1.25rem;
+  table:not([data-no-cards]) > thead {
+    display: none;
   }
 
-  /* Floor font-weight policy: 100/200/300/400 → 500 (minimum) */
-  .font-thin,
-  .font-extralight,
-  .font-light,
-  .font-normal {
-    font-weight: 500 !important;
+  table:not([data-no-cards]) > tbody > tr {
+    display: block;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--app-divider) !important;
+    border-radius: var(--mantine-radius-md);
+    background: var(--mantine-color-body);
+  }
+
+  /* 칸: 열 이름은 왼쪽에 띄우고(float) 값은 오른쪽 정렬 — 값이 여러 요소여도 한 덩어리로 오른쪽에 쌓인다 */
+  table:not([data-no-cards]) > tbody > tr > td {
+    display: block;
+    padding: 0.5rem 0 !important;
+    border: none !important;
+    text-align: right !important;
+    white-space: normal !important;
+    word-break: keep-all;
+    overflow: hidden;
+  }
+
+  table:not([data-no-cards]) > tbody > tr > td::before {
+    content: attr(data-label);
+    float: left;
+    max-width: 45%;
+    margin-right: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--mantine-color-dimmed);
+  }
+
+  table:not([data-no-cards]) > tbody > tr > td::after {
+    content: '';
+    display: table;
+    clear: both;
+  }
+
+  /* 칸 안의 블록 요소·가로 묶음도 오른쪽으로 */
+  table:not([data-no-cards]) > tbody > tr > td > div,
+  table:not([data-no-cards]) > tbody > tr > td > p {
+    margin-left: auto;
+  }
+
+  table:not([data-no-cards]) > tbody > tr > td .mantine-Group-root {
+    justify-content: flex-end;
+  }
+
+  table:not([data-no-cards]) > tbody > tr > td .mantine-Stack-root {
+    align-items: flex-end;
+  }
+
+  /* 첫 칸(이름·상호명 등)은 카드 제목처럼 굵게 */
+  table:not([data-no-cards]) > tbody > tr > td:first-child {
+    font-weight: 700;
+  }
+
+  /* 표 카드 안에 행 카드가 겹쳐 보이지 않게 바깥 카드는 투명하게 */
+  .app-table-card {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  table:not([data-no-cards]) > tbody > tr > td + td {
+    border-top: 1px solid var(--app-divider) !important;
+  }
+
+  /* 열 이름이 없는 칸(작업 버튼 등)·여러 열을 합친 칸(빈 목록 안내 등)은 이름 없이 */
+  table:not([data-no-cards]) > tbody > tr > td[data-label='']::before,
+  table:not([data-no-cards]) > tbody > tr > td:not([data-label])::before {
+    content: none;
+  }
+
+  table:not([data-no-cards]) > tbody > tr > td[colspan] {
+    text-align: center !important;
+  }
+
+  /* 필터 카드: 한 줄에 안 들어가면 다음 줄로 */
+  .app-filter-card .mantine-Group-root {
+    flex-wrap: wrap !important;
+  }
+
+  /* 필터 카드의 입력창·셀렉트는 전체 폭 */
+  .app-filter-card .mantine-TextInput-root,
+  .app-filter-card .mantine-Select-root,
+  .app-filter-card .mantine-MultiSelect-root,
+  .app-filter-card .mantine-Autocomplete-root {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* 폼·필터의 입력창은 전체 폭 (표 칸 안의 작은 입력창은 제외) */
+  main :is(.mantine-TextInput-root, .mantine-Select-root, .mantine-MultiSelect-root, .mantine-NumberInput-root,
+      .mantine-Textarea-root, .mantine-Autocomplete-root, .mantine-PasswordInput-root):not(td *) {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 다이얼로그는 전체 화면 */
+  .mantine-Modal-inner {
+    padding: 0 !important;
+  }
+
+  .mantine-Modal-content {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+    height: 100dvh;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
   }
 }
 
-.dark {
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+/* 카드 안의 카드(테두리 없이)는 연한 배경으로 구분하고 그림자는 없앤다 */
+.mantine-Paper-root .mantine-Paper-root {
+  background-color: var(--app-bg-muted);
+  box-shadow: none;
+}
+/* 회색 안쪽 카드에 놓인 입력칸은 배경과 섞이지 않게 바탕색으로 (테마의 --input-bg가 이 변수를 읽는다) */
+.mantine-Paper-root .mantine-Paper-root {
+  --app-input-bg: var(--mantine-color-body);
+}
+
+/* 페이지 번호: 테두리 없이 회색 채움 (현재 페이지는 Mantine 기본 주색 유지) */
+@layer components {
+  .mantine-Pagination-control:not([data-active]) {
+    border-color: transparent;
+    background-color: var(--mantine-color-default);
+  }
+  .mantine-Pagination-control:not([data-active]):hover {
+    background-color: var(--mantine-color-default-hover);
+  }
+  .mantine-Pagination-control[data-active] {
+    border-color: transparent;
+  }
+  /* 숫자 글자 굵기를 이전/다음 버튼과 맞춘다 */
+  .mantine-Pagination-control {
+    font-weight: var(--mantine-font-weight-medium);
+  }
 }

@@ -2,15 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Cropper from 'react-easy-crop';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Box, Button, Group, Modal, Slider, Stack, Text } from '@mantine/core';
 import type { CropArea } from './cropImage';
 
 const MIN_ZOOM = 1;
@@ -52,13 +44,10 @@ export function SoloImageCropDialog({
   }, [file]);
 
   return (
-    <Dialog open={!!file} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>사진을 드래그해 위치를 옮기고, 아래 막대로 확대할 수 있어요.</DialogDescription>
-        </DialogHeader>
-        <div className="relative h-[360px] w-full overflow-hidden rounded-md bg-black">
+    <Modal opened={!!file} onClose={onCancel} title={title} size={520}>
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">사진을 드래그해 위치를 옮기고, 아래 막대로 확대할 수 있어요.</Text>
+        <Box pos="relative" h={360} w="100%" bg="dark.9" style={{ overflow: 'hidden', borderRadius: 'var(--mantine-radius-md)' }}>
           {imageUrl && (
             <Cropper
               image={imageUrl}
@@ -72,25 +61,25 @@ export function SoloImageCropDialog({
               onCropComplete={(_, pixels) => setArea(pixels)}
             />
           )}
-        </div>
-        <label className="flex items-center gap-3 text-sm">
-          <span className="shrink-0 text-muted-foreground">확대</span>
-          <input
-            type="range"
+        </Box>
+        <Group gap="sm" wrap="nowrap">
+          <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>확대</Text>
+          <Slider
+            style={{ flex: 1 }}
             min={MIN_ZOOM}
             max={MAX_ZOOM}
             step={ZOOM_STEP}
             value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-            className="w-full"
-            aria-label="확대"
+            onChange={(v) => setZoom(v)}
+            label={null}
+            thumbLabel="확대"
           />
-        </label>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>취소</Button>
-          <Button type="button" disabled={!area} onClick={() => area && onApply(area)}>적용</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </Group>
+      </Stack>
+      <Group justify="flex-end" mt="lg">
+        <Button type="button" variant="default" onClick={onCancel}>취소</Button>
+        <Button type="button" disabled={!area} onClick={() => area && onApply(area)}>적용</Button>
+      </Group>
+    </Modal>
   );
 }

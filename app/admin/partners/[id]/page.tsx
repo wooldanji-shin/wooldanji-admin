@@ -3,36 +3,34 @@
 import {
   AlertCircle,
   Building2,
-  ChevronLeft,
   ClipboardList,
   ExternalLink,
   Pencil,
   Phone,
   User,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import {
+  Anchor,
+  Badge,
+  Box,
+  Button,
+  Center,
+  Checkbox,
+  Flex,
+  Group,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { BIZ_CALL_DUPLICATE_MESSAGE } from '@/lib/biz-call';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
+  Stack,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { BIZ_CALL_DUPLICATE_MESSAGE } from '@/lib/biz-call';
+import { PageShell } from '@/components/page-shell';
+import { DetailSkeleton } from '@/components/skeletons';
 import { AdminHeader } from '@/components/admin-header';
+import { HeaderTitle } from '@/components/header-title';
 import { StatusBadge, type AdStatus } from '@/components/status-badge';
 import { usePartnerDetailPage } from './usePartnerDetailPage';
 
@@ -44,10 +42,21 @@ function InfoRow({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div className="grid grid-cols-[160px_1fr] items-start gap-3 border-b border-border/50 py-2.5 last:border-0">
-      <span className="pt-0.5 text-sm font-medium text-muted-foreground">{label}</span>
-      <span className="text-sm text-foreground">{children}</span>
-    </div>
+    <Group
+      wrap="nowrap"
+      align="flex-start"
+      gap="sm"
+      py={10}
+      className="border-b last:border-b-0"
+      style={{ borderColor: 'var(--app-divider)' }}
+    >
+      <Text size="sm" fw={500} c="dimmed" w={160} pt={2} style={{ flexShrink: 0 }}>
+        {label}
+      </Text>
+      <Box fz="sm" style={{ flex: 1, minWidth: 0 }}>
+        {children}
+      </Box>
+    </Group>
   );
 }
 
@@ -70,11 +79,11 @@ function EditableRow({
   return (
     <InfoRow label={label}>
       {editing ? (
-        <Input
+        <TextInput
+          size="sm"
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className="h-9"
         />
       ) : (
         children
@@ -91,30 +100,20 @@ export default function PartnerDetailPage({
   const page = usePartnerDetailPage(params);
 
   if (page.loading) {
-    return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-        <AdminHeader title="파트너 상세" />
-        <div className="flex w-full items-center justify-center py-20">
-          <div className="flex flex-col items-center gap-3 text-muted-foreground">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <span className="text-base">불러오는 중...</span>
-          </div>
-        </div>
-      </div>
-    );
+    return <DetailSkeleton sections={4} />;
   }
 
   if (!page.partner) {
     return (
-      <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+      <PageShell>
         <AdminHeader title="파트너 상세" />
-        <div className="flex w-full items-center justify-center py-20">
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <AlertCircle className="h-8 w-8" />
-            <span className="text-base">파트너 정보를 찾을 수 없습니다.</span>
-          </div>
-        </div>
-      </div>
+        <Center py={80}>
+          <Stack align="center" gap="xs" c="dimmed">
+            <AlertCircle size={32} />
+            <Text c="dimmed">파트너 정보를 찾을 수 없습니다.</Text>
+          </Stack>
+        </Center>
+      </PageShell>
     );
   }
 
@@ -122,345 +121,329 @@ export default function PartnerDetailPage({
   const { editing, draft, patchDraft, saving, canSave } = page;
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={page.handleBack} aria-label="뒤로가기">
-          <ChevronLeft className="size-7" />
-        </Button>
-        <AdminHeader title="파트너 상세" className="flex-1" />
+    <PageShell>
+      <HeaderTitle title="파트너 상세" onBack={page.handleBack} />
+      <Group justify="flex-end">
         {editing ? (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={page.cancelEdit} disabled={saving}>
+          <Group gap="xs">
+            <Button variant="default" onClick={page.cancelEdit} disabled={saving}>
               취소
             </Button>
             <Button onClick={page.handleSave} disabled={!canSave}>
               {saving ? '저장 중...' : '저장'}
             </Button>
-          </div>
+          </Group>
         ) : (
-          <Button variant="outline" onClick={page.startEdit}>
-            <Pencil className="mr-1.5 h-4 w-4" />
+          <Button
+            variant="default"
+            leftSection={<Pencil size={16} />}
+            onClick={page.startEdit}
+          >
             정보 수정
           </Button>
         )}
-      </div>
+      </Group>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <Flex direction={{ base: 'column', lg: 'row' }} gap="lg" align="flex-start">
         {/* ── 좌측 ── */}
-        <div className="space-y-5">
+        <Stack gap="lg" w="100%" style={{ flex: 1, minWidth: 0 }}>
           {/* 기본 정보 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <User className="h-4 w-4 text-muted-foreground" />
-                기본 정보
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-6 py-0 pb-4">
-              <EditableRow
-                label="상호명"
-                editing={editing}
-                value={draft.businessName}
-                onChange={(v) => patchDraft({ businessName: v })}
-              >
-                {partner.businessName}
-              </EditableRow>
-              <EditableRow
-                label="대표자명"
-                editing={editing}
-                value={draft.representativeName}
-                onChange={(v) => patchDraft({ representativeName: v })}
-              >
-                {partner.representativeName}
-              </EditableRow>
-              <InfoRow label="카테고리">
-                {editing ? (
-                  <Select
-                    value={draft.categoryId ?? ''}
-                    onValueChange={(v) => patchDraft({ categoryId: v })}
-                  >
-                    <SelectTrigger className="h-9 w-[220px]">
-                      <SelectValue placeholder="카테고리 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {page.categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.categoryName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  partner.categoryName ?? '-'
-                )}
-              </InfoRow>
-              <EditableRow
-                label="광고표시용 전화"
-                editing={editing}
-                value={draft.displayPhoneNumber}
-                onChange={(v) => patchDraft({ displayPhoneNumber: v })}
-              >
-                {partner.displayPhoneNumber ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    {partner.displayPhoneNumber}
-                  </span>
-                ) : (
-                  '-'
-                )}
-              </EditableRow>
-              <EditableRow
-                label="연락처"
-                editing={editing}
-                value={draft.phoneNumber}
-                onChange={(v) => patchDraft({ phoneNumber: v })}
-              >
-                {partner.phoneNumber ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    {partner.phoneNumber}
-                  </span>
-                ) : (
-                  '-'
-                )}
-              </EditableRow>
-              <InfoRow label="비즈콜 번호">
-                {editing ? (
-                  <div className="space-y-1">
-                    <Input
-                      value={draft.bizCallNumber}
-                      placeholder="050-0000-0000 (비우면 대표번호 노출)"
-                      onChange={(e) => patchDraft({ bizCallNumber: e.target.value })}
-                      className="h-9"
-                    />
-                    {page.bizCallDuplicateName && (
-                      <p className="text-xs text-destructive">
-                        {BIZ_CALL_DUPLICATE_MESSAGE} ({page.bizCallDuplicateName})
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  partner.bizCallNumber ?? '-'
-                )}
-              </InfoRow>
-              <InfoRow label="가입일">
-                {new Date(partner.createdAt).toLocaleDateString('ko-KR')}
-              </InfoRow>
-              <InfoRow label="마케팅 동의">
-                {partner.marketingAgreed ? (
-                  <Badge variant="secondary">동의</Badge>
-                ) : (
-                  <span className="text-muted-foreground">미동의</span>
-                )}
-              </InfoRow>
-              <InfoRow label="광고 분석 열람">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="analyticsEnabled"
-                    checked={partner.analyticsEnabled}
-                    disabled={analyticsToggling}
-                    onCheckedChange={handleToggleAnalytics}
-                  />
-                  <Label htmlFor="analyticsEnabled" className="cursor-pointer text-sm">
-                    {partner.analyticsEnabled ? '허용됨' : '비허용'}
-                  </Label>
-                </div>
-              </InfoRow>
-            </CardContent>
-          </Card>
+          <Paper withBorder radius="md" p="lg">
+            <Group gap="xs" mb="sm">
+              <User size={16} color="var(--mantine-color-dimmed)" />
+              <Title order={4}>기본 정보</Title>
+            </Group>
+            <EditableRow
+              label="상호명"
+              editing={editing}
+              value={draft.businessName}
+              onChange={(v) => patchDraft({ businessName: v })}
+            >
+              {partner.businessName}
+            </EditableRow>
+            <EditableRow
+              label="대표자명"
+              editing={editing}
+              value={draft.representativeName}
+              onChange={(v) => patchDraft({ representativeName: v })}
+            >
+              {partner.representativeName}
+            </EditableRow>
+            <InfoRow label="카테고리">
+              {editing ? (
+                <Select
+                  w={220}
+                  placeholder="카테고리 선택"
+                  data={page.categories.map((cat) => ({
+                    value: cat.id,
+                    label: cat.categoryName,
+                  }))}
+                  value={draft.categoryId || null}
+                  onChange={(v) => {
+                    if (v === null) return;
+                    patchDraft({ categoryId: v });
+                  }}
+                  allowDeselect={false}
+                />
+              ) : (
+                partner.categoryName ?? '-'
+              )}
+            </InfoRow>
+            <EditableRow
+              label="광고표시용 전화"
+              editing={editing}
+              value={draft.displayPhoneNumber}
+              onChange={(v) => patchDraft({ displayPhoneNumber: v })}
+            >
+              {partner.displayPhoneNumber ? (
+                <Group gap={6} wrap="nowrap" display="inline-flex">
+                  <Phone size={14} color="var(--mantine-color-dimmed)" />
+                  {partner.displayPhoneNumber}
+                </Group>
+              ) : (
+                '-'
+              )}
+            </EditableRow>
+            <EditableRow
+              label="연락처"
+              editing={editing}
+              value={draft.phoneNumber}
+              onChange={(v) => patchDraft({ phoneNumber: v })}
+            >
+              {partner.phoneNumber ? (
+                <Group gap={6} wrap="nowrap" display="inline-flex">
+                  <Phone size={14} color="var(--mantine-color-dimmed)" />
+                  {partner.phoneNumber}
+                </Group>
+              ) : (
+                '-'
+              )}
+            </EditableRow>
+            <InfoRow label="비즈콜 번호">
+              {editing ? (
+                <TextInput
+                  size="sm"
+                  value={draft.bizCallNumber}
+                  placeholder="050-0000-0000 (비우면 대표번호 노출)"
+                  onChange={(e) => patchDraft({ bizCallNumber: e.target.value })}
+                  error={
+                    page.bizCallDuplicateName
+                      ? `${BIZ_CALL_DUPLICATE_MESSAGE} (${page.bizCallDuplicateName})`
+                      : undefined
+                  }
+                />
+              ) : (
+                partner.bizCallNumber ?? '-'
+              )}
+            </InfoRow>
+            <InfoRow label="가입일">
+              {new Date(partner.createdAt).toLocaleDateString('ko-KR')}
+            </InfoRow>
+            <InfoRow label="마케팅 동의">
+              {partner.marketingAgreed ? (
+                <Badge variant="light" color="green">동의</Badge>
+              ) : (
+                <Text span size="sm" c="dimmed">미동의</Text>
+              )}
+            </InfoRow>
+            <InfoRow label="광고 분석 열람">
+              <Checkbox
+                id="analyticsEnabled"
+                checked={partner.analyticsEnabled}
+                disabled={analyticsToggling}
+                onChange={() => handleToggleAnalytics()}
+                label={partner.analyticsEnabled ? '허용됨' : '비허용'}
+              />
+            </InfoRow>
+          </Paper>
 
           {/* 사업자 정보 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                사업자 정보
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-6 py-0 pb-4">
-              <EditableRow
-                label="사업자등록번호"
-                editing={editing}
-                value={draft.businessRegistrationNumber}
-                onChange={(v) => patchDraft({ businessRegistrationNumber: v })}
-              >
-                {partner.businessRegistrationNumber ?? '-'}
-              </EditableRow>
-              <InfoRow label="사업장 주소">
-                {editing ? (
-                  <div className="space-y-1.5">
-                    <Input
-                      value={draft.businessAddress}
-                      placeholder="도로명 주소"
-                      onChange={(e) => patchDraft({ businessAddress: e.target.value })}
-                      className="h-9"
-                    />
-                    <Input
-                      value={draft.businessDetailAddress}
-                      placeholder="상세 주소"
-                      onChange={(e) => patchDraft({ businessDetailAddress: e.target.value })}
-                      className="h-9"
-                    />
-                  </div>
-                ) : partner.businessAddress ? (
-                  <span>
-                    {partner.businessAddress}
-                    {partner.businessDetailAddress && (
-                      <span className="text-muted-foreground">
-                        {' '}
-                        {partner.businessDetailAddress}
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  '-'
-                )}
-              </InfoRow>
-              {/* 영업시간은 별도 테이블(business_hours)이라 파트너 앱에서만 고친다 */}
-              <InfoRow label="영업시간">{partner.businessHoursNote ?? '-'}</InfoRow>
-              <EditableRow
-                label="주차 정보"
-                editing={editing}
-                value={draft.parkingInfo}
-                onChange={(v) => patchDraft({ parkingInfo: v })}
-              >
-                {partner.parkingInfo ?? '-'}
-              </EditableRow>
-              <EditableRow
-                label="오시는길"
-                editing={editing}
-                value={draft.directionsInfo}
-                onChange={(v) => patchDraft({ directionsInfo: v })}
-              >
-                {partner.directionsInfo ?? '-'}
-              </EditableRow>
-              {partner.businessRegistrationImageUrl && (
-                <div className="mt-3">
-                  <p className="mb-2 text-sm font-medium text-muted-foreground">
-                    사업자등록증
-                  </p>
-                  <a
-                    href={partner.businessRegistrationImageUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    이미지 보기
-                  </a>
-                </div>
+          <Paper withBorder radius="md" p="lg">
+            <Group gap="xs" mb="sm">
+              <Building2 size={16} color="var(--mantine-color-dimmed)" />
+              <Title order={4}>사업자 정보</Title>
+            </Group>
+            <EditableRow
+              label="사업자등록번호"
+              editing={editing}
+              value={draft.businessRegistrationNumber}
+              onChange={(v) => patchDraft({ businessRegistrationNumber: v })}
+            >
+              {partner.businessRegistrationNumber ?? '-'}
+            </EditableRow>
+            <InfoRow label="사업장 주소">
+              {editing ? (
+                <Stack gap={6}>
+                  <TextInput
+                    size="sm"
+                    value={draft.businessAddress}
+                    placeholder="도로명 주소"
+                    onChange={(e) => patchDraft({ businessAddress: e.target.value })}
+                  />
+                  <TextInput
+                    size="sm"
+                    value={draft.businessDetailAddress}
+                    placeholder="상세 주소"
+                    onChange={(e) => patchDraft({ businessDetailAddress: e.target.value })}
+                  />
+                </Stack>
+              ) : partner.businessAddress ? (
+                <span>
+                  {partner.businessAddress}
+                  {partner.businessDetailAddress && (
+                    <Text span size="sm" c="dimmed">
+                      {' '}
+                      {partner.businessDetailAddress}
+                    </Text>
+                  )}
+                </span>
+              ) : (
+                '-'
               )}
-            </CardContent>
-          </Card>
+            </InfoRow>
+            {/* 영업시간은 별도 테이블(business_hours)이라 파트너 앱에서만 고친다 */}
+            <InfoRow label="영업시간">{partner.businessHoursNote ?? '-'}</InfoRow>
+            <EditableRow
+              label="주차 정보"
+              editing={editing}
+              value={draft.parkingInfo}
+              onChange={(v) => patchDraft({ parkingInfo: v })}
+            >
+              {partner.parkingInfo ?? '-'}
+            </EditableRow>
+            <EditableRow
+              label="오시는길"
+              editing={editing}
+              value={draft.directionsInfo}
+              onChange={(v) => patchDraft({ directionsInfo: v })}
+            >
+              {partner.directionsInfo ?? '-'}
+            </EditableRow>
+            {partner.businessRegistrationImageUrl && (
+              <Box mt="sm">
+                <Text size="sm" fw={500} c="dimmed" mb="xs">
+                  사업자등록증
+                </Text>
+                <Anchor
+                  href={partner.businessRegistrationImageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  size="sm"
+                >
+                  <Group gap={6} wrap="nowrap" display="inline-flex">
+                    <ExternalLink size={14} />
+                    이미지 보기
+                  </Group>
+                </Anchor>
+              </Box>
+            )}
+          </Paper>
 
           {/* 광고 이력 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                광고 신청 이력
-                <span className="ml-auto text-sm font-normal text-muted-foreground">
-                  {adHistory.length}건
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {adHistory.length === 0 ? (
-                <p className="px-6 pb-5 text-sm text-muted-foreground">
-                  광고 신청 이력이 없습니다.
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>광고 제목</TableHead>
-                      <TableHead>구분</TableHead>
-                      <TableHead>광고 상태</TableHead>
-                      <TableHead>신청일</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+          <Paper withBorder radius="md" p="lg">
+            <Group gap="xs" mb="sm">
+              <ClipboardList size={16} color="var(--mantine-color-dimmed)" />
+              <Title order={4}>광고 신청 이력</Title>
+              <Text size="sm" c="dimmed" ml="auto">
+                {adHistory.length}건
+              </Text>
+            </Group>
+            {adHistory.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                광고 신청 이력이 없습니다.
+              </Text>
+            ) : (
+              <Table.ScrollContainer minWidth={480}>
+                <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>광고 제목</Table.Th>
+                      <Table.Th>구분</Table.Th>
+                      <Table.Th>광고 상태</Table.Th>
+                      <Table.Th>신청일</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
                     {adHistory.map((ad) => (
-                      <TableRow
+                      <Table.Tr
                         key={ad.id}
-                        className="cursor-pointer"
+                        style={{ cursor: 'pointer' }}
                         onClick={() => page.handleAdClick(ad.id)}
                       >
-                        <TableCell className="font-medium">
-                          {ad.title ?? '(제목 없음)'}
-                        </TableCell>
-                        <TableCell>
+                        <Table.Td fw={500}>{ad.title ?? '(제목 없음)'}</Table.Td>
+                        <Table.Td>
                           {ad.isFirstAdApplication ? (
-                            <Badge
-                              variant="outline"
-                              className="border-blue-200 bg-blue-50 text-blue-700"
-                            >
+                            <Badge variant="light" color="blue">
                               첫광고
                             </Badge>
                           ) : (
-                            <span className="text-sm text-muted-foreground">일반</span>
+                            <Text size="sm" c="dimmed">일반</Text>
                           )}
-                        </TableCell>
-                        <TableCell>
+                        </Table.Td>
+                        <Table.Td>
                           <StatusBadge.Ad status={ad.adStatus as AdStatus} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        </Table.Td>
+                        <Table.Td c="dimmed">
                           {ad.submittedAt
                             ? new Date(ad.submittedAt).toLocaleDateString('ko-KR')
                             : new Date(ad.createdAt).toLocaleDateString('ko-KR')}
-                        </TableCell>
-                      </TableRow>
+                        </Table.Td>
+                      </Table.Tr>
                     ))}
-                  </TableBody>
+                  </Table.Tbody>
                 </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </Table.ScrollContainer>
+            )}
+          </Paper>
+        </Stack>
 
         {/* ── 우측 요약 ── */}
-        <aside className="lg:sticky lg:top-6 lg:self-start">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">요약</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2.5 px-6 pb-4 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">광고 이력</span>
+        <Box
+          component="aside"
+          w={{ base: '100%', lg: 340 }}
+          pos={{ base: 'static', lg: 'sticky' }}
+          top={24}
+          style={{ flexShrink: 0 }}
+        >
+          <Paper withBorder radius="md" p="lg">
+            <Title order={4} mb="sm">요약</Title>
+            <Stack gap={10}>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">광고 이력</Text>
                 {partner.hasHadRunningAd ? (
-                  <Badge variant="secondary">진행 이력 있음</Badge>
+                  <Badge variant="light" color="blue">진행 이력 있음</Badge>
                 ) : (
-                  <span className="text-muted-foreground">없음</span>
+                  <Text size="sm" c="dimmed">없음</Text>
                 )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">총 신청 건수</span>
-                <span className="font-medium tabular-nums">{adHistory.length}건</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">진행중</span>
-                <span className="font-medium tabular-nums">
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">총 신청 건수</Text>
+                <Text size="sm" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {adHistory.length}건
+                </Text>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">진행중</Text>
+                <Text size="sm" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {adHistory.filter((a) => a.adStatus === 'running').length}건
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">승인 대기</span>
-                <span className="font-medium tabular-nums">
+                </Text>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">승인 대기</Text>
+                <Text size="sm" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {adHistory.filter((a) => a.adStatus === 'pending').length}건
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">종료</span>
-                <span className="font-medium tabular-nums">
+                </Text>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">종료</Text>
+                <Text size="sm" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {adHistory.filter((a) => a.adStatus === 'ended').length}건
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
-    </div>
+                </Text>
+              </Group>
+            </Stack>
+          </Paper>
+        </Box>
+      </Flex>
+    </PageShell>
   );
 }

@@ -1,18 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Button,
+  Checkbox,
+  Group,
+  Input,
+  Modal,
+  Paper,
+  ScrollArea,
+  SimpleGrid,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import {
   ACCEPTED_TYPES,
   TIME_SLOTS,
@@ -87,83 +89,108 @@ export function FillerImageDialog({ open, image, apartments, saving, onClose, on
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
-        <DialogHeader>
-          <DialogTitle>{image ? '채움 이미지 수정' : '채움 이미지 등록'}</DialogTitle>
-          <DialogDescription>
-            단독 팝업 광고가 최대 장수보다 적을 때 남은 자리를 채우며, 광고와 섞여 랜덤으로 나옵니다. 단독 팝업 카드 크기 안에 이미지 전체가 보이게 들어갑니다.
-          </DialogDescription>
-        </DialogHeader>
+    <Modal
+      opened={open}
+      onClose={onClose}
+      title={image ? '채움 이미지 수정' : '채움 이미지 등록'}
+      size={560}
+    >
+      <Stack gap="lg">
+        <Text size="sm" c="dimmed">
+          단독 팝업 광고가 최대 장수보다 적을 때 남은 자리를 채우며, 광고와 섞여 랜덤으로 나옵니다. 단독 팝업 카드 크기 안에 이미지 전체가 보이게 들어갑니다.
+        </Text>
 
-        <div className="space-y-5">
-          <section className="space-y-2">
-            <label className="text-sm font-medium">이미지 (세로형)</label>
-            {previewUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="채움 이미지 미리보기" className="max-h-[280px] rounded-md border object-contain" />
-            )}
-            <Input type="file" accept={ACCEPTED_TYPES.join(',')} onChange={onFileChange} />
-          </section>
+        <Stack gap="xs">
+          <Text size="sm" fw={500}>
+            이미지 (세로형)
+          </Text>
+          {previewUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewUrl}
+              alt="채움 이미지 미리보기"
+              className="object-contain"
+              style={{
+                maxHeight: 280,
+                maxWidth: '100%',
+                alignSelf: 'flex-start',
+                borderRadius: 'var(--mantine-radius-md)',
+                border: '1px solid var(--app-divider)',
+              }}
+            />
+          )}
+          <Input type="file" accept={ACCEPTED_TYPES.join(',')} onChange={onFileChange} />
+        </Stack>
 
-          <section className="space-y-2">
-            <label className="text-sm font-medium">노출 시간대 (여러 개 선택 가능)</label>
-            <div className="grid grid-cols-2 gap-2">
-              {TIME_SLOTS.map((slot) => (
-                <label key={slot.value} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={input.timeSlots.includes(slot.value)}
-                    onCheckedChange={() => patch({ timeSlots: toggle<TimeSlot>(input.timeSlots, slot.value) })}
-                  />
-                  {slot.label}
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section className="space-y-2">
-            <label className="text-sm font-medium">노출 아파트</label>
-            <label className="flex items-center gap-2 text-sm">
+        <Stack gap="xs">
+          <Text size="sm" fw={500}>
+            노출 시간대 (여러 개 선택 가능)
+          </Text>
+          <SimpleGrid cols={2} spacing="xs">
+            {TIME_SLOTS.map((slot) => (
               <Checkbox
-                checked={input.isAllApartments}
-                onCheckedChange={(v) => patch({ isAllApartments: v === true })}
+                key={slot.value}
+                checked={input.timeSlots.includes(slot.value)}
+                onChange={() => patch({ timeSlots: toggle<TimeSlot>(input.timeSlots, slot.value) })}
+                label={slot.label}
               />
-              전체 단지
-            </label>
-            {!input.isAllApartments && (
-              <div className="space-y-2 rounded-md border p-3">
-                <Input placeholder="아파트 검색" value={search} onChange={(e) => setSearch(e.target.value)} />
-                <p className="text-xs text-muted-foreground">{input.apartmentIds.length}개 선택됨</p>
-                <div className="max-h-[200px] space-y-1 overflow-y-auto">
-                  {filteredApartments.map((apt) => (
-                    <label key={apt.id} className="flex items-center gap-2 text-sm">
+            ))}
+          </SimpleGrid>
+        </Stack>
+
+        <Stack gap="xs">
+          <Text size="sm" fw={500}>
+            노출 아파트
+          </Text>
+          <Checkbox
+            checked={input.isAllApartments}
+            onChange={(e) => patch({ isAllApartments: e.currentTarget.checked })}
+            label="전체 단지"
+          />
+          {!input.isAllApartments && (
+            <Paper withBorder radius="md" p="sm">
+              <Stack gap="xs">
+                <TextInput placeholder="아파트 검색" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <Text size="xs" c="dimmed">
+                  {input.apartmentIds.length}개 선택됨
+                </Text>
+                <ScrollArea.Autosize mah={200}>
+                  <Stack gap={6}>
+                    {filteredApartments.map((apt) => (
                       <Checkbox
+                        key={apt.id}
                         checked={input.apartmentIds.includes(apt.id)}
-                        onCheckedChange={() => patch({ apartmentIds: toggle(input.apartmentIds, apt.id) })}
+                        onChange={() => patch({ apartmentIds: toggle(input.apartmentIds, apt.id) })}
+                        label={apt.name}
                       />
-                      {apt.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
+                    ))}
+                  </Stack>
+                </ScrollArea.Autosize>
+              </Stack>
+            </Paper>
+          )}
+        </Stack>
 
-          <section className="flex items-center justify-between">
-            <label className="text-sm font-medium">사용</label>
-            <Switch checked={input.isActive} onCheckedChange={(v) => patch({ isActive: v })} />
-          </section>
-        </div>
+        <Group justify="space-between">
+          <Text size="sm" fw={500}>
+            사용
+          </Text>
+          <Switch
+            checked={input.isActive}
+            onChange={(e) => patch({ isActive: e.currentTarget.checked })}
+            aria-label="사용"
+          />
+        </Group>
+      </Stack>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            취소
-          </Button>
-          <Button onClick={submit} disabled={saving}>
-            {saving ? '저장 중...' : '저장'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={onClose} disabled={saving}>
+          취소
+        </Button>
+        <Button onClick={submit} disabled={saving}>
+          {saving ? '저장 중...' : '저장'}
+        </Button>
+      </Group>
+    </Modal>
   );
 }

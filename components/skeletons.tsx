@@ -1,19 +1,9 @@
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Group, Paper, SimpleGrid, Skeleton, Stack, Table } from '@mantine/core';
 import {
   PageContent,
   PageHeader,
   PageShell,
 } from '@/components/page-shell';
-import { cn } from '@/lib/utils';
 
 interface PageSkeletonProps {
   /** Number of stat cards to render at the top. Set to 0 to hide. */
@@ -41,44 +31,42 @@ export function PageSkeleton({
   return (
     <PageShell className={className}>
       <PageHeader>
-        <div className="space-y-2">
-          <Skeleton className="h-7 w-48" />
-          <Skeleton className="h-4 w-72" />
-        </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-24" />
-        </div>
+        <Stack gap="xs">
+          <Skeleton h={28} w={192} />
+          <Skeleton h={16} w={288} />
+        </Stack>
+        <Skeleton h={36} w={96} />
       </PageHeader>
 
       <PageContent>
         {stats > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SimpleGrid cols={{ base: 1, sm: 2, xl: 4 }}>
             {Array.from({ length: stats }).map((_, i) => (
-              <Card key={`stat-${i}`} className="border-border/70 shadow-card">
-                <CardContent className="space-y-3 p-5">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-7 w-32" />
-                  <Skeleton className="h-3 w-20" />
-                </CardContent>
-              </Card>
+              <Paper key={`stat-${i}`} withBorder radius="md" p="md">
+                <Stack gap="sm">
+                  <Skeleton h={16} w={96} />
+                  <Skeleton h={28} w={128} />
+                  <Skeleton h={12} w={80} />
+                </Stack>
+              </Paper>
             ))}
-          </div>
+          </SimpleGrid>
         )}
 
         {searchBar && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Skeleton className="h-10 w-full sm:max-w-md" />
-            <div className="flex gap-2">
-              <Skeleton className="h-10 w-28" />
-              <Skeleton className="h-10 w-28" />
-            </div>
-          </div>
+          <Group justify="space-between">
+            <Skeleton h={36} maw={448} style={{ flex: 1 }} />
+            <Group gap="xs">
+              <Skeleton h={36} w={112} />
+              <Skeleton h={36} w={112} />
+            </Group>
+          </Group>
         )}
 
         {rows > 0 && (
-          <Card className="overflow-hidden border-border/70 shadow-card">
+          <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
             <TableSkeleton rows={rows} columns={columns} />
-          </Card>
+          </Paper>
         )}
       </PageContent>
     </PageShell>
@@ -100,37 +88,36 @@ export function TableSkeleton({
   className,
 }: TableSkeletonProps): React.ReactElement {
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <Table>
+    <Table.ScrollContainer minWidth={0} type="native" className={className}>
+      <Table verticalSpacing="md">
         {showHeader && (
-          <TableHeader>
-            <TableRow className="border-border hover:bg-transparent">
+          <Table.Thead>
+            <Table.Tr>
               {Array.from({ length: columns }).map((_, i) => (
-                <TableHead key={`th-${i}`} className="py-3">
-                  <Skeleton className="h-4 w-20" />
-                </TableHead>
+                <Table.Th key={`th-${i}`}>
+                  <Skeleton h={16} w={80} />
+                </Table.Th>
               ))}
-            </TableRow>
-          </TableHeader>
+            </Table.Tr>
+          </Table.Thead>
         )}
-        <TableBody>
+        <Table.Tbody>
           {Array.from({ length: rows }).map((_, r) => (
-            <TableRow key={`tr-${r}`} className="border-border">
+            <Table.Tr key={`tr-${r}`}>
               {Array.from({ length: columns }).map((_, c) => (
-                <TableCell key={`td-${r}-${c}`} className="py-4">
+                <Table.Td key={`td-${r}-${c}`}>
                   <Skeleton
-                    className={cn(
-                      'h-4',
-                      c === 0 ? 'w-32' : c === columns - 1 ? 'w-16 ml-auto' : 'w-24'
-                    )}
+                    h={16}
+                    w={c === 0 ? 128 : c === columns - 1 ? 64 : 96}
+                    ml={c === columns - 1 ? 'auto' : undefined}
                   />
-                </TableCell>
+                </Table.Td>
               ))}
-            </TableRow>
+            </Table.Tr>
           ))}
-        </TableBody>
+        </Table.Tbody>
       </Table>
-    </div>
+    </Table.ScrollContainer>
   );
 }
 
@@ -147,29 +134,27 @@ export function DetailSkeleton({
 }: DetailSkeletonProps): React.ReactElement {
   return (
     <PageShell className={className}>
-      <div>
-        <Skeleton className="mb-3 h-8 w-20" />
-        <Skeleton className="h-7 w-64" />
-        <Skeleton className="mt-2 h-4 w-80" />
-      </div>
+      <Stack gap="xs">
+        <Skeleton h={32} w={80} mb={4} />
+        <Skeleton h={28} w={256} />
+        <Skeleton h={16} w={320} />
+      </Stack>
       <PageContent>
         {Array.from({ length: sections }).map((_, i) => (
-          <Card key={`sec-${i}`} className="border-border/70 shadow-card">
-            <CardHeader className="border-b border-border/60 pb-4">
-              <Skeleton className="h-5 w-40" />
-            </CardHeader>
-            <CardContent className="space-y-3 p-6">
-              <Skeleton className="h-4 w-full max-w-md" />
-              <Skeleton className="h-4 w-full max-w-sm" />
-              <Skeleton className="h-4 w-full max-w-lg" />
+          <Paper key={`sec-${i}`} withBorder radius="md" p="lg">
+            <Stack gap="sm">
+              <Skeleton h={20} w={160} mb="xs" />
+              <Skeleton h={16} maw={448} />
+              <Skeleton h={16} maw={384} />
+              <Skeleton h={16} maw={512} />
               {i % 2 === 0 && (
-                <div className="grid gap-3 pt-2 sm:grid-cols-2">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} pt="xs">
+                  <Skeleton h={48} />
+                  <Skeleton h={48} />
+                </SimpleGrid>
               )}
-            </CardContent>
-          </Card>
+            </Stack>
+          </Paper>
         ))}
       </PageContent>
     </PageShell>
@@ -185,16 +170,10 @@ export function InlineLoadingSkeleton({
   rows?: number;
 }): React.ReactElement {
   return (
-    <div className={cn('space-y-3 p-6', className)}>
+    <Stack gap="sm" p="lg" className={className}>
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton
-          key={i}
-          className={cn(
-            'h-4',
-            i % 3 === 0 ? 'w-full' : i % 3 === 1 ? 'w-4/5' : 'w-2/3'
-          )}
-        />
+        <Skeleton key={i} h={16} w={i % 3 === 0 ? '100%' : i % 3 === 1 ? '80%' : '66%'} />
       ))}
-    </div>
+    </Stack>
   );
 }

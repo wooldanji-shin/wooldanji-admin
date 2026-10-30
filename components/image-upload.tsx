@@ -2,8 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Upload, X, Download, FileText, Image as ImageIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { ActionIcon, Button, Group, Loader, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
 import { createClient } from '@/lib/supabase/client';
 
 //업로드파일
@@ -108,77 +107,6 @@ export function ImageUpload({
     }
     return [];
   });
-
-  // 이미지 비율 체크 함수 (1:1, 3:4, 2:3 허용, ±5% 허용치)
-  const checkImageRatio = async (file: File): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        const img = new Image();
-
-        img.onload = () => {
-          const ratio = img.width / img.height;
-
-          // 1:1 비율 체크 (0.95 ~ 1.05)
-          const isSquare = ratio >= 0.95 && ratio <= 1.05;
-
-          // 3:4 비율 체크 세로 (0.714 ~ 0.789)
-          const is3to4Portrait = ratio >= 0.714 && ratio <= 0.789;
-
-          // 2:3 비율 체크 세로 (0.633 ~ 0.700)
-          const is2to3Portrait = ratio >= 0.633 && ratio <= 0.700;
-
-          if (isSquare || is3to4Portrait || is2to3Portrait) {
-            resolve();
-          } else {
-            // 추천 크기 계산
-            let recommendations = '';
-
-            // 1:1 정사각형 추천
-            const squareSize = Math.min(img.width, img.height);
-            recommendations += `\n\n추천 크기:\n`;
-            recommendations += `• 1:1 (정사각형): ${squareSize} x ${squareSize}\n`;
-
-            // 2:3 세로 추천 (가로 기준)
-            const height2to3FromWidth = Math.round(img.width * 3 / 2);
-            recommendations += `• 2:3 (세로, 가로 기준): ${img.width} x ${height2to3FromWidth}\n`;
-
-            // 2:3 세로 추천 (세로 기준)
-            const width2to3FromHeight = Math.round(img.height * 2 / 3);
-            recommendations += `• 2:3 (세로, 세로 기준): ${width2to3FromHeight} x ${img.height}\n`;
-
-            // 3:4 세로 추천 (가로 기준)
-            const height3to4FromWidth = Math.round(img.width * 4 / 3);
-            recommendations += `• 3:4 (세로, 가로 기준): ${img.width} x ${height3to4FromWidth}\n`;
-
-            // 3:4 세로 추천 (세로 기준)
-            const width3to4FromHeight = Math.round(img.height * 3 / 4);
-            recommendations += `• 3:4 (세로, 세로 기준): ${width3to4FromHeight} x ${img.height}`;
-
-            reject(new Error(
-              `이미지 비율이 맞지 않습니다.\n` +
-              `허용 비율: 1:1 (정사각형), 2:3 (세로), 3:4 (세로)\n` +
-              `현재 이미지: ${img.width} x ${img.height} (비율: ${ratio.toFixed(2)}:1)` +
-              recommendations
-            ));
-          }
-        };
-
-        img.onerror = () => {
-          reject(new Error('이미지를 로드할 수 없습니다.'));
-        };
-
-        img.src = e.target?.result as string;
-      };
-
-      reader.onerror = () => {
-        reject(new Error('파일을 읽을 수 없습니다.'));
-      };
-
-      reader.readAsDataURL(file);
-    });
-  };
 
   // 이미지를 WebP로 변환하는 함수 (긴 변 1920px 리사이징 + 95% 품질)
   const convertToWebP = async (file: File): Promise<Blob> => {
@@ -455,25 +383,27 @@ export function ImageUpload({
   const isImage = (fileType: string) => fileType.startsWith('image/');
 
   return (
-    <div className='space-y-2'>
+    <Stack gap='xs'>
       {description && (
-        <p className='text-xs text-muted-foreground'>{description}</p>
+        <Text size='xs' c='dimmed'>{description}</Text>
       )}
 
       {error && (
-        <p className='text-xs text-destructive'>{error}</p>
+        <Text size='xs' c='red'>{error}</Text>
       )}
 
       {/* 파일이 없을 때: 업로드 영역 표시 */}
       {uploadedFiles.length === 0 && (
         <div
-          className={cn(
-            'relative border-2 border-dashed rounded-lg transition-colors py-4 px-6',
-            isDragging
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-primary/50',
-            isUploading && 'opacity-50 pointer-events-none'
-          )}
+          style={{
+            border: `2px dashed ${isDragging ? 'var(--mantine-color-blue-filled)' : 'var(--app-divider)'}`,
+            background: isDragging ? 'var(--mantine-color-blue-light)' : undefined,
+            borderRadius: 'var(--mantine-radius-md)',
+            opacity: isUploading ? 0.5 : 1,
+            pointerEvents: isUploading ? 'none' : undefined,
+            transition: 'border-color 150ms, background 150ms',
+          }}
+          className='py-4 px-6'
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -484,20 +414,20 @@ export function ImageUpload({
           >
             {isUploading ? (
               <>
-                <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-primary flex-shrink-0' />
-                <span className='text-sm text-muted-foreground'>업로드 중...</span>
+                <Loader size='sm' />
+                <Text size='sm' c='dimmed'>업로드 중...</Text>
               </>
             ) : (
               <>
-                <Upload className='h-6 w-6 text-muted-foreground flex-shrink-0' />
-                <div className='flex-1'>
-                  <p className='text-sm font-medium text-foreground'>
+                <Upload size={24} color='var(--mantine-color-dimmed)' style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <Text size='sm' fw={500}>
                     클릭하거나 파일을 드래그하여 업로드
-                  </p>
-                  <p className='text-xs text-muted-foreground mt-0.5'>
+                  </Text>
+                  <Text size='xs' c='dimmed' mt={2}>
                     {accept === 'image/*' ? '이미지 파일만' : accept === 'image/*,application/pdf' ? '이미지 또는 PDF' : '파일'}
                     {maxSizeMB && ` (최대 ${maxSizeMB}MB)`}
-                  </p>
+                  </Text>
                 </div>
               </>
             )}
@@ -516,7 +446,7 @@ export function ImageUpload({
 
       {/* 파일이 있을 때: 업로드된 파일 목록 표시 */}
       {uploadedFiles.length > 0 && (
-        <div className='space-y-2'>
+        <Stack gap='xs'>
           {uploadedFiles.map((file) => {
             const cleanUrl = file.url.split('?')[0];
             // 원본 파일명이 있으면 사용, 없으면 Storage 파일명 사용
@@ -526,124 +456,127 @@ export function ImageUpload({
               : nameToDisplay;
 
             return (
-              <div
-                key={file.url}
-                className='flex gap-4 p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors'
-              >
-                {/* 왼쪽: 파일 아이콘/썸네일 */}
-                <div className='flex-shrink-0'>
-                  {isPDF(file.fileType) ? (
-                    <div className='w-16 h-16 rounded-lg bg-red-50 dark:bg-red-950 flex items-center justify-center'>
-                      <FileText className='h-6 w-6 text-red-600 dark:text-red-400' />
-                    </div>
-                  ) : isImage(file.fileType) ? (
-                    <div className='w-16 h-16 rounded-lg overflow-hidden bg-muted flex items-center justify-center relative'>
-                      <img
-                        src={cleanUrl}
-                        alt={nameToDisplay}
-                        className='w-full h-full object-cover'
-                        onError={(e) => {
-                          // 이미지 로딩 실패 시 아이콘으로 대체
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const icon = document.createElement('div');
-                            icon.className = 'flex items-center justify-center w-full h-full';
-                            icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
-                            parent.appendChild(icon);
-                          }
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className='w-16 h-16 rounded-lg bg-muted flex items-center justify-center'>
-                      <ImageIcon className='h-6 w-6 text-muted-foreground' />
-                    </div>
-                  )}
-                </div>
-
-                {/* 오른쪽: 파일 정보와 액션 버튼 */}
-                <div className='flex-1 min-w-0 flex flex-col justify-between gap-2'>
-                  {/* 상단: 파일 정보 */}
-                  <div>
-                    <p className='text-sm font-medium truncate' title={nameToDisplay}>
-                      {displayName}
-                    </p>
-                    <p className='text-xs text-muted-foreground mt-0.5'>
-                      {new Date(file.uploadedAt).toLocaleString('ko-KR', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+              <Paper key={file.url} withBorder radius='md' p='md'>
+                <Group gap='md' wrap='nowrap' align='stretch'>
+                  {/* 왼쪽: 파일 아이콘/썸네일 */}
+                  <div style={{ flexShrink: 0 }}>
+                    {isPDF(file.fileType) ? (
+                      <ThemeIcon variant='light' color='red' size={64} radius='md'>
+                        <FileText size={24} />
+                      </ThemeIcon>
+                    ) : isImage(file.fileType) ? (
+                      <div
+                        className='w-16 h-16 overflow-hidden flex items-center justify-center relative'
+                        style={{ borderRadius: 'var(--mantine-radius-md)', background: 'var(--app-bg-subtle)' }}
+                      >
+                        <img
+                          src={cleanUrl}
+                          alt={nameToDisplay}
+                          className='w-full h-full object-cover'
+                          onError={(e) => {
+                            // 이미지 로딩 실패 시 아이콘으로 대체
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              const icon = document.createElement('div');
+                              icon.className = 'flex items-center justify-center w-full h-full';
+                              icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--mantine-color-dimmed)"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                              parent.appendChild(icon);
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <ThemeIcon variant='light' color='gray' size={64} radius='md'>
+                        <ImageIcon size={24} />
+                      </ThemeIcon>
+                    )}
                   </div>
 
-                  {/* 하단: 액션 버튼들 */}
-                  <div className='flex items-center gap-1'>
-                    {/* 미리보기/열기 버튼 */}
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => window.open(cleanUrl, '_blank')}
-                      className='h-8 px-3'
-                      title={isPDF(file.fileType) ? 'PDF 열기' : '이미지 보기'}
-                    >
-                      {isPDF(file.fileType) ? '열기' : '보기'}
-                    </Button>
+                  {/* 오른쪽: 파일 정보와 액션 버튼 */}
+                  <Stack gap='xs' justify='space-between' miw={0} style={{ flex: 1 }}>
+                    {/* 상단: 파일 정보 */}
+                    <div>
+                      <Text size='sm' fw={500} truncate title={nameToDisplay}>
+                        {displayName}
+                      </Text>
+                      <Text size='xs' c='dimmed' mt={2}>
+                        {new Date(file.uploadedAt).toLocaleString('ko-KR', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </div>
 
-                    {/* 다운로드 버튼 */}
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => handleDownload(cleanUrl, nameToDisplay)}
-                      className='h-8 w-8 p-0'
-                      title='다운로드'
-                    >
-                      <Download className='h-4 w-4' />
-                    </Button>
+                    {/* 하단: 액션 버튼들 */}
+                    <Group gap={4}>
+                      {/* 미리보기/열기 버튼 */}
+                      <Button
+                        type='button'
+                        variant='subtle'
+                        size='compact-sm'
+                        onClick={() => window.open(cleanUrl, '_blank')}
+                        title={isPDF(file.fileType) ? 'PDF 열기' : '이미지 보기'}
+                      >
+                        {isPDF(file.fileType) ? '열기' : '보기'}
+                      </Button>
 
-                    {/* 삭제 버튼 */}
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => handleRemove(file.url)}
-                      className='h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive'
-                      title='삭제'
-                    >
-                      <X className='h-4 w-4' />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+                      {/* 다운로드 버튼 */}
+                      <ActionIcon
+                        type='button'
+                        variant='subtle'
+                        color='gray'
+                        onClick={() => handleDownload(cleanUrl, nameToDisplay)}
+                        title='다운로드'
+                        aria-label='다운로드'
+                      >
+                        <Download size={16} />
+                      </ActionIcon>
+
+                      {/* 삭제 버튼 */}
+                      <ActionIcon
+                        type='button'
+                        variant='subtle'
+                        color='red'
+                        onClick={() => handleRemove(file.url)}
+                        title='삭제'
+                        aria-label='삭제'
+                      >
+                        <X size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Stack>
+                </Group>
+              </Paper>
             );
           })}
 
           {/* 여러 파일 모드일 때: 파일 추가 버튼 */}
           {multiple && (
             <div
-              className={cn(
-                'relative border-2 border-dashed rounded-lg transition-colors py-3 px-6',
-                isDragging
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50',
-                isUploading && 'opacity-50 pointer-events-none'
-              )}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
+          style={{
+            border: `2px dashed ${isDragging ? 'var(--mantine-color-blue-filled)' : 'var(--app-divider)'}`,
+            background: isDragging ? 'var(--mantine-color-blue-light)' : undefined,
+            borderRadius: 'var(--mantine-radius-md)',
+            opacity: isUploading ? 0.5 : 1,
+            pointerEvents: isUploading ? 'none' : undefined,
+            transition: 'border-color 150ms, background 150ms',
+          }}
+          className='py-3 px-6'
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+        >
               <label
                 htmlFor={`upload-${storagePath}`}
                 className='flex items-center gap-3 cursor-pointer'
               >
-                <Upload className='h-5 w-5 text-muted-foreground flex-shrink-0' />
-                <span className='text-sm text-muted-foreground'>파일 추가</span>
+                <Upload size={20} color='var(--mantine-color-dimmed)' style={{ flexShrink: 0 }} />
+                <Text size='sm' c='dimmed'>파일 추가</Text>
                 <input
                   id={`upload-${storagePath}`}
                   type='file'
@@ -656,8 +589,8 @@ export function ImageUpload({
               </label>
             </div>
           )}
-        </div>
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
 }

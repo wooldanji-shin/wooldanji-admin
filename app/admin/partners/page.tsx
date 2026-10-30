@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react';
 import { Search, ChevronLeft, ChevronRight, Users } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   PageContent,
   PageHeader,
@@ -12,24 +11,17 @@ import {
 import { DataTableShell } from '@/components/data-table-shell';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Pagination,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { usePartnersPage } from './usePartnersPage';
 
 function PartnersContent(): React.ReactElement {
@@ -46,62 +38,63 @@ function PartnersContent(): React.ReactElement {
       </PageHeader>
 
       <PageContent>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 w-full max-w-2xl">
-            <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
+        <DataTableShell
+          toolbar={
+            <Group gap="xs" wrap="nowrap" w="100%" maw={672}>
+              <TextInput
                 placeholder="상호명, 대표자명, 전화번호, 사업자번호 검색..."
                 value={page.searchInput}
                 onChange={(e) => page.handleSearch(e.target.value)}
-                className="pl-10"
+                leftSection={<Search size={16} />}
+                w="100%"
+                maw={384}
               />
-            </div>
-            <Select
-              value={page.categoryFilter ?? 'all'}
-              onValueChange={(value) =>
-                page.handleCategoryFilterChange(value === 'all' ? null : value)
-              }
-            >
-              <SelectTrigger className="w-[140px] shrink-0">
-                <SelectValue placeholder="카테고리" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체 카테고리</SelectItem>
-                {page.categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.categoryName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {page.categoryFilter && page.subCategories.length > 0 && (
               <Select
-                value={page.subCategoryFilter ?? 'all'}
-                onValueChange={(value) =>
-                  page.handleSubCategoryFilterChange(value === 'all' ? null : value)
-                }
-              >
-                <SelectTrigger className="w-[140px] shrink-0">
-                  <SelectValue placeholder="서브카테고리" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 서브카테고리</SelectItem>
-                  {page.subCategories.map((sub) => (
-                    <SelectItem key={sub.id} value={sub.id}>
-                      {sub.subCategoryName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          <span className="shrink-0 text-sm text-muted-foreground">
-            전체 {page.totalCount.toLocaleString()}명
-          </span>
-        </div>
-
-        <DataTableShell>
+                placeholder="카테고리"
+                w={140}
+                style={{ flexShrink: 0 }}
+                data={[
+                  { value: 'all', label: '전체 카테고리' },
+                  ...page.categories.map((category) => ({
+                    value: category.id,
+                    label: category.categoryName,
+                  })),
+                ]}
+                value={page.categoryFilter ?? 'all'}
+                onChange={(value) => {
+                  if (value === null) return;
+                  page.handleCategoryFilterChange(value === 'all' ? null : value);
+                }}
+                allowDeselect={false}
+              />
+              {page.categoryFilter && page.subCategories.length > 0 && (
+                <Select
+                  placeholder="서브카테고리"
+                  w={140}
+                  style={{ flexShrink: 0 }}
+                  data={[
+                    { value: 'all', label: '전체 서브카테고리' },
+                    ...page.subCategories.map((sub) => ({
+                      value: sub.id,
+                      label: sub.subCategoryName,
+                    })),
+                  ]}
+                  value={page.subCategoryFilter ?? 'all'}
+                  onChange={(value) => {
+                    if (value === null) return;
+                    page.handleSubCategoryFilterChange(value === 'all' ? null : value);
+                  }}
+                  allowDeselect={false}
+                />
+              )}
+            </Group>
+          }
+          summary={
+            <Text size="sm" c="dimmed">
+              전체 {page.totalCount.toLocaleString()}명
+            </Text>
+          }
+        >
           {page.loading ? (
             <TableSkeleton rows={8} columns={10} />
           ) : page.partners.length === 0 ? (
@@ -111,123 +104,106 @@ function PartnersContent(): React.ReactElement {
               description="검색 조건을 변경하거나 새 파트너가 가입할 때까지 기다려 주세요."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>상호명</TableHead>
-                  <TableHead>대표자명</TableHead>
-                  <TableHead>카테고리</TableHead>
-                  <TableHead>주소</TableHead>
-                  <TableHead>연락처</TableHead>
-                  <TableHead>비즈콜</TableHead>
-                  <TableHead>노출수/클릭수</TableHead>
-                  <TableHead>광고 이력</TableHead>
-                  <TableHead>분석 권한</TableHead>
-                  <TableHead>가입일</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>상호명</Table.Th>
+                  <Table.Th>대표자명</Table.Th>
+                  <Table.Th>카테고리</Table.Th>
+                  <Table.Th>주소</Table.Th>
+                  <Table.Th>연락처</Table.Th>
+                  <Table.Th>비즈콜</Table.Th>
+                  <Table.Th>노출수/클릭수</Table.Th>
+                  <Table.Th>광고 이력</Table.Th>
+                  <Table.Th>분석 권한</Table.Th>
+                  <Table.Th>가입일</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {page.partners.map((partner) => (
-                  <TableRow
+                  <Table.Tr
                     key={partner.id}
-                    className="cursor-pointer"
+                    style={{ cursor: 'pointer' }}
                     onClick={() => page.handleRowClick(partner.id)}
                   >
-                    <TableCell className="font-medium">{partner.businessName}</TableCell>
-                    <TableCell>{partner.representativeName}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <Table.Td fw={500}>{partner.businessName}</Table.Td>
+                    <Table.Td>{partner.representativeName}</Table.Td>
+                    <Table.Td c="dimmed">
                       {partner.categoryNames.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {partner.categoryNames.map((name) => (
-                            <Badge key={name} variant="outline">
+                        <Group gap={4}>
+                          {partner.categoryNames.map((name, i) => (
+                            <Badge key={`${name}-${i}`} variant="light" color="gray">
                               {name}
                             </Badge>
                           ))}
-                        </div>
+                        </Group>
                       ) : (
                         '-'
                       )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground max-w-[160px] truncate">
-                      {partner.businessAddress ?? '-'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {partner.phoneNumber ?? '-'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {partner.bizCallNumber ?? '-'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      <Text size="sm" c="dimmed" maw={160} truncate>
+                        {partner.businessAddress ?? '-'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td c="dimmed">{partner.phoneNumber ?? '-'}</Table.Td>
+                    <Table.Td c="dimmed">{partner.bizCallNumber ?? '-'}</Table.Td>
+                    <Table.Td c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {partner.totalImpressionCount.toLocaleString()} / {partner.totalClickCount.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
+                    </Table.Td>
+                    <Table.Td>
                       {partner.hasHadRunningAd ? (
-                        <Badge variant="secondary">광고 이력 있음</Badge>
+                        <Badge variant="light" color="blue">광고 이력 있음</Badge>
                       ) : (
-                        <span className="text-muted-foreground text-sm">없음</span>
+                        <Text size="sm" c="dimmed">없음</Text>
                       )}
-                    </TableCell>
-                    <TableCell
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    </Table.Td>
+                    <Table.Td onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={partner.analyticsEnabled}
-                        onCheckedChange={() =>
+                        onChange={() =>
                           handleToggleAnalytics(partner.id, partner.analyticsEnabled)
                         }
+                        aria-label="분석 권한"
                       />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    </Table.Td>
+                    <Table.Td c="dimmed">
                       {new Date(partner.createdAt).toLocaleDateString('ko-KR')}
-                    </TableCell>
-                  </TableRow>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </TableBody>
+              </Table.Tbody>
             </Table>
           )}
         </DataTableShell>
 
         {page.totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
+          <Group justify="center" gap="xs">
             <Button
-              variant="outline"
-              size="sm"
+              variant="default"
+              size="xs"
+              leftSection={<ChevronLeft size={16} />}
               onClick={() => page.handlePageChange(page.currentPage - 1)}
               disabled={page.currentPage === 1}
             >
-              <ChevronLeft className="h-4 w-4" />
               이전
             </Button>
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(10, page.totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (page.totalPages <= 10) pageNum = i + 1;
-                else if (page.currentPage <= 5) pageNum = i + 1;
-                else if (page.currentPage >= page.totalPages - 4) pageNum = page.totalPages - 9 + i;
-                else pageNum = page.currentPage - 4 + i;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={page.currentPage === pageNum ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => page.handlePageChange(pageNum)}
-                    className="w-10"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
+            <Pagination
+              total={page.totalPages}
+              value={page.currentPage}
+              onChange={page.handlePageChange}
+              withControls={false}
+            />
             <Button
-              variant="outline"
-              size="sm"
+              variant="default"
+              size="xs"
+              rightSection={<ChevronRight size={16} />}
               onClick={() => page.handlePageChange(page.currentPage + 1)}
               disabled={page.currentPage === page.totalPages}
             >
               다음
-              <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
+          </Group>
         )}
       </PageContent>
     </PageShell>

@@ -1,10 +1,16 @@
 'use client';
 
 import { Check, Circle, Plus, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import {
+  Button,
+  Divider,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import {
   CTA_CUSTOM_LABEL_MAX_LENGTH,
   MAX_CTA_BUTTONS,
@@ -53,122 +59,109 @@ export function CtaButtonsCard({
   const isFull = buttons.length >= MAX_CTA_BUTTONS;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle>하단 버튼</CardTitle>
-        <span
-          className={cn(
-            'text-sm font-semibold',
-            isFull ? 'text-primary' : 'text-muted-foreground'
-          )}
-        >
+    <Paper withBorder radius="md" p="lg">
+      <Group justify="space-between" mb="xs">
+        <Title order={4}>하단 버튼</Title>
+        <Text size="sm" fw={600} c={isFull ? 'blue' : 'dimmed'}>
           {buttons.length}/{MAX_CTA_BUTTONS}
-        </span>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
+        </Text>
+      </Group>
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
           앱 광고 상세 하단에 노출될 버튼입니다. 전화·문자는 파트너 전화번호를 사용합니다.
-        </p>
+        </Text>
 
-        <div className="flex flex-wrap gap-2">
+        <Group gap="xs">
           {presetTypes.map((type) => {
             const selected = buttons.some((b) => b.type === type);
             return (
-              <button
+              <Button
                 key={type}
                 type="button"
+                variant={selected ? 'light' : 'default'}
                 disabled={!selected && isFull}
                 onClick={() => onToggleType(type)}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-lg border px-3.5 py-2.5 text-sm font-semibold transition-colors',
-                  selected
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:bg-accent',
-                  !selected && isFull && 'cursor-not-allowed opacity-50'
-                )}
+                leftSection={selected ? <Check size={16} /> : <Circle size={16} />}
               >
-                {selected ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Circle className="h-4 w-4" />
-                )}
                 {ctaButtonLabel({ id: type, type })}
-              </button>
+              </Button>
             );
           })}
-        </div>
+        </Group>
 
         {!deliveryAvailable && (
-          <p className="text-xs text-muted-foreground">
+          <Text size="xs" c="dimmed">
             배달의민족·쿠팡이츠는 음식 카테고리에서 서브카테고리를 선택하면 나타납니다.
-          </p>
+          </Text>
         )}
 
         {linkButtons.map((button) => (
-          <div key={button.id} className="space-y-1.5">
-            <label className="text-sm font-medium">
-              {ctaButtonLabel(button)} 링크 <span className="text-destructive">*</span>
-            </label>
-            <Input
-              value={button.url ?? ''}
-              placeholder={PRESET_PLACEHOLDER[button.type]}
-              onChange={(e) => onUpdate(button.id, { url: e.target.value.trim() })}
-            />
-          </div>
+          <TextInput
+            key={button.id}
+            label={`${ctaButtonLabel(button)} 링크`}
+            withAsterisk
+            value={button.url ?? ''}
+            placeholder={PRESET_PLACEHOLDER[button.type]}
+            onChange={(e) => onUpdate(button.id, { url: e.target.value.trim() })}
+          />
         ))}
 
-        <div className="space-y-3 border-t border-border pt-4">
+        <Divider />
+
+        <Stack gap="sm">
           <div>
-            <p className="text-sm font-semibold">직접 추가</p>
-            <p className="text-xs text-muted-foreground">
+            <Text size="sm" fw={600}>직접 추가</Text>
+            <Text size="xs" c="dimmed">
               버튼 이름과 링크를 직접 입력합니다 (최대 {MAX_CUSTOM_CTA_BUTTONS}개)
-            </p>
+            </Text>
           </div>
 
           {customButtons.map((button) => (
-            <div key={button.id} className="space-y-3 rounded-lg bg-muted/50 p-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">버튼 이름</label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-destructive hover:text-destructive"
-                  onClick={() => onRemove(button.id)}
-                >
-                  <X className="mr-1 h-3.5 w-3.5" />
-                  삭제
-                </Button>
-              </div>
-              <Input
-                value={button.label ?? ''}
-                maxLength={CTA_CUSTOM_LABEL_MAX_LENGTH}
-                placeholder={`예: 요기요 (최대 ${CTA_CUSTOM_LABEL_MAX_LENGTH}자)`}
-                onChange={(e) => onUpdate(button.id, { label: e.target.value })}
-              />
-              <label className="block text-sm font-medium">링크</label>
-              <Input
-                value={button.url ?? ''}
-                placeholder="https://"
-                onChange={(e) => onUpdate(button.id, { url: e.target.value.trim() })}
-              />
-            </div>
+            <Paper key={button.id} bg="var(--app-bg-muted)" radius="md" p="sm">
+              <Stack gap="sm">
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>버튼 이름</Text>
+                  <Button
+                    type="button"
+                    variant="subtle"
+                    color="red"
+                    size="compact-sm"
+                    leftSection={<X size={14} />}
+                    onClick={() => onRemove(button.id)}
+                  >
+                    삭제
+                  </Button>
+                </Group>
+                <TextInput
+                  value={button.label ?? ''}
+                  maxLength={CTA_CUSTOM_LABEL_MAX_LENGTH}
+                  placeholder={`예: 요기요 (최대 ${CTA_CUSTOM_LABEL_MAX_LENGTH}자)`}
+                  onChange={(e) => onUpdate(button.id, { label: e.target.value })}
+                />
+                <TextInput
+                  label="링크"
+                  value={button.url ?? ''}
+                  placeholder="https://"
+                  onChange={(e) => onUpdate(button.id, { url: e.target.value.trim() })}
+                />
+              </Stack>
+            </Paper>
           ))}
 
           {customButtons.length < MAX_CUSTOM_CTA_BUTTONS && (
             <Button
               type="button"
-              variant="outline"
-              className="w-full"
+              variant="default"
+              fullWidth
               disabled={isFull}
               onClick={onAddCustom}
+              leftSection={<Plus size={16} />}
             >
-              <Plus className="mr-1.5 h-4 w-4" />
               버튼 추가
             </Button>
           )}
-        </div>
-      </CardContent>
-    </Card>
+        </Stack>
+      </Stack>
+    </Paper>
   );
 }

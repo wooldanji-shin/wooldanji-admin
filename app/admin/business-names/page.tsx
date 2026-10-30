@@ -11,27 +11,17 @@ import {
 import { DataTableShell } from '@/components/data-table-shell';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
+  ActionIcon,
+  Badge,
+  Button,
+  Group,
+  Modal,
+  Pagination,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useBusinessNamesPage } from './useBusinessNamesPage';
 
 function BusinessNamesContent(): React.ReactElement {
@@ -48,20 +38,19 @@ function BusinessNamesContent(): React.ReactElement {
       </PageHeader>
 
       <PageContent>
-        <div className="flex items-center justify-between gap-4">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="상호명 검색..."
-              value={page.searchInput}
-              onChange={(e) => page.handleSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <span className="shrink-0 text-sm text-muted-foreground">
+        <Group justify="space-between" gap="md" wrap="nowrap">
+          <TextInput
+            placeholder="상호명 검색..."
+            value={page.searchInput}
+            onChange={(e) => page.handleSearch(e.target.value)}
+            leftSection={<Search size={16} />}
+            w="100%"
+            maw={384}
+          />
+          <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>
             전체 {page.totalCount.toLocaleString()}건
-          </span>
-        </div>
+          </Text>
+        </Group>
 
         <DataTableShell>
           {page.loading ? (
@@ -73,165 +62,162 @@ function BusinessNamesContent(): React.ReactElement {
               description="검색 조건을 변경해 보세요."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>상호명</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead>등록일</TableHead>
-                  <TableHead className="text-right">작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>상호명</Table.Th>
+                  <Table.Th>상태</Table.Th>
+                  <Table.Th>등록일</Table.Th>
+                  <Table.Th ta="right">작업</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {page.rows.map((row) => {
                   const isWithdrawn = row.partnerUserId === null;
                   const isEditing = page.editingId === row.id;
 
                   return (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">
+                    <Table.Tr key={row.id}>
+                      <Table.Td fw={500}>
                         {isEditing ? (
-                          <div className="flex gap-2">
-                            <Input
-                              className="max-w-xs"
+                          <Group gap="xs" wrap="nowrap">
+                            <TextInput
+                              maw={320}
+                              style={{ flex: 1 }}
                               value={page.editingName}
                               autoFocus
                               disabled={page.saving}
                               onChange={(e) => page.setEditingName(e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && page.saveEdit()}
                             />
-                            <Button size="sm" onClick={page.saveEdit} disabled={page.saving}>
+                            <Button size="xs" onClick={page.saveEdit} disabled={page.saving}>
                               저장
                             </Button>
                             <Button
-                              size="sm"
-                              variant="ghost"
+                              size="xs"
+                              variant="subtle"
+                              color="gray"
                               onClick={page.cancelEdit}
                               disabled={page.saving}
                             >
                               취소
                             </Button>
-                          </div>
+                          </Group>
                         ) : (
                           row.businessName
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={isWithdrawn ? 'secondary' : 'default'}>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge variant="light" color={isWithdrawn ? 'gray' : 'green'}>
                           {isWithdrawn ? '탈퇴' : '사용중'}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      </Table.Td>
+                      <Table.Td c="dimmed">
                         {new Date(row.createdAt).toLocaleDateString('ko-KR')}
-                      </TableCell>
-                      <TableCell className="text-right">
+                      </Table.Td>
+                      <Table.Td>
                         {isEditing ? null : (
-                          <>
-                            <Button
-                              size="icon"
-                              variant="ghost"
+                          <Group gap={4} justify="flex-end" wrap="nowrap">
+                            <ActionIcon
+                              variant="subtle"
+                              color="gray"
                               aria-label="수정"
                               onClick={() => page.startEdit(row)}
                             >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
+                              <Pencil size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
                               aria-label="삭제"
-                              className="text-destructive hover:text-destructive"
                               onClick={() => page.setDeleteTarget(row)}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
+                              <Trash2 size={16} />
+                            </ActionIcon>
+                          </Group>
                         )}
-                      </TableCell>
-                    </TableRow>
+                      </Table.Td>
+                    </Table.Tr>
                   );
                 })}
-              </TableBody>
+              </Table.Tbody>
             </Table>
           )}
         </DataTableShell>
 
         {page.totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
+          <Group justify="center" gap="xs">
             <Button
-              variant="outline"
-              size="sm"
+              variant="default"
+              size="xs"
+              leftSection={<ChevronLeft size={16} />}
               onClick={() => page.handlePageChange(page.currentPage - 1)}
               disabled={page.currentPage === 1}
             >
-              <ChevronLeft className="h-4 w-4" />
               이전
             </Button>
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(10, page.totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (page.totalPages <= 10) pageNum = i + 1;
-                else if (page.currentPage <= 5) pageNum = i + 1;
-                else if (page.currentPage >= page.totalPages - 4) pageNum = page.totalPages - 9 + i;
-                else pageNum = page.currentPage - 4 + i;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={page.currentPage === pageNum ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => page.handlePageChange(pageNum)}
-                    className="w-10"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
+            <Pagination
+              total={page.totalPages}
+              value={page.currentPage}
+              onChange={page.handlePageChange}
+              withControls={false}
+            />
             <Button
-              variant="outline"
-              size="sm"
+              variant="default"
+              size="xs"
+              rightSection={<ChevronRight size={16} />}
               onClick={() => page.handlePageChange(page.currentPage + 1)}
               disabled={page.currentPage === page.totalPages}
             >
               다음
-              <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
+          </Group>
         )}
       </PageContent>
 
-      <AlertDialog
-        open={page.deleteTarget !== null}
-        onOpenChange={(open) => !open && page.setDeleteTarget(null)}
+      <Modal
+        closeOnClickOutside={false}
+        withCloseButton={false}
+        opened={page.deleteTarget !== null}
+        onClose={() => page.setDeleteTarget(null)}
+        title={isDeleteTargetWithdrawn ? '상호명 삭제' : '사용중인 상호명 삭제'}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isDeleteTargetWithdrawn ? '상호명 삭제' : '사용중인 상호명 삭제'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {isDeleteTargetWithdrawn ? (
-                <>
-                  &apos;{page.deleteTarget?.businessName}&apos; 상호명 기록을 삭제할까요? 삭제하면
-                  이 상호명을 다른 파트너가 다시 등록할 수 있게 됩니다. 되돌릴 수 없습니다.
-                </>
-              ) : (
-                <>
-                  &apos;{page.deleteTarget?.businessName}&apos;은(는) 현재 영업 중인 파트너의
-                  상호명입니다. 삭제해도 해당 파트너의 상호명은 그대로 유지되지만, 레지스트리
-                  기록만 사라져 제3자가 같은 이름으로 가입할 수 있게 됩니다. 정말 삭제하시겠습니까?
-                  되돌릴 수 없습니다.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={page.deleting}>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={page.confirmDelete} disabled={page.deleting}>
-              삭제
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <Text size="sm" c="dimmed">
+          {isDeleteTargetWithdrawn ? (
+            <>
+              &apos;{page.deleteTarget?.businessName}&apos; 상호명 기록을 삭제할까요? 삭제하면
+              이 상호명을 다른 파트너가 다시 등록할 수 있게 됩니다. 되돌릴 수 없습니다.
+            </>
+          ) : (
+            <>
+              &apos;{page.deleteTarget?.businessName}&apos;은(는) 현재 영업 중인 파트너의
+              상호명입니다. 삭제해도 해당 파트너의 상호명은 그대로 유지되지만, 레지스트리
+              기록만 사라져 제3자가 같은 이름으로 가입할 수 있게 됩니다. 정말 삭제하시겠습니까?
+              되돌릴 수 없습니다.
+            </>
+          )}
+        </Text>
+        <Group justify="flex-end" mt="lg">
+          <Button
+            variant="default"
+            disabled={page.deleting}
+            onClick={() => page.setDeleteTarget(null)}
+          >
+            취소
+          </Button>
+          {/* AlertDialogAction과 동일하게 클릭 즉시 다이얼로그를 닫는다 */}
+          <Button
+            color="red"
+            disabled={page.deleting}
+            onClick={() => {
+              page.confirmDelete();
+              page.setDeleteTarget(null);
+            }}
+          >
+            삭제
+          </Button>
+        </Group>
+      </Modal>
     </PageShell>
   );
 }

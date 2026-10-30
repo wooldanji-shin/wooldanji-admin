@@ -8,10 +8,8 @@ import { DataTableShell } from '@/components/data-table-shell';
 import { DateInput } from '@/components/date-input';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
-import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Box, Group, List, Paper, SegmentedControl, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { createClient } from '@/lib/supabase/client';
-import { cn } from '@/lib/utils';
 
 type RangeUnit = 'day' | 'month';
 
@@ -88,39 +86,43 @@ const percent = (count: number, total: number): string =>
 function ViewDepthCard({ depth, loading }: { depth: DepthSummary; loading: boolean }): React.ReactElement | null {
   if (loading) return null;
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-card p-5">
-      <div>
-        <h3 className="text-base font-semibold">단독 팝업 — 몇 장까지 봤나요?</h3>
-        <p className="text-sm text-muted-foreground">
-          카드가 2장 이상인 단독 팝업을 닫을 때 몇 장까지 넘겨 봤는지 보여줍니다.
-        </p>
-      </div>
-      {depth.multiTotal === 0 ? (
-        <p className="text-sm text-muted-foreground">선택한 기간에 집계된 데이터가 없습니다.</p>
-      ) : (
-        <>
-          <p className="text-sm">
-            끝까지 본 비율{' '}
-            <strong className="text-lg tabular-nums">{percent(depth.completed, depth.multiTotal)}</strong>
-            <span className="ml-2 text-muted-foreground tabular-nums">
-              ({depth.completed.toLocaleString()} / {depth.multiTotal.toLocaleString()}회)
-            </span>
-          </p>
-          <ul className="space-y-1 text-sm">
-            {depth.byViewed.map((count, i) => (
-              count > 0 && (
-                <li key={i} className="tabular-nums">
-                  {i + 1}장까지 보고 닫음 {count.toLocaleString()}회 ({percent(count, depth.multiTotal)})
-                </li>
-              )
-            ))}
-          </ul>
-        </>
-      )}
-      <p className="text-xs text-muted-foreground">
-        카드가 1장뿐인 팝업은 항상 끝까지 본 것이 되어 이 숫자에서 뺐습니다.
-      </p>
-    </div>
+    <Paper withBorder radius="md" p="lg">
+      <Stack gap="sm">
+        <Box>
+          <Title order={4}>단독 팝업 — 몇 장까지 봤나요?</Title>
+          <Text size="sm" c="dimmed">
+            카드가 2장 이상인 단독 팝업을 닫을 때 몇 장까지 넘겨 봤는지 보여줍니다.
+          </Text>
+        </Box>
+        {depth.multiTotal === 0 ? (
+          <Text size="sm" c="dimmed">선택한 기간에 집계된 데이터가 없습니다.</Text>
+        ) : (
+          <>
+            <Text size="sm">
+              끝까지 본 비율{' '}
+              <Text span size="lg" fw={700} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {percent(depth.completed, depth.multiTotal)}
+              </Text>
+              <Text span c="dimmed" ml="xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                ({depth.completed.toLocaleString()} / {depth.multiTotal.toLocaleString()}회)
+              </Text>
+            </Text>
+            <List size="sm" spacing={4} listStyleType="none">
+              {depth.byViewed.map((count, i) => (
+                count > 0 && (
+                  <List.Item key={i} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {i + 1}장까지 보고 닫음 {count.toLocaleString()}회 ({percent(count, depth.multiTotal)})
+                  </List.Item>
+                )
+              ))}
+            </List>
+          </>
+        )}
+        <Text size="xs" c="dimmed">
+          카드가 1장뿐인 팝업은 항상 끝까지 본 것이 되어 이 숫자에서 뺐습니다.
+        </Text>
+      </Stack>
+    </Paper>
   );
 }
 
@@ -184,36 +186,41 @@ export default function DoorPopupStatsPage(): React.ReactElement {
       </PageHeader>
 
       <PageContent>
-        <div className="flex flex-wrap items-center gap-3">
-          {(['day', 'month'] as const).map((u) => (
-            <button
-              key={u}
-              onClick={() => setUnit(u)}
-              className={cn(
-                'h-10 rounded-md border px-5 text-sm font-medium transition-colors',
-                unit === u
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-card text-muted-foreground hover:bg-accent'
-              )}
-            >
-              {u === 'day' ? '일' : '월'}
-            </button>
-          ))}
+        <Group gap="sm">
+          <SegmentedControl
+            value={unit}
+            onChange={(v) => setUnit(v as RangeUnit)}
+            data={(['day', 'month'] as const).map((u) => ({
+              value: u,
+              label: u === 'day' ? '일' : '월',
+            }))}
+          />
           {unit === 'day' ? (
-            <div className="flex items-center gap-2">
-              <DateInput value={from} onChange={setFrom} className="h-10 w-[140px]" />
-              <span className="text-muted-foreground">~</span>
-              <DateInput value={to} onChange={setTo} className="h-10 w-[140px]" />
-            </div>
+            <Stack gap={4}>
+              <Group gap="xs" wrap="nowrap">
+                <Box w={140}>
+                  <DateInput value={from} onChange={setFrom} />
+                </Box>
+                <Text c="dimmed">~</Text>
+                <Box w={140}>
+                  <DateInput value={to} onChange={setTo} />
+                </Box>
+              </Group>
+              {from > to && (
+                <Text size="xs" c="red">
+                  시작일이 종료일보다 늦습니다
+                </Text>
+              )}
+            </Stack>
           ) : (
-            <Input
+            <TextInput
               type="month"
               value={month}
               onChange={(e) => e.target.value && setMonth(e.target.value)}
-              className="h-10 w-[160px]"
+              w={160}
             />
           )}
-        </div>
+        </Group>
 
         <DataTableShell>
           {loading ? (
@@ -225,45 +232,45 @@ export default function DoorPopupStatsPage(): React.ReactElement {
               description="선택한 기간에 기록된 문열림 팝업 이벤트가 없습니다."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>모드</TableHead>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>모드</Table.Th>
                   {ACTIONS.map((a) => (
-                    <TableHead key={a.value} className="text-right">{a.label}</TableHead>
+                    <Table.Th key={a.value} ta="right">{a.label}</Table.Th>
                   ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {MODES.map((m) => {
                   const actions = totals.get(m.value);
                   const shown = actions?.get('shown') ?? 0;
                   return (
-                    <TableRow key={m.value}>
-                      <TableCell className="font-medium">{m.label}</TableCell>
+                    <Table.Tr key={m.value}>
+                      <Table.Td fw={500}>{m.label}</Table.Td>
                       {ACTIONS.map((a) => {
                         const count = actions?.get(a.value) ?? 0;
                         const ratio = a.value !== 'shown' && shown > 0
                           ? ` (${((count / shown) * 100).toFixed(1)}%)`
                           : '';
                         return (
-                          <TableCell key={a.value} className="text-right tabular-nums">
+                          <Table.Td key={a.value} ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                             {count.toLocaleString()}
-                            <span className="text-xs text-muted-foreground">{ratio}</span>
-                          </TableCell>
+                            <Text span size="xs" c="dimmed">{ratio}</Text>
+                          </Table.Td>
                         );
                       })}
-                    </TableRow>
+                    </Table.Tr>
                   );
                 })}
-              </TableBody>
+              </Table.Tbody>
             </Table>
           )}
         </DataTableShell>
         <ViewDepthCard depth={depth} loading={loading} />
-        <p className="text-xs text-muted-foreground">
+        <Text size="xs" c="dimmed">
           괄호 안 비율은 같은 모드의 &apos;표시&apos; 횟수 대비입니다. 팝업을 연 채 앱을 종료하면 &apos;표시&apos;만 남습니다.
-        </p>
+        </Text>
       </PageContent>
     </PageShell>
   );

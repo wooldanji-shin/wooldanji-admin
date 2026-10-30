@@ -1,40 +1,36 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowLeft, Ban, Check, Pencil, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, Ban, Check, Pencil, X } from 'lucide-react';
 import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Center,
+  Checkbox,
+  Divider,
+  Flex,
+  Group,
+  Modal,
+  Paper,
+  Progress,
+  ScrollArea,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+  SimpleGrid,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Textarea,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
+import { PageShell } from '@/components/page-shell';
+import { HeaderTitle } from '@/components/header-title';
+import { DetailSkeleton } from '@/components/skeletons';
 import { ImageThumbnail, ImageLightbox, useImageLightbox } from '@/components/image-lightbox';
-import { cn } from '@/lib/utils';
 import { PARTICIPATION_TYPE_LABEL } from '../usePartnerEventsPage';
 import { EventBannerPreview } from './EventBannerPreview';
 import { eventBannerThemeOf } from './eventBannerThemes';
@@ -63,20 +59,6 @@ const AUTO_SCHEDULE_FIELDS = [
   ['endAt', '이벤트 종료', '발표 다음날 자정'],
 ] as const;
 
-// ── DESIGN.md 토큰 (그림자 없음 — 깊이는 배경 전환과 hairline으로만) ──
-/** 모든 버튼은 pill, 기본 48px */
-const BTN_BASE = 'h-12 rounded-full px-7 text-base font-semibold tracking-[0.24px] shadow-none';
-/** button-primary — 검정 캔버스 위 흰 pill */
-const BTN_PRIMARY = cn(BTN_BASE, 'bg-white text-black hover:bg-[#c9c9cd]');
-/** button-outline-dark — 검정 캔버스 위 테두리 pill */
-const BTN_OUTLINE_DARK = cn(BTN_BASE, 'border border-white bg-black text-white hover:bg-[#16181a] hover:text-white');
-/** button-dark — 흰 캔버스 위 검정 pill */
-const BTN_DARK = cn(BTN_BASE, 'bg-black text-white hover:bg-[#191c1f]');
-/** button-outline-light — 흰 캔버스 위 테두리 pill */
-const BTN_OUTLINE_LIGHT = cn(BTN_BASE, 'border border-[#191c1f] bg-white text-[#191c1f] hover:bg-[#f4f4f4]');
-/** text-input — 12px 라운드, hairline */
-const INPUT = 'h-11 rounded-[12px] border-[#e2e2e7] bg-white px-4 text-base text-[#191c1f] shadow-none';
-
 function toDateTimeText(value: string | null): string {
   return value ? new Date(value).toLocaleString('ko-KR') : '-';
 }
@@ -90,34 +72,39 @@ function toCompactDateTime(value: string | null): string {
 }
 
 /** 상태 배지 — 공용 StatusBadge는 흰 배경용(연한 틴트)이라 검정·cobalt 면에서 묻힌다. 어두운 면 전용으로 색을 채운다 */
-const EVENT_STATUS_PILL: Record<EventDetail['status'], { label: string; className: string }> = {
-  pending: { label: '승인대기', className: 'bg-[#ec7e00] text-white' },
-  approved: { label: '승인됨', className: 'bg-[#00a87e] text-white' },
-  rejected: { label: '거절됨', className: 'bg-[#e23b4a] text-white' },
-  ended: { label: '종료', className: 'bg-white/20 text-white' },
+const EVENT_STATUS_PILL: Record<EventDetail['status'], { label: string }> = {
+  pending: { label: '승인대기' },
+  approved: { label: '승인됨' },
+  rejected: { label: '거절됨' },
+  ended: { label: '종료' },
 };
 
 function EventStatusPill({ status }: { status: EventDetail['status'] }): React.ReactElement {
-  const { label, className } = EVENT_STATUS_PILL[status];
+  const { label } = EVENT_STATUS_PILL[status];
   return (
-    <span className={cn('inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold', className)}>
-      <span className="size-1.5 rounded-full bg-white" aria-hidden />
+    <Badge
+      variant="light"
+      color={
+        status === 'pending'
+          ? 'yellow'
+          : status === 'approved'
+            ? 'green'
+            : status === 'rejected'
+              ? 'red'
+              : 'gray'
+      }
+    >
       {label}
-    </span>
+    </Badge>
   );
 }
 
 /** badge-tag — 중립 태그 */
 function Tag({ children, dark }: { children: React.ReactNode; dark?: boolean }): React.ReactElement {
   return (
-    <span
-      className={cn(
-        'inline-flex h-7 items-center rounded-full px-3 text-[13px]',
-        dark ? 'bg-[#16181a] text-white' : 'bg-[#f4f4f4] text-[#191c1f]',
-      )}
-    >
+    <Badge variant={dark ? 'filled' : 'light'} color="gray">
       {children}
-    </span>
+    </Badge>
   );
 }
 
@@ -136,22 +123,28 @@ function Card({
   bodyClassName?: string;
 }): React.ReactElement {
   return (
-    <section className={cn('rounded-[20px] border border-[#e2e2e7] bg-white', className)}>
-      <header className="flex items-center justify-between gap-3 px-6 pt-6 md:px-8 md:pt-8">
-        <h2 className="text-xl font-medium leading-[1.4] text-[#191c1f]">{title}</h2>
+    <Paper component="section" withBorder radius="md" p="lg" className={className}>
+      <Group justify="space-between" gap="sm" mb="md">
+        <Title order={4}>{title}</Title>
         {meta}
-      </header>
-      <div className={cn('px-6 pt-5 pb-6 md:px-8 md:pb-8', bodyClassName)}>{children}</div>
-    </section>
+      </Group>
+      <Box className={bodyClassName}>{children}</Box>
+    </Paper>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
   return (
-    <div className="flex flex-col gap-2 border-t border-[#e2e2e7] py-4">
-      <dt className="text-sm text-[#8d969e]">{label}</dt>
-      <dd className="text-base tracking-[0.24px] text-[#191c1f]">{children}</dd>
-    </div>
+    <Stack
+      gap={6}
+      py="sm"
+      style={{ borderTop: '1px solid var(--app-divider)' }}
+    >
+      <Text size="sm" c="dimmed">
+        {label}
+      </Text>
+      <Box fz="sm">{children}</Box>
+    </Stack>
   );
 }
 
@@ -167,29 +160,22 @@ export default function PartnerEventDetailPage({
   const goBack = (): void => router.push('/admin/partner-events');
 
   if (page.loading) {
-    return (
-      <div className="min-h-full w-full bg-[#f4f4f4]">
-        <div className="bg-black px-4 py-12 md:px-10 md:py-16">
-          <Skeleton className="h-4 w-32 bg-[#16181a]" />
-          <Skeleton className="mt-4 h-12 w-2/3 bg-[#16181a]" />
-        </div>
-        <div className="mx-auto grid max-w-[1200px] gap-6 px-4 py-10 md:px-10 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <Skeleton className="h-96 w-full rounded-[20px]" />
-          <Skeleton className="h-64 w-full rounded-[20px]" />
-        </div>
-      </div>
-    );
+    return <DetailSkeleton sections={4} />;
   }
 
   if (!page.detail) {
     return (
-      <div className="flex min-h-full w-full flex-col items-center justify-center gap-6 bg-black px-6 py-24 text-center">
-        <AlertCircle className="h-8 w-8 text-white/70" />
-        <p className="text-2xl font-medium text-white">이벤트 정보를 찾을 수 없습니다.</p>
-        <Button onClick={goBack} className={BTN_PRIMARY}>
-          목록으로
-        </Button>
-      </div>
+      <PageShell>
+        <Center py={96}>
+          <Stack align="center" gap="lg">
+            <AlertCircle size={32} color="var(--mantine-color-dimmed)" />
+            <Text size="xl" fw={500}>
+              이벤트 정보를 찾을 수 없습니다.
+            </Text>
+            <Button onClick={goBack}>목록으로</Button>
+          </Stack>
+        </Center>
+      </PageShell>
     );
   }
 
@@ -197,49 +183,53 @@ export default function PartnerEventDetailPage({
   const form = page.editing ? page.editForm : null;
 
   return (
-    <div className="min-h-full w-full bg-[#f4f4f4] text-[#191c1f]">
+    <PageShell>
+      {/* 이벤트명은 아래 본문에 크게(수정 중엔 입력칸으로) 나오니 헤더는 화면 이름만 */}
+      <HeaderTitle title="이벤트 상세" onBack={goBack} />
       <HeroBand
         page={page}
         detail={detail}
         form={form}
-        onBack={goBack}
         onOpenBanner={() => bannerLb.open(0)}
         onOpenDetailImage={(index) => detailLb.open(index)}
       />
 
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-10 md:px-10 md:py-14">
-        {detail.status === 'rejected' && detail.rejectionReason && (
-          <div className="flex gap-3 rounded-[20px] border border-[#e23b4a]/30 bg-white px-6 py-5 md:px-8">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#e23b4a]" />
-            <div className="space-y-1">
-              <p className="text-base font-semibold text-[#8b0000]">거절 사유</p>
-              <p className="whitespace-pre-wrap text-base text-[#3a3d40]">{detail.rejectionReason}</p>
-            </div>
-          </div>
-        )}
+      {detail.status === 'rejected' && detail.rejectionReason && (
+        <Alert color="red" variant="light" icon={<AlertCircle size={20} />} title="거절 사유">
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+            {detail.rejectionReason}
+          </Text>
+        </Alert>
+      )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          {/* ── 좌측 ── */}
-          <div className="min-w-0 space-y-6">
-            <EventCard detail={detail} form={form} setForm={page.setEditForm} error={page.scheduleError} />
-            <CouponCard detail={detail} form={form} setForm={page.setEditForm} />
-            <ApartmentsCard detail={detail} form={form} setForm={page.setEditForm} allApartments={page.allApartments} />
-            <EntriesCard entries={page.entries} winners={page.winners} />
-          </div>
+      <Flex direction={{ base: 'column', lg: 'row' }} gap="lg" align="flex-start">
+        {/* ── 좌측 ── */}
+        <Stack gap="lg" w="100%" style={{ flex: 1, minWidth: 0 }}>
+          <EventCard detail={detail} form={form} setForm={page.setEditForm} error={page.scheduleError} />
+          <CouponCard detail={detail} form={form} setForm={page.setEditForm} />
+          <ApartmentsCard detail={detail} form={form} setForm={page.setEditForm} allApartments={page.allApartments} />
+          <EntriesCard entries={page.entries} winners={page.winners} />
+        </Stack>
 
-          {/* ── 우측 ── */}
-          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <SummaryCard detail={detail} entryCount={page.entries.length} winnerCount={page.winners.length} />
-            {!page.editing && <ReviewActions page={page} />}
-          </aside>
-        </div>
-      </div>
+        {/* ── 우측 ── */}
+        <Stack
+          component="aside"
+          gap="md"
+          w={{ base: '100%', lg: 360 }}
+          pos={{ base: 'static', lg: 'sticky' }}
+          top={24}
+          style={{ flexShrink: 0 }}
+        >
+          <SummaryCard detail={detail} entryCount={page.entries.length} winnerCount={page.winners.length} />
+          {!page.editing && <ReviewActions page={page} />}
+        </Stack>
+      </Flex>
 
       <RejectDialog page={page} />
       <ForceEndDialog page={page} />
       <ImageLightbox {...bannerLb.props} />
       <ImageLightbox {...detailLb.props} />
-    </div>
+    </PageShell>
   );
 }
 
@@ -248,63 +238,56 @@ function HeroBand({
   page,
   detail,
   form,
-  onBack,
   onOpenBanner,
   onOpenDetailImage,
 }: {
   page: Page;
   detail: EventDetail;
   form: EventEditForm | null;
-  onBack: () => void;
   onOpenBanner: () => void;
   onOpenDetailImage: (index: number) => void;
 }): React.ReactElement {
   const drawLabel = drawStatusLabelOf(detail);
 
   return (
-    <section className="bg-black text-white">
-      <div className="mx-auto w-full max-w-[1200px] px-4 pt-6 pb-12 md:px-10 md:pb-16">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="뒤로가기"
-            className="flex h-10 items-center gap-2 rounded-full bg-[#16181a] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3a3d40]"
-          >
-            <ArrowLeft className="size-4" />
-            이벤트 목록
-          </button>
-          <div className="ml-auto">
-            <HeaderActions page={page} />
-          </div>
-        </div>
+    <Stack component="section" gap="lg">
+      {/* 종료된 이벤트는 버튼이 없어 빈 줄이 생기지 않게 한다 */}
+      {(page.editing || detail.status !== 'ended') && (
+        <Group justify="flex-end">
+          <HeaderActions page={page} />
+        </Group>
+      )}
 
-        <div className="mt-10 grid items-end gap-10 lg:mt-14 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="min-w-0 space-y-5">
-            <div className="flex flex-wrap items-center gap-2">
+      <Paper withBorder radius="md" p="lg">
+        <Flex direction={{ base: 'column', lg: 'row' }} gap="xl" align={{ base: 'stretch', lg: 'flex-start' }}>
+          <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
+            <Group gap="xs">
               <EventStatusPill status={detail.status} />
               {drawLabel && <Tag dark>{drawLabel}</Tag>}
-            </div>
-            <p className="text-lg text-white/72">{detail.businessName}</p>
+            </Group>
+            <Text c="dimmed">{detail.businessName}</Text>
             {form ? (
-              <Input
+              <TextInput
+                size="lg"
+                maw={672}
                 value={form.title}
                 onChange={(e) => page.setEditForm((p) => ({ ...p, title: e.target.value }))}
                 placeholder="이벤트명"
-                className="h-16 max-w-2xl rounded-[12px] border-white/12 bg-[#16181a] px-5 text-[28px] font-medium text-white shadow-none placeholder:text-white/40 md:text-[32px]"
               />
             ) : (
-              <h1 className="text-[36px] font-medium leading-[1.1] tracking-[-0.36px] md:text-[48px] md:leading-[1.08] md:tracking-[-0.48px]">
+              <Title order={1} size="h2">
                 {detail.title}
-              </h1>
+              </Title>
             )}
-            <p className="text-sm text-white/72">신청일시 {toDateTimeText(detail.createdAt)}</p>
-          </div>
+            <Text size="sm" c="dimmed">
+              신청일시 {toDateTimeText(detail.createdAt)}
+            </Text>
+          </Stack>
 
           <BannerMockup detail={detail} form={form} onOpenBanner={onOpenBanner} onOpenDetailImage={onOpenDetailImage} />
-        </div>
-      </div>
-    </section>
+        </Flex>
+      </Paper>
+    </Stack>
   );
 }
 
@@ -321,50 +304,58 @@ function BannerMockup({
   onOpenDetailImage: (index: number) => void;
 }): React.ReactElement {
   return (
-    <div className="w-full space-y-5 rounded-[28px] bg-[#16181a] p-6 sm:w-auto md:p-8">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-white">홈 배너</span>
-        <span className="text-[13px] text-white/72">{detail.bannerType === 'image' ? '이미지로만' : `기본 배너 · ${eventBannerThemeOf(detail.bannerTheme).label} 테마`}</span>
-      </div>
-      <div className="overflow-x-auto">
-        <EventBannerPreview data={bannerPreviewOf(detail, form)} onImageClick={onOpenBanner} />
-      </div>
-      <div className="space-y-3 border-t border-white/12 pt-5">
-        <p className="text-[13px] text-white/72">상세 이미지 {detail.detailImageUrls.length}장</p>
-        {detail.detailImageUrls.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {detail.detailImageUrls.map((url, index) => (
-              <ImageThumbnail
-                key={url}
-                src={url}
-                alt={`상세 이미지 ${index + 1}`}
-                onClick={() => onOpenDetailImage(index)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    <Paper bg="var(--app-bg-muted)" radius="md" p="lg" w={{ base: '100%', sm: 'auto' }}>
+      <Stack gap="md">
+        <Group justify="space-between" gap="sm">
+          <Text size="sm" fw={600}>
+            홈 배너
+          </Text>
+          <Text size="xs" c="dimmed">
+            {detail.bannerType === 'image' ? '이미지로만' : `기본 배너 · ${eventBannerThemeOf(detail.bannerTheme).label} 테마`}
+          </Text>
+        </Group>
+        <Box style={{ overflowX: 'auto' }}>
+          <EventBannerPreview data={bannerPreviewOf(detail, form)} onImageClick={onOpenBanner} />
+        </Box>
+        <Divider />
+        <Stack gap="sm">
+          <Text size="xs" c="dimmed">
+            상세 이미지 {detail.detailImageUrls.length}장
+          </Text>
+          {detail.detailImageUrls.length > 0 && (
+            <Group gap="xs">
+              {detail.detailImageUrls.map((url, index) => (
+                <ImageThumbnail
+                  key={url}
+                  src={url}
+                  alt={`상세 이미지 ${index + 1}`}
+                  onClick={() => onOpenDetailImage(index)}
+                />
+              ))}
+            </Group>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
   );
 }
 
 function HeaderActions({ page }: { page: Page }): React.ReactElement | null {
   if (page.editing) {
     return (
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={page.cancelEdit} disabled={page.saving} className={cn(BTN_OUTLINE_DARK, 'h-10 px-5 text-sm')}>
+      <Group gap="xs">
+        <Button variant="default" onClick={page.cancelEdit} disabled={page.saving}>
           취소
         </Button>
-        <Button onClick={page.handleSaveEdit} disabled={page.saving} className={cn(BTN_PRIMARY, 'h-10 px-5 text-sm')}>
+        <Button onClick={page.handleSaveEdit} disabled={page.saving}>
           {page.saving ? '저장 중...' : '저장'}
         </Button>
-      </div>
+      </Group>
     );
   }
   if (page.detail?.status === 'ended') return null;
   return (
-    <Button onClick={page.startEdit} className={cn(BTN_PRIMARY, 'h-10 px-5 text-sm')}>
-      <Pencil className="h-4 w-4" />
+    <Button variant="default" leftSection={<Pencil size={16} />} onClick={page.startEdit}>
       정보 수정
     </Button>
   );
@@ -384,58 +375,76 @@ function EventCard({
 }): React.ReactElement {
   return (
     <Card title="이벤트">
-      <dl className="grid gap-x-8 sm:grid-cols-2">
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xl" verticalSpacing={0}>
         <Field label="참여방식">
           {form ? (
+            /* 선착순은 당분간 운영하지 않아 선택지에서 뺐다 (기존 선착순 이벤트 표시는 유지) */
             <Select
+              data={[
+                { value: 'draw', label: PARTICIPATION_TYPE_LABEL.draw },
+                // 기존 선착순 이벤트는 현재 값이 보이도록 비활성 옵션으로만 노출
+                ...(form.participationType !== 'draw'
+                  ? [
+                      {
+                        value: form.participationType,
+                        label: PARTICIPATION_TYPE_LABEL[form.participationType],
+                        disabled: true,
+                      },
+                    ]
+                  : []),
+              ]}
               value={form.participationType}
-              onValueChange={(v) => setForm((p) => ({ ...p, participationType: v as typeof p.participationType }))}
-            >
-              <SelectTrigger className={cn(INPUT, 'w-full')}>
-                <SelectValue />
-              </SelectTrigger>
-              {/* 선착순은 당분간 운영하지 않아 선택지에서 뺐다 (기존 선착순 이벤트 표시는 유지) */}
-              <SelectContent>
-                <SelectItem value="draw">추첨</SelectItem>
-              </SelectContent>
-            </Select>
+              onChange={(v) => {
+                if (v === null) return;
+                setForm((p) => ({ ...p, participationType: v as typeof p.participationType }));
+              }}
+              allowDeselect={false}
+            />
           ) : (
             PARTICIPATION_TYPE_LABEL[detail.participationType]
           )}
         </Field>
         <Field label="당첨 인원">
           {form ? (
-            <Input
+            <TextInput
               type="number"
               min={1}
               value={form.winnerCount}
               onChange={(e) => setForm((p) => ({ ...p, winnerCount: Math.max(1, parseInt(e.target.value) || 1) }))}
-              className={INPUT}
             />
           ) : (
-            <span className="tabular-nums">{detail.winnerCount.toLocaleString()}명</span>
+            <Text span size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {detail.winnerCount.toLocaleString()}명
+            </Text>
           )}
         </Field>
         {form &&
           SCHEDULE_FIELDS.map(([key, label]) => (
             <Field key={key} label={label}>
-              <Input
+              <TextInput
                 type="datetime-local"
                 value={form[key]}
                 onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                className={INPUT}
               />
             </Field>
           ))}
         {form &&
           AUTO_SCHEDULE_FIELDS.map(([key, label, rule]) => (
             <Field key={key} label={`${label} (자동)`}>
-              <span className="tabular-nums">{toDateTimeText(detail[key])}</span>
-              <span className="mt-1 block text-sm text-[#8d969e]">{rule}</span>
+              <Text span size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {toDateTimeText(detail[key])}
+              </Text>
+              <Text size="sm" c="dimmed" mt={4}>
+                {rule}
+              </Text>
             </Field>
           ))}
-      </dl>
-      {form && error && <p className="pt-2 text-sm text-[#e23b4a]">{error}</p>}
+      </SimpleGrid>
+      {form && error && (
+        <Text size="sm" c="red" pt="xs">
+          {error}
+        </Text>
+      )}
       {!form && <ScheduleTimeline detail={detail} />}
     </Card>
   );
@@ -450,37 +459,50 @@ function ScheduleTimeline({ detail }: { detail: EventDetail }): React.ReactEleme
   ];
 
   return (
-    <div className="border-t border-[#e2e2e7] pt-6">
-      <p className="mb-5 text-sm text-[#8d969e]">일정</p>
-      <ol className="grid gap-5 sm:grid-cols-4 sm:gap-0">
+    <Box pt="lg" style={{ borderTop: '1px solid var(--app-divider)' }}>
+      <Text size="sm" c="dimmed" mb="md">
+        일정
+      </Text>
+      <SimpleGrid component="ol" cols={{ base: 1, sm: 4 }} spacing={0} verticalSpacing="md" m={0} p={0} style={{ listStyle: 'none' }}>
         {steps.map((step, index) => {
           const passed = new Date(detail[step.key]).getTime() <= now;
           const isLast = index === steps.length - 1;
           return (
-            <li key={step.key} className="flex gap-3 sm:flex-col sm:pr-4">
-              <div className="flex items-center pt-1 sm:pt-0">
-                <span
-                  className={cn(
-                    'size-3 shrink-0 rounded-full',
-                    passed ? 'bg-[#191c1f]' : 'border-2 border-[#c9c9cd] bg-white',
-                  )}
+            <Box component="li" key={step.key} pr={{ sm: 'md' }}>
+              <Group gap={0} wrap="nowrap" mb="xs">
+                <ThemeIcon
+                  size={12}
+                  radius="xl"
+                  variant={passed ? 'filled' : 'outline'}
+                  color={passed ? 'blue' : 'gray'}
                 />
                 {!isLast && (
-                  <span className={cn('hidden h-0.5 flex-1 sm:block', passed ? 'bg-[#191c1f]' : 'bg-[#e2e2e7]')} />
+                  <Divider
+                    visibleFrom="sm"
+                    size={2}
+                    color={passed ? 'blue' : undefined}
+                    style={{ flex: 1 }}
+                  />
                 )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-[#505a63]">{step.label}</p>
-                <p className="text-base font-semibold tabular-nums text-[#191c1f]">
+              </Group>
+              <Stack gap={2}>
+                <Text size="sm" c="dimmed">
+                  {step.label}
+                </Text>
+                <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {toCompactDateTime(detail[step.key])}
-                </p>
-                {step.rule && <p className="text-[13px] text-[#8d969e]">{step.rule}</p>}
-              </div>
-            </li>
+                </Text>
+                {step.rule && (
+                  <Text size="xs" c="dimmed">
+                    {step.rule}
+                  </Text>
+                )}
+              </Stack>
+            </Box>
           );
         })}
-      </ol>
-    </div>
+      </SimpleGrid>
+    </Box>
   );
 }
 
@@ -499,16 +521,18 @@ function CouponCard({
 
   return (
     <Card title="당첨 쿠폰">
-      <div className="mb-6 rounded-[20px] bg-black px-6 py-7 text-white md:px-8">
-        <p className="text-[13px] text-white/72">{detail.businessName}</p>
-        <p className="mt-2 text-[28px] font-medium leading-[1.19] tracking-[-0.28px] md:text-[32px] md:tracking-[-0.32px]">
+      <Paper bg="var(--app-bg-muted)" radius="md" p="lg" mb="lg">
+        <Text size="xs" c="dimmed">
+          {detail.businessName}
+        </Text>
+        <Title order={2} mt="xs">
           {benefit || '-'}
-        </p>
-        <p className="mt-4 text-sm text-white/72">
+        </Title>
+        <Text size="sm" c="dimmed" mt="md">
           {form ? '만료일은 아래에서 수정' : `${toCompactDateTime(detail.couponExpiresAt)}까지`}
-        </p>
-      </div>
-      <dl className="grid gap-x-8 sm:grid-cols-2">
+        </Text>
+      </Paper>
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xl" verticalSpacing={0}>
         <Field label="혜택">
           {form ? (
             <BenefitEditor form={form} setForm={setForm} />
@@ -518,11 +542,10 @@ function CouponCard({
         </Field>
         <Field label={source.couponDiscountType === 'gift' ? '증정품' : '할인 대상'}>
           {form ? (
-            <Input
+            <TextInput
               value={form.couponTitle}
               onChange={(e) => setForm((p) => ({ ...p, couponTitle: e.target.value }))}
               placeholder={form.couponDiscountType === 'gift' ? '예) 아메리카노 1잔' : '예) 아메리카노 / 전 메뉴'}
-              className={INPUT}
             />
           ) : (
             detail.couponTitle
@@ -530,47 +553,49 @@ function CouponCard({
         </Field>
         <Field label="쿠폰 만료일">
           {form ? (
-            <Input
+            <TextInput
               type="datetime-local"
               value={form.couponExpiresAt}
               onChange={(e) => setForm((p) => ({ ...p, couponExpiresAt: e.target.value }))}
-              className={INPUT}
             />
           ) : (
-            <span className="tabular-nums">{toDateTimeText(detail.couponExpiresAt)}</span>
+            <Text span size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {toDateTimeText(detail.couponExpiresAt)}
+            </Text>
           )}
         </Field>
-      </dl>
+      </SimpleGrid>
     </Card>
   );
 }
 
 function BenefitEditor({ form, setForm }: { form: EventEditForm; setForm: SetForm }): React.ReactElement {
   return (
-    <div className="flex gap-2">
+    <Group gap="xs" wrap="nowrap">
       <Select
+        w={120}
+        style={{ flexShrink: 0 }}
+        data={[
+          { value: 'percent', label: '% 할인' },
+          { value: 'fixed', label: '원 할인' },
+          { value: 'gift', label: '증정' },
+        ]}
         value={form.couponDiscountType}
-        onValueChange={(v) =>
+        onChange={(v) => {
+          if (v === null) return;
           setForm((p) => ({
             ...p,
             couponDiscountType: v as typeof p.couponDiscountType,
             couponDiscountValue: v === 'gift' ? null : p.couponDiscountValue,
-          }))
-        }
-      >
-        <SelectTrigger className={cn(INPUT, 'w-[120px] shrink-0')}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="percent">% 할인</SelectItem>
-          <SelectItem value="fixed">원 할인</SelectItem>
-          <SelectItem value="gift">증정</SelectItem>
-        </SelectContent>
-      </Select>
+          }));
+        }}
+        allowDeselect={false}
+      />
       {form.couponDiscountType !== 'gift' && (
-        <Input
+        <TextInput
           type="number"
           min={0}
+          style={{ flex: 1 }}
           value={form.couponDiscountValue ?? ''}
           onChange={(e) =>
             setForm((p) => ({
@@ -579,10 +604,9 @@ function BenefitEditor({ form, setForm }: { form: EventEditForm; setForm: SetFor
             }))
           }
           placeholder={form.couponDiscountType === 'percent' ? '%' : '원'}
-          className={INPUT}
         />
       )}
-    </div>
+    </Group>
   );
 }
 
@@ -609,36 +633,36 @@ function ApartmentsCard({
   return (
     <Card title="대상 아파트" meta={<Tag>{count}곳</Tag>}>
       {form ? (
-        <div className="grid max-h-80 gap-2 overflow-y-auto md:grid-cols-2">
-          {allApartments.map((apt) => {
-            const checked = form.apartmentIds.includes(apt.id);
-            return (
-              <label
-                key={apt.id}
-                className={cn(
-                  'flex cursor-pointer items-center gap-3 rounded-[12px] border px-4 py-3 transition-colors',
-                  checked ? 'border-[#191c1f] bg-white' : 'border-[#e2e2e7] bg-white hover:bg-[#f4f4f4]',
-                )}
-              >
-                <Checkbox checked={checked} onCheckedChange={() => toggle(apt.id)} />
-                <span className="min-w-0 flex-1 truncate text-base text-[#191c1f]">{apt.name}</span>
-              </label>
-            );
-          })}
-        </div>
+        <ScrollArea.Autosize mah={320}>
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xs">
+            {allApartments.map((apt) => {
+              const checked = form.apartmentIds.includes(apt.id);
+              return (
+                <Paper key={apt.id} withBorder radius="md" px="md" py="sm">
+                  <Checkbox
+                    checked={checked}
+                    onChange={() => toggle(apt.id)}
+                    label={apt.name}
+                    styles={{ body: { cursor: 'pointer' }, label: { cursor: 'pointer' } }}
+                  />
+                </Paper>
+              );
+            })}
+          </SimpleGrid>
+        </ScrollArea.Autosize>
       ) : detail.apartmentNames.length === 0 ? (
-        <p className="text-base text-[#8d969e]">지정된 아파트가 없습니다.</p>
+        <Text size="sm" c="dimmed">
+          지정된 아파트가 없습니다.
+        </Text>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {detail.apartmentNames.map((name) => (
-            <span
-              key={name}
-              className="inline-flex h-9 items-center rounded-full bg-[#f4f4f4] px-4 text-sm font-semibold text-[#191c1f]"
-            >
+        <Group gap="xs">
+          {/* 이름이 같은 아파트가 있을 수 있어 순서까지 key에 넣는다 */}
+          {detail.apartmentNames.map((name, i) => (
+            <Badge key={`${name}-${i}`} variant="light" color="gray" size="lg">
               {name}
-            </span>
+            </Badge>
           ))}
-        </div>
+        </Group>
       )}
     </Card>
   );
@@ -651,28 +675,19 @@ function EntriesCard({
   entries: EventEntryRow[];
   winners: EventEntryRow[];
 }): React.ReactElement {
-  const triggerClass =
-    'h-9 flex-none rounded-full px-4 text-sm font-semibold text-[#191c1f] data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-none';
-
   return (
-    <Card title="응모 현황" bodyClassName="px-0 md:px-0 pb-2 md:pb-2">
-      <Tabs defaultValue="entries" className="gap-0">
-        <div className="px-6 pb-4 md:px-8">
-          <TabsList className="h-auto gap-2 bg-transparent p-0">
-            <TabsTrigger value="entries" className={cn(triggerClass, 'bg-[#f4f4f4]')}>
-              응모자 {entries.length}
-            </TabsTrigger>
-            <TabsTrigger value="winners" className={cn(triggerClass, 'bg-[#f4f4f4]')}>
-              당첨자 {winners.length}
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="entries">
+    <Card title="응모 현황">
+      <Tabs defaultValue="entries" variant="pills">
+        <Tabs.List mb="md">
+          <Tabs.Tab value="entries">응모자 {entries.length}</Tabs.Tab>
+          <Tabs.Tab value="winners">당첨자 {winners.length}</Tabs.Tab>
+        </Tabs.List>
+        <Tabs.Panel value="entries">
           <EntriesTable rows={entries} emptyText="응모자가 없습니다." />
-        </TabsContent>
-        <TabsContent value="winners">
+        </Tabs.Panel>
+        <Tabs.Panel value="winners">
           <EntriesTable rows={winners} emptyText="당첨자가 없습니다." />
-        </TabsContent>
+        </Tabs.Panel>
       </Tabs>
     </Card>
   );
@@ -680,48 +695,56 @@ function EntriesCard({
 
 function EntriesTable({ rows, emptyText }: { rows: EventEntryRow[]; emptyText: string }): React.ReactElement {
   if (rows.length === 0) {
-    return <p className="border-t border-[#e2e2e7] px-8 py-12 text-center text-base text-[#8d969e]">{emptyText}</p>;
+    return (
+      <Text py={48} ta="center" c="dimmed">
+        {emptyText}
+      </Text>
+    );
   }
-  const th = 'px-6 py-3 text-left text-sm font-normal text-[#8d969e] first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8';
-  const td = 'px-6 py-4 first:pl-6 md:first:pl-8 last:pr-6 md:last:pr-8';
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse">
-        <thead>
-          <tr className="border-t border-[#e2e2e7]">
-            <th className={th}>이름</th>
-            <th className={th}>응모 코드</th>
-            <th className={th}>아파트</th>
-            <th className={th}>동 · 호수</th>
-            <th className={th}>당첨</th>
-            <th className={th}>응모일시</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Table.ScrollContainer minWidth={760}>
+      <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>이름</Table.Th>
+            <Table.Th>응모 코드</Table.Th>
+            <Table.Th>아파트</Table.Th>
+            <Table.Th>동 · 호수</Table.Th>
+            <Table.Th>당첨</Table.Th>
+            <Table.Th>응모일시</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {rows.map((row) => (
-            <tr key={row.entryId} className="border-t border-[#e2e2e7] hover:bg-[#f4f4f4]">
-              <td className={cn(td, 'text-base font-semibold text-[#191c1f]')}>{row.userName}</td>
-              <td className={cn(td, 'font-mono text-base tracking-wider text-[#191c1f]')}>{row.entryCode}</td>
-              <td className={cn(td, 'text-base text-[#3a3d40]')}>{row.apartmentName?.trim() || '-'}</td>
-              <td className={cn(td, 'text-base tabular-nums text-[#3a3d40]')}>
+            <Table.Tr key={row.entryId}>
+              <Table.Td fw={600}>{row.userName}</Table.Td>
+              <Table.Td ff="monospace" style={{ letterSpacing: '0.05em' }}>
+                {row.entryCode}
+              </Table.Td>
+              <Table.Td>{row.apartmentName?.trim() || '-'}</Table.Td>
+              <Table.Td style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {row.buildingNumber != null ? `${row.buildingNumber}동` : '-'}
                 {row.unit != null && ` ${row.unit}호`}
-              </td>
-              <td className={td}>
+              </Table.Td>
+              <Table.Td>
                 {row.isWinner ? (
-                  <span className="inline-flex h-7 items-center rounded-full bg-black px-3 text-[13px] text-white">
+                  <Badge variant="light" color="green">
                     당첨
-                  </span>
+                  </Badge>
                 ) : (
-                  <span className="text-[#c9c9cd]">-</span>
+                  <Text span c="dimmed">
+                    -
+                  </Text>
                 )}
-              </td>
-              <td className={cn(td, 'text-sm tabular-nums text-[#8d969e]')}>{toDateTimeText(row.enteredAt)}</td>
-            </tr>
+              </Table.Td>
+              <Table.Td c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {toDateTimeText(row.enteredAt)}
+              </Table.Td>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Table.Tbody>
+      </Table>
+    </Table.ScrollContainer>
   );
 }
 
@@ -743,47 +766,61 @@ function SummaryCard({
   ] as const;
 
   return (
-    <section className="rounded-[20px] bg-[#494fdf] p-8 text-white">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">요약</p>
+    <Paper component="section" withBorder radius="md" p="lg">
+      <Group justify="space-between">
+        <Title order={4}>요약</Title>
         <EventStatusPill status={detail.status} />
-      </div>
+      </Group>
 
-      <div className="mt-8">
-        <p className="text-sm text-white/72">응모자</p>
-        <p className="mt-1 text-[48px] font-medium leading-none tracking-[-0.48px] tabular-nums">
+      <Box mt="lg">
+        <Text size="sm" c="dimmed">
+          응모자
+        </Text>
+        <Text fz="2.5rem" fw={500} lh={1} mt={4} style={{ fontVariantNumeric: 'tabular-nums' }}>
           {entryCount.toLocaleString()}
-          <span className="ml-1 text-xl tracking-normal">명</span>
-        </p>
-      </div>
+          <Text span fz="lg" ml={4}>
+            명
+          </Text>
+        </Text>
+      </Box>
 
-      <div className="mt-8 space-y-3">
-        <div className="flex items-baseline justify-between">
-          <p className="text-sm text-white/72">당첨자</p>
-          <p className="text-base font-semibold tabular-nums">
+      <Stack gap="xs" mt="lg">
+        <Group justify="space-between" align="baseline">
+          <Text size="sm" c="dimmed">
+            당첨자
+          </Text>
+          <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {winnerCount.toLocaleString()} / {detail.winnerCount.toLocaleString()}명
-          </p>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
-          <div className="h-full rounded-full bg-white" style={{ width: `${fillRate}%` }} />
-        </div>
-      </div>
+          </Text>
+        </Group>
+        <Progress value={fillRate} size="sm" radius="xl" />
+      </Stack>
 
-      <dl className="mt-8 space-y-3 border-t border-white/20 pt-6">
-        <div className="flex items-center justify-between">
-          <dt className="text-sm text-white/72">대상 아파트</dt>
-          <dd className="text-base font-semibold tabular-nums">{detail.apartmentNames.length}곳</dd>
-        </div>
+      <Divider my="lg" />
+
+      <Stack gap="xs">
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            대상 아파트
+          </Text>
+          <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {detail.apartmentNames.length}곳
+          </Text>
+        </Group>
         {history
           .filter(([, value]) => value)
           .map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-white/72">{label}</dt>
-              <dd className="text-sm tabular-nums">{toDateTimeText(value)}</dd>
-            </div>
+            <Group key={label} justify="space-between" gap="md">
+              <Text size="sm" c="dimmed">
+                {label}
+              </Text>
+              <Text size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {toDateTimeText(value)}
+              </Text>
+            </Group>
           ))}
-      </dl>
-    </section>
+      </Stack>
+    </Paper>
   );
 }
 
@@ -795,38 +832,52 @@ function ReviewActions({ page }: { page: Page }): React.ReactElement | null {
     const entryStartAt = page.detail?.entryStartAt;
     const entryStarted = !!entryStartAt && new Date(entryStartAt).getTime() <= Date.now();
     return (
-      <section className="space-y-3 rounded-[20px] border border-[#e2e2e7] bg-white p-6">
-        {entryStarted && (
-          <div className="flex gap-2 rounded-[12px] bg-[#f4f4f4] px-4 py-3 text-sm text-[#3a3d40]">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#ec7e00]" />
-            <span>응모 시작 시각이 지나 승인할 수 없습니다. 일정을 수정한 뒤 승인해주세요.</span>
-          </div>
-        )}
-        <Button onClick={page.handleApprove} disabled={page.approving || entryStarted} className={cn(BTN_DARK, 'w-full')}>
-          <Check className="h-4 w-4" />
-          {page.approving ? '처리 중...' : '승인하기'}
-        </Button>
-        <Button variant="outline" onClick={() => page.setRejectDialog(true)} className={cn(BTN_OUTLINE_LIGHT, 'w-full')}>
-          <X className="h-4 w-4" />
-          거절하기
-        </Button>
-      </section>
+      <Paper component="section" withBorder radius="md" p="lg">
+        <Stack gap="sm">
+          {entryStarted && (
+            <Alert color="yellow" variant="light" icon={<AlertCircle size={16} />}>
+              응모 시작 시각이 지나 승인할 수 없습니다. 일정을 수정한 뒤 승인해주세요.
+            </Alert>
+          )}
+          <Button
+            fullWidth
+            leftSection={<Check size={16} />}
+            onClick={page.handleApprove}
+            disabled={page.approving || entryStarted}
+          >
+            {page.approving ? '처리 중...' : '승인하기'}
+          </Button>
+          <Button
+            fullWidth
+            variant="default"
+            leftSection={<X size={16} />}
+            onClick={() => page.setRejectDialog(true)}
+          >
+            거절하기
+          </Button>
+        </Stack>
+      </Paper>
     );
   }
 
   if (status === 'approved') {
     return (
-      <section className="space-y-4 rounded-[20px] border border-[#e2e2e7] bg-white p-6">
-        <p className="text-sm text-[#505a63]">종료하면 주민 앱에서 바로 사라지고 되돌릴 수 없습니다.</p>
-        <Button
-          variant="outline"
-          onClick={() => page.setEndDialog(true)}
-          className={cn(BTN_OUTLINE_LIGHT, 'w-full border-[#e23b4a] text-[#e23b4a] hover:text-[#8b0000]')}
-        >
-          <Ban className="h-4 w-4" />
-          강제 종료
-        </Button>
-      </section>
+      <Paper component="section" withBorder radius="md" p="lg">
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            종료하면 주민 앱에서 바로 사라지고 되돌릴 수 없습니다.
+          </Text>
+          <Button
+            fullWidth
+            variant="light"
+            color="red"
+            leftSection={<Ban size={16} />}
+            onClick={() => page.setEndDialog(true)}
+          >
+            강제 종료
+          </Button>
+        </Stack>
+      </Paper>
     );
   }
 
@@ -835,59 +886,52 @@ function ReviewActions({ page }: { page: Page }): React.ReactElement | null {
 
 function RejectDialog({ page }: { page: Page }): React.ReactElement {
   return (
-    <Dialog open={page.rejectDialog} onOpenChange={page.setRejectDialog}>
-      <DialogContent className="rounded-[20px] p-8 sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-medium">이벤트 거절</DialogTitle>
-          <DialogDescription className="text-base text-[#505a63]">거절 사유는 파트너에게 그대로 보여집니다.</DialogDescription>
-        </DialogHeader>
-        <div className="py-2">
-          <Textarea
-            className="min-h-[120px] resize-none rounded-[12px] border-[#e2e2e7] px-4 py-3 text-base shadow-none"
-            placeholder="거절 사유를 입력해주세요"
-            value={page.rejectReason}
-            onChange={(e) => page.setRejectReason(e.target.value)}
-          />
-        </div>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => page.setRejectDialog(false)} disabled={page.rejecting} className={BTN_OUTLINE_LIGHT}>
-            취소
-          </Button>
-          <Button onClick={page.handleReject} disabled={page.rejecting} className={BTN_DARK}>
-            {page.rejecting ? '처리 중...' : '거절'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Modal opened={page.rejectDialog} onClose={() => page.setRejectDialog(false)} title="이벤트 거절">
+      <Text size="sm" c="dimmed">
+        거절 사유는 파트너에게 그대로 보여집니다.
+      </Text>
+      <Textarea
+        mt="md"
+        minRows={5}
+        autosize
+        placeholder="거절 사유를 입력해주세요"
+        value={page.rejectReason}
+        onChange={(e) => page.setRejectReason(e.target.value)}
+      />
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={() => page.setRejectDialog(false)} disabled={page.rejecting}>
+          취소
+        </Button>
+        <Button color="red" onClick={page.handleReject} disabled={page.rejecting}>
+          {page.rejecting ? '처리 중...' : '거절'}
+        </Button>
+      </Group>
+    </Modal>
   );
 }
 
 function ForceEndDialog({ page }: { page: Page }): React.ReactElement {
   return (
-    <AlertDialog open={page.endDialog} onOpenChange={page.setEndDialog}>
-      <AlertDialogContent className="rounded-[20px] p-8">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-2xl font-medium">이벤트를 종료할까요?</AlertDialogTitle>
-          <AlertDialogDescription className="text-base text-[#505a63]">
-            종료하면 주민 앱에서 바로 사라지고 되돌릴 수 없습니다.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter className="gap-2">
-          <AlertDialogCancel disabled={page.ending} className={BTN_OUTLINE_LIGHT}>
-            취소
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(e) => {
-              e.preventDefault();
-              page.handleForceEnd();
-            }}
-            disabled={page.ending}
-            className={cn(BTN_DARK, 'bg-[#e23b4a] hover:bg-[#8b0000]')}
-          >
-            {page.ending ? '처리 중...' : '종료'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Modal closeOnClickOutside={false} withCloseButton={false} opened={page.endDialog} onClose={() => page.setEndDialog(false)} title="이벤트를 종료할까요?">
+      <Text size="sm" c="dimmed">
+        종료하면 주민 앱에서 바로 사라지고 되돌릴 수 없습니다.
+      </Text>
+      <Group justify="flex-end" mt="lg">
+        {/* AlertDialogCancel과 동일하게 클릭 시 다이얼로그를 닫는다 */}
+        <Button variant="default" disabled={page.ending} onClick={() => page.setEndDialog(false)}>
+          취소
+        </Button>
+        {/* 원본은 e.preventDefault()로 자동 닫힘을 막았으므로 여기서도 닫지 않는다 (처리 후 훅이 닫음) */}
+        <Button
+          color="red"
+          onClick={() => {
+            page.handleForceEnd();
+          }}
+          disabled={page.ending}
+        >
+          {page.ending ? '처리 중...' : '종료'}
+        </Button>
+      </Group>
+    </Modal>
   );
 }

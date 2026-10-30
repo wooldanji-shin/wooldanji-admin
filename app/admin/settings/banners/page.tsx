@@ -6,46 +6,33 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { InlineLoadingSkeleton } from '@/components/skeletons';
+import { confirmModal } from '@/components/confirm-modal';
+import { TableSkeleton } from '@/components/skeletons';
 import { LinkedAdPicker, type LinkableAd } from './LinkedAdPicker';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
+  ActionIcon,
+  Alert,
+  Anchor,
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  CloseButton,
+  Group,
+  HoverCard,
+  Input,
+  Modal,
+  Paper,
+  ScrollArea,
+  SimpleGrid,
+  Stack,
+  Switch,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/supabase';
 import {
@@ -58,13 +45,12 @@ import {
   Building2,
   Globe,
   Search,
-  X,
   Calendar,
   RotateCcw,
 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import { ImageUpload } from '@/components/image-upload';
 import { getUserRoles } from '@/lib/auth';
 import { deleteFileFromStorage } from '@/lib/utils/storage';
@@ -146,6 +132,7 @@ function BannerRow({
   canEdit,
   canDelete,
   hideClickCounts,
+  toggling,
 }: {
   banner: Banner;
   onEdit: (banner: Banner) => void;
@@ -155,175 +142,203 @@ function BannerRow({
   canEdit: boolean;
   canDelete: boolean;
   hideClickCounts: boolean;
+  toggling: boolean;
 }) {
   return (
-    <TableRow className='border-border hover:bg-secondary/50'>
-      <TableCell>
-        <div className='relative w-32 h-20 rounded overflow-hidden bg-muted'>
-          <Image
-            src={banner.imageUrl}
-            alt='배너 이미지'
-            fill
-            className='object-cover'
-          />
-        </div>
-      </TableCell>
-      <TableCell className='max-w-xs truncate'>
+    <Table.Tr>
+      <Table.Td>
+        <Box
+          pos="relative"
+          w={128}
+          h={80}
+          bg="var(--app-bg-muted)"
+          style={{ overflow: 'hidden', borderRadius: 'var(--mantine-radius-sm)' }}
+        >
+          <Image src={banner.imageUrl} alt="배너 이미지" fill className="object-cover" />
+        </Box>
+      </Table.Td>
+      <Table.Td maw={320}>
         {banner.linkUrl ? (
-          <a
+          <Anchor
             href={banner.linkUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='text-primary hover:underline'
+            target="_blank"
+            rel="noopener noreferrer"
+            size="sm"
+            truncate
+            display="block"
           >
             {banner.linkUrl}
-          </a>
+          </Anchor>
         ) : (
-          <span className='text-muted-foreground'>링크 없음</span>
+          <Text size="sm" c="dimmed">
+            링크 없음
+          </Text>
         )}
-      </TableCell>
-      <TableCell>
+      </Table.Td>
+      <Table.Td>
         {banner.isGlobal ? (
-          <Badge variant='default' className='gap-1'>
-            <Globe className='h-3 w-3' />
+          <Badge variant="filled" color="blue" leftSection={<Globe size={12} />}>
             전체
           </Badge>
         ) : (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className='flex flex-wrap gap-1 cursor-pointer'>
-                  {banner.home_banner_apartments?.slice(0, 2).map((hba) => (
-                    <Badge key={hba.apartmentId} variant='outline' className='text-xs'>
-                      <Building2 className='h-3 w-3 mr-1' />
-                      {hba.apartments?.name}
-                    </Badge>
-                  ))}
-                  {(banner.home_banner_apartments?.length || 0) > 2 && (
-                    <Badge variant='outline' className='text-xs'>
-                      +{(banner.home_banner_apartments?.length || 0) - 2}
-                    </Badge>
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side='bottom' className='max-w-xs bg-white border shadow-md p-0'>
-                <div className='flex flex-col'>
-                  <p className='font-semibold text-base text-black px-3 py-2 border-b'>
-                    타겟 아파트 ({banner.home_banner_apartments?.length || 0}개)
-                  </p>
-                  {banner.home_banner_apartments?.map((hba, index) => (
-                    <span
-                      key={hba.apartmentId}
-                      className={`text-base text-black px-3 py-1.5 ${index !== (banner.home_banner_apartments?.length || 0) - 1 ? 'border-b' : ''
-                        }`}
-                    >
-                      {hba.apartments?.name}
-                    </span>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <HoverCard position="bottom" shadow="md" withinPortal>
+            <HoverCard.Target>
+              <Group gap={4} style={{ cursor: 'pointer' }}>
+                {banner.home_banner_apartments?.slice(0, 2).map((hba) => (
+                  <Badge
+                    key={hba.apartmentId}
+                    variant="light"
+                    color="gray"
+                    size="sm"
+                    tt="none"
+                    leftSection={<Building2 size={12} />}
+                  >
+                    {hba.apartments?.name}
+                  </Badge>
+                ))}
+                {(banner.home_banner_apartments?.length || 0) > 2 && (
+                  <Badge variant="light" color="gray" size="sm">
+                    +{(banner.home_banner_apartments?.length || 0) - 2}
+                  </Badge>
+                )}
+              </Group>
+            </HoverCard.Target>
+            <HoverCard.Dropdown p={0} maw={320}>
+              <Stack gap={0}>
+                <Text
+                  fw={600}
+                  px="sm"
+                  py="xs"
+                  style={{ borderBottom: '1px solid var(--app-divider)' }}
+                >
+                  타겟 아파트 ({banner.home_banner_apartments?.length || 0}개)
+                </Text>
+                {banner.home_banner_apartments?.map((hba, index) => (
+                  <Text
+                    key={hba.apartmentId}
+                    px="sm"
+                    py={6}
+                    style={
+                      index !== (banner.home_banner_apartments?.length || 0) - 1
+                        ? { borderBottom: '1px solid var(--app-divider)' }
+                        : undefined
+                    }
+                  >
+                    {hba.apartments?.name}
+                  </Text>
+                ))}
+              </Stack>
+            </HoverCard.Dropdown>
+          </HoverCard>
         )}
-      </TableCell>
-      <TableCell>
+      </Table.Td>
+      <Table.Td>
         {banner.isGlobal ? (
-          <span className='text-muted-foreground text-sm'>-</span>
+          <Text size="sm" c="dimmed">
+            -
+          </Text>
         ) : (
-          <div className='space-y-0.5 text-sm'>
-            <div className='flex items-center gap-1 text-muted-foreground'>
-              <Calendar className='h-3 w-3' />
-              {formatDisplayDate(banner.startDate)}
-            </div>
-            <div className='flex items-center gap-1 text-muted-foreground'>
-              <Calendar className='h-3 w-3' />
-              {formatDisplayDate(banner.endDate)}
-            </div>
-          </div>
+          <Stack gap={2}>
+            <Group gap={4} wrap="nowrap">
+              <Calendar size={12} color="var(--mantine-color-dimmed)" />
+              <Text size="sm" c="dimmed">
+                {formatDisplayDate(banner.startDate)}
+              </Text>
+            </Group>
+            <Group gap={4} wrap="nowrap">
+              <Calendar size={12} color="var(--mantine-color-dimmed)" />
+              <Text size="sm" c="dimmed">
+                {formatDisplayDate(banner.endDate)}
+              </Text>
+            </Group>
+          </Stack>
         )}
-      </TableCell>
-      <TableCell>
-        <span className='text-sm'>
-          {banner.user?.name || '-'}
-        </span>
-      </TableCell>
-      <TableCell className='max-w-[150px]'>
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm">{banner.user?.name || '-'}</Text>
+      </Table.Td>
+      <Table.Td maw={150}>
         {banner.description ? (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className='text-sm truncate block cursor-pointer'>
-                  {banner.description.length > 20 ? banner.description.substring(0, 20) + '...' : banner.description}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side='bottom' className='max-w-xs bg-white border shadow-md'>
-                <p className='text-sm text-black whitespace-pre-wrap'>{banner.description}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <HoverCard position="bottom" shadow="md" withinPortal>
+            <HoverCard.Target>
+              <Text size="sm" truncate display="block" style={{ cursor: 'pointer' }}>
+                {banner.description.length > 20 ? banner.description.substring(0, 20) + '...' : banner.description}
+              </Text>
+            </HoverCard.Target>
+            <HoverCard.Dropdown maw={320}>
+              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                {banner.description}
+              </Text>
+            </HoverCard.Dropdown>
+          </HoverCard>
         ) : (
-          <span className='text-muted-foreground text-sm'>-</span>
+          <Text size="sm" c="dimmed">
+            -
+          </Text>
         )}
-      </TableCell>
+      </Table.Td>
       {!hideClickCounts && (
         <>
-          <TableCell>
-            <span className='text-sm'>{banner.adClickCount?.toLocaleString() || 0}</span>
-          </TableCell>
-          <TableCell>
-            <span className='text-sm'>{banner.clickCount?.toLocaleString() || 0}</span>
-          </TableCell>
+          <Table.Td>
+            <Text size="sm">{banner.adClickCount?.toLocaleString() || 0}</Text>
+          </Table.Td>
+          <Table.Td>
+            <Text size="sm">{banner.clickCount?.toLocaleString() || 0}</Text>
+          </Table.Td>
         </>
       )}
-      <TableCell>
+      <Table.Td>
         <Switch
           checked={banner.isActive}
-          onCheckedChange={(checked) => onToggleActive(banner.id, checked)}
-          disabled={!canEdit}
+          onChange={(e) => onToggleActive(banner.id, e.currentTarget.checked)}
+          disabled={!canEdit || toggling}
         />
-      </TableCell>
-      <TableCell>
-        <div className='flex items-center gap-2'>
+      </Table.Td>
+      <Table.Td>
+        <Group gap={4} wrap="nowrap">
           {canEdit && (
-            <Button
-              variant='ghost'
-              size='sm'
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              aria-label="수정"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(banner);
               }}
             >
-              <Edit className='h-4 w-4' />
-            </Button>
+              <Edit size={16} />
+            </ActionIcon>
           )}
           {canEdit && (
-            <Button
-              variant='ghost'
-              size='sm'
+            <ActionIcon
+              variant="subtle"
+              color="gray"
               onClick={(e) => {
                 e.stopPropagation();
                 onResetClick(banner);
               }}
-              title='클릭수 초기화'
+              title="클릭수 초기화"
+              aria-label="클릭수 초기화"
             >
-              <RotateCcw className='h-4 w-4' />
-            </Button>
+              <RotateCcw size={16} />
+            </ActionIcon>
           )}
           {canDelete && (
-            <Button
-              variant='ghost'
-              size='sm'
+            <ActionIcon
+              variant="subtle"
+              color="red"
+              aria-label="삭제"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(banner.id);
               }}
             >
-              <Trash2 className='h-4 w-4 text-destructive' />
-            </Button>
+              <Trash2 size={16} />
+            </ActionIcon>
           )}
-        </div>
-      </TableCell>
-    </TableRow>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
   );
 }
 
@@ -359,6 +374,7 @@ export default function BannersPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [resetClickDialogOpen, setResetClickDialogOpen] = useState(false);
   const [resetClickBanner, setResetClickBanner] = useState<Banner | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   // 클릭수 컬럼 숨김 상태 (localStorage에서 읽어옴 - ads 페이지와 공유)
   const [hideClickCounts, setHideClickCounts] = useState(false);
@@ -377,6 +393,16 @@ export default function BannersPage() {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  // 클릭수 숨김 토글 (ads 페이지와 같은 localStorage 키에 저장)
+  const handleHideClickCountsChange = (checked: boolean): void => {
+    setHideClickCounts(checked);
+    try {
+      localStorage.setItem('hideClickColumn', String(checked));
+    } catch {
+      // localStorage 접근 불가(시크릿 모드 등) 시 현재 화면 상태만 유지
+    }
+  };
 
   const supabase = createClient();
 
@@ -513,6 +539,7 @@ export default function BannersPage() {
       return;
     }
 
+    setTogglingId(id);
     try {
       const { error: updateError } = await supabase
         .from('home_banners')
@@ -529,6 +556,8 @@ export default function BannersPage() {
     } catch (err) {
       console.error('Error toggling active:', err);
       toast.error('활성화 상태 변경 중 오류가 발생했습니다.');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -783,7 +812,7 @@ export default function BannersPage() {
       return;
     }
 
-    if (!confirm('이 배너를 삭제하시겠습니까?')) {
+    if (!(await confirmModal({ title: '배너 삭제', message: '이 배너를 삭제하시겠습니까?', confirmLabel: '삭제', danger: true }))) {
       return;
     }
 
@@ -862,17 +891,6 @@ export default function BannersPage() {
     setLinkedAd(null);
   };
 
-  if (loading) {
-    return (
-      <PageShell>
-        <PageHeader>
-          <PageHeaderTitle title="배너 등록/수정" />
-        </PageHeader>
-        <InlineLoadingSkeleton />
-      </PageShell>
-    );
-  }
-
   return (
     <PageShell>
       <PageHeader>
@@ -883,244 +901,263 @@ export default function BannersPage() {
       </PageHeader>
 
       <PageContent>
-        <div className='space-y-6'>
-          {/* Info Alert */}
-          <Alert className='bg-muted/50 border-muted'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>
-              홈 화면 상단에 표시되는 배너 광고를 관리합니다. 최신 등록순으로 정렬됩니다.
-            </AlertDescription>
-          </Alert>
+        {/* Info Alert */}
+        <Alert variant="light" color="gray" icon={<AlertCircle size={16} />}>
+          홈 화면 상단에 표시되는 배너 광고를 관리합니다. 최신 등록순으로 정렬됩니다.
+        </Alert>
 
-          {/* Banners List */}
-          <Card className='bg-card border-border'>
-            <CardHeader className='flex flex-row items-center justify-between space-y-0'>
-              <CardTitle className='text-card-foreground'>배너 목록</CardTitle>
-              <Button onClick={handleAddNew}>
-                <Plus className='h-4 w-4 mr-2' />
-                새 배너
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {banners.length === 0 ? (
-                <div className='text-center py-12 text-muted-foreground'>
-                  등록된 배너가 없습니다.
-                </div>
-              ) : (
-                <div className='overflow-x-auto'>
-                  <Table className='w-full'>
-                    <TableHeader>
-                      <TableRow className='border-border hover:bg-transparent'>
-                        <TableHead className='w-32'>이미지</TableHead>
-                        <TableHead className='w-32'>링크 URL</TableHead>
-                        <TableHead className='w-32'>타겟</TableHead>
-                        <TableHead className='w-28'>게시 기간</TableHead>
-                        <TableHead className='w-20'>등록자</TableHead>
-                        <TableHead className='w-32'>소개내용</TableHead>
-                        {!hideClickCounts && (
-                          <>
-                            <TableHead className='w-24'>광고클릭수</TableHead>
-                            <TableHead className='w-20'>클릭수</TableHead>
-                          </>
-                        )}
-                        <TableHead className='w-20'>활성화</TableHead>
-                        <TableHead className='w-24'>작업</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {banners.map((banner) => (
-                        <BannerRow
-                          key={banner.id}
-                          banner={banner}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onToggleActive={handleToggleActive}
-                          onResetClick={(b) => {
-                            setResetClickBanner(b);
-                            setResetClickDialogOpen(true);
-                          }}
-                          canEdit={canEditBanner(banner)}
-                          canDelete={canDeleteBanner(banner)}
-                          hideClickCounts={hideClickCounts}
-                        />
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* Banners List */}
+        <Paper withBorder radius="md" p="lg">
+          <Stack gap="md">
+            <Group justify="space-between" gap="sm">
+              <Title order={4}>배너 목록</Title>
+              <Group gap="md">
+                <Checkbox
+                  label="클릭수 숨기기"
+                  checked={hideClickCounts}
+                  onChange={(e) => handleHideClickCountsChange(e.currentTarget.checked)}
+                />
+                <Button onClick={handleAddNew} leftSection={<Plus size={16} />}>
+                  새 배너
+                </Button>
+              </Group>
+            </Group>
+            {loading ? (
+              <TableSkeleton rows={8} columns={hideClickCounts ? 8 : 10} />
+            ) : banners.length === 0 ? (
+              <Text c="dimmed" ta="center" py={48}>
+                등록된 배너가 없습니다.
+              </Text>
+            ) : (
+              <Table.ScrollContainer minWidth={720} type="native">
+                <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th w={128}>이미지</Table.Th>
+                      <Table.Th w={128}>링크 URL</Table.Th>
+                      <Table.Th w={128}>타겟</Table.Th>
+                      <Table.Th w={112}>게시 기간</Table.Th>
+                      <Table.Th w={80}>등록자</Table.Th>
+                      <Table.Th w={128}>소개내용</Table.Th>
+                      {!hideClickCounts && (
+                        <>
+                          <Table.Th w={96}>광고클릭수</Table.Th>
+                          <Table.Th w={80}>클릭수</Table.Th>
+                        </>
+                      )}
+                      <Table.Th w={80}>활성화</Table.Th>
+                      <Table.Th w={96}>작업</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {banners.map((banner) => (
+                      <BannerRow
+                        key={banner.id}
+                        banner={banner}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onToggleActive={handleToggleActive}
+                        onResetClick={(b) => {
+                          setResetClickBanner(b);
+                          setResetClickDialogOpen(true);
+                        }}
+                        canEdit={canEditBanner(banner)}
+                        canDelete={canDeleteBanner(banner)}
+                        hideClickCounts={hideClickCounts}
+                        toggling={togglingId === banner.id}
+                      />
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+            )}
+          </Stack>
+        </Paper>
 
         {/* Add/Edit Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className='min-w-[672px] max-w-4xl max-h-[90vh] overflow-y-auto'>
-            <DialogHeader>
-              <DialogTitle>
-                {editingBanner ? '배너 수정' : '새 배너 등록'}
-              </DialogTitle>
-            </DialogHeader>
+        <Modal
+          opened={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          title={editingBanner ? '배너 수정' : '새 배너 등록'}
+          size={896}
+        >
+          <Stack gap="lg">
+            {/* Image Upload */}
+            <Input.Wrapper label="배너 이미지" withAsterisk>
+              <ImageUpload
+                bucket={BUCKET_NAME}
+                storagePath={BANNERS_FOLDER}
+                value={form.imageUrl}
+                onChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url }))}
+                accept="image/*"
+                maxSizeMB={5}
+                description="배너 이미지를 업로드하세요 (권장: 가로형 이미지)"
+              />
+            </Input.Wrapper>
 
-            <div className='space-y-6 py-4'>
-              {/* Image Upload */}
-              <div className='space-y-2'>
-                <Label className='text-sm font-medium'>
-                  배너 이미지 <span className='text-destructive'>*</span>
-                </Label>
-                <ImageUpload
-                  bucket={BUCKET_NAME}
-                  storagePath={BANNERS_FOLDER}
-                  value={form.imageUrl}
-                  onChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url }))}
-                  accept='image/*'
-                  maxSizeMB={5}
-                  description='배너 이미지를 업로드하세요 (권장: 가로형 이미지)'
-                />
-              </div>
+            {/* Additional Image Upload */}
+            <Input.Wrapper
+              label={
+                <>
+                  추가 이미지{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+            >
+              <ImageUpload
+                bucket={BUCKET_NAME}
+                storagePath={BANNERS_FOLDER}
+                value={form.additionalImageUrl}
+                onChange={(url) => setForm((prev) => ({ ...prev, additionalImageUrl: url }))}
+                accept="image/*"
+                maxSizeMB={5}
+                description="배너와 함께 표시할 추가 이미지를 업로드하세요"
+              />
+            </Input.Wrapper>
 
-              {/* Additional Image Upload */}
-              <div className='space-y-2'>
-                <Label className='text-sm font-medium'>
-                  추가 이미지 <span className='text-muted-foreground'>(선택사항)</span>
-                </Label>
-                <ImageUpload
-                  bucket={BUCKET_NAME}
-                  storagePath={BANNERS_FOLDER}
-                  value={form.additionalImageUrl}
-                  onChange={(url) => setForm((prev) => ({ ...prev, additionalImageUrl: url }))}
-                  accept='image/*'
-                  maxSizeMB={5}
-                  description='배너와 함께 표시할 추가 이미지를 업로드하세요'
-                />
-              </div>
+            {/* Link URL */}
+            <TextInput
+              id="linkUrl"
+              type="url"
+              label={
+                <>
+                  링크 URL{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+              value={form.linkUrl}
+              onChange={(e) => setForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
+              placeholder="https://example.com"
+              description="배너 클릭 시 이동할 URL을 입력하세요."
+              inputWrapperOrder={['label', 'input', 'description']}
+            />
 
-              {/* Link URL */}
-              <div className='space-y-2'>
-                <Label htmlFor='linkUrl' className='text-sm font-medium'>
-                  링크 URL <span className='text-muted-foreground'>(선택사항)</span>
-                </Label>
-                <Input
-                  id='linkUrl'
-                  type='url'
-                  value={form.linkUrl}
-                  onChange={(e) => setForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
-                  placeholder='https://example.com'
-                />
-                <p className='text-xs text-muted-foreground'>
-                  배너 클릭 시 이동할 URL을 입력하세요.
-                </p>
-              </div>
-
-              {/* 아정당 배너 — 탭하면 앱이 인터넷 가입 상담 / 가전 렌탈 상담 중 하나를 고르게 하고 인앱 웹뷰로 연다 */}
-              <div className='flex items-center justify-between p-4 border rounded-lg'>
-                <div className='space-y-1'>
-                  <Label htmlFor='isAjl' className='text-sm font-medium'>
+            {/* 아정당 배너 — 탭하면 앱이 인터넷 가입 상담 / 가전 렌탈 상담 중 하나를 고르게 하고 인앱 웹뷰로 연다 */}
+            <Paper withBorder radius="md" p="md">
+              <Group justify="space-between" wrap="nowrap" gap="md">
+                <Stack gap={4}>
+                  <Text component="label" htmlFor="isAjl" size="sm" fw={500}>
                     아정당 배너
-                  </Label>
-                  <p className='text-xs text-muted-foreground'>
+                  </Text>
+                  <Text size="xs" c="dimmed">
                     활성화하면 링크 URL은 인터넷 가입 상담, 아래 두 번째 링크는 가전 렌탈 상담으로 쓰입니다.
-                  </p>
-                </div>
+                  </Text>
+                </Stack>
                 <Switch
-                  id='isAjl'
+                  id="isAjl"
                   checked={form.isAjl}
-                  onCheckedChange={(checked) =>
+                  onChange={(e) => {
+                    const checked = e.currentTarget.checked;
                     setForm((prev) => ({
                       ...prev,
                       isAjl: checked,
                       isDirectLink: checked ? false : prev.isDirectLink,
                       isAdLink: checked ? false : prev.isAdLink,
-                    }))
-                  }
+                    }));
+                  }}
                 />
-              </div>
+              </Group>
+            </Paper>
 
-              {form.isAjl && (
-                <div className='space-y-2'>
-                  <Label htmlFor='secondLinkUrl' className='text-sm font-medium'>
-                    가전 렌탈 상담 링크 URL
-                  </Label>
-                  <Input
-                    id='secondLinkUrl'
-                    type='url'
-                    value={form.secondLinkUrl}
-                    onChange={(e) => setForm((prev) => ({ ...prev, secondLinkUrl: e.target.value }))}
-                    placeholder='https://biz.ajl.to/lead/rental?companyId=...'
-                  />
-                </div>
-              )}
+            {form.isAjl && (
+              <TextInput
+                id="secondLinkUrl"
+                type="url"
+                label="가전 렌탈 상담 링크 URL"
+                value={form.secondLinkUrl}
+                onChange={(e) => setForm((prev) => ({ ...prev, secondLinkUrl: e.target.value }))}
+                placeholder="https://biz.ajl.to/lead/rental?companyId=..."
+              />
+            )}
 
-              {/* 광고 연결 배너 — 탭하면 앱이 연결된 광고 상세로 바로 이동한다. 대상 아파트는 광고 노출 아파트 안에서만 */}
-              <div className='flex items-center justify-between p-4 border rounded-lg'>
-                <div className='space-y-1'>
-                  <Label htmlFor='isAdLink' className='text-sm font-medium'>
+            {/* 광고 연결 배너 — 탭하면 앱이 연결된 광고 상세로 바로 이동한다. 대상 아파트는 광고 노출 아파트 안에서만 */}
+            <Paper withBorder radius="md" p="md">
+              <Group justify="space-between" wrap="nowrap" gap="md">
+                <Stack gap={4}>
+                  <Text component="label" htmlFor="isAdLink" size="sm" fw={500}>
                     광고 연결 배너
-                  </Label>
-                  <p className='text-xs text-muted-foreground'>
+                  </Text>
+                  <Text size="xs" c="dimmed">
                     활성화하면 배너를 눌렀을 때 연결한 광고의 상세 화면으로 바로 이동합니다. 전체 대상으로는 쓸 수 없습니다.
-                  </p>
-                </div>
+                  </Text>
+                </Stack>
                 <Switch
-                  id='isAdLink'
+                  id="isAdLink"
                   checked={form.isAdLink}
-                  onCheckedChange={(checked) =>
+                  onChange={(e) => {
+                    const checked = e.currentTarget.checked;
                     setForm((prev) => ({
                       ...prev,
                       isAdLink: checked,
                       isAjl: checked ? false : prev.isAjl,
                       isDirectLink: checked ? false : prev.isDirectLink,
                       isGlobal: checked ? false : prev.isGlobal,
-                    }))
-                  }
+                    }));
+                  }}
                 />
-              </div>
+              </Group>
+            </Paper>
 
-              {form.isAdLink && (
-                <div className='space-y-2'>
-                  <Label className='text-sm font-medium'>
-                    연결할 광고 <span className='text-destructive'>*</span>
-                  </Label>
-                  <LinkedAdPicker
-                    value={{ linkedAdId: form.linkedAdId, linkedPremiumAdId: form.linkedPremiumAdId }}
-                    onChange={handleSelectLinkedAd}
-                  />
-                </div>
-              )}
+            {form.isAdLink && (
+              <Input.Wrapper label="연결할 광고" withAsterisk>
+                <LinkedAdPicker
+                  value={{ linkedAdId: form.linkedAdId, linkedPremiumAdId: form.linkedPremiumAdId }}
+                  onChange={handleSelectLinkedAd}
+                />
+              </Input.Wrapper>
+            )}
 
-              {/* isDirectLink Switch - 링크 URL이 있을 때만 의미 있음. 아정당 배너는 자체 선택 화면이 있어 사용 불가 */}
-              <div className='flex items-center justify-between p-4 border rounded-lg'>
-                <div className='space-y-1'>
-                  <Label htmlFor='isDirectLink' className='text-sm font-medium'>
+            {/* isDirectLink Switch - 링크 URL이 있을 때만 의미 있음. 아정당 배너는 자체 선택 화면이 있어 사용 불가 */}
+            <Paper withBorder radius="md" p="md">
+              <Group justify="space-between" wrap="nowrap" gap="md">
+                <Stack gap={4}>
+                  <Text component="label" htmlFor="isDirectLink" size="sm" fw={500}>
                     링크로 바로 이동
-                  </Label>
-                  <p className='text-xs text-muted-foreground'>
+                  </Text>
+                  <Text size="xs" c="dimmed">
                     활성화하면 배너 상세 화면 없이 링크 URL이 바로 열립니다.
-                  </p>
-                </div>
+                  </Text>
+                </Stack>
                 <Switch
-                  id='isDirectLink'
+                  id="isDirectLink"
                   checked={form.isDirectLink}
-                  onCheckedChange={(checked) => setForm((prev) => ({ ...prev, isDirectLink: checked }))}
+                  onChange={(e) => {
+                    const checked = e.currentTarget.checked;
+                    setForm((prev) => ({ ...prev, isDirectLink: checked }));
+                  }}
                   disabled={!form.linkUrl.trim() || form.isAjl || form.isAdLink}
                 />
-              </div>
+              </Group>
+            </Paper>
 
-              {/* isGlobal Switch - 매니저·광고 연결 배너는 사용 불가 */}
-              {isSuperAdmin && !form.isAdLink && (
-                <div className='flex items-center justify-between p-4 border rounded-lg'>
-                  <div className='space-y-1'>
-                    <Label htmlFor='isGlobal' className='text-sm font-medium flex items-center gap-2'>
-                      <Globe className='h-4 w-4' />
+            {/* isGlobal Switch - 매니저·광고 연결 배너는 사용 불가 */}
+            {isSuperAdmin && !form.isAdLink && (
+              <Paper withBorder radius="md" p="md">
+                <Group justify="space-between" wrap="nowrap" gap="md">
+                  <Stack gap={4}>
+                    <Text
+                      component="label"
+                      htmlFor="isGlobal"
+                      size="sm"
+                      fw={500}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <Globe size={16} />
                       전체 대상
-                    </Label>
-                    <p className='text-xs text-muted-foreground'>
+                    </Text>
+                    <Text size="xs" c="dimmed">
                       활성화하면 모든 회원에게 배너가 표시됩니다.
-                    </p>
-                  </div>
+                    </Text>
+                  </Stack>
                   <Switch
-                    id='isGlobal'
+                    id="isGlobal"
                     checked={form.isGlobal}
-                    onCheckedChange={(checked) => {
+                    onChange={(e) => {
+                      const checked = e.currentTarget.checked;
                       setForm((prev) => ({
                         ...prev,
                         isGlobal: checked,
@@ -1128,41 +1165,47 @@ export default function BannersPage() {
                       }));
                     }}
                   />
-                </div>
-              )}
+                </Group>
+              </Paper>
+            )}
 
-              {/* 게시 기간 - isGlobal이 false인 경우에만 표시 */}
-              {!form.isGlobal && (
-                <div className='space-y-2'>
-                  <Label className='text-sm font-medium flex items-center gap-2'>
-                    <Calendar className='h-4 w-4' />
-                    게시 기간 <span className='text-destructive'>*</span>
-                  </Label>
-                  <div className='grid grid-cols-2 gap-3'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='startDate' className='text-xs text-muted-foreground'>시작일</Label>
-                      <Input
-                        id='startDate'
-                        type='date'
-                        value={form.startDate}
-                        onChange={(e) =>
-                          setForm((prev) => ({ ...prev, startDate: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='endDate' className='text-xs text-muted-foreground'>종료일</Label>
-                      <Input
-                        id='endDate'
-                        type='date'
-                        value={form.endDate}
-                        onChange={(e) =>
-                          setForm((prev) => ({ ...prev, endDate: e.target.value }))
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className='flex gap-2 pt-1'>
+            {/* 게시 기간 - isGlobal이 false인 경우에만 표시 */}
+            {!form.isGlobal && (
+              <Input.Wrapper
+                label={
+                  <Group gap="xs" component="span" display="inline-flex">
+                    <Calendar size={16} />
+                    게시 기간
+                  </Group>
+                }
+                withAsterisk
+              >
+                <Stack gap="xs">
+                  <SimpleGrid cols={2} spacing="sm">
+                    <TextInput
+                      id="startDate"
+                      type="date"
+                      label="시작일"
+                      size="sm"
+                      styles={{ label: { fontSize: 'var(--mantine-font-size-xs)', color: 'var(--mantine-color-dimmed)', fontWeight: 500 } }}
+                      value={form.startDate}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, startDate: e.target.value }))
+                      }
+                    />
+                    <TextInput
+                      id="endDate"
+                      type="date"
+                      label="종료일"
+                      size="sm"
+                      styles={{ label: { fontSize: 'var(--mantine-font-size-xs)', color: 'var(--mantine-color-dimmed)', fontWeight: 500 } }}
+                      value={form.endDate}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, endDate: e.target.value }))
+                      }
+                    />
+                  </SimpleGrid>
+                  <Group gap="xs">
                     {[
                       { days: 14, label: '14일' },
                       { days: 30, label: '1개월' },
@@ -1171,171 +1214,188 @@ export default function BannersPage() {
                     ].map(({ days, label }) => (
                       <Button
                         key={days}
-                        type='button'
-                        variant='outline'
-                        size='sm'
+                        type="button"
+                        variant="default"
+                        size="xs"
                         onClick={() => {
                           const today = new Date();
                           const endDate = new Date();
                           endDate.setDate(today.getDate() + days);
                           setForm({
                             ...form,
-                            startDate: today.toISOString().split('T')[0],
-                            endDate: endDate.toISOString().split('T')[0],
+                            startDate: format(today, 'yyyy-MM-dd'),
+                            endDate: format(endDate, 'yyyy-MM-dd'),
                           });
                         }}
                       >
                         {label}
                       </Button>
                     ))}
-                  </div>
-                </div>
-              )}
+                  </Group>
+                </Stack>
+              </Input.Wrapper>
+            )}
 
-              {/* 소개내용 */}
-              <div className='space-y-2'>
-                <Label htmlFor='description' className='text-sm font-medium'>
-                  소개내용{!form.isGlobal && <span className='text-destructive'> *</span>}
-                  {form.isGlobal && <span className='text-muted-foreground'> (선택사항)</span>}
-                </Label>
-                <Textarea
-                  id='description'
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder='배너 소개내용을 입력하세요'
-                  rows={3}
-                />
-              </div>
+            {/* 소개내용 */}
+            <Textarea
+              id="description"
+              label={
+                <>
+                  소개내용
+                  {!form.isGlobal && (
+                    <Text span c="red" inherit>
+                      {' '}*
+                    </Text>
+                  )}
+                  {form.isGlobal && (
+                    <Text span c="dimmed" inherit>
+                      {' '}(선택사항)
+                    </Text>
+                  )}
+                </>
+              }
+              value={form.description}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, description: e.target.value }))
+              }
+              placeholder="배너 소개내용을 입력하세요"
+              rows={3}
+            />
 
-              {/* 아파트 선택 - isGlobal이 false인 경우에만 표시 */}
-              {!form.isGlobal && (
-                <div className='space-y-2'>
-                  <div className='flex items-center justify-between'>
-                    <Label className='text-sm font-medium'>
-                      타겟 아파트 선택 <span className='text-destructive'>*</span>
-                    </Label>
-                    <div className='flex items-center gap-2'>
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='sm'
-                        onClick={() => setForm({ ...form, selectedApartments: selectableApartments.map(a => a.id) })}
-                      >
-                        전체 선택
-                      </Button>
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='sm'
-                        onClick={() => setForm({ ...form, selectedApartments: [] })}
-                      >
-                        전체 해제
-                      </Button>
-                    </div>
-                  </div>
+            {/* 아파트 선택 - isGlobal이 false인 경우에만 표시 */}
+            {!form.isGlobal && (
+              <Stack gap="xs">
+                <Group justify="space-between" wrap="nowrap">
+                  <Input.Label required>타겟 아파트 선택</Input.Label>
+                  <Group gap={4}>
+                    <Button
+                      type="button"
+                      variant="subtle"
+                      size="xs"
+                      onClick={() => setForm({ ...form, selectedApartments: selectableApartments.map(a => a.id) })}
+                    >
+                      전체 선택
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="subtle"
+                      color="gray"
+                      size="xs"
+                      onClick={() => setForm({ ...form, selectedApartments: [] })}
+                    >
+                      전체 해제
+                    </Button>
+                  </Group>
+                </Group>
 
-                  {/* 아파트 검색 및 체크박스 목록 */}
-                  <div className='border rounded-md'>
-                    {/* 검색 입력 */}
-                    <div className='p-2 border-b'>
-                      <div className='relative'>
-                        <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                        <Input
-                          placeholder='아파트명 또는 주소 검색...'
-                          value={apartmentSearch}
-                          onChange={(e) => setApartmentSearch(e.target.value)}
-                          className='pl-9'
-                        />
-                      </div>
-                    </div>
-                    <div className='h-[200px] overflow-y-auto'>
-                      <div className='p-3 space-y-2'>
-                        {(() => {
-                          const filteredApartments = selectableApartments.filter(apt =>
-                            apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
-                            apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                {/* 아파트 검색 및 체크박스 목록 */}
+                <Paper withBorder radius="md">
+                  {/* 검색 입력 */}
+                  <Box p="xs" style={{ borderBottom: '1px solid var(--app-divider)' }}>
+                    <TextInput
+                      placeholder="아파트명 또는 주소 검색..."
+                      value={apartmentSearch}
+                      onChange={(e) => setApartmentSearch(e.target.value)}
+                      leftSection={<Search size={16} />}
+                    />
+                  </Box>
+                  <ScrollArea h={200}>
+                    <Stack gap={4} p="xs">
+                      {(() => {
+                        const filteredApartments = selectableApartments.filter(apt =>
+                          apt.name.toLowerCase().includes(apartmentSearch.toLowerCase()) ||
+                          apt.address.toLowerCase().includes(apartmentSearch.toLowerCase())
+                        );
+
+                        if (selectableApartments.length === 0) {
+                          return (
+                            <Text size="sm" c="dimmed" ta="center" py="md">
+                              {form.isAdLink ? '먼저 연결할 광고를 선택해주세요.' : '선택 가능한 아파트가 없습니다.'}
+                            </Text>
                           );
+                        }
 
-                          if (selectableApartments.length === 0) {
-                            return (
-                              <p className='text-sm text-muted-foreground text-center py-4'>
-                                {form.isAdLink ? '먼저 연결할 광고를 선택해주세요.' : '선택 가능한 아파트가 없습니다.'}
-                              </p>
-                            );
-                          }
+                        if (filteredApartments.length === 0) {
+                          return (
+                            <Text size="sm" c="dimmed" ta="center" py="md">
+                              검색 결과가 없습니다.
+                            </Text>
+                          );
+                        }
 
-                          if (filteredApartments.length === 0) {
-                            return (
-                              <p className='text-sm text-muted-foreground text-center py-4'>
-                                검색 결과가 없습니다.
-                              </p>
-                            );
-                          }
-
-                          return filteredApartments.map((apt) => (
-                            <div
-                              key={apt.id}
-                              className='flex items-center space-x-3 p-2 rounded hover:bg-muted/50 cursor-pointer'
-                              onClick={() => {
-                                const isSelected = form.selectedApartments.includes(apt.id);
+                        return filteredApartments.map((apt) => (
+                          <Group
+                            key={apt.id}
+                            gap="sm"
+                            wrap="nowrap"
+                            p="xs"
+                            style={{ cursor: 'pointer', borderRadius: 'var(--mantine-radius-sm)' }}
+                            onClick={() => {
+                              const isSelected = form.selectedApartments.includes(apt.id);
+                              setForm({
+                                ...form,
+                                selectedApartments: isSelected
+                                  ? form.selectedApartments.filter(id => id !== apt.id)
+                                  : [...form.selectedApartments, apt.id]
+                              });
+                            }}
+                          >
+                            <Checkbox
+                              id={`apt-${apt.id}`}
+                              checked={form.selectedApartments.includes(apt.id)}
+                              onChange={(e) => {
+                                const checked = e.currentTarget.checked;
                                 setForm({
                                   ...form,
-                                  selectedApartments: isSelected
-                                    ? form.selectedApartments.filter(id => id !== apt.id)
-                                    : [...form.selectedApartments, apt.id]
+                                  selectedApartments: checked
+                                    ? [...form.selectedApartments, apt.id]
+                                    : form.selectedApartments.filter(id => id !== apt.id)
                                 });
                               }}
-                            >
-                              <Checkbox
-                                id={`apt-${apt.id}`}
-                                checked={form.selectedApartments.includes(apt.id)}
-                                onCheckedChange={(checked) => {
-                                  setForm({
-                                    ...form,
-                                    selectedApartments: checked
-                                      ? [...form.selectedApartments, apt.id]
-                                      : form.selectedApartments.filter(id => id !== apt.id)
-                                  });
-                                }}
-                              />
-                              <div className='flex-1 min-w-0'>
-                                <label
-                                  htmlFor={`apt-${apt.id}`}
-                                  className='text-sm font-medium cursor-pointer block'
-                                >
-                                  {apt.name}
-                                </label>
-                                <p className='text-xs text-muted-foreground truncate'>
-                                  {apt.address}
-                                </p>
-                              </div>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  </div>
+                            />
+                            <Box style={{ flex: 1, minWidth: 0 }}>
+                              <Text
+                                component="label"
+                                htmlFor={`apt-${apt.id}`}
+                                size="sm"
+                                fw={500}
+                                display="block"
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {apt.name}
+                              </Text>
+                              <Text size="xs" c="dimmed" truncate>
+                                {apt.address}
+                              </Text>
+                            </Box>
+                          </Group>
+                        ));
+                      })()}
+                    </Stack>
+                  </ScrollArea>
+                </Paper>
 
-                  <p className='text-xs text-muted-foreground'>
-                    선택된 아파트: {form.selectedApartments.length}개 / 전체 {apartments.length}개
-                  </p>
+                <Text size="xs" c="dimmed">
+                  선택된 아파트: {form.selectedApartments.length}개 / 전체 {apartments.length}개
+                </Text>
 
-                  {/* 선택된 아파트 뱃지 */}
-                  {form.selectedApartments.length > 0 && (
-                    <div className='flex flex-wrap gap-2 pt-2'>
-                      {form.selectedApartments.map((aptId) => {
-                        const apt = apartments.find((a) => a.id === aptId);
-                        return apt ? (
-                          <Badge
-                            key={aptId}
-                            variant='secondary'
-                            className='font-normal gap-1'
-                          >
-                            {apt.name}
-                            <button
-                              type='button'
+                {/* 선택된 아파트 뱃지 */}
+                {form.selectedApartments.length > 0 && (
+                  <Group gap="xs" pt="xs">
+                    {form.selectedApartments.map((aptId) => {
+                      const apt = apartments.find((a) => a.id === aptId);
+                      return apt ? (
+                        <Badge
+                          key={aptId}
+                          variant="light"
+                          color="gray"
+                          tt="none"
+                          pr={4}
+                          rightSection={
+                            <CloseButton
+                              size="xs"
+                              variant="transparent"
+                              aria-label={`${apt.name} 제거`}
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -1346,97 +1406,91 @@ export default function BannersPage() {
                                   ),
                                 });
                               }}
-                              className='ml-1 rounded-full hover:bg-muted-foreground/20'
-                            >
-                              <X className='h-3 w-3' />
-                            </button>
-                          </Badge>
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Active Status */}
-              <div className='flex items-center justify-between'>
-                <Label htmlFor='isActive' className='text-sm font-medium'>
-                  활성화
-                </Label>
-                <Switch
-                  id='isActive'
-                  checked={form.isActive}
-                  onCheckedChange={(checked) =>
-                    setForm((prev) => ({ ...prev, isActive: checked }))
-                  }
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant='outline'
-                onClick={() => {
-                  setDialogOpen(false);
-                  resetForm();
-                }}
-                disabled={saving}
-              >
-                취소
-              </Button>
-              <Button onClick={handleSave} disabled={saving || !form.imageUrl || (!form.isGlobal && !form.description.trim())}>
-                {saving ? (
-                  <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    저장 중...
-                  </>
-                ) : (
-                  <>
-                    <Save className='mr-2 h-4 w-4' />
-                    저장
-                  </>
+                            />
+                          }
+                        >
+                          {apt.name}
+                        </Badge>
+                      ) : null;
+                    })}
+                  </Group>
                 )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              </Stack>
+            )}
+
+            {/* Active Status */}
+            <Group justify="space-between" wrap="nowrap">
+              <Text component="label" htmlFor="isActive" size="sm" fw={500}>
+                활성화
+              </Text>
+              <Switch
+                id="isActive"
+                checked={form.isActive}
+                onChange={(e) => {
+                  const checked = e.currentTarget.checked;
+                  setForm((prev) => ({ ...prev, isActive: checked }));
+                }}
+              />
+            </Group>
+          </Stack>
+
+          <Group justify="flex-end" mt="lg">
+            <Button
+              variant="default"
+              onClick={() => {
+                setDialogOpen(false);
+                resetForm();
+              }}
+              disabled={saving}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving || !form.imageUrl || (!form.isGlobal && !form.description.trim())}
+              leftSection={
+                saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />
+              }
+            >
+              {saving ? '저장 중...' : '저장'}
+            </Button>
+          </Group>
+        </Modal>
 
         {/* 클릭수 초기화 확인 다이얼로그 */}
-        <Dialog open={resetClickDialogOpen} onOpenChange={setResetClickDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className='flex items-center gap-2'>
-                <AlertCircle className='h-5 w-5 text-blue-500' />
-                클릭수 초기화
-              </DialogTitle>
-              <DialogDescription className='pt-2'>
-                이 배너의 클릭수를 0으로 초기화하시겠습니까?
-                <br />
-                <span className='text-blue-600 mt-2 block'>
-                  현재: 광고 클릭수 {resetClickBanner?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {resetClickBanner?.clickCount?.toLocaleString() || '0'}
-                </span>
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant='outline'
-                onClick={() => {
-                  setResetClickDialogOpen(false);
-                  setResetClickBanner(null);
-                }}
-              >
-                취소
-              </Button>
-              <Button
-                variant='default'
-                className='bg-blue-500 hover:bg-blue-600'
-                onClick={handleResetClickCount}
-              >
-                초기화
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Modal
+          opened={resetClickDialogOpen}
+          onClose={() => setResetClickDialogOpen(false)}
+          title={
+            <Group component="span" gap="xs" display="inline-flex">
+              <AlertCircle size={20} color="var(--mantine-color-blue-filled)" />
+              클릭수 초기화
+            </Group>
+          }
+        >
+          <Stack gap="xs">
+            <Text size="sm" c="dimmed">
+              이 배너의 클릭수를 0으로 초기화하시겠습니까?
+            </Text>
+            <Text size="sm" c="blue">
+              현재: 광고 클릭수 {resetClickBanner?.adClickCount?.toLocaleString() || '0'} / 클릭 수 {resetClickBanner?.clickCount?.toLocaleString() || '0'}
+            </Text>
+          </Stack>
+          <Group justify="flex-end" mt="lg">
+            <Button
+              variant="default"
+              onClick={() => {
+                setResetClickDialogOpen(false);
+                setResetClickBanner(null);
+              }}
+            >
+              취소
+            </Button>
+            <Button color="blue" onClick={handleResetClickCount}>
+              초기화
+            </Button>
+          </Group>
+        </Modal>
       </PageContent>
     </PageShell>
   );

@@ -1,0 +1,74 @@
+/* 어두운 네이비 사이드바 메뉴 (기준: banselin-admin / Skote) */
+.link {
+  color: var(--app-sidebar-text);
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.link:hover {
+  color: var(--app-sidebar-active);
+  background: var(--app-sidebar-hover-bg);
+}
+
+.link[data-active] {
+  color: var(--app-sidebar-active);
+  background: var(--app-sidebar-hover-bg);
+}
+
+.icon {
+  color: var(--app-sidebar-icon);
+}
+
+.link:hover .icon,
+.link[data-active] .icon {
+  color: var(--app-sidebar-active);
+}
+
+.groupLabel {
+  color: var(--app-sidebar-icon);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.divider {
+  border-color: var(--app-sidebar-divider);
+}
+
+/* 접고 펼치는 섹션 제목 */
+.section {
+  color: var(--app-sidebar-icon);
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+}
+
+.section:hover {
+  color: var(--app-sidebar-active);
+  background: var(--app-sidebar-hover-bg);
+}
+
+.section[data-section-active] {
+  color: var(--app-sidebar-text);
+}
+
+.sectionLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.sectionChevron {
+  transition: transform 150ms ease;
+}
+
+.sectionChevron[data-opened] {
+  transform: rotate(90deg);
+}
+
+/* 섹션 안 메뉴는 왼쪽 세로선으로 묶어 어느 섹션 소속인지 보이게 한다 */
+.sectionChildren {
+  margin-left: 0.75rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--app-sidebar-divider);
+}

@@ -12,16 +12,8 @@ import { DataPagination } from '@/components/data-pagination';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { FilterChips, FilterRow } from '@/components/filter-chips';
+import { Table, Text } from '@mantine/core';
 import {
   usePartnerEventsPage,
   PARTICIPATION_TYPE_LABEL,
@@ -45,22 +37,22 @@ function toDateText(value: string): string {
 
 /** 대상 아파트 열 — 목록이 길어도 한 줄로, 나머지는 title 속성으로 hover 확인 */
 function ApartmentCell({ names }: { names: string[] }): React.ReactElement {
-  if (names.length === 0) return <span className="text-muted-foreground">-</span>;
+  if (names.length === 0) return <Text span size="sm" c="dimmed">-</Text>;
   const [first, ...rest] = names;
   return (
-    <span title={names.join(', ')} className="text-sm">
+    <Text span size="sm" title={names.join(', ')}>
       {first}
       {rest.length > 0 && ` 외 ${rest.length}곳`}
-    </span>
+    </Text>
   );
 }
 
 function ScheduleCell({ event }: { event: PartnerEventListItem }): React.ReactElement {
   return (
-    <span className="text-sm text-muted-foreground">
+    <Text span size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
       {/* 앱 배너 카드와 같은 기준 (응모 시작 ~ 당첨 발표) */}
       {toDateText(event.entryStartAt)} ~ {toDateText(event.announceAt)}
-    </span>
+    </Text>
   );
 }
 
@@ -87,38 +79,27 @@ export default function PartnerEventsPage(): React.ReactElement {
       </PageHeader>
 
       <PageContent>
-        {/* 상태 탭 — 개수 배지 포함 */}
-        <div className="inline-flex w-full max-w-3xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
-          {STATUS_TABS.map((tab) => {
-            const isActive = statusFilter === tab.value;
-            const count = statusCounts[tab.value];
-            return (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
-                className={cn(
-                  'inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-md px-2 text-sm font-medium transition-all whitespace-nowrap',
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-card'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                )}
-              >
-                {tab.label}
-                <Badge
-                  variant="secondary"
-                  className={cn(
-                    'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
-                    isActive && 'bg-primary-foreground/20 text-primary-foreground'
-                  )}
-                >
-                  {count}
-                </Badge>
-              </button>
-            );
-          })}
-        </div>
-
         <DataTableShell
+          toolbar={
+            <FilterRow label="상태">
+              <FilterChips
+                options={STATUS_TABS.map((tab) => ({
+                  value: tab.value,
+                  label: tab.label,
+                  count: statusCounts[tab.value],
+                }))}
+                value={statusFilter}
+                onChange={setStatusFilter}
+              />
+            </FilterRow>
+          }
+          summary={
+            !loading && totalCount > 0 ? (
+              <Text size="sm" c="dimmed">
+                총 {totalCount.toLocaleString()}건
+              </Text>
+            ) : undefined
+          }
           pagination={
             <DataPagination
               page={page}
@@ -138,60 +119,56 @@ export default function PartnerEventsPage(): React.ReactElement {
               description="선택한 상태에 해당하는 파트너 이벤트가 없습니다."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>이벤트명</TableHead>
-                  <TableHead>파트너 상호명</TableHead>
-                  <TableHead className="text-center">참여방식</TableHead>
-                  <TableHead className="text-center">당첨인원</TableHead>
-                  <TableHead>대상 아파트</TableHead>
-                  <TableHead>일정</TableHead>
-                  <TableHead className="text-center">응모수</TableHead>
-                  <TableHead className="text-center">상태</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>이벤트명</Table.Th>
+                  <Table.Th>파트너 상호명</Table.Th>
+                  <Table.Th ta="center">참여방식</Table.Th>
+                  <Table.Th ta="center">당첨인원</Table.Th>
+                  <Table.Th>대상 아파트</Table.Th>
+                  <Table.Th>일정</Table.Th>
+                  <Table.Th ta="center">응모수</Table.Th>
+                  <Table.Th ta="center">상태</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {paginatedEvents.map((event) => (
-                  <TableRow
+                  <Table.Tr
                     key={event.id}
-                    className="cursor-pointer"
+                    style={{ cursor: 'pointer' }}
                     onClick={() => handleRowClick(event.id)}
                   >
-                    <TableCell className="max-w-[240px] truncate font-medium">
-                      {event.title}
-                    </TableCell>
-                    <TableCell>{event.businessName}</TableCell>
-                    <TableCell className="text-center">
+                    <Table.Td>
+                      <Text size="sm" fw={500} maw={240} truncate>
+                        {event.title}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>{event.businessName}</Table.Td>
+                    <Table.Td ta="center">
                       {PARTICIPATION_TYPE_LABEL[event.participationType]}
-                    </TableCell>
-                    <TableCell className="text-center tabular-nums">
+                    </Table.Td>
+                    <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {event.winnerCount.toLocaleString()}명
-                    </TableCell>
-                    <TableCell className="max-w-[200px]">
+                    </Table.Td>
+                    <Table.Td maw={200}>
                       <ApartmentCell names={event.apartmentNames} />
-                    </TableCell>
-                    <TableCell>
+                    </Table.Td>
+                    <Table.Td>
                       <ScheduleCell event={event} />
-                    </TableCell>
-                    <TableCell className="text-center tabular-nums">
+                    </Table.Td>
+                    <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {event.entryCount.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-center">
+                    </Table.Td>
+                    <Table.Td ta="center">
                       <StatusBadge.Event status={event.status} />
-                    </TableCell>
-                  </TableRow>
+                    </Table.Td>
+                  </Table.Tr>
                 ))}
-              </TableBody>
+              </Table.Tbody>
             </Table>
           )}
         </DataTableShell>
-
-        {!loading && totalCount > 0 && (
-          <div className="flex items-center justify-end text-xs text-muted-foreground">
-            총 {totalCount.toLocaleString()}건
-          </div>
-        )}
       </PageContent>
     </PageShell>
   );

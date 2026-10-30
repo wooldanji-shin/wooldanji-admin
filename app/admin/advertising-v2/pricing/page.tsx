@@ -3,11 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { AdminHeader } from '@/components/admin-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageShell } from '@/components/page-shell';
+import { Button, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core';
 import { createClient } from '@/lib/supabase/client';
 
 interface AdPricingV2 {
@@ -115,103 +112,89 @@ export default function AdPricingPage() {
   };
 
   return (
-    <div className="flex w-full flex-col gap-6 px-6 py-6 md:py-8">
+    <PageShell>
       <AdminHeader title="가격 변동하기" />
 
       {loading ? (
-        <Card className="bg-card border-border max-w-lg">
-          <CardHeader>
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
+        <Paper withBorder radius="md" p="lg" maw={512}>
+          <Stack gap="md">
+            <Skeleton h={20} w={160} />
+            <Skeleton h={16} w={256} />
+            <Skeleton h={36} />
+            <Skeleton h={36} />
+            <Skeleton h={36} />
+          </Stack>
+        </Paper>
       ) : (
-        <Card className="bg-card border-border max-w-lg">
-          <CardHeader>
-            <CardTitle>광고 단가 설정</CardTitle>
-            <CardDescription>
+        <Paper withBorder radius="md" p="lg" maw={512}>
+          <Stack gap={4} mb="lg">
+            <Title order={4}>광고 단가 설정</Title>
+            <Text size="sm" c="dimmed">
               변경 즉시 파트너 앱의 광고 금액 계산에 적용됩니다.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="pricePerHousehold">세대당 기본 단가 (원)</Label>
-              <Input
-                id="pricePerHousehold"
-                type="number"
-                min={0}
-                value={form.pricePerHousehold}
-                onChange={(e) => setForm((prev) => ({ ...prev, pricePerHousehold: e.target.value }))}
-                placeholder="예: 100"
-              />
-            </div>
+            </Text>
+          </Stack>
+          <Stack gap="lg">
+            <TextInput
+              id="pricePerHousehold"
+              label="세대당 기본 단가 (원)"
+              type="number"
+              min={0}
+              value={form.pricePerHousehold}
+              onChange={(e) => setForm((prev) => ({ ...prev, pricePerHousehold: e.target.value }))}
+              placeholder="예: 100"
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="defaultDiscountRate">기본 할인율 (%)</Label>
-              <Input
-                id="defaultDiscountRate"
-                type="number"
-                min={0}
-                max={100}
-                value={form.defaultDiscountRate}
-                onChange={(e) => setForm((prev) => ({ ...prev, defaultDiscountRate: e.target.value }))}
-                placeholder="예: 20"
-              />
-            </div>
+            <TextInput
+              id="defaultDiscountRate"
+              label="기본 할인율 (%)"
+              type="number"
+              min={0}
+              max={100}
+              value={form.defaultDiscountRate}
+              onChange={(e) => setForm((prev) => ({ ...prev, defaultDiscountRate: e.target.value }))}
+              placeholder="예: 20"
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="defaultFreeMonths">첫 광고 기본 무료 개월수</Label>
-              <Input
-                id="defaultFreeMonths"
-                type="number"
-                min={0}
-                value={form.defaultFreeMonths}
-                onChange={(e) => setForm((prev) => ({ ...prev, defaultFreeMonths: e.target.value }))}
-                placeholder="예: 1"
-              />
-              <p className="text-muted-foreground text-xs">
-                광고 승인 화면의 무료 개월수 기본값입니다. 승인 시 건별로 변경할 수 있습니다.
-              </p>
-            </div>
+            <TextInput
+              id="defaultFreeMonths"
+              label="첫 광고 기본 무료 개월수"
+              type="number"
+              min={0}
+              value={form.defaultFreeMonths}
+              onChange={(e) => setForm((prev) => ({ ...prev, defaultFreeMonths: e.target.value }))}
+              placeholder="예: 1"
+              description="광고 승인 화면의 무료 개월수 기본값입니다. 승인 시 건별로 변경할 수 있습니다."
+              inputWrapperOrder={['label', 'input', 'description', 'error']}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="premiumPricePerHouseholdPerWeek">프리미엄 주당 세대단가 (원)</Label>
-              <Input
-                id="premiumPricePerHouseholdPerWeek"
-                type="number"
-                min={0}
-                value={form.premiumPricePerHouseholdPerWeek}
-                onChange={(e) => setForm((prev) => ({ ...prev, premiumPricePerHouseholdPerWeek: e.target.value }))}
-                placeholder="예: 20"
-              />
-            </div>
+            <TextInput
+              id="premiumPricePerHouseholdPerWeek"
+              label="프리미엄 주당 세대단가 (원)"
+              type="number"
+              min={0}
+              value={form.premiumPricePerHouseholdPerWeek}
+              onChange={(e) => setForm((prev) => ({ ...prev, premiumPricePerHouseholdPerWeek: e.target.value }))}
+              placeholder="예: 20"
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="soloPopupPricePerHouseholdPerWeek">단독 팝업 주당 세대단가 (원)</Label>
-              <Input
-                id="soloPopupPricePerHouseholdPerWeek"
-                type="number"
-                min={0}
-                value={form.soloPopupPricePerHouseholdPerWeek}
-                onChange={(e) => setForm((prev) => ({ ...prev, soloPopupPricePerHouseholdPerWeek: e.target.value }))}
-                placeholder="예: 50"
-              />
-              <p className="text-muted-foreground text-xs">
-                1개월은 4주로 환산해 계산합니다. 서버(DB 함수)가 이 값으로 금액을 계산합니다.
-              </p>
-            </div>
+            <TextInput
+              id="soloPopupPricePerHouseholdPerWeek"
+              label="단독 팝업 주당 세대단가 (원)"
+              type="number"
+              min={0}
+              value={form.soloPopupPricePerHouseholdPerWeek}
+              onChange={(e) => setForm((prev) => ({ ...prev, soloPopupPricePerHouseholdPerWeek: e.target.value }))}
+              placeholder="예: 50"
+              description="1개월은 4주로 환산해 계산합니다. 서버(DB 함수)가 이 값으로 금액을 계산합니다."
+              inputWrapperOrder={['label', 'input', 'description', 'error']}
+            />
 
-            <Button onClick={handleSave} disabled={saving} className="w-full">
+            <Button onClick={handleSave} disabled={saving} fullWidth>
               {saving ? '저장 중...' : '저장'}
             </Button>
-          </CardContent>
-        </Card>
+          </Stack>
+        </Paper>
       )}
-    </div>
+    </PageShell>
   );
 }

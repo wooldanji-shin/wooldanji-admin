@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { PageContent, PageHeader, PageHeaderActions, PageHeaderTitle, PageShell } from '@/components/page-shell';
 import { InlineLoadingSkeleton } from '@/components/skeletons';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
+import { confirmModal } from '@/components/confirm-modal';
+import { Badge, Button, Group, Paper, SimpleGrid, Stack, Switch, Text } from '@mantine/core';
 import { FillerImageDialog } from './FillerImageDialog';
 import { TIME_SLOTS, useFillerImagesPage, type FillerImage } from './useFillerImagesPage';
 
@@ -39,37 +37,52 @@ function FillerImageCard({
   onDelete: () => void;
 }): React.ReactElement {
   return (
-    <Card>
-      <CardContent className="flex gap-4 p-4">
+    <Paper withBorder radius="md" p="md">
+      <Group align="stretch" gap="md" wrap="nowrap">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={image.imageUrl} alt="채움 이미지" className="h-[160px] w-[90px] rounded-md border bg-muted object-contain" />
-        <div className="flex flex-1 flex-col gap-2 text-sm">
-          <div className="flex flex-wrap gap-1">
+        <img
+          src={image.imageUrl}
+          alt="채움 이미지"
+          className="object-contain"
+          style={{
+            width: 90,
+            height: 160,
+            flexShrink: 0,
+            borderRadius: 'var(--mantine-radius-md)',
+            border: '1px solid var(--app-divider)',
+            background: 'var(--app-bg-muted)',
+          }}
+        />
+        <Stack gap="xs" style={{ flex: 1 }}>
+          <Group gap={4}>
             {image.timeSlots.map((slot) => (
-              <Badge key={slot} variant="outline">
+              <Badge key={slot} variant="light" color="gray">
                 {SLOT_SHORT_LABEL[slot]}
               </Badge>
             ))}
-          </div>
-          <ApartmentsText image={image} />
-          <span className="text-muted-foreground">
+          </Group>
+          <Text size="sm" component="div">
+            <ApartmentsText image={image} />
+          </Text>
+          <Text size="sm" c="dimmed">
             노출 누적 {image.totalImpressions.toLocaleString()} · 오늘 {image.todayImpressions.toLocaleString()}
-          </span>
-          <div className="mt-auto flex items-center gap-3">
-            <label className="flex items-center gap-2">
-              <Switch checked={image.isActive} onCheckedChange={onToggle} />
-              {image.isActive ? '사용 중' : '사용 안 함'}
-            </label>
-            <Button variant="outline" size="sm" onClick={onEdit}>
+          </Text>
+          <Group gap="sm" mt="auto">
+            <Switch
+              checked={image.isActive}
+              onChange={(e) => onToggle(e.currentTarget.checked)}
+              label={image.isActive ? '사용 중' : '사용 안 함'}
+            />
+            <Button variant="default" size="xs" onClick={onEdit}>
               수정
             </Button>
-            <Button variant="outline" size="sm" className="text-destructive" onClick={onDelete}>
+            <Button variant="light" color="red" size="xs" onClick={onDelete}>
               삭제
             </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          </Group>
+        </Stack>
+      </Group>
+    </Paper>
   );
 }
 
@@ -86,8 +99,17 @@ export default function DoorFillerImagesPage(): React.ReactElement {
     setEditing(image);
     setDialogOpen(true);
   };
-  const confirmDelete = (image: FillerImage) => {
-    if (window.confirm('이 채움 이미지를 삭제할까요? 노출 기록도 함께 삭제됩니다.')) page.remove(image);
+  const confirmDelete = async (image: FillerImage): Promise<void> => {
+    if (
+      !(await confirmModal({
+        title: '채움 이미지 삭제',
+        message: '이 채움 이미지를 삭제할까요? 노출 기록도 함께 삭제됩니다.',
+        confirmLabel: '삭제',
+        danger: true,
+      }))
+    )
+      return;
+    page.remove(image);
   };
 
   return (
@@ -98,8 +120,7 @@ export default function DoorFillerImagesPage(): React.ReactElement {
           description="단독 팝업 광고를 먼저 채우고, '팝업 최대 장수'보다 적으면 남은 자리를 이 이미지들이 채웁니다. 보여주는 순서는 광고와 섞여 랜덤입니다. 시간대·아파트 조건에 맞는 것 중 랜덤으로 나갑니다. (팝업 모드가 '단독 팝업'일 때만 노출)"
         />
         <PageHeaderActions>
-          <Button onClick={openCreate}>
-            <Plus className="mr-1 h-4 w-4" />
+          <Button onClick={openCreate} leftSection={<Plus size={16} />}>
             이미지 등록
           </Button>
         </PageHeaderActions>
@@ -108,9 +129,11 @@ export default function DoorFillerImagesPage(): React.ReactElement {
         {page.loading ? (
           <InlineLoadingSkeleton />
         ) : page.images.length === 0 ? (
-          <p className="py-20 text-center text-muted-foreground">등록된 채움 이미지가 없습니다.</p>
+          <Text py={80} ta="center" c="dimmed">
+            등록된 채움 이미지가 없습니다.
+          </Text>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             {page.images.map((image) => (
               <FillerImageCard
                 key={image.id}
@@ -120,7 +143,7 @@ export default function DoorFillerImagesPage(): React.ReactElement {
                 onDelete={() => confirmDelete(image)}
               />
             ))}
-          </div>
+          </SimpleGrid>
         )}
       </PageContent>
       <FillerImageDialog

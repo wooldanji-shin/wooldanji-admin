@@ -6,28 +6,25 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
-import { InlineLoadingSkeleton } from '@/components/skeletons';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+import { confirmModal } from '@/components/confirm-modal';
+import { TableSkeleton } from '@/components/skeletons';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
+  ActionIcon,
+  Alert,
+  Box,
+  Button,
+  Group,
+  Input,
+  Modal,
+  Paper,
+  Stack,
+  Switch,
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/supabase';
 import {
@@ -41,7 +38,6 @@ import {
   Plus,
   GripVertical,
 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import {
@@ -87,11 +83,12 @@ interface AnnouncementForm {
 const BUCKET_NAME = 'home-content';
 const ANNOUNCEMENTS_FOLDER = 'announcements';
 
-function SortableRow({ announcement, onEdit, onDelete, onToggleActive }: {
+function SortableRow({ announcement, onEdit, onDelete, onToggleActive, toggling }: {
   announcement: Announcement;
   onEdit: (announcement: Announcement) => void;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, isActive: boolean) => void;
+  toggling: boolean;
 }) {
   const {
     attributes,
@@ -107,70 +104,85 @@ function SortableRow({ announcement, onEdit, onDelete, onToggleActive }: {
   };
 
   return (
-    <TableRow
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      className='border-border hover:bg-secondary/50'
-    >
-      <TableCell>
-        <div
-          className='flex items-center gap-2 cursor-grab active:cursor-grabbing'
-          {...listeners}
-        >
-          <GripVertical className='h-4 w-4 text-muted-foreground' />
-          <span className='font-medium'>{announcement.orderIndex}</span>
-        </div>
-      </TableCell>
-      <TableCell>
+    <Table.Tr ref={setNodeRef} style={style} {...attributes}>
+      <Table.Td>
+        <Group gap="xs" wrap="nowrap" style={{ cursor: 'grab' }} {...listeners}>
+          <Box c="dimmed" style={{ display: 'flex' }}>
+            <GripVertical size={16} />
+          </Box>
+          <Text fw={500} size="sm">
+            {announcement.orderIndex}
+          </Text>
+        </Group>
+      </Table.Td>
+      <Table.Td>
         {announcement.imageUrl && (
-          <div className='relative w-16 h-16 rounded overflow-hidden bg-muted'>
+          <Box
+            pos="relative"
+            w={64}
+            h={64}
+            bg="var(--app-bg-muted)"
+            style={{ overflow: 'hidden', borderRadius: 'var(--mantine-radius-sm)' }}
+          >
             <Image
               src={announcement.imageUrl}
               alt={announcement.title || '공지사항 이미지'}
               fill
-              className='object-cover'
+              className="object-cover"
             />
-          </div>
+          </Box>
         )}
-      </TableCell>
-      <TableCell className='font-medium'>
-        {announcement.title || <span className='text-muted-foreground'>제목 없음</span>}
-      </TableCell>
-      <TableCell className='max-w-xs truncate'>
-        {announcement.content || <span className='text-muted-foreground'>내용 없음</span>}
-      </TableCell>
-      <TableCell>
+      </Table.Td>
+      <Table.Td fw={500}>
+        {announcement.title || (
+          <Text span c="dimmed" inherit>
+            제목 없음
+          </Text>
+        )}
+      </Table.Td>
+      <Table.Td maw={320}>
+        <Text size="sm" truncate>
+          {announcement.content || (
+            <Text span c="dimmed" inherit>
+              내용 없음
+            </Text>
+          )}
+        </Text>
+      </Table.Td>
+      <Table.Td>
         <Switch
           checked={announcement.isActive}
-          onCheckedChange={(checked) => onToggleActive(announcement.id, checked)}
+          onChange={(e) => onToggleActive(announcement.id, e.currentTarget.checked)}
+          disabled={toggling}
         />
-      </TableCell>
-      <TableCell>
-        <div className='flex items-center gap-2'>
-          <Button
-            variant='ghost'
-            size='sm'
+      </Table.Td>
+      <Table.Td>
+        <Group gap={4} wrap="nowrap">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            aria-label="수정"
             onClick={(e) => {
               e.stopPropagation();
               onEdit(announcement);
             }}
           >
-            <Edit className='h-4 w-4' />
-          </Button>
-          <Button
-            variant='ghost'
-            size='sm'
+            <Edit size={16} />
+          </ActionIcon>
+          <ActionIcon
+            variant="subtle"
+            color="red"
+            aria-label="삭제"
             onClick={(e) => {
               e.stopPropagation();
               onDelete(announcement.id);
             }}
           >
-            <Trash2 className='h-4 w-4 text-destructive' />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
+            <Trash2 size={16} />
+          </ActionIcon>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
   );
 }
 
@@ -178,6 +190,7 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
@@ -260,6 +273,7 @@ export default function AnnouncementsPage() {
   };
 
   const handleToggleActive = async (id: string, isActive: boolean) => {
+    setTogglingId(id);
     try {
       const { error: updateError } = await supabase
         .from('announcements')
@@ -276,6 +290,8 @@ export default function AnnouncementsPage() {
     } catch (err) {
       console.error('Error toggling active:', err);
       toast.error('활성화 상태 변경 중 오류가 발생했습니다.');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -570,7 +586,7 @@ export default function AnnouncementsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('이 공지사항을 삭제하시겠습니까?')) {
+    if (!(await confirmModal({ title: '공지 삭제', message: '이 공지사항을 삭제하시겠습니까?', confirmLabel: '삭제', danger: true }))) {
       return;
     }
 
@@ -609,17 +625,6 @@ export default function AnnouncementsPage() {
     setEditingAnnouncement(null);
   };
 
-  if (loading) {
-    return (
-      <PageShell>
-        <PageHeader>
-          <PageHeaderTitle title="공지사항 관리" />
-        </PageHeader>
-        <InlineLoadingSkeleton />
-      </PageShell>
-    );
-  }
-
   return (
     <PageShell>
       <PageHeader>
@@ -630,48 +635,45 @@ export default function AnnouncementsPage() {
       </PageHeader>
 
       <PageContent>
-        <div className='space-y-6'>
-          {/* Info Alert */}
-          <Alert className='bg-muted/50 border-muted'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>
-              홈 화면에 표시되는 공지사항을 관리합니다. 드래그하여 순서를 변경할 수 있습니다.
-            </AlertDescription>
-          </Alert>
+        {/* Info Alert */}
+        <Alert variant="light" color="gray" icon={<AlertCircle size={16} />}>
+          홈 화면에 표시되는 공지사항을 관리합니다. 드래그하여 순서를 변경할 수 있습니다.
+        </Alert>
 
-          {/* Announcements List */}
-          <Card className='bg-card border-border'>
-            <CardHeader className='flex flex-row items-center justify-between space-y-0'>
-              <CardTitle className='text-card-foreground'>공지사항 목록</CardTitle>
-              <Button onClick={handleAddNew}>
-                <Plus className='h-4 w-4 mr-2' />
+        {/* Announcements List */}
+        <Paper withBorder radius="md" p="lg">
+          <Stack gap="md">
+            <Group justify="space-between" wrap="nowrap">
+              <Title order={4}>공지사항 목록</Title>
+              <Button onClick={handleAddNew} leftSection={<Plus size={16} />}>
                 새 공지사항
               </Button>
-            </CardHeader>
-            <CardContent>
-              {announcements.length === 0 ? (
-                <div className='text-center py-12 text-muted-foreground'>
-                  등록된 공지사항이 없습니다.
-                </div>
-              ) : (
-                <div className='overflow-x-auto'>
+            </Group>
+            {loading ? (
+              <TableSkeleton rows={8} columns={6} />
+            ) : announcements.length === 0 ? (
+              <Text c="dimmed" ta="center" py={48}>
+                등록된 공지사항이 없습니다.
+              </Text>
+            ) : (
+              <Table.ScrollContainer minWidth={720} type="native">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   onDragEnd={handleDragEnd}
                 >
-                  <Table>
-                    <TableHeader>
-                      <TableRow className='border-border hover:bg-transparent'>
-                        <TableHead className='w-24'>순서</TableHead>
-                        <TableHead className='w-24'>이미지</TableHead>
-                        <TableHead>제목</TableHead>
-                        <TableHead className='max-w-xs'>내용</TableHead>
-                        <TableHead className='w-24'>활성화</TableHead>
-                        <TableHead className='w-32'>작업</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th w={96}>순서</Table.Th>
+                        <Table.Th w={96}>이미지</Table.Th>
+                        <Table.Th>제목</Table.Th>
+                        <Table.Th maw={320}>내용</Table.Th>
+                        <Table.Th w={96}>활성화</Table.Th>
+                        <Table.Th w={128}>작업</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
                       <SortableContext
                         items={announcements.map((a) => a.id)}
                         strategy={verticalListSortingStrategy}
@@ -683,149 +685,177 @@ export default function AnnouncementsPage() {
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onToggleActive={handleToggleActive}
+                            toggling={togglingId === announcement.id}
                           />
                         ))}
                       </SortableContext>
-                    </TableBody>
+                    </Table.Tbody>
                   </Table>
                 </DndContext>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </Table.ScrollContainer>
+            )}
+          </Stack>
+        </Paper>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle>
-              {editingAnnouncement ? '공지사항 수정' : '새 공지사항 등록'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className='space-y-6 py-4'>
+        {/* Add/Edit Dialog */}
+        <Modal
+          opened={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          title={editingAnnouncement ? '공지사항 수정' : '새 공지사항 등록'}
+          size={672}
+        >
+          <Stack gap="lg">
             {/* Image Upload */}
-            <div className='space-y-2'>
-              <Label className='text-sm font-medium'>
-                이미지 <span className='text-muted-foreground'>(선택사항)</span>
-              </Label>
+            <Input.Wrapper
+              label={
+                <>
+                  이미지{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+            >
               {form.imagePreview ? (
-                <div className='relative w-full aspect-video rounded-lg overflow-hidden bg-muted border border-border'>
-                  <Image
-                    src={form.imagePreview}
-                    alt='Preview'
-                    fill
-                    className='object-contain'
-                  />
-                  <Button
-                    variant='destructive'
-                    size='icon'
-                    className='absolute top-2 right-2 z-10'
+                <Box
+                  pos="relative"
+                  w="100%"
+                  bg="var(--app-bg-muted)"
+                  style={{
+                    aspectRatio: '16 / 9',
+                    overflow: 'hidden',
+                    borderRadius: 'var(--mantine-radius-md)',
+                    border: '1px solid var(--app-divider)',
+                  }}
+                >
+                  <Image src={form.imagePreview} alt="Preview" fill className="object-contain" />
+                  <ActionIcon
+                    color="red"
+                    size="lg"
+                    aria-label="이미지 제거"
                     onClick={removeImage}
+                    pos="absolute"
+                    top={8}
+                    right={8}
+                    style={{ zIndex: 10 }}
                   >
-                    <X className='h-4 w-4' />
-                  </Button>
-                </div>
+                    <X size={16} />
+                  </ActionIcon>
+                </Box>
               ) : (
-                <div
-                  className={`relative border-2 border-dashed rounded-lg p-8 transition-colors ${
-                    dragActive
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  }`}
+                <Box
+                  pos="relative"
+                  p="xl"
+                  bg={dragActive ? 'var(--mantine-color-blue-light)' : undefined}
+                  style={{
+                    border: `2px dashed ${
+                      dragActive
+                        ? 'var(--mantine-color-blue-filled)'
+                        : 'var(--app-divider)'
+                    }`,
+                    borderRadius: 'var(--mantine-radius-md)',
+                    transition: 'border-color 150ms, background-color 150ms',
+                  }}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
                 >
                   <input
-                    type='file'
-                    id='imageUpload'
-                    className='hidden'
-                    accept='image/*'
+                    type="file"
+                    id="imageUpload"
+                    className="hidden"
+                    accept="image/*"
                     onChange={handleFileInput}
                   />
-                  <label
-                    htmlFor='imageUpload'
-                    className='flex flex-col items-center justify-center cursor-pointer'
-                  >
-                    <Upload className='h-12 w-12 text-muted-foreground mb-4' />
-                    <p className='text-sm font-medium text-center mb-1'>
-                      이미지를 드래그하거나 클릭하여 업로드
-                    </p>
-                    <p className='text-xs text-muted-foreground text-center'>
-                      PNG, JPG, GIF (최대 5MB)
-                    </p>
+                  <label htmlFor="imageUpload" style={{ cursor: 'pointer', display: 'block' }}>
+                    <Stack align="center" gap={4}>
+                      <Box c="dimmed" mb="sm">
+                        <Upload size={48} />
+                      </Box>
+                      <Text size="sm" fw={500} ta="center">
+                        이미지를 드래그하거나 클릭하여 업로드
+                      </Text>
+                      <Text size="xs" c="dimmed" ta="center">
+                        PNG, JPG, GIF (최대 5MB)
+                      </Text>
+                    </Stack>
                   </label>
-                </div>
+                </Box>
               )}
-            </div>
+            </Input.Wrapper>
 
             {/* Title */}
-            <div className='space-y-2'>
-              <Label htmlFor='title' className='text-sm font-medium'>
-                제목 <span className='text-muted-foreground'>(선택사항)</span>
-              </Label>
-              <Input
-                id='title'
-                type='text'
-                value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder='공지사항 제목'
-              />
-            </div>
+            <TextInput
+              id="title"
+              type="text"
+              label={
+                <>
+                  제목{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+              value={form.title}
+              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="공지사항 제목"
+            />
 
             {/* Content */}
-            <div className='space-y-2'>
-              <Label htmlFor='content' className='text-sm font-medium'>
-                내용 <span className='text-muted-foreground'>(선택사항)</span>
-              </Label>
-              <Textarea
-                id='content'
-                value={form.content}
-                onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))}
-                placeholder='공지사항 내용을 입력하세요'
-                rows={4}
-                className='resize-none'
-              />
-            </div>
+            <Textarea
+              id="content"
+              label={
+                <>
+                  내용{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+              value={form.content}
+              onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))}
+              placeholder="공지사항 내용을 입력하세요"
+              rows={4}
+              styles={{ input: { resize: 'none' } }}
+            />
 
             {/* Link URL */}
-            <div className='space-y-2'>
-              <Label htmlFor='linkUrl' className='text-sm font-medium'>
-                링크 URL <span className='text-muted-foreground'>(선택사항)</span>
-              </Label>
-              <Input
-                id='linkUrl'
-                type='url'
-                value={form.linkUrl}
-                onChange={(e) => setForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
-                placeholder='https://example.com'
-              />
-              <p className='text-xs text-muted-foreground'>
-                공지사항 클릭 시 이동할 URL을 입력하세요.
-              </p>
-            </div>
+            <TextInput
+              id="linkUrl"
+              type="url"
+              label={
+                <>
+                  링크 URL{' '}
+                  <Text span c="dimmed" inherit>
+                    (선택사항)
+                  </Text>
+                </>
+              }
+              value={form.linkUrl}
+              onChange={(e) => setForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
+              placeholder="https://example.com"
+              description="공지사항 클릭 시 이동할 URL을 입력하세요."
+              inputWrapperOrder={['label', 'input', 'description']}
+            />
 
             {/* Active Status */}
-            <div className='flex items-center justify-between'>
-              <Label htmlFor='isActive' className='text-sm font-medium'>
-                활성화
-              </Label>
-              <Switch
-                id='isActive'
-                checked={form.isActive}
-                onCheckedChange={(checked) =>
-                  setForm((prev) => ({ ...prev, isActive: checked }))
-                }
-              />
-            </div>
-          </div>
+            <Switch
+              id="isActive"
+              label="활성화"
+              labelPosition="left"
+              checked={form.isActive}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                setForm((prev) => ({ ...prev, isActive: checked }));
+              }}
+              styles={{ body: { justifyContent: 'space-between' } }}
+            />
+          </Stack>
 
-          <DialogFooter>
+          <Group justify="flex-end" mt="lg">
             <Button
-              variant='outline'
+              variant="default"
               onClick={() => {
                 setDialogOpen(false);
                 resetForm();
@@ -834,22 +864,17 @@ export default function AnnouncementsPage() {
             >
               취소
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  저장 중...
-                </>
-              ) : (
-                <>
-                  <Save className='mr-2 h-4 w-4' />
-                  저장
-                </>
-              )}
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              leftSection={
+                saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />
+              }
+            >
+              {saving ? '저장 중...' : '저장'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </Group>
+        </Modal>
       </PageContent>
     </PageShell>
   );

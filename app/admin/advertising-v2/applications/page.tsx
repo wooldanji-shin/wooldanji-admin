@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertCircle, Check, Download, Inbox, Plus, Search, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Inbox, Plus, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
+  PageHeaderActions,
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
 import { DataTableShell } from '@/components/data-table-shell';
-import { DataToolbar, DataToolbarFilters } from '@/components/data-toolbar';
+import { FilterChips, FilterRow } from '@/components/filter-chips';
 import { AdCategoryFilter } from '@/components/ad-category-filter';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -17,48 +18,28 @@ import { TableSkeleton } from '@/components/skeletons';
 import { ApartmentCombobox } from '@/components/apartment-combobox';
 import { SalesRepFilter } from '@/components/sales-rep-filter';
 import { SalesRepSelect } from '@/components/sales-rep-select';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { formatBizCallNumber } from '@/lib/utils/format';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
-import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  Divider,
+  Group,
   HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card';
+  Input,
+  Modal,
+  Paper,
+  Popover,
+  Select,
+  Stack,
+  Table,
+  Text,
+  Textarea,
+  TextInput,
+  Tooltip,
+} from '@mantine/core';
 import { useRowHoverPreview } from './useRowHoverPreview';
-import { cn } from '@/lib/utils';
 import {
   useApplicationsPage,
   type AdApplication,
@@ -85,46 +66,53 @@ function ApartmentTooltip({
   const hasDiscount = (discountRate ?? 0) > 0;
   const totalHouseholds = apartments.reduce((sum, a) => sum + a.totalHouseholds, 0);
   const totalBase = totalHouseholds * pricePerHousehold;
-  const totalDiscounted = hasDiscount ? Math.round(totalBase * (1 - (discountRate ?? 0) / 100)) : totalBase;
+  const totalDiscounted = hasDiscount ? Math.round((totalBase * (1 - (discountRate ?? 0) / 100)) / 10) * 10 : totalBase;
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent
-        side="bottom"
-        className="max-w-xs border border-border bg-popover p-0 text-popover-foreground shadow-popover"
-      >
-        <div className="space-y-1.5 p-3">
+    <HoverCard position="bottom" openDelay={300} shadow="md" withinPortal>
+      <HoverCard.Target>{children}</HoverCard.Target>
+      <HoverCard.Dropdown maw={320} p="sm">
+        <Stack gap={6}>
           {apartments.map((apt) => {
             const base = apt.totalHouseholds * pricePerHousehold;
-            const discounted = hasDiscount ? Math.round(base * (1 - (discountRate ?? 0) / 100)) : base;
+            const discounted = hasDiscount ? Math.round((base * (1 - (discountRate ?? 0) / 100)) / 10) * 10 : base;
             return (
-              <div
-                key={apt.apartmentId}
-                className="flex items-center justify-between gap-6 text-xs"
-              >
-                <span className="font-medium">{apt.apartmentName}</span>
-                <span className="shrink-0 text-muted-foreground">
+              <Group key={apt.apartmentId} justify="space-between" gap="lg" wrap="nowrap">
+                <Text size="xs" fw={500}>
+                  {apt.apartmentName}
+                </Text>
+                <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
                   {apt.totalHouseholds.toLocaleString()}세대 ·{' '}
-                  {hasDiscount && <span className="line-through opacity-50">{base.toLocaleString()}원 </span>}
+                  {hasDiscount && (
+                    <Text span inherit td="line-through" opacity={0.5}>
+                      {base.toLocaleString()}원 </Text>
+                  )}
                   {discounted.toLocaleString()}원
-                </span>
-              </div>
+                </Text>
+              </Group>
             );
           })}
           {apartments.length > 1 && (
-            <div className="flex items-center justify-between border-t border-border pt-1.5 text-xs font-semibold">
-              <span>합계</span>
-              <span>
-                {totalHouseholds.toLocaleString()}세대 ·{' '}
-                {hasDiscount && <span className="line-through font-normal opacity-50">{totalBase.toLocaleString()}원 </span>}
-                {totalDiscounted.toLocaleString()}원
-              </span>
-            </div>
+            <>
+              <Divider />
+              <Group justify="space-between" gap="lg" wrap="nowrap">
+                <Text size="xs" fw={600}>
+                  합계
+                </Text>
+                <Text size="xs" fw={600}>
+                  {totalHouseholds.toLocaleString()}세대 ·{' '}
+                  {hasDiscount && (
+                    <Text span inherit fw={500} td="line-through" opacity={0.5}>
+                      {totalBase.toLocaleString()}원 </Text>
+                  )}
+                  {totalDiscounted.toLocaleString()}원
+                </Text>
+              </Group>
+            </>
           )}
-        </div>
-      </TooltipContent>
-    </Tooltip>
+        </Stack>
+      </HoverCard.Dropdown>
+    </HoverCard>
   );
 }
 
@@ -145,10 +133,17 @@ function Pagination({ page, totalPages, onPageChange }: PaginationProps): React.
   };
 
   return (
-    <div className="flex items-center justify-center gap-1 border-t border-border px-4 py-3">
+    <Group
+      justify="center"
+      gap={4}
+      px="md"
+      py="sm"
+      style={{ borderTop: '1px solid var(--app-divider)' }}
+    >
       <Button
-        variant="ghost"
-        size="sm"
+        variant="default"
+        size="xs"
+        leftSection={<ChevronLeft size={16} />}
         disabled={page === 1}
         onClick={() => onPageChange(page - 1)}
       >
@@ -157,23 +152,26 @@ function Pagination({ page, totalPages, onPageChange }: PaginationProps): React.
       {getPageNumbers().map((n) => (
         <Button
           key={n}
-          variant={n === page ? 'default' : 'ghost'}
-          size="sm"
-          className="w-9"
+          variant={n === page ? 'filled' : 'default'}
+          color={n === page ? 'blue' : 'gray'}
+          size="xs"
+          w={36}
+          px={0}
           onClick={() => onPageChange(n)}
         >
           {n}
         </Button>
       ))}
       <Button
-        variant="ghost"
-        size="sm"
+        variant="default"
+        size="xs"
+        rightSection={<ChevronRight size={16} />}
         disabled={page === totalPages}
         onClick={() => onPageChange(page + 1)}
       >
         다음
       </Button>
-    </div>
+    </Group>
   );
 }
 
@@ -205,72 +203,95 @@ function AdHoverPreview({
     .map((d) => (d ? new Date(d).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }) : null));
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-3">
+    <Stack gap="sm">
+      <Group gap="sm" wrap="nowrap" align="flex-start">
         {thumbnail ? (
           // 광고 이미지는 원격 도메인이 파트너마다 달라 next/image 최적화 대상이 아니다
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbnail}
             alt=""
-            className="h-20 w-20 shrink-0 rounded-md border border-border object-cover"
+            className="object-cover"
+            style={{
+              width: 80,
+              height: 80,
+              flexShrink: 0,
+              borderRadius: 'var(--mantine-radius-sm)',
+              border: '1px solid var(--app-divider)',
+            }}
           />
         ) : (
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
-            이미지 없음
-          </div>
+          <Box
+            w={80}
+            h={80}
+            style={{
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 'var(--mantine-radius-sm)',
+              border: '1px dashed var(--app-divider)',
+            }}
+          >
+            <Text size="xs" c="dimmed">
+              이미지 없음
+            </Text>
+          </Box>
         )}
-        <div className="min-w-0 space-y-0.5">
-          <p className="truncate text-sm font-semibold">{ad.title ?? '(제목 없음)'}</p>
-          <p className="truncate text-xs text-muted-foreground">
+        <Stack gap={2} miw={0}>
+          <Text size="sm" fw={600} truncate>
+            {ad.title ?? '(제목 없음)'}
+          </Text>
+          <Text size="xs" c="dimmed" truncate>
             {ad.ad_categories_v2?.categoryName ?? '카테고리 없음'}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
+          </Text>
+          <Text size="xs" c="dimmed" truncate>
             {ad.partner_users?.businessName ?? '-'}
-          </p>
-        </div>
-      </div>
+          </Text>
+        </Stack>
+      </Group>
 
       {ad.content && (
-        <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+        <Text size="xs" c="dimmed" lineClamp={3} lh={1.6}>
           {ad.content}
-        </p>
+        </Text>
       )}
 
-      <div className="space-y-1 border-t border-border pt-2 text-xs">
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">월 금액</span>
-          <span className="tabular-nums font-medium">
+      <Divider />
+      <Stack gap={4}>
+        <Group justify="space-between" gap="xs" wrap="nowrap">
+          <Text size="xs" c="dimmed">월 금액</Text>
+          <Text size="xs" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {monthlyAmount.toLocaleString()}원
             {(ad.approvedDiscountRate ?? 0) > 0 && ` (${ad.approvedDiscountRate}%↓)`}
             {ad.freeMonths > 0 && ` · 무료 ${ad.freeMonths}개월`}
-          </span>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">광고 기간</span>
-          <span className="tabular-nums">
+          </Text>
+        </Group>
+        <Group justify="space-between" gap="xs" wrap="nowrap">
+          <Text size="xs" c="dimmed">광고 기간</Text>
+          <Text size="xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {period[0] ? `${period[0]} ~ ${period[1] ?? '-'}` : '시작 전'}
-          </span>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">아파트</span>
-          <span className="tabular-nums">
+          </Text>
+        </Group>
+        <Group justify="space-between" gap="xs" wrap="nowrap">
+          <Text size="xs" c="dimmed">아파트</Text>
+          <Text size="xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {ad.apartments.length}개 · {totalHouseholds.toLocaleString()}세대
-          </span>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">노출 · 클릭 · 전화</span>
-          <span className="tabular-nums">
+          </Text>
+        </Group>
+        <Group justify="space-between" gap="xs" wrap="nowrap">
+          <Text size="xs" c="dimmed">노출 · 클릭 · 전화</Text>
+          <Text size="xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {ad.totalImpressions.toLocaleString()} · {ad.totalClicks.toLocaleString()} ·{' '}
             {ad.totalPhoneClicks.toLocaleString()}
-          </span>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">영업 담당자</span>
-          <span>{ad.salesRepName ?? '-'}</span>
-        </div>
-      </div>
-    </div>
+          </Text>
+        </Group>
+        <Group justify="space-between" gap="xs" wrap="nowrap">
+          <Text size="xs" c="dimmed">영업 담당자</Text>
+          <Text size="xs">{ad.salesRepName ?? '-'}</Text>
+        </Group>
+      </Stack>
+    </Stack>
   );
 }
 
@@ -365,95 +386,68 @@ export default function AdApplicationsPage(): React.ReactElement {
   const approveCategoryData = allCategoriesWithSubs.find((c) => c.id === approveCategory);
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <>
       <PageShell>
         <PageHeader>
           <PageHeaderTitle
             title="기본광고 관리"
             description="광고 신청을 검토하고 승인 상태를 관리합니다."
           />
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleExportCsv} disabled={loading}>
-              <Download className="mr-2 h-4 w-4" />
+          <PageHeaderActions>
+            <Button
+              variant="default"
+              leftSection={<Download size={16} />}
+              onClick={handleExportCsv}
+              disabled={loading}
+            >
               CSV 내보내기
             </Button>
-            <Button asChild>
-              <Link href="/admin/advertising-v2/applications/new">
-                <Plus className="mr-2 h-4 w-4" />
-                광고 대리 등록
-              </Link>
+            <Button
+              component={Link}
+              href="/admin/advertising-v2/applications/new"
+              leftSection={<Plus size={16} />}
+            >
+              광고 대리 등록
             </Button>
-          </div>
+          </PageHeaderActions>
         </PageHeader>
 
         <PageContent>
-          {/* 아파트 필터 + 검색 */}
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="상호명·광고 제목 검색"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-11 w-[260px] pl-9"
-              />
-            </div>
-            <ApartmentCombobox
-              apartments={allApartments}
-              value={apartmentFilter}
-              onChange={setApartmentFilter}
-              placeholder="아파트 필터"
-            />
-            <SalesRepFilter value={salesRepFilter} onChange={setSalesRepFilter} />
-          </div>
-
-          {/* 상태 탭 — 개수 배지 포함 · 우측 월 광고료 합계 */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex w-full max-w-5xl items-center gap-1 rounded-lg border border-border/70 bg-card p-1.5 shadow-card">
-              {STATUS_TABS.map((tab) => {
-                const isActive = statusFilter === tab.value;
-                const count = statusCounts[tab.value];
-                return (
-                  <button
-                    key={tab.value}
-                    onClick={() => setStatusFilter(tab.value)}
-                    className={cn(
-                      'inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-md px-2 text-sm font-medium transition-all whitespace-nowrap',
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-card'
-                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                    )}
-                  >
-                    {tab.label}
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
-                        isActive && 'bg-primary-foreground/20 text-primary-foreground'
-                      )}
-                    >
-                      {count}
-                    </Badge>
-                  </button>
-                );
-              })}
-            </div>
-
-            {!loading && filteredCount > 0 && (
-              <div className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 shadow-card">
-                <span className="text-xs font-medium text-muted-foreground">
-                  월 광고료 합계
-                </span>
-                <strong className="text-base font-bold tabular-nums text-primary">
-                  {totalMonthlyAmount.toLocaleString()}원
-                </strong>
-              </div>
-            )}
-          </div>
-
           <DataTableShell
             toolbar={
-              <DataToolbar className="flex-col sm:flex-col sm:items-stretch gap-2 py-3">
+              <Stack gap="md">
+                {/* 검색 · 아파트 · 담당자 */}
+                <Group gap="xs">
+                  <TextInput
+                    placeholder="상호명·광고 제목 검색"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    leftSection={<Search size={16} />}
+                    w={260}
+                  />
+                  <ApartmentCombobox
+                    apartments={allApartments}
+                    value={apartmentFilter}
+                    onChange={setApartmentFilter}
+                    placeholder="아파트 필터"
+                  />
+                  <SalesRepFilter value={salesRepFilter} onChange={setSalesRepFilter} />
+                </Group>
+
+                <Divider />
+
+                <FilterRow label="광고 상태">
+                  <FilterChips
+                    options={STATUS_TABS.map((tab) => ({
+                      value: tab.value,
+                      label: tab.label,
+                      count: statusCounts[tab.value],
+                    }))}
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                  />
+                </FilterRow>
+
                 <AdCategoryFilter
                   categories={categories}
                   categoryFilter={categoryFilter}
@@ -465,36 +459,35 @@ export default function AdApplicationsPage(): React.ReactElement {
                 />
 
                 {/* 비즈콜(안심번호) 부여 여부 */}
-                <DataToolbarFilters>
-                  {BIZ_CALL_FILTERS.map((f) => {
-                    const isActive = bizCallFilter === f.value;
-                    return (
-                      <button
-                        key={f.value}
-                        type="button"
-                        onClick={() => setBizCallFilter(f.value)}
-                        className={cn(
-                          'inline-flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors',
-                          isActive
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-accent hover:text-foreground'
-                        )}
-                      >
-                        {f.label}
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            'h-5 min-w-5 justify-center px-1.5 text-xs tabular-nums',
-                            isActive && 'bg-primary-foreground/20 text-primary-foreground'
-                          )}
-                        >
-                          {bizCallCounts[f.value]}
-                        </Badge>
-                      </button>
-                    );
-                  })}
-                </DataToolbarFilters>
-              </DataToolbar>
+                <FilterRow label="비즈콜">
+                  <FilterChips
+                    options={BIZ_CALL_FILTERS.map((f) => ({
+                      value: f.value,
+                      label: f.label,
+                      count: bizCallCounts[f.value],
+                    }))}
+                    value={bizCallFilter}
+                    onChange={setBizCallFilter}
+                  />
+                </FilterRow>
+              </Stack>
+            }
+            summary={
+              !loading && filteredCount > 0 ? (
+                <Group gap="lg">
+                  <Text size="sm" c="dimmed">
+                    총 <Text span fw={700} c="var(--mantine-color-text)">{filteredCount.toLocaleString()}</Text>건
+                  </Text>
+                  <Group gap={6} wrap="nowrap">
+                    <Text size="sm" c="dimmed">
+                      월 광고료 합계
+                    </Text>
+                    <Text fw={700} c="blue" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {totalMonthlyAmount.toLocaleString()}원
+                    </Text>
+                  </Group>
+                </Group>
+              ) : undefined
             }
             pagination={
               <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
@@ -509,71 +502,92 @@ export default function AdApplicationsPage(): React.ReactElement {
                 description="아직 등록된 광고 신청이 없습니다."
               />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>상호명</TableHead>
-                    <TableHead className="text-center">구분</TableHead>
-                    <TableHead>광고 제목</TableHead>
-                    <TableHead className="text-center">신청 아파트</TableHead>
-                    <TableHead className="text-center">광고 상태</TableHead>
-                    <TableHead className="text-center">결제 상태</TableHead>
-                    <TableHead className="text-right">금액(월)</TableHead>
-                    <TableHead>광고 시작일</TableHead>
-                    <TableHead>광고 종료일</TableHead>
-                    <TableHead>무료체험 종료일</TableHead>
-                    <TableHead>영업 담당자</TableHead>
-                    <TableHead className="text-center">노출수</TableHead>
-                    <TableHead className="text-center">클릭수</TableHead>
-                    <TableHead className="text-center">전화클릭수</TableHead>
-                    <TableHead className="text-center">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="cursor-default underline decoration-dashed underline-offset-2">
-                            자동승인
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-xs">
-                          켜면 파트너 수정 요청을 10분마다 자동승인합니다.
-                          <br />
-                          꺼두어도 매일 저녁 7시에 남은 수정 요청이 일괄 자동승인됩니다.
-                        </TooltipContent>
+              <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>상호명</Table.Th>
+                    <Table.Th ta="center">구분</Table.Th>
+                    <Table.Th>광고 제목</Table.Th>
+                    <Table.Th ta="center">신청 아파트</Table.Th>
+                    <Table.Th ta="center">광고 상태</Table.Th>
+                    <Table.Th ta="center">결제 상태</Table.Th>
+                    <Table.Th ta="right">금액(월)</Table.Th>
+                    <Table.Th>광고 시작일</Table.Th>
+                    <Table.Th>광고 종료일</Table.Th>
+                    <Table.Th>무료체험 종료일</Table.Th>
+                    <Table.Th>영업 담당자</Table.Th>
+                    <Table.Th ta="center">노출수</Table.Th>
+                    <Table.Th ta="center">클릭수</Table.Th>
+                    <Table.Th ta="center">전화클릭수</Table.Th>
+                    <Table.Th ta="center">
+                      <Tooltip
+                        multiline
+                        w={320}
+                        position="bottom"
+                        openDelay={300}
+                        label={
+                          <>
+                            켜면 파트너 수정 요청을 10분마다 자동승인합니다.
+                            <br />
+                            꺼두어도 매일 저녁 7시에 남은 수정 요청이 일괄 자동승인됩니다.
+                          </>
+                        }
+                      >
+                        <Text
+                          span
+                          inherit
+                          td="underline"
+                          style={{ cursor: 'default', textDecorationStyle: 'dashed', textUnderlineOffset: 2 }}
+                        >
+                          자동승인
+                        </Text>
                       </Tooltip>
-                    </TableHead>
-                    <TableHead className="text-center">숨김</TableHead>
-                    <TableHead className="text-center">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="cursor-help underline decoration-dotted">팝업 우선</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          체크한 광고가 하나라도 있으면 문열림 광고 팝업은 체크한 광고 중에서만 나옵니다.
-                          <br />
-                          전부 해제하면 운영 중 광고 전체에서 무작위로 나옵니다.
-                          <br />
-                          단독 팝업 모드에서는 이 광고가 단독 팝업 카드(첫 번째 사진·제목·광고 내용)로 맨 앞에 노출됩니다 (단독 팝업 &apos;첫 화면&apos; 광고가 있으면 그 다음).
-                          <br />
-                          체크한 수만큼 유료 단독 팝업 자리가 줄어드니, 영업 시연이 끝나면 꼭 해제해 주세요.
-                        </TooltipContent>
+                    </Table.Th>
+                    <Table.Th ta="center">숨김</Table.Th>
+                    <Table.Th ta="center">
+                      <Tooltip
+                        multiline
+                        w={360}
+                        openDelay={300}
+                        label={
+                          <>
+                            체크한 광고가 하나라도 있으면 문열림 광고 팝업은 체크한 광고 중에서만 나옵니다.
+                            <br />
+                            전부 해제하면 운영 중 광고 전체에서 무작위로 나옵니다.
+                            <br />
+                            단독 팝업 모드에서는 이 광고가 단독 팝업 카드(첫 번째 사진·제목·광고 내용)로 맨 앞에 노출됩니다 (단독 팝업 &apos;첫 화면&apos; 광고가 있으면 그 다음).
+                            <br />
+                            체크한 수만큼 유료 단독 팝업 자리가 줄어드니, 영업 시연이 끝나면 꼭 해제해 주세요.
+                          </>
+                        }
+                      >
+                        <Text
+                          span
+                          inherit
+                          td="underline"
+                          style={{ cursor: 'help', textDecorationStyle: 'dotted' }}
+                        >
+                          팝업 우선
+                        </Text>
                       </Tooltip>
-                    </TableHead>
-                    <TableHead className="text-center">액션</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                    </Table.Th>
+                    <Table.Th ta="center">액션</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
                   {paginatedApplications.map((app) => (
-                    <TableRow
+                    <Table.Tr
                       key={app.id}
-                      className="cursor-pointer"
+                      style={{ cursor: 'pointer' }}
                       onClick={() => handleRowClick(app.id)}
                       onMouseEnter={() => preview.handleRowEnter(app)}
                       onMouseMove={preview.handleRowMove}
                       onMouseLeave={preview.handleRowLeave}
                     >
-                      <TableCell className="font-medium">
+                      <Table.Td fw={500}>
                         {app.partner_users?.businessName ?? '-'}
-                      </TableCell>
-                      <TableCell className="text-center">
+                      </Table.Td>
+                      <Table.Td ta="center">
                         {app.subscriptionStatus === 'cancel_pending' ? (
                           <StatusBadge variant="error" size="sm" withDot={false}>
                             중단예정
@@ -583,32 +597,39 @@ export default function AdApplicationsPage(): React.ReactElement {
                             첫광고
                           </StatusBadge>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <Text span c="dimmed">-</Text>
                         )}
-                      </TableCell>
-                      <TableCell className="max-w-[240px]">
+                      </Table.Td>
+                      <Table.Td maw={240}>
                         {app.title ? (
-                          <div className="truncate text-sm">{app.title}</div>
+                          <Text size="sm" truncate>
+                            {app.title}
+                          </Text>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <Text span c="dimmed">-</Text>
                         )}
-                      </TableCell>
-                      <TableCell className="text-center">
+                      </Table.Td>
+                      <Table.Td ta="center">
                         <ApartmentTooltip
                           apartments={app.apartments}
                           pricePerHousehold={pricePerHousehold}
                           discountRate={app.approvedDiscountRate}
                         >
-                          <span
-                            className="cursor-default text-muted-foreground underline decoration-dashed underline-offset-2"
+                          <Text
+                            span
+                            inherit
+                            c="blue"
+                            fw={600}
+                            td="underline"
+                            style={{ cursor: 'help', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             {app.apartments.length}개
-                          </span>
+                          </Text>
                         </ApartmentTooltip>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex flex-col items-center gap-1">
+                      </Table.Td>
+                      <Table.Td ta="center">
+                        <Stack gap={4} align="center">
                           <StatusBadge.Ad status={app.adStatus} />
                           {app.adStatus === 'running' && app.freeMonths > 0 && (
                             <StatusBadge variant="free">
@@ -618,12 +639,12 @@ export default function AdApplicationsPage(): React.ReactElement {
                           {app.modificationStatus && (
                             <StatusBadge.Modification status={app.modificationStatus} />
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td ta="center">
                         <StatusBadge.Payment status={app.paymentStatus} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      </Table.Td>
+                      <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {(() => {
                           const totalHouseholds = app.apartments.reduce((s, a) => s + a.totalHouseholds, 0);
                           const hasDiscount = (app.approvedDiscountRate ?? 0) > 0;
@@ -634,139 +655,148 @@ export default function AdApplicationsPage(): React.ReactElement {
                             (hasDiscount
                               ? Math.round((base * (1 - (app.approvedDiscountRate ?? 0) / 100)) / 10) * 10
                               : base);
-                          if (base === 0) return <span className="text-muted-foreground">-</span>;
+                          if (base === 0) return <Text span c="dimmed">-</Text>;
                           return (
-                            <div className="flex flex-col items-end gap-0.5">
-                              <div className="flex items-center gap-1.5">
+                            <Stack gap={2} align="flex-end">
+                              <Group gap={6} wrap="nowrap">
                                 {hasDiscount && (
-                                  <span className="text-xs text-gray-500 line-through">{base.toLocaleString()}원</span>
+                                  <Text span size="xs" c="dimmed" td="line-through">{base.toLocaleString()}원</Text>
                                 )}
-                                <span className="text-sm font-medium">{discounted.toLocaleString()}원</span>
-                              </div>
+                                <Text span size="sm" fw={500}>{discounted.toLocaleString()}원</Text>
+                              </Group>
                               {hasDiscount && (
                                 <StatusBadge variant="error" withDot={false}>
                                   할인{app.approvedDiscountRate}%
                                 </StatusBadge>
                               )}
-                            </div>
+                            </Stack>
                           );
                         })()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      </Table.Td>
+                      <Table.Td c="dimmed">
                         {app.activatedAt
                           ? new Date(app.activatedAt).toLocaleDateString('ko-KR')
                           : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      </Table.Td>
+                      <Table.Td c="dimmed">
                         {app.nextBillingDate
                           ? new Date(app.nextBillingDate).toLocaleDateString('ko-KR')
                           : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      </Table.Td>
+                      <Table.Td c="dimmed">
                         {app.freeEndDate
                           ? new Date(app.freeEndDate).toLocaleDateString('ko-KR')
                           : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      </Table.Td>
+                      <Table.Td c="dimmed">
                         {app.salesRepName ?? '-'}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums text-sm">
+                      </Table.Td>
+                      <Table.Td ta="center" fz="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {app.totalImpressions > 0 ? app.totalImpressions.toLocaleString() : '-'}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums text-sm">
+                      </Table.Td>
+                      <Table.Td ta="center" fz="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {app.totalClicks > 0 ? app.totalClicks.toLocaleString() : '-'}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums text-sm">
+                      </Table.Td>
+                      <Table.Td ta="center" fz="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {app.totalPhoneClicks > 0 ? app.totalPhoneClicks.toLocaleString() : '-'}
-                      </TableCell>
+                      </Table.Td>
                       {/* 행 클릭이 상세로 넘어가므로 체크박스 조작은 여기서 막는다 */}
-                      <TableCell
-                        className="text-center"
+                      <Table.Td
+                        ta="center"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {app.adStatus === 'running' ? (
-                          <Checkbox
-                            checked={app.autoApproveModification}
-                            aria-label="수정 심사 자동승인"
-                            onCheckedChange={(v) =>
-                              handleToggleAutoApprove(app, v === true)
-                            }
-                          />
+                          <Group justify="center">
+                            <Checkbox
+                              checked={app.autoApproveModification}
+                              aria-label="수정 심사 자동승인"
+                              onChange={(e) =>
+                                handleToggleAutoApprove(app, e.currentTarget.checked)
+                              }
+                            />
+                          </Group>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <Text span c="dimmed">-</Text>
                         )}
-                      </TableCell>
-                      <TableCell
-                        className="text-center"
+                      </Table.Td>
+                      <Table.Td
+                        ta="center"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Checkbox
-                          checked={app.isHidden}
-                          aria-label="앱 노출에서 숨기기"
-                          onCheckedChange={(v) => handleToggleHidden(app, v === true)}
-                        />
-                      </TableCell>
-                      <TableCell
-                        className="text-center"
+                        <Group justify="center">
+                          <Checkbox
+                            checked={app.isHidden}
+                            aria-label="앱 노출에서 숨기기"
+                            onChange={(e) => handleToggleHidden(app, e.currentTarget.checked)}
+                          />
+                        </Group>
+                      </Table.Td>
+                      <Table.Td
+                        ta="center"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Checkbox
-                          checked={app.showInDoorPopup}
-                          aria-label="문열림 팝업 우선 노출"
-                          disabled={app.adStatus !== 'running'}
-                          onCheckedChange={(v) => handleToggleDoorPopup(app, v === true)}
-                        />
-                      </TableCell>
-                      <TableCell
-                        className="text-center"
+                        <Group justify="center">
+                          <Checkbox
+                            checked={app.showInDoorPopup}
+                            aria-label="문열림 팝업 우선 노출"
+                            disabled={app.adStatus !== 'running'}
+                            onChange={(e) => handleToggleDoorPopup(app, e.currentTarget.checked)}
+                          />
+                        </Group>
+                      </Table.Td>
+                      <Table.Td
+                        ta="center"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-center gap-1">
+                        <Group justify="center" gap={4} wrap="nowrap">
                           {app.adStatus === 'pending' && (
                             <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 gap-1 px-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                              size="compact-sm"
+                              variant="subtle"
+                              color="blue"
+                              leftSection={<Check size={12} />}
                               onClick={() => handleOpenApprove(app)}
                             >
-                              <Check className="h-3 w-3" />
                               승인
                             </Button>
                           )}
                           {app.adStatus === 'pending' && (
                             <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 gap-1 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              size="compact-sm"
+                              variant="subtle"
+                              color="red"
+                              leftSection={<X size={12} />}
                               onClick={() => handleOpenReject(app)}
                             >
-                              <X className="h-3 w-3" />
                               거절
                             </Button>
                           )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
                   ))}
-                </TableBody>
+                </Table.Tbody>
               </Table>
             )}
 
             {/* 마우스 좌표에 붙는 0x0 앵커 — 카드가 커서 옆에 뜨게 한다 */}
-            <HoverCard open={preview.hovered !== null}>
-              {/* Trigger가 곧 앵커 — 열림 여부는 훅이 제어하므로 자체 hover 동작은 쓰지 않는다 */}
-              <HoverCardTrigger asChild>
+            {/* 열림 여부는 훅이 제어하므로 controlled Popover로 띄운다 (HoverCard는 자체 hover 동작만 지원) */}
+            <Popover
+              opened={preview.hovered !== null}
+              position="right-start"
+              offset={16}
+              width={380}
+              shadow="md"
+              hideDetached={false}
+            >
+              <Popover.Target>
                 <span
                   ref={preview.anchorRef}
                   aria-hidden
-                  className="pointer-events-none fixed h-0 w-0"
+                  style={{ pointerEvents: 'none', position: 'fixed', width: 0, height: 0 }}
                 />
-              </HoverCardTrigger>
-              <HoverCardContent
-                className="w-[380px]"
-                side="right"
-                align="start"
-                sideOffset={16}
+              </Popover.Target>
+              <Popover.Dropdown
                 onMouseEnter={preview.handleCardEnter}
                 onMouseLeave={preview.handleCardLeave}
               >
@@ -776,305 +806,309 @@ export default function AdApplicationsPage(): React.ReactElement {
                     pricePerHousehold={pricePerHousehold}
                   />
                 )}
-              </HoverCardContent>
-            </HoverCard>
+              </Popover.Dropdown>
+            </Popover>
           </DataTableShell>
 
           {/* 결과 개수 안내 (합계는 테이블 우측 상단으로 이동) */}
           {!loading && filteredCount > 0 && (
-            <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground">
-              <span>
+            <Group justify="flex-end" gap="md">
+              <Text size="xs" c="dimmed">
                 총 {filteredCount.toLocaleString()}건 · {page}/{totalPages} 페이지
-              </span>
-            </div>
+              </Text>
+            </Group>
           )}
         </PageContent>
       </PageShell>
 
       {/* 승인 다이얼로그 */}
-      <Dialog open={approveDialog} onOpenChange={setApproveDialog}>
-        {/* 입력 항목이 많아 작은 화면에서 잘리므로 내용 영역을 스크롤 가능하게 둔다 */}
-        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>광고 신청 승인</DialogTitle>
-            <DialogDescription>
-              <strong className="text-foreground">
-                {selectedAd?.partner_users?.businessName}
-              </strong>
-              의 광고 신청을 승인합니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 py-2">
-            {!selectedAdIsFirstAd && (
-              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <div className="flex-1">
-                  <p className="text-sm text-amber-800">
-                    이 파트너는 이미 광고를 운영한 이력이 있습니다.
-                  </p>
-                  <label className="mt-2 flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={overrideEnabled}
-                      onChange={(e) => setOverrideEnabled(e.target.checked)}
-                    />
-                    <span className="text-sm font-medium text-amber-900">
-                      예외 적용 (파트너 협의 완료)
-                    </span>
-                  </label>
-                </div>
-              </div>
-            )}
-            {/* 광고 분석 열람 권한 부여 */}
-            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1.5">
-              <label className="flex items-center gap-2 cursor-pointer">
+      {/* 입력 항목이 많아 작은 화면에서 잘리므로 내용 영역을 스크롤 가능하게 둔다 */}
+      <Modal
+        opened={approveDialog}
+        onClose={() => setApproveDialog(false)}
+        title="광고 신청 승인"
+        size="md"
+      >
+        <Stack gap="lg">
+          <Text size="sm" c="dimmed">
+            <Text span inherit fw={700} c="var(--mantine-color-text)">
+              {selectedAd?.partner_users?.businessName}
+            </Text>
+            의 광고 신청을 승인합니다.
+          </Text>
+          {!selectedAdIsFirstAd && (
+            <Alert color="yellow" variant="light" icon={<AlertCircle size={16} />} p="sm">
+              <Stack gap="xs">
+                <Text size="sm">
+                  이 파트너는 이미 광고를 운영한 이력이 있습니다.
+                </Text>
                 <Checkbox
-                  checked={grantAnalytics}
-                  disabled={selectedAd?.partner_users?.analyticsEnabled}
-                  onCheckedChange={(checked) => setGrantAnalytics(!!checked)}
-                  className="border-blue-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                  checked={overrideEnabled}
+                  onChange={(e) => setOverrideEnabled(e.target.checked)}
+                  label="예외 적용 (파트너 협의 완료)"
+                  styles={{ label: { fontWeight: 500 } }}
                 />
-                <span className="text-base font-semibold text-blue-900">광고 분석 열람 권한 부여</span>
-              </label>
-              {selectedAd?.partner_users?.analyticsEnabled ? (
-                <p className="text-sm text-blue-600 pl-6">이미 분석 열람 권한이 허용된 파트너입니다.</p>
-              ) : (
-                <p className="text-sm text-blue-700/70 pl-6">승인 시 파트너가 앱에서 광고 통계를 열람할 수 있습니다.</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <div className="space-y-1.5">
-                <label className="text-base font-medium">
+              </Stack>
+            </Alert>
+          )}
+          {/* 광고 분석 열람 권한 부여 */}
+          <Paper withBorder radius="md" p="sm" bg="var(--mantine-color-blue-light)">
+            <Checkbox
+              checked={grantAnalytics}
+              disabled={selectedAd?.partner_users?.analyticsEnabled}
+              onChange={(e) => setGrantAnalytics(!!e.currentTarget.checked)}
+              label="광고 분석 열람 권한 부여"
+              description={
+                selectedAd?.partner_users?.analyticsEnabled
+                  ? '이미 분석 열람 권한이 허용된 파트너입니다.'
+                  : '승인 시 파트너가 앱에서 광고 통계를 열람할 수 있습니다.'
+              }
+              styles={{ label: { fontWeight: 600 } }}
+            />
+          </Paper>
+          <Stack gap="xs">
+            <Select
+              label={
+                <>
                   카테고리{' '}
-                  <span className="text-sm font-normal text-muted-foreground">
+                  <Text span size="sm" fw={500} c="dimmed">
                     (변경 시에만 수정)
-                  </span>
-                </label>
-                <Select
-                  value={approveCategory ?? ''}
-                  onValueChange={handleApproveCategoryChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="카테고리 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allCategoriesWithSubs.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.categoryName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {approveCategoryData && approveCategoryData.subCategories.length > 0 && (
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    서브카테고리
-                  </label>
-                  <div className="flex flex-wrap gap-3">
-                    {approveCategoryData.subCategories.map((sub) => (
-                      <label key={sub.id} className="flex cursor-pointer items-center gap-1.5">
-                        <Checkbox
-                          checked={approveSubCategoryIds.includes(sub.id)}
-                          onCheckedChange={(checked) => {
-                            setApproveSubCategoryIds(
-                              checked
-                                ? [...approveSubCategoryIds, sub.id]
-                                : approveSubCategoryIds.filter((id) => id !== sub.id)
-                            );
-                          }}
-                        />
-                        <span className="text-sm">{sub.subCategoryName}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-base font-medium">무료 개월 수</label>
-              <Input
-                type="number"
-                min={0}
-                max={24}
-                placeholder="0"
-                disabled={!selectedAdIsFirstAd && !overrideEnabled}
-                value={freeMonths || ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFreeMonths(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
-                }}
-              />
-              {(selectedAdIsFirstAd || overrideEnabled) && (
-                <p className="text-sm text-muted-foreground">
-                  무료 기간: <strong>{freeMonths}개월</strong>
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-base font-medium">
-                {overrideEnabled ? '예외 결제 할인율 (%)' : '첫 결제 할인율 (%)'}
-              </label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="0"
-                disabled={!selectedAdIsFirstAd && !overrideEnabled}
-                value={discountRate || ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDiscountRate(
-                    val === '' ? 0 : Math.min(100, Math.max(0, parseInt(val) || 0))
-                  );
-                }}
-              />
-              {(selectedAdIsFirstAd || overrideEnabled) && (
-                <p className="text-sm text-muted-foreground">
-                  적용 후 월 결제금액:{' '}
-                  <strong>
-                    {(
-                      Math.round(
-                        (selectedAdMonthlyAmount * (1 - discountRate / 100)) / 10
-                      ) * 10
-                    ).toLocaleString()}
-                    원
-                  </strong>
-                </p>
-              )}
-            </div>
-            {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다 — 등록·수정 폼과 같은 조건 */}
-            {(selectedAdIsFirstAd || overrideEnabled) && discountRate === 100 && (
-              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={startImmediately}
-                  onCheckedChange={(checked) => setStartImmediately(checked === true)}
-                />
-                <span className="space-y-1 text-sm">
-                  <span className="block font-medium">카드 등록 없이 바로 광고 시작</span>
-                  <span className="block text-xs text-muted-foreground">
-                    승인과 동시에 노출됩니다. 파트너 결제를 건너뛰고 정기결제는 돌지 않습니다.
-                  </span>
-                </span>
-              </label>
+                  </Text>
+                </>
+              }
+              placeholder="카테고리 선택"
+              data={allCategoriesWithSubs.map((cat) => ({
+                value: cat.id,
+                label: cat.categoryName,
+              }))}
+              value={approveCategory || null}
+              onChange={(v) => {
+                if (v === null) return;
+                handleApproveCategoryChange(v);
+              }}
+              allowDeselect={false}
+            />
+            {approveCategoryData && approveCategoryData.subCategories.length > 0 && (
+              <Stack gap={6}>
+                <Text size="sm" fw={500} c="dimmed">
+                  서브카테고리
+                </Text>
+                <Group gap="sm">
+                  {approveCategoryData.subCategories.map((sub) => (
+                    <Checkbox
+                      key={sub.id}
+                      label={sub.subCategoryName}
+                      checked={approveSubCategoryIds.includes(sub.id)}
+                      onChange={(e) => {
+                        const checked = e.currentTarget.checked;
+                        setApproveSubCategoryIds(
+                          checked
+                            ? [...approveSubCategoryIds, sub.id]
+                            : approveSubCategoryIds.filter((id) => id !== sub.id)
+                        );
+                      }}
+                    />
+                  ))}
+                </Group>
+              </Stack>
             )}
-            <div className="space-y-1.5">
-              <label className="text-base font-medium">
-                파트너 할인관련 안내 문구{' '}
-                <span className="text-sm font-normal text-muted-foreground">
-                  (파트너에게 표시, 선택)
-                </span>
-              </label>
-              <Textarea
-                className="min-h-[80px] resize-none"
-                placeholder="예: 개업 축하 혜택으로 함께합니다 / 신규 상권 지원 등"
-                maxLength={100}
-                value={discountNote}
-                onChange={(e) => setDiscountNote(e.target.value)}
-              />
-              <p className="text-right text-xs text-muted-foreground">
-                {discountNote.length}/100
-              </p>
-            </div>
-          </div>
-            <div className="space-y-1.5">
-              <label className="text-base font-medium">
-                비즈콜 번호{' '}
-                <span className="text-sm font-normal text-muted-foreground">
-                  (안심번호, 선택)
-                </span>
-              </label>
-              <Input
-                placeholder="예: 0507-1234-5678"
-                inputMode="numeric"
-                value={bizCallNumber}
-                onChange={(e) => setBizCallNumber(formatBizCallNumber(e.target.value))}
-              />
-              {bizCallDuplicateName ? (
-                <p className="text-xs text-red-600">
-                  이미 다른 파트너({bizCallDuplicateName})가 사용 중인 번호입니다.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
-                  {selectedAd?.partner_users?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-base font-medium">
+          </Stack>
+          <Stack gap={6}>
+            <TextInput
+              label="무료 개월 수"
+              type="number"
+              min={0}
+              max={24}
+              placeholder="0"
+              disabled={!selectedAdIsFirstAd && !overrideEnabled}
+              value={freeMonths || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFreeMonths(val === '' ? 0 : Math.min(24, Math.max(0, parseInt(val) || 0)));
+              }}
+            />
+            {(selectedAdIsFirstAd || overrideEnabled) && (
+              <Text size="sm" c="dimmed">
+                무료 기간: <strong>{freeMonths}개월</strong>
+              </Text>
+            )}
+          </Stack>
+          <Stack gap={6}>
+            <TextInput
+              label={overrideEnabled ? '예외 결제 할인율 (%)' : '첫 결제 할인율 (%)'}
+              type="number"
+              min={0}
+              max={100}
+              placeholder="0"
+              disabled={!selectedAdIsFirstAd && !overrideEnabled}
+              value={discountRate || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDiscountRate(
+                  val === '' ? 0 : Math.min(100, Math.max(0, parseInt(val) || 0))
+                );
+              }}
+            />
+            {(selectedAdIsFirstAd || overrideEnabled) && (
+              <Text size="sm" c="dimmed">
+                적용 후 월 결제금액:{' '}
+                <strong>
+                  {(
+                    Math.round(
+                      (selectedAdMonthlyAmount * (1 - discountRate / 100)) / 10
+                    ) * 10
+                  ).toLocaleString()}
+                  원
+                </strong>
+              </Text>
+            )}
+          </Stack>
+          {/* 받을 돈이 0원일 때만 카드 없이 개시할 수 있다 — 등록·수정 폼과 같은 조건 */}
+          {(selectedAdIsFirstAd || overrideEnabled) && discountRate === 100 && (
+            <Paper component="label" withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)" style={{ cursor: 'pointer' }}>
+              {/* 원래처럼 상자 전체(설명 포함)를 눌러도 체크된다 */}
+              <Group gap="sm" align="flex-start" wrap="nowrap">
+                <Checkbox
+                  checked={startImmediately}
+                  onChange={(e) => setStartImmediately(e.currentTarget.checked)}
+                  mt={2}
+                />
+                <div>
+                  <Text size="sm" fw={500}>카드 등록 없이 바로 광고 시작</Text>
+                  <Text size="xs" c="dimmed" mt={2}>
+                    승인과 동시에 노출됩니다. 파트너 결제를 건너뛰고 정기결제는 돌지 않습니다.
+                  </Text>
+                </div>
+              </Group>
+            </Paper>
+          )}
+          <Stack gap={4}>
+            <Textarea
+              label={
+                <>
+                  파트너 할인관련 안내 문구{' '}
+                  <Text span size="sm" fw={500} c="dimmed">
+                    (파트너에게 표시, 선택)
+                  </Text>
+                </>
+              }
+              minRows={3}
+              autosize
+              placeholder="예: 개업 축하 혜택으로 함께합니다 / 신규 상권 지원 등"
+              maxLength={100}
+              value={discountNote}
+              onChange={(e) => setDiscountNote(e.target.value)}
+            />
+            <Text ta="right" size="xs" c="dimmed">
+              {discountNote.length}/100
+            </Text>
+          </Stack>
+          <Stack gap={6}>
+            <TextInput
+              label={
+                <>
+                  비즈콜 번호{' '}
+                  <Text span size="sm" fw={500} c="dimmed">
+                    (안심번호, 선택)
+                  </Text>
+                </>
+              }
+              placeholder="예: 0507-1234-5678"
+              inputMode="numeric"
+              value={bizCallNumber}
+              onChange={(e) => setBizCallNumber(formatBizCallNumber(e.target.value))}
+            />
+            {bizCallDuplicateName ? (
+              <Text size="xs" c="red">
+                이미 다른 파트너({bizCallDuplicateName})가 사용 중인 번호입니다.
+              </Text>
+            ) : (
+              <Text size="xs" c="dimmed">
+                입력하면 앱 광고 상세에서 이 번호가 노출됩니다. 비워두면 기존 대표번호(
+                {selectedAd?.partner_users?.displayPhoneNumber || '미등록'})가 그대로 노출됩니다.
+              </Text>
+            )}
+          </Stack>
+          <Input.Wrapper
+            label={
+              <>
                 영업 담당자{' '}
-                <span className="text-sm font-normal text-muted-foreground">(선택)</span>
-              </label>
-              <SalesRepSelect value={salesRepId} onChange={setSalesRepId} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-base font-medium">
-                관리 메모{' '}
-                <span className="text-sm font-normal text-muted-foreground">
-                  (내부용, 파트너 비공개)
-                </span>
-              </label>
-              <Textarea
-                className="min-h-[80px] resize-none"
-                placeholder="승인 관련 내부 메모를 남겨주세요..."
-                maxLength={500}
-                value={adminMemo}
-                onChange={(e) => setAdminMemo(e.target.value)}
-              />
-              <p className="text-right text-xs text-muted-foreground">{adminMemo.length}/500</p>
-            </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setApproveDialog(false)}
-              disabled={processing}
-            >
-              취소
-            </Button>
-            <Button
-              onClick={handleApprove}
-              disabled={processing || !!bizCallDuplicateName}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              {processing ? '처리 중...' : '승인'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                <Text span size="sm" fw={500} c="dimmed">(선택)</Text>
+              </>
+            }
+          >
+            <SalesRepSelect value={salesRepId} onChange={setSalesRepId} />
+          </Input.Wrapper>
+          <Stack gap={4}>
+            <Textarea
+              label={
+                <>
+                  관리 메모{' '}
+                  <Text span size="sm" fw={500} c="dimmed">
+                    (내부용, 파트너 비공개)
+                  </Text>
+                </>
+              }
+              minRows={3}
+              autosize
+              placeholder="승인 관련 내부 메모를 남겨주세요..."
+              maxLength={500}
+              value={adminMemo}
+              onChange={(e) => setAdminMemo(e.target.value)}
+            />
+            <Text ta="right" size="xs" c="dimmed">{adminMemo.length}/500</Text>
+          </Stack>
+        </Stack>
+        <Group justify="flex-end" mt="lg">
+          <Button
+            variant="default"
+            onClick={() => setApproveDialog(false)}
+            disabled={processing}
+          >
+            취소
+          </Button>
+          <Button
+            color="blue"
+            onClick={handleApprove}
+            disabled={processing || !!bizCallDuplicateName}
+          >
+            {processing ? '처리 중...' : '승인'}
+          </Button>
+        </Group>
+      </Modal>
 
       {/* 거절 다이얼로그 */}
-      <Dialog open={rejectDialog} onOpenChange={setRejectDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>광고 신청 거절</DialogTitle>
-            <DialogDescription>
-              거절 사유를 입력해주세요. 파트너가 이 사유를 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Textarea
-              className="min-h-[120px] resize-none"
-              placeholder="거절 사유를 입력해주세요..."
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRejectDialog(false)}
-              disabled={processing}
-            >
-              취소
-            </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={processing}>
-              {processing ? '처리 중...' : '거절'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </TooltipProvider>
+      <Modal
+        opened={rejectDialog}
+        onClose={() => setRejectDialog(false)}
+        title="광고 신청 거절"
+        size="md"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            거절 사유를 입력해주세요. 파트너가 이 사유를 확인할 수 있습니다.
+          </Text>
+          <Textarea
+            minRows={5}
+            autosize
+            placeholder="거절 사유를 입력해주세요..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+        </Stack>
+        <Group justify="flex-end" mt="lg">
+          <Button
+            variant="default"
+            onClick={() => setRejectDialog(false)}
+            disabled={processing}
+          >
+            취소
+          </Button>
+          <Button color="red" onClick={handleReject} disabled={processing}>
+            {processing ? '처리 중...' : '거절'}
+          </Button>
+        </Group>
+      </Modal>
+    </>
   );
 }

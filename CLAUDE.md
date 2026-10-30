@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Wooldanji Admin — a Next.js (App Router) admin dashboard built with TypeScript, Supabase, TanStack React Query, and shadcn/ui (Radix + Tailwind CSS v4).
+Wooldanji Admin — a Next.js (App Router) admin dashboard built with TypeScript, Supabase, TanStack React Query, and Mantine v9 (with Tailwind CSS v4 for a few utilities).
 
 ## Tech Stack
 
@@ -10,7 +10,7 @@ Wooldanji Admin — a Next.js (App Router) admin dashboard built with TypeScript
 - **Language**: TypeScript 5
 - **Database / Auth**: Supabase (`@supabase/ssr`, `@supabase/supabase-js`)
 - **Data Fetching**: TanStack React Query v5, `@supabase-cache-helpers/postgrest-react-query`
-- **UI**: Radix UI primitives, Tailwind CSS v4, `class-variance-authority`, `lucide-react`, `cmdk`, `recharts`, `sonner`
+- **UI**: Mantine v9 (`@mantine/core`, `@mantine/hooks`, `@mantine/modals`), Tailwind CSS v4 (utilities only), `lucide-react`, `recharts`, `sonner`
 - **DnD**: `@dnd-kit`
 - **Date**: `date-fns`
 
@@ -22,11 +22,83 @@ npm run build      # Production build
 npm run start      # Start production server
 ```
 
+## UI Rules (Mantine)
+
+The UI is Mantine v9. Pre-migration backup: `backup/pre-mantine` branch / `pre-mantine` tag.
+
+### 1. NEVER change logic when working on UI
+
+- UI/design work changes only the **rendering layer** (JSX, component imports, styling).
+- **Do NOT modify**: custom hooks (`use*.ts`), Supabase queries, React Query keys/mutations, API routes (`app/api/**`), types, validation rules, permission checks, event handler bodies, state shape, routing/navigation, loading conditions.
+- Behavior must stay identical: same fields, default values, validation/error messages, toasts, confirm dialogs, loading/disabled states, empty states, sorting/filtering/pagination, user-facing copy, and where buttons/back actions navigate.
+- If a component needs a different value shape (e.g. Mantine `Select` returns `string | null`), adapt it **in the JSX at the call site** — never change the hook to fit the component.
+- Some `page.tsx` files still contain logic. Leave that logic exactly as is and change only the JSX.
+- If a change truly cannot be made without touching logic, **stop and ask** first — explain why. Logic changes happen only when the user explicitly approves them (e.g. bug fixes), as a separate change.
+- After UI work, verify: the code outside JSX `return (...)` blocks is unchanged, no Korean copy was lost, `npx tsc --noEmit` shows no new errors, `npm run build` passes.
+
+### 2. Functional UX changes: propose, don't apply
+
+- Visual changes (spacing, grouping, component choice, hierarchy) are fine. Changes to *what users can do or see* need approval: adding/removing fields or columns, flows, confirmations, copy, defaults.
+- Report proposals as a list: **위치** (`file:line`) · **현재** · **문제** · **제안**. Apply only after approval.
+
+### 3. Design system — `lib/theme.ts` is the single source of truth
+
+Reference: `/Users/hyeonwoo/Code/banselin-admin-code` (Skote admin template), adjusted per user feedback. Change tokens in the theme, never per page.
+
+- **Colors**: primary `#556ee6` (Mantine `blue`), success `#34c38f` (`green`), danger `#f46a6a` (`red`), warning `#f1b44c` (`yellow`), info `#50a5f1` (`cyan`). Text `#495057`, dimmed `#5f6478`, page bg `#f8f8fb`. Dark mode: text pure white, `light` variants are soft translucent tints (never saturated).
+- **No hardcoded colors**: use color props (`color="red"`, `c="dimmed"`) and theme variables (`--app-bg-muted`, `--app-bg-subtle`, `--app-divider`, `--app-input-bg`, `--mantine-color-<color>-light`). Never fixed light shades (`gray.0`, `blue.0`) — dark mode must work.
+- **No borders**: separate areas with background, shadow and spacing. Cards have no outline (theme makes `withBorder` transparent; a card inside a card gets a light gray background). Gray/default buttons and filter chips are light-gray filled. Never `variant="outline"` — use `light`. If a separator is really needed, use `var(--app-divider)` (Divider and Table already default to it).
+- **Typography**: Pretendard; body 16px (`1rem`); always rem units; minimum font weight 500 (never 300/400); page title 1.375rem / 600.
+- **Sizes**: inputs and buttons 48px (default `sm`); filter chips 36px; pagination (이전·다음·page numbers) all 36px on one line (`size="xs"` buttons, theme sizes `Pagination`); icon buttons and small buttons inside tables 36px. Radius: controls 0.5rem (`sm`), cards 0.75rem (`md`).
+- **Inputs**: Toss-style `variant="filled"` (theme default) — no border, light blue-gray background, primary border only on focus.
+- **Badges**: always `variant="light"`, weight 700 from the theme — don't override `fw`.
+- **Scrollbars**: thin and light gray site-wide (`globals.css`, base layer); the sidebar hides its scrollbar.
+- Prefer Mantine layout components (`Stack`, `Group`, `SimpleGrid`, `Flex`) and style props over Tailwind. Check component APIs with the Mantine MCP server (`mcp__mantine__*`).
+
+### 4. Page patterns
+
+- **Shell**: dark navy sidebar with collapsible sections (no icons/numbers in the expanded state; icons only in the 70px collapsed rail), white 70px header with breadcrumb, dark-mode toggle, user menu.
+- **List pages**: `PageShell` → `PageHeader` (title, description, actions) → `DataTableShell`:
+  - `toolbar` = ONE filter card: search/selects row, `Divider`, then one `FilterRow label="…"` per `FilterChips` group (pill chips with counts; 0 counts dimmed).
+  - `summary` = line at the top of the table card ("총 N건", totals).
+  - Tables: gray header, centered one-line cells, unique `key`s.
+- **Detail / edit / new pages**: put the title + back button in the header with `<HeaderTitle title="…" onBack={…} />` (`@/components/header-title`) instead of a title row in the body. Description text and page actions stay in the body. Two-column layout on PC (content left, sticky info/actions right); merge related actions into one "관리" card instead of one card per button; stats as tile grids; avoid long repetitive lists (group identical rows).
+- **Loading**: never replace the whole page with a spinner/text. List pages render header + filters immediately and show `TableSkeleton` (real column count) in the table card; detail/form pages use `DetailSkeleton`. Spinners only inside buttons/uploads.
+- **Empty states**: `EmptyState` or a centered icon + dimmed text; side-by-side cards keep equal height.
+- **Dialogs**: `Modal`; confirmations via `confirmModal()` (`@/components/confirm-modal`), never native `confirm()`. Disable buttons and block close (`closeOnClickOutside`/`closeOnEscape`) while processing.
+
+### 5. Responsive — every page must fully work on phones (48em and below)
+
+- All information must be visible and every action (register, edit, approve) must work on a phone. Never hide columns or data on mobile.
+- Tables automatically become a card list on phones (one row = one card, "column name : value"; labels come from `useTableCardLabels`). Add `data-no-cards` to a `<table>` only if it must stay a table.
+- Filter rows stack (label above chips); form/filter inputs go full width; dialogs open full screen; the header shows only the current page title.
+- Check new/changed pages at 390px width.
+
+### 6. React keys
+
+- Keys must be unique and stable. Never use display text (labels, names) alone as a key when duplicates are possible — use an id, or `${name}-${index}` for plain string lists, or a dedicated `key` field for config-built rows.
+
+### 7. Component mapping (from shadcn/Radix)
+
+| shadcn/ui | Mantine |
+|---|---|
+| `Select` | `Select` (**always `allowDeselect={false}`** unless clearing is intended) |
+| `Dialog`, `AlertDialog` | `Modal`. `AlertDialogAction`/`Cancel` auto-closed the dialog — replicate with `onClick={() => { action(); close(); }}`. Former AlertDialogs → `closeOnClickOutside={false} withCloseButton={false}` |
+| `DropdownMenu` | `Menu` |
+| `Command` / combobox | `Select searchable` (use `onOptionSubmit` if a side effect must re-run on re-select) |
+| `Sheet` | `Drawer` |
+| `Collapsible` | `Collapse` |
+
+### 8. Workflow
+
+- Don't commit unless the user asks. Keep changes in the working tree so the user can review or revert.
+- Verify visually: capture the page (PC and 390px phone width) and fix what looks wrong before reporting. `globals.css` changes need a dev-server restart (or check on a production build).
+
 ## Project Structure
 
 ```
 app/               # Next.js App Router pages & layouts
-components/        # Shared React components (+ components/ui for shadcn)
+components/        # Shared React components (page shell, table shell, filter chips, header title, skeletons, ...)
 lib/               # Utilities, Supabase clients, helpers
   supabase/        # Supabase client/server/middleware/types
   utils/           # Utility functions (format, storage, line)

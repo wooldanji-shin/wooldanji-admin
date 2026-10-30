@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { Group, Stack, Text, Title } from '@mantine/core';
 
 interface PageShellProps {
   children: ReactNode;
@@ -7,19 +7,14 @@ interface PageShellProps {
 }
 
 /**
- * Standard outer container for admin pages. Provides consistent max-width,
- * horizontal padding, vertical rhythm and centered layout.
+ * Standard outer container for admin pages. Provides consistent padding
+ * and vertical rhythm.
  */
 export function PageShell({ children, className }: PageShellProps): React.ReactElement {
   return (
-    <div
-      className={cn(
-        'flex w-full flex-col gap-6 px-6 py-6 md:py-8',
-        className
-      )}
-    >
+    <Stack gap="lg" p={{ base: 'md', md: 'xl' }} className={className}>
       {children}
-    </div>
+    </Stack>
   );
 }
 
@@ -30,14 +25,9 @@ interface PageHeaderProps {
 
 export function PageHeader({ children, className }: PageHeaderProps): React.ReactElement {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-6',
-        className
-      )}
-    >
+    <Group justify="space-between" align="flex-end" gap="md" className={className}>
       {children}
-    </div>
+    </Group>
   );
 }
 
@@ -53,14 +43,12 @@ export function PageHeaderTitle({
   className,
 }: PageHeaderTitleProps): React.ReactElement {
   return (
-    <div className={cn('min-w-0', className)}>
-      <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground md:text-[1.625rem]">
+    <Stack gap={4} miw={0} className={className}>
+      <Title order={1} fz="1.375rem" fw={600} lineClamp={1}>
         {title}
-      </h1>
-      {description && (
-        <p className="mt-2 text-base font-medium text-muted-foreground">{description}</p>
-      )}
-    </div>
+      </Title>
+      {description && <Text c="dimmed">{description}</Text>}
+    </Stack>
   );
 }
 
@@ -74,7 +62,9 @@ export function PageHeaderActions({
   className,
 }: PageHeaderActionsProps): React.ReactElement {
   return (
-    <div className={cn('flex flex-wrap items-center gap-2', className)}>{children}</div>
+    <Group gap="xs" className={className}>
+      {children}
+    </Group>
   );
 }
 
@@ -84,5 +74,9 @@ interface PageContentProps {
 }
 
 export function PageContent({ children, className }: PageContentProps): React.ReactElement {
-  return <div className={cn('flex flex-col gap-6', className)}>{children}</div>;
+  return (
+    <Stack gap="lg" className={className}>
+      {children}
+    </Stack>
+  );
 }

@@ -2,18 +2,23 @@
 
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { useRouter } from 'next/navigation';
 import {
+  Button,
+  Group,
+  Input,
+  Paper,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { PageShell, PageHeader, PageHeaderTitle } from '@/components/page-shell';
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { PageShell } from '@/components/page-shell';
+import { HeaderTitle } from '@/components/header-title';
+import { DetailSkeleton } from '@/components/skeletons';
 import { PartnerCombobox } from '@/components/partner-combobox';
 import { SalesRepSelect } from '@/components/sales-rep-select';
 import { AdImagePicker } from '@/components/ad-image-picker';
@@ -45,6 +50,7 @@ interface PremiumFormViewProps {
 
 export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.ReactElement {
   const page = usePremiumForm(premiumId);
+  const router = useRouter();
   const {
     isEdit,
     contentOnly,
@@ -63,22 +69,21 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
   } = page;
 
   if (loading) {
-    return (
-      <PageShell>
-        <p className="text-sm text-muted-foreground">불러오는 중...</p>
-      </PageShell>
-    );
+    return <DetailSkeleton sections={5} />;
   }
 
   if (loadError) {
     return (
       <PageShell>
-        <p className="text-sm text-destructive">{loadError}</p>
-        <Button variant="outline" asChild className="self-start">
-          <Link href="/admin/advertising-v2/premium">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            목록으로
-          </Link>
+        <Text size="sm" c="red">{loadError}</Text>
+        <Button
+          variant="default"
+          component={Link}
+          href="/admin/advertising-v2/premium"
+          leftSection={<ArrowLeft size={16} />}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          목록으로
         </Button>
       </PageShell>
     );
@@ -86,42 +91,33 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
 
   return (
     <PageShell>
-      <PageHeader>
-        <PageHeaderTitle
-          title={isEdit ? '프리미엄 광고 수정' : '프리미엄 광고 대리 등록'}
-          description={contentOnly
-            ? '광고중인 프리미엄 광고의 내용을 고칩니다. 저장하면 앱에 바로 반영됩니다.'
-            : isEdit
-              ? '결제 전 프리미엄 광고의 내용과 승인 조건을 고칩니다.'
-              : '운영 중인 기본 광고 위에 프리미엄 광고를 대신 등록합니다.'}
-        />
-        <Button variant="outline" asChild>
-          <Link
-            href={isEdit
-              ? `/admin/advertising-v2/premium/${premiumId}`
-              : '/admin/advertising-v2/premium'}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {isEdit ? '상세로' : '목록으로'}
-          </Link>
-        </Button>
-      </PageHeader>
+      <HeaderTitle
+        title={isEdit ? '프리미엄 광고 수정' : '프리미엄 광고 대리 등록'}
+        onBack={() => router.push(isEdit
+          ? `/admin/advertising-v2/premium/${premiumId}`
+          : '/admin/advertising-v2/premium')}
+      />
+      <Text size="sm" c="dimmed">
+        {contentOnly
+          ? '광고중인 프리미엄 광고의 내용을 고칩니다. 저장하면 앱에 바로 반영됩니다.'
+          : isEdit
+            ? '결제 전 프리미엄 광고의 내용과 승인 조건을 고칩니다.'
+            : '운영 중인 기본 광고 위에 프리미엄 광고를 대신 등록합니다.'}
+      </Text>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>파트너 · 기본 광고</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Paper withBorder radius="md" p="lg">
+        <Title order={4} mb="md">파트너 · 기본 광고</Title>
+        <Stack gap="sm">
           {isEdit ? (
             // 기본 광고를 바꾸면 노출 아파트와 금액이 통째로 달라진다 — 수정에서는 잠근다
-            <div className="space-y-1 text-sm">
-              <p className="text-base font-semibold">
+            <Stack gap={4}>
+              <Text fw={600}>
                 {selectedPartner?.businessName ?? '-'}
-              </p>
-              <p className="text-muted-foreground">
+              </Text>
+              <Text size="sm" c="dimmed">
                 기본 광고: {selectedBaseAd?.title ?? '-'}
-              </p>
-            </div>
+              </Text>
+            </Stack>
           ) : (
             <>
               <PartnerCombobox
@@ -132,114 +128,107 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
 
               {form.partnerId && (
                 partnerBaseAds.length > 0 ? (
-                  <Select value={form.baseAdId ?? ''} onValueChange={page.selectBaseAd}>
-                    <SelectTrigger className="w-full md:w-[420px]">
-                      <SelectValue placeholder="프리미엄을 얹을 기본 광고 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {partnerBaseAds.map((ad) => (
-                        <SelectItem key={ad.id} value={ad.id}>
-                          {ad.title ?? '(제목 없음)'} · {ad.totalHouseholds.toLocaleString()}세대
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Select
+                    w={{ base: '100%', md: 420 }}
+                    placeholder="프리미엄을 얹을 기본 광고 선택"
+                    data={partnerBaseAds.map((ad) => ({
+                      value: ad.id,
+                      label: `${ad.title ?? '(제목 없음)'} · ${ad.totalHouseholds.toLocaleString()}세대`,
+                    }))}
+                    value={form.baseAdId || null}
+                    onChange={(v) => {
+                      if (v === null) return;
+                      page.selectBaseAd(v);
+                    }}
+                    allowDeselect={false}
+                  />
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <Text size="sm" c="dimmed">
                     이 파트너에게는 프리미엄을 등록할 수 있는 광고가 없습니다.
                     운영 중(결제 완료)이고 진행 중인 프리미엄이 없는 광고만 고를 수 있습니다.
-                  </p>
+                  </Text>
                 )
               )}
             </>
           )}
 
           {selectedBaseAd && (
-            <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
-              <p>
-                카테고리 {selectedBaseAd.categoryName ?? '-'} · 노출 아파트{' '}
-                {selectedBaseAd.apartments.length}곳 · 총{' '}
-                <strong>{totalHouseholds.toLocaleString()}세대</strong>
-              </p>
-              <p className="text-muted-foreground">
-                {selectedBaseAd.apartments.map((a) => a.name).join(', ')}
-              </p>
-              <p className="text-muted-foreground">
-                노출 아파트는 기본 광고를 그대로 따릅니다.
-              </p>
-            </div>
+            <Paper withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)">
+              <Stack gap={4}>
+                <Text size="sm">
+                  카테고리 {selectedBaseAd.categoryName ?? '-'} · 노출 아파트{' '}
+                  {selectedBaseAd.apartments.length}곳 · 총{' '}
+                  <strong>{totalHouseholds.toLocaleString()}세대</strong>
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {selectedBaseAd.apartments.map((a) => a.name).join(', ')}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  노출 아파트는 기본 광고를 그대로 따릅니다.
+                </Text>
+              </Stack>
+            </Paper>
           )}
-        </CardContent>
-      </Card>
+        </Stack>
+      </Paper>
 
       {form.baseAdId && (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>광고 내용</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+          <Paper withBorder radius="md" p="lg">
+            <Title order={4} mb="md">광고 내용</Title>
+            <Stack gap="md">
+              <Text size="sm" c="dimmed">
                 기본 광고 내용을 그대로 가져왔습니다. 프리미엄에만 다르게 넣고 싶으면 고치세요.
-              </p>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  제목 <span className="text-destructive">*</span>
-                </label>
-                <Input
-                  value={form.title}
-                  maxLength={30}
-                  onChange={(e) => patch({ title: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">본문</label>
-                <Textarea
-                  className="min-h-[140px]"
-                  value={form.content}
-                  onChange={(e) => patch({ content: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">
-                    이미지 <span className="text-destructive">*</span>
-                  </label>
-                  <span className="text-sm text-muted-foreground">
+              </Text>
+              <TextInput
+                label="제목"
+                withAsterisk
+                value={form.title}
+                maxLength={30}
+                onChange={(e) => patch({ title: e.target.value })}
+              />
+              <Textarea
+                label="본문"
+                minRows={6}
+                autosize
+                value={form.content}
+                onChange={(e) => patch({ content: e.target.value })}
+              />
+              <Stack gap={6}>
+                <Group justify="space-between">
+                  <Input.Label required>이미지</Input.Label>
+                  <Text size="sm" c="dimmed">
                     {form.images.length}/{MAX_AD_IMAGES}
-                  </span>
-                </div>
+                  </Text>
+                </Group>
                 <AdImagePicker
                   items={form.images}
                   onAdd={page.addImages}
                   onRemove={page.removeImage}
                   onReorder={page.reorderImages}
                 />
-                <p className="text-xs text-muted-foreground">
+                <Text size="xs" c="dimmed">
                   기본 광고에서 가져온 이미지는 목록에서 빼도 파일이 지워지지 않습니다
                   (기본 광고와 같은 파일을 씁니다).
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                </Text>
+              </Stack>
+            </Stack>
+          </Paper>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>링크</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
+          <Paper withBorder radius="md" p="lg">
+            <Title order={4} mb="md">링크</Title>
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
               {LINK_FIELDS.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <label className="text-sm font-medium">{field.label}</label>
-                  <Input
-                    value={form[field.key]}
-                    placeholder={field.placeholder}
-                    onChange={(e) => patch({ [field.key]: e.target.value })}
-                  />
-                </div>
+                <TextInput
+                  key={field.key}
+                  label={field.label}
+                  value={form[field.key]}
+                  placeholder={field.placeholder}
+                  onChange={(e) => patch({ [field.key]: e.target.value })}
+                />
               ))}
-            </CardContent>
-          </Card>
+            </SimpleGrid>
+          </Paper>
 
           <CtaButtonsCard
             buttons={form.ctaButtons}
@@ -250,120 +239,117 @@ export function PremiumFormView({ premiumId }: PremiumFormViewProps): React.Reac
             onRemove={page.removeCtaButton}
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>노출 기간 · 승인 조건</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Paper withBorder radius="md" p="lg">
+            <Title order={4} mb="md">노출 기간 · 승인 조건</Title>
+            <Stack gap="md">
               {/* 광고중에는 주수·할인율이 이미 받은 결제의 근거다 */}
               {contentOnly ? (
-                <div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-sm">
-                  <p>
-                    노출 {form.weeks}주
-                    {form.discountRate > 0 && ` · 할인 ${form.discountRate}%`}
-                  </p>
-                  <p className="text-muted-foreground">
-                    광고중에는 이미 결제된 금액의 근거라 바꿀 수 없습니다.
-                  </p>
-                </div>
+                <Paper withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)">
+                  <Stack gap={4}>
+                    <Text size="sm">
+                      노출 {form.weeks}주
+                      {form.discountRate > 0 && ` · 할인 ${form.discountRate}%`}
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      광고중에는 이미 결제된 금액의 근거라 바꿀 수 없습니다.
+                    </Text>
+                  </Stack>
+                </Paper>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">노출 주수</label>
-                    <Select
-                      value={String(form.weeks)}
-                      onValueChange={(v) => patch({ weeks: Number(v) })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WEEK_OPTIONS.map((week) => (
-                          <SelectItem key={week} value={String(week)}>
-                            {week}주
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">할인율 (%)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={form.discountRate || ''}
-                      onChange={(e) =>
-                        patch({
-                          discountRate: Math.min(
-                            100,
-                            Math.max(0, parseInt(e.target.value) || 0)
-                          ),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                  <Select
+                    label="노출 주수"
+                    data={WEEK_OPTIONS.map((week) => ({
+                      value: String(week),
+                      label: `${week}주`,
+                    }))}
+                    value={String(form.weeks)}
+                    onChange={(v) => {
+                      if (v === null) return;
+                      patch({ weeks: Number(v) });
+                    }}
+                    allowDeselect={false}
+                  />
+                  <TextInput
+                    label="할인율 (%)"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.discountRate || ''}
+                    onChange={(e) =>
+                      patch({
+                        discountRate: Math.min(
+                          100,
+                          Math.max(0, parseInt(e.target.value) || 0)
+                        ),
+                      })
+                    }
+                  />
+                </SimpleGrid>
               )}
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  영업 담당자{' '}
-                  <span className="text-xs font-normal text-muted-foreground">(선택)</span>
-                </label>
+              <Input.Wrapper
+                label={
+                  <>
+                    영업 담당자{' '}
+                    <Text span size="xs" fw={500} c="dimmed">(선택)</Text>
+                  </>
+                }
+              >
                 <SalesRepSelect
                   className="w-[240px]"
                   value={form.salesRepId}
                   onChange={(salesRepId) => patch({ salesRepId })}
                 />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  관리 메모{' '}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    (내부용, 파트너 비공개)
-                  </span>
-                </label>
-                <Textarea
-                  className="min-h-[80px] resize-none"
-                  value={form.adminMemo}
-                  onChange={(e) => patch({ adminMemo: e.target.value })}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </Input.Wrapper>
+              <Textarea
+                label={
+                  <>
+                    관리 메모{' '}
+                    <Text span size="xs" fw={500} c="dimmed">
+                      (내부용, 파트너 비공개)
+                    </Text>
+                  </>
+                }
+                minRows={3}
+                autosize
+                value={form.adminMemo}
+                onChange={(e) => patch({ adminMemo: e.target.value })}
+              />
+            </Stack>
+          </Paper>
         </>
       )}
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm">
-            <p>
+      <Paper withBorder radius="md" p="lg">
+        <Group justify="space-between" gap="sm">
+          <Stack gap={2}>
+            <Text size="sm">
               {contentOnly ? '결제 완료 금액' : '결제 예정 금액'}{' '}
-              <strong className="text-base">
+              <Text span fw={700}>
                 {(discountedTotalAmount ?? totalAmount).toLocaleString()}원
-              </strong>
+              </Text>
               {discountedTotalAmount !== null && (
-                <span className="ml-2 text-muted-foreground line-through">
+                <Text span inherit c="dimmed" td="line-through" ml="xs">
                   {totalAmount.toLocaleString()}원
-                </span>
+                </Text>
               )}
-            </p>
-            <p className="text-muted-foreground">
+            </Text>
+            <Text size="sm" c="dimmed">
               {totalHouseholds.toLocaleString()}세대 × {page.pricePerWeek.toLocaleString()}원 ×{' '}
               {form.weeks}주
               {form.discountRate > 0 && ` · ${form.discountRate}% 할인`}
-            </p>
+            </Text>
             {page.ctaError && (
-              <p className="mt-1 text-destructive">{page.ctaError}</p>
+              <Text size="sm" c="red" mt={4}>{page.ctaError}</Text>
             )}
-          </div>
-          <Button size="lg" disabled={!canSubmit} onClick={page.submit}>
+          </Stack>
+          <Button size="md" disabled={!canSubmit} onClick={page.submit}>
             {submitting
               ? (isEdit ? '수정 중...' : '등록 중...')
               : (isEdit ? '수정 저장' : '프리미엄 등록 (결제 대기 상태)')}
           </Button>
-        </CardContent>
-      </Card>
+        </Group>
+      </Paper>
     </PageShell>
   );
 }
