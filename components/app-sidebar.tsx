@@ -240,6 +240,12 @@ const settingsItems: MenuItem[] = [
     icon: MessageSquare,
     roles: ['SUPER_ADMIN'],
   },
+  {
+    name: '사용법·FAQ 이미지',
+    href: '/admin/faq-images',
+    icon: ImageIcon,
+    roles: ['SUPER_ADMIN', 'MANAGER'],
+  },
 ];
 
 // ─── V1 시스템 관리 ────────────────────────────────────────

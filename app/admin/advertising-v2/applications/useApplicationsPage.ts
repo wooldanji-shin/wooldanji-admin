@@ -382,12 +382,10 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       const adIds = (data ?? []).map((r: any) => r.id as string);
 
       // 통계와 구독은 서로 기다릴 필요가 없어 동시에 요청한다
+      // 일별 행을 받아 합산하면 API 행 제한에 잘려 일부 광고 통계가 비므로 DB에서 합산한다
       const [{ data: analyticsRows }, { data: subscriptionRows }] = await Promise.all([
         adIds.length > 0
-          ? supabase
-              .from('ad_analytics_v2')
-              .select('baseAdId, impressionCount, homeImpressionCount, clickCount, phoneClickCount')
-              .in('baseAdId', adIds)
+          ? (supabase as any).rpc('get_ad_analytics_totals', { p_ad_ids: adIds })
           : Promise.resolve({ data: [] }),
         adIds.length > 0
           ? supabase
@@ -417,18 +415,17 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         return acc;
       }, {});
 
-      // baseAdId별 누적 집계
-      const analyticsMap = (analyticsRows ?? []).reduce<Record<string, { impressions: number; clicks: number; phoneClicks: number }>>(
-        (acc, r: any) => {
-          const key = r.baseAdId as string;
-          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0, phoneClicks: 0 };
-          acc[key].impressions += (r.homeImpressionCount ?? 0) + (r.impressionCount ?? 0);
-          acc[key].clicks += (r.clickCount ?? 0);
-          acc[key].phoneClicks += (r.phoneClickCount ?? 0);
-          return acc;
-        },
-        {}
-      );
+      const analyticsMap: Record<string, { impressions: number; clicks: number; phoneClicks: number }> =
+        Object.fromEntries(
+          ((analyticsRows ?? []) as any[]).map((r) => [
+            r.baseAdId as string,
+            {
+              impressions: r.homeImpressionCount + r.impressionCount,
+              clicks: r.clickCount,
+              phoneClicks: r.phoneClickCount,
+            },
+          ])
+        );
 
       const mapped: AdApplication[] = (data ?? []).map((row: any) => ({
         id: row.id,

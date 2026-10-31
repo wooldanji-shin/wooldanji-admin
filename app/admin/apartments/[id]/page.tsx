@@ -159,22 +159,16 @@ export default function ApartmentDetailPage({ params }: PageProps) {
 
       const basicAdIds = (basicRows ?? []).map((r: any) => r.advertisementId as string);
 
+      // 일별 행을 받아 합산하면 API 행 제한에 잘릴 수 있어 DB에서 합산한다
       const { data: basicAnalytics } = basicAdIds.length > 0
-        ? await supabase
-            .from('ad_analytics_v2')
-            .select('baseAdId, impressionCount, homeImpressionCount, clickCount')
-            .in('baseAdId', basicAdIds)
+        ? await (supabase as any).rpc('get_ad_analytics_totals', { p_ad_ids: basicAdIds })
         : { data: [] };
 
-      const basicAnalyticsMap = (basicAnalytics ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
-        (acc, r: any) => {
-          const key = r.baseAdId as string;
-          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
-          acc[key].impressions += (r.homeImpressionCount ?? 0) + (r.impressionCount ?? 0);
-          acc[key].clicks += (r.clickCount ?? 0);
-          return acc;
-        },
-        {}
+      const basicAnalyticsMap: Record<string, { impressions: number; clicks: number }> = Object.fromEntries(
+        ((basicAnalytics ?? []) as any[]).map((r) => [
+          r.baseAdId as string,
+          { impressions: r.homeImpressionCount + r.impressionCount, clicks: r.clickCount },
+        ])
       );
 
       setRunningBasicAds(
@@ -220,10 +214,7 @@ export default function ApartmentDetailPage({ params }: PageProps) {
           ? supabase.from('partner_users').select('"userId", "businessName"').in('userId', partnerIds)
           : Promise.resolve({ data: [] }),
         premiumAdIds.length > 0
-          ? supabase
-              .from('premium_ad_analytics_v2')
-              .select('"premiumAdId", "impressionCount", "homePremiumImpressionCount", "clickCount"')
-              .in('premiumAdId', premiumAdIds)
+          ? (supabase as any).rpc('get_premium_ad_analytics_totals', { p_ad_ids: premiumAdIds })
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -231,15 +222,11 @@ export default function ApartmentDetailPage({ params }: PageProps) {
         (partnerData ?? []).map((p: any) => [p.userId, p.businessName])
       );
 
-      const premiumAnalyticsMap = (premiumAnalytics ?? []).reduce<Record<string, { impressions: number; clicks: number }>>(
-        (acc, r: any) => {
-          const key = r.premiumAdId as string;
-          if (!acc[key]) acc[key] = { impressions: 0, clicks: 0 };
-          acc[key].impressions += (r.homePremiumImpressionCount ?? 0) + (r.impressionCount ?? 0);
-          acc[key].clicks += (r.clickCount ?? 0);
-          return acc;
-        },
-        {}
+      const premiumAnalyticsMap: Record<string, { impressions: number; clicks: number }> = Object.fromEntries(
+        ((premiumAnalytics ?? []) as any[]).map((r) => [
+          r.premiumAdId as string,
+          { impressions: r.homePremiumImpressionCount + r.impressionCount, clicks: r.clickCount },
+        ])
       );
 
       setRunningPremiumAds(

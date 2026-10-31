@@ -56,6 +56,7 @@ const ROUTE_LABEL_MAP: Record<string, string> = {
   'door-banner': '공동현관문 팝업',
   'door-filler-images': '문열림 채움 이미지',
   'door-popup-stats': '문열림 팝업 통계',
+  'faq-images': '사용법·FAQ 이미지',
   'membership-conversion': '회원 전환',
   'partner-ad-intro-image': '광고 소개 이미지',
   'partner-events': '이벤트 관리',
