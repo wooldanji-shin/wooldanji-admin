@@ -132,6 +132,8 @@ export interface AdAnalyticsSummary {
   kakaoChatClickCount: number;
   homeImpressionCount: number;
   dialogImpressionCount: number;
+  /** 문열림 팝업에서 눌린 클릭 — clickCount(홈·카테고리)와 별도 */
+  dialogClickCount: number;
   baeminClickCount: number;
   coupangEatsClickCount: number;
   wishCount: number;
@@ -145,7 +147,7 @@ function sumAnalyticsRows(rows: any[]): AdAnalyticsSummary {
     impressionCount: 0, clickCount: 0, phoneClickCount: 0,
     messageClickCount: 0, naverMapClickCount: 0, blogClickCount: 0,
     youtubeClickCount: 0, instagramClickCount: 0, kakaoChatClickCount: 0,
-    homeImpressionCount: 0, dialogImpressionCount: 0,
+    homeImpressionCount: 0, dialogImpressionCount: 0, dialogClickCount: 0,
     baeminClickCount: 0, coupangEatsClickCount: 0, wishCount: 0,
     // jsonb라 단순 덧셈이 안 되므로 별도 병합
     extraClickCounts: mergeExtraClickCounts(rows),
@@ -162,6 +164,7 @@ function sumAnalyticsRows(rows: any[]): AdAnalyticsSummary {
     sum.kakaoChatClickCount += r.kakaoChatClickCount ?? 0;
     sum.homeImpressionCount += r.homeImpressionCount ?? 0;
     sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+    sum.dialogClickCount += r.dialogClickCount ?? 0;
     sum.baeminClickCount += r.baeminClickCount ?? 0;
     sum.coupangEatsClickCount += r.coupangEatsClickCount ?? 0;
     sum.wishCount += r.wishCount ?? 0;
@@ -354,7 +357,7 @@ export function useApplicationDetailPage(
           .maybeSingle(),
         supabase
           .from('ad_analytics_v2')
-          .select('date, impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts')
+          .select('date, impressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, homeImpressionCount, dialogImpressionCount, dialogClickCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts')
           .eq('baseAdId', adId),
         supabase
           .from('ad_categories_v2')

@@ -627,6 +627,7 @@ export default function AdApplicationDetailPage({
                 { key: 'impression', label: '카테고리 노출', value: a?.impressionCount ?? 0 },
                 { key: 'home', label: '홈 노출수', value: a?.homeImpressionCount ?? 0 },
                 { key: 'dialog', label: '다이얼로그 노출수', value: a?.dialogImpressionCount ?? 0 },
+                { key: 'dialog-click', label: '팝업 클릭수', value: a?.dialogClickCount ?? 0 },
                 { key: 'click', label: '클릭수', value: a?.clickCount ?? 0 },
                 { key: 'phone', label: '전화 클릭', value: a?.phoneClickCount ?? 0 },
                 { key: 'wish', label: '찜 수', value: a?.wishCount ?? 0 },

@@ -105,6 +105,8 @@ export interface PremiumAdAnalyticsSummary {
   /** 일반 광고는 홈 노출수, 프리미엄 광고는 홈 프리미엄 노출수 */
   homeImpressionCount: number;
   dialogImpressionCount: number;
+  /** 문열림 팝업에서 눌린 클릭 — clickCount(홈·카테고리)와 별도 */
+  dialogClickCount: number;
   clickCount: number;
   phoneClickCount: number;
   messageClickCount: number;
@@ -126,7 +128,7 @@ function sumAnalyticsRows(
   homeKey: 'homeImpressionCount' | 'homePremiumImpressionCount'
 ): PremiumAdAnalyticsSummary {
   const sum: PremiumAdAnalyticsSummary = {
-    impressionCount: 0, homeImpressionCount: 0, dialogImpressionCount: 0,
+    impressionCount: 0, homeImpressionCount: 0, dialogImpressionCount: 0, dialogClickCount: 0,
     clickCount: 0, phoneClickCount: 0, messageClickCount: 0,
     naverMapClickCount: 0, blogClickCount: 0, youtubeClickCount: 0,
     instagramClickCount: 0, kakaoChatClickCount: 0,
@@ -138,6 +140,7 @@ function sumAnalyticsRows(
     sum.impressionCount += r.impressionCount ?? 0;
     sum.homeImpressionCount += r[homeKey] ?? 0;
     sum.dialogImpressionCount += r.dialogImpressionCount ?? 0;
+    sum.dialogClickCount += r.dialogClickCount ?? 0;
     sum.clickCount += r.clickCount ?? 0;
     sum.phoneClickCount += r.phoneClickCount ?? 0;
     sum.messageClickCount += r.messageClickCount ?? 0;
@@ -378,7 +381,7 @@ export function usePremiumDetailPage(
       // 누적 결제 합계 + 연장 이력 + 통계 동시 조회
       // 홈 노출 컬럼명이 테이블마다 달라(homePremiumImpressionCount / homeImpressionCount) select를 나눈다
       const analyticsSelect =
-        'date, impressionCount, dialogImpressionCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts';
+        'date, impressionCount, dialogImpressionCount, dialogClickCount, clickCount, phoneClickCount, messageClickCount, naverMapClickCount, blogClickCount, youtubeClickCount, instagramClickCount, kakaoChatClickCount, baeminClickCount, coupangEatsClickCount, wishCount, extraClickCounts';
 
       const [{ data: paidRows }, { data: extRows }, { data: premiumRows }, { data: baseRows }] = await Promise.all([
         supabase
