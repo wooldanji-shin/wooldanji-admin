@@ -30,16 +30,18 @@ export default function UsersPage(): React.ReactElement {
           title="회원 관리"
           description="등록된 회원 정보를 검색하고 관리합니다."
         />
-        <PageHeaderActions>
-          <Button
-            variant='default'
-            onClick={exportCsv.handleExportCSV}
-            disabled={exportCsv.exporting || list.totalCount === 0}
-            leftSection={<Download size={16} />}
-          >
-            {exportCsv.exporting ? '내보내는 중...' : 'CSV 내보내기'}
-          </Button>
-        </PageHeaderActions>
+        {page.canExportCsv && (
+          <PageHeaderActions>
+            <Button
+              variant='default'
+              onClick={exportCsv.handleExportCSV}
+              disabled={exportCsv.exporting || list.totalCount === 0}
+              leftSection={<Download size={16} />}
+            >
+              {exportCsv.exporting ? '내보내는 중...' : 'CSV 내보내기'}
+            </Button>
+          </PageHeaderActions>
+        )}
       </PageHeader>
 
       <PageContent>

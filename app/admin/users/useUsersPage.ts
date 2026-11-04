@@ -48,7 +48,8 @@ export function useUsersPage(): UseUsersPageReturn {
   const approval = useApprovalStatus({ fetchUsers: list.fetchUsers });
   const suspend = useSuspendDialog({ fetchUsers: list.fetchUsers });
   const detail = useDetailDialog({ supabase, fetchUsers: list.fetchUsers });
-  const exportCsv = useUsersExport({ supabase, isManager, authUserId });
+  const exportCsv = useUsersExport({ supabase });
+  const canExportCsv = authRoles.includes('SUPER_ADMIN');
 
   const totalPages = Math.ceil(list.totalCount / ITEMS_PER_PAGE);
 
@@ -61,6 +62,7 @@ export function useUsersPage(): UseUsersPageReturn {
     suspend,
     detail,
     exportCsv,
+    canExportCsv,
     totalPages,
   };
 }

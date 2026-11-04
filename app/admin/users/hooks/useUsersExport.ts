@@ -1,64 +1,21 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import type { UseUsersExportDeps, UseUsersExportReturn } from '../types';
+import { getAgeFromBirthDay, getOverlayPermissionLabel } from '../utils';
 
-/** CSV 내보내기 (전체 회원, 매니저는 관리 아파트 범위) */
-export function useUsersExport({ supabase, isManager, authUserId }: UseUsersExportDeps): UseUsersExportReturn {
+/** CSV 내보내기 (SUPER_ADMIN 전용, 1000행 제한 없이 RPC로 전체 회원 조회) */
+export function useUsersExport({ supabase }: UseUsersExportDeps): UseUsersExportReturn {
   const [exporting, setExporting] = useState(false);
 
   // CSV 내보내기 함수
   const handleExportCSV = useCallback(async (): Promise<void> => {
     setExporting(true);
     try {
-      // 매니저인 경우 아파트 ID 목록 먼저 가져오기 (역할은 AuthGuard가 확인한 값을 사용)
-      let apartmentIds: string[] = [];
-      if (isManager) {
-        const { data: managerApartments } = await supabase
-          .from('manager_apartments')
-          .select('apartmentId')
-          .eq('managerId', authUserId);
+      // RPC가 전체 회원을 JSON 하나로 반환 (권한 없으면 42501 에러)
+      const { data: allData, error } = await (supabase as any).rpc('admin_export_users');
+      if (error) throw error;
 
-        if (managerApartments && managerApartments.length > 0) {
-          apartmentIds = managerApartments.map((ma: any) => ma.apartmentId);
-        } else {
-          toast.error('관리하는 아파트가 없습니다.');
-          setExporting(false);
-          return;
-        }
-      }
-
-      // 페이지네이션으로 모든 데이터 가져오기
-      const allData: any[] = [];
-      const pageSize = 1000;
-      let from = 0;
-
-      while (true) {
-        let query = supabase
-          .from('user')
-          .select(`
-            *,
-            user_roles!inner(id, role, createdAt),
-            apartments:apartmentId(id, name, address)
-          `)
-          .eq('user_roles.role', 'APP_USER')
-          .order('createdAt', { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        if (isManager && apartmentIds.length > 0) {
-          query = query.in('apartmentId', apartmentIds);
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-
-        allData.push(...data);
-        if (data.length < pageSize) break; // 마지막 페이지
-        from += pageSize;
-      }
-
-      if (allData.length === 0) {
+      if (!allData || allData.length === 0) {
         toast.error('내보낼 회원 데이터가 없습니다.');
         setExporting(false);
         return;
@@ -76,13 +33,14 @@ export function useUsersExport({ supabase, isManager, authUserId }: UseUsersExpo
         '동',
         '호',
         '승인상태',
+        '나이',
+        '다른 앱 위에 표시',
         '문 연 횟수',
         '가입일',
       ];
 
       // CSV 데이터 생성
       const csvRows = data.map((user: any) => {
-        const apartment = user.apartments as any;
         const registrationType = user.registrationType === 'APARTMENT' ? '아파트' : '일반';
         const approvalStatus = user.approvalStatus === 'approve' ? '승인' :
                                user.approvalStatus === 'pending' ? '대기' :
@@ -94,10 +52,12 @@ export function useUsersExport({ supabase, isManager, authUserId }: UseUsersExpo
           user.email || '',
           user.phoneNumber || '',
           registrationType,
-          apartment?.name || '',
+          user.apartmentName || '',
           user.buildingNumber || '',
           user.unit || '',
           approvalStatus,
+          getAgeFromBirthDay(user.birthDay) ?? '',
+          getOverlayPermissionLabel(user.registrationType, user.overlayPermissionGranted),
           user.openDoorCount || 0,
           createdAt,
         ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
@@ -127,7 +87,7 @@ export function useUsersExport({ supabase, isManager, authUserId }: UseUsersExpo
     } finally {
       setExporting(false);
     }
-  }, [supabase, isManager, authUserId]);
+  }, [supabase]);
 
   return { exporting, handleExportCSV };
 }

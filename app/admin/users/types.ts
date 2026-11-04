@@ -164,8 +164,6 @@ export interface UseDetailDialogReturn {
 
 export interface UseUsersExportDeps {
   supabase: SupabaseClient;
-  isManager: boolean;
-  authUserId: string;
 }
 
 export interface UseUsersExportReturn {
@@ -184,5 +182,7 @@ export interface UseUsersPageReturn {
   suspend: UseSuspendDialogReturn;
   detail: UseDetailDialogReturn;
   exportCsv: UseUsersExportReturn;
+  // CSV 내보내기 RPC가 SUPER_ADMIN만 허용하므로 버튼 노출도 맞춘다
+  canExportCsv: boolean;
   totalPages: number;
 }

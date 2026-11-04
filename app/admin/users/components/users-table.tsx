@@ -6,7 +6,7 @@ import { MoreVertical, Check, X, Eye, Image as ImageIcon, Ban, Edit } from 'luci
 import { TableSkeleton } from '@/components/skeletons';
 import type { UserFullDetails } from '@/lib/supabase/types';
 import type { ApprovalStatusAction } from '../types';
-import { formatDate } from '../utils';
+import { formatDate, getOverlayPermissionLabel } from '../utils';
 
 interface UsersTableProps {
   users: UserFullDetails[];
@@ -48,6 +48,11 @@ const getRegistrationTypeBadge = (type: string | null): React.ReactElement => {
   }
 };
 
+const getOverlayPermissionBadge = (registrationType: string | null, granted: boolean | null): React.ReactElement => {
+  const label = getOverlayPermissionLabel(registrationType, granted);
+  if (label === '-') return <Text c="dimmed">-</Text>;
+  return <Badge variant="light" color={granted ? 'green' : 'red'}>{label}</Badge>;
+};
 
 const getRegisterMethodBadge = (method: string | null): React.ReactElement | null => {
   switch (method?.toLowerCase()) {
@@ -89,6 +94,7 @@ export const UsersTable = memo(function UsersTable({
           <Table.Th>아파트/동/호</Table.Th>
           <Table.Th>출생년도</Table.Th>
           <Table.Th>승인상태</Table.Th>
+          <Table.Th>다른 앱 위 표시</Table.Th>
           <Table.Th>가입일</Table.Th>
           <Table.Th ta="center">문 연 횟수</Table.Th>
           <Table.Th ta="right">작업</Table.Th>
@@ -97,13 +103,13 @@ export const UsersTable = memo(function UsersTable({
       <Table.Tbody>
         {initialLoading && loading ? (
           <Table.Tr>
-            <Table.Td colSpan={10} p={0}>
-              <TableSkeleton rows={8} columns={10} showHeader={false} />
+            <Table.Td colSpan={11} p={0}>
+              <TableSkeleton rows={8} columns={11} showHeader={false} />
             </Table.Td>
           </Table.Tr>
         ) : users.length === 0 ? (
           <Table.Tr>
-            <Table.Td colSpan={10} ta="center" py={48} c="dimmed">
+            <Table.Td colSpan={11} ta="center" py={48} c="dimmed">
               {searchQuery ? '검색 결과가 없습니다.' : '회원이 없습니다.'}
             </Table.Td>
           </Table.Tr>
@@ -185,6 +191,9 @@ export const UsersTable = memo(function UsersTable({
               </Table.Td>
               <Table.Td>
                 {getApprovalBadge(user.approvalStatus)}
+              </Table.Td>
+              <Table.Td>
+                {getOverlayPermissionBadge(user.registrationType, user.overlayPermissionGranted)}
               </Table.Td>
               <Table.Td c="dimmed">
                 {formatDate(user.createdAt)}
