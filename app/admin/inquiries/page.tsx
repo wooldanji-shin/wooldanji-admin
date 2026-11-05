@@ -134,11 +134,13 @@ export default function InquiriesPage() {
 
       // SUPER_ADMIN: 모든 문의 조회
       // MANAGER: 자신이 등록한 아파트의 회원들의 문의만 조회
+      // 매니저는 담당 아파트 회원으로 거르기 위해 user를 inner 조인 (슈퍼관리자는 기존처럼 left)
+      const isManagerOnly = isManager && !isSuperAdmin;
       let query = supabase
         .from('inquiries')
         .select(`
           *,
-          user:userId (
+          user:userId${isManagerOnly ? '!inner' : ''} (
             name,
             email,
             phoneNumber,
@@ -147,7 +149,7 @@ export default function InquiriesPage() {
         `);
 
       // MANAGER인 경우: 자신이 관리하는 아파트의 회원들 문의만 조회
-      if (isManager && !isSuperAdmin) {
+      if (isManagerOnly) {
         // 매니저가 관리하는 아파트 목록 조회
         const { data: managerApartments, error: aptError } = await supabase
           .from('manager_apartments')
@@ -165,23 +167,8 @@ export default function InquiriesPage() {
           return;
         }
 
-        // 해당 아파트에 속한 사용자들의 문의만 조회
-        const { data: usersInApartments, error: usersError } = await supabase
-          .from('user')
-          .select('id')
-          .in('apartmentId', apartmentIds);
-
-        if (usersError) throw usersError;
-
-        const userIds = usersInApartments?.map(u => u.id) || [];
-
-        if (userIds.length === 0) {
-          setInquiries([]);
-          setLoading(false);
-          return;
-        }
-
-        query = query.in('userId', userIds);
+        // 회원 id 목록을 URL에 넣지 않고 조인한 회원의 아파트로 거른다 (큰 아파트에서 길이 초과·1000행 잘림)
+        query = query.in('user.apartmentId', apartmentIds);
       }
 
       const { data: inquiriesData, error: fetchError } = await query

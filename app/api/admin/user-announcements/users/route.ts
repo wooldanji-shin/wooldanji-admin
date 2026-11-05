@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     const search = url.searchParams.get('search') ?? '';
     const status = url.searchParams.get('status') ?? 'ALL';
     const role = url.searchParams.get('role') ?? 'ALL';
+    const overlay = url.searchParams.get('overlay') ?? 'ALL';
     const limit = Math.min(Number(url.searchParams.get('limit') ?? PAGE_SIZE), 200);
     const offset = Number(url.searchParams.get('offset') ?? 0);
 
@@ -41,48 +42,26 @@ export async function GET(req: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // 회원 유형(role) 필터 — user_roles에서 해당 role 보유한 userId 목록 선조회
-    let roleUserIds: string[] | null = null;
-    if (role !== 'ALL') {
-      const { data: roleData, error: roleErr } = await supabase
-        .from('user_roles')
-        .select('userId')
-        .eq('role', role);
-      if (roleErr) {
-        console.error('[user-announcements/users] role filter error:', roleErr);
-        return NextResponse.json({ error: '회원 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
-      }
-      roleUserIds = (roleData ?? []).map((r: any) => r.userId as string);
-      // 해당 역할 유저가 없으면 빈 결과 즉시 반환
-      if (roleUserIds.length === 0) {
-        return NextResponse.json({ rows: [], totalCount: 0 });
-      }
-    }
-
-    // 아파트명 검색 — apartments에서 일치하는 ID 목록 선조회
-    let aptUserIds: string[] | null = null;
+    // 아파트명 검색 — 일치하는 아파트 ID만 선조회해서 apartmentId로 거른다
+    // (회원 id 목록을 URL에 넣으면 큰 아파트에서 길이 초과·1000행 잘림 발생)
+    let aptIds: string[] = [];
     const s = search.trim();
     if (s) {
       const { data: aptData } = await supabase
         .from('apartments')
         .select('id')
         .ilike('name', `%${s}%`);
-      const aptIds = (aptData ?? []).map((a: any) => a.id as string);
-      if (aptIds.length > 0) {
-        const { data: aptUserData } = await supabase
-          .from('user')
-          .select('id')
-          .in('apartmentId', aptIds);
-        aptUserIds = (aptUserData ?? []).map((u: any) => u.id as string);
-      } else {
-        aptUserIds = [];
-      }
+      aptIds = (aptData ?? []).map((a: any) => a.id as string);
     }
+
+    // 회원 유형 필터는 조인으로 거른다 (userId 목록을 URL에 넣으면 길이 초과·1000행 잘림 발생)
+    // 표시용 user_roles(role)는 전체 역할을 보여줘야 해서 거르기용 조인을 별칭으로 따로 붙인다
+    const roleFilterJoin = role !== 'ALL' ? ', role_filter:user_roles!inner(role)' : '';
 
     let query = supabase
       .from('user')
       .select(
-        'id, name, phoneNumber, email, approvalStatus, fcmToken, marketingAgreed, openDoorCount, apartments!user_apartmentId_fkey(name), user_roles(role)',
+        `id, name, phoneNumber, email, approvalStatus, fcmToken, marketingAgreed, openDoorCount, platform, registrationType, overlayPermissionGranted, apartments!user_apartmentId_fkey(name), user_roles(role)${roleFilterJoin}`,
         { count: 'exact' },
       );
 
@@ -92,8 +71,8 @@ export async function GET(req: NextRequest) {
         `phoneNumber.ilike.%${s}%`,
         `email.ilike.%${s}%`,
       ];
-      if (aptUserIds && aptUserIds.length > 0) {
-        orParts.push(`id.in.(${aptUserIds.join(',')})`);
+      if (aptIds.length > 0) {
+        orParts.push(`apartmentId.in.(${aptIds.join(',')})`);
       }
       query = query.or(orParts.join(','));
     }
@@ -101,8 +80,15 @@ export async function GET(req: NextRequest) {
     if (status !== 'ALL') {
       query = query.eq('approvalStatus', status);
     }
-    if (roleUserIds !== null) {
-      query = query.in('id', roleUserIds);
+    if (role !== 'ALL') {
+      query = query.eq('role_filter.role', role);
+    }
+    // 다른 앱 위에 표시 권한은 Android 아파트 회원만 앱이 동기화하므로 그 범위로 한정
+    if (overlay === 'granted' || overlay === 'denied') {
+      query = query
+        .eq('platform', 'aos')
+        .eq('registrationType', 'APARTMENT')
+        .eq('overlayPermissionGranted', overlay === 'granted');
     }
 
     query = query.order('createdAt', { ascending: false }).range(offset, offset + limit - 1);
@@ -124,6 +110,9 @@ export async function GET(req: NextRequest) {
       hasFcmToken: Array.isArray(u.fcmToken) && u.fcmToken.length > 0,
       marketingAgreed: u.marketingAgreed,
       openDoorCount: u.openDoorCount ?? 0,
+      // Android 아파트 회원이 아니면 권한 개념이 없어 null
+      overlayPermissionGranted:
+        u.platform === 'aos' && u.registrationType === 'APARTMENT' ? !!u.overlayPermissionGranted : null,
     }));
 
     return NextResponse.json({ rows, totalCount: count ?? 0 });

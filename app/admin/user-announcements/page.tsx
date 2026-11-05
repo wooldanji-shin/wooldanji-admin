@@ -60,6 +60,8 @@ interface UserRow {
   hasFcmToken: boolean;
   marketingAgreed: boolean;
   openDoorCount: number;
+  // Android 아파트 회원만 값이 있고 그 외는 null
+  overlayPermissionGranted: boolean | null;
   total_count: number;
 }
 
@@ -96,8 +98,10 @@ interface SendResult {
 
 type FilterStatus = 'ALL' | 'approve' | 'inactive' | 'suspended';
 type FilterRole = 'ALL' | 'APP_USER' | 'APT_ADMIN' | 'MANAGER' | 'SUPER_ADMIN';
+type FilterOverlay = 'ALL' | 'granted' | 'denied';
 
 const PAGE_SIZE = 50;
+const RECIPIENTS_PAGE_SIZE = 1000;
 
 export default function UserAnnouncementsPage() {
   const router = useRouter();
@@ -111,6 +115,7 @@ export default function UserAnnouncementsPage() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('ALL');
   const [filterRole, setFilterRole] = useState<FilterRole>('ALL');
+  const [filterOverlay, setFilterOverlay] = useState<FilterOverlay>('ALL');
   // URL query param 기반 페이지 (URL은 1-indexed, 내부는 0-indexed)
   const page = Math.max(0, parseInt(searchParams.get('page') || '1') - 1);
   const setPage = (newPage: number | ((prev: number) => number)) => {
@@ -166,6 +171,7 @@ export default function UserAnnouncementsPage() {
         search: search.trim(),
         status: filterStatus,
         role: filterRole,
+        overlay: filterOverlay,
         limit: String(PAGE_SIZE),
         offset: String(page * PAGE_SIZE),
       });
@@ -189,7 +195,7 @@ export default function UserAnnouncementsPage() {
   useEffect(() => {
     void loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filterStatus, filterRole]);
+  }, [page, filterStatus, filterRole, filterOverlay]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -227,27 +233,27 @@ export default function UserAnnouncementsPage() {
     setRecipientsLoading(true);
     setRecipients([]);
     try {
-      const { data: recData, error: recErr } = await supabase
-        .from('user_announcement_recipients')
-        .select('userId')
-        .eq('announcementId', announcementId);
-      if (recErr) throw recErr;
-
-      const ids = (recData ?? []).map((r: any) => r.userId as string);
-      if (ids.length === 0) return;
-
-      const { data: userData, error: userErr } = await supabase
-        .from('user')
-        .select('id, name, phoneNumber, email')
-        .in('id', ids);
-      if (userErr) throw userErr;
+      // 회원 id 목록을 URL에 넣지 않고 조인으로 한 번에 조회 (수신자가 많으면 URL 길이 초과)
+      // 한 번에 최대 1000행만 오므로 1000명 넘는 발송도 다 보이게 나눠 받는다
+      const rows: any[] = [];
+      for (let from = 0; ; from += RECIPIENTS_PAGE_SIZE) {
+        const { data, error: recErr } = await supabase
+          .from('user_announcement_recipients')
+          .select('userId, user:userId(name, phoneNumber, email)')
+          .eq('announcementId', announcementId)
+          .order('userId')
+          .range(from, from + RECIPIENTS_PAGE_SIZE - 1);
+        if (recErr) throw recErr;
+        rows.push(...(data ?? []));
+        if ((data ?? []).length < RECIPIENTS_PAGE_SIZE) break;
+      }
 
       setRecipients(
-        (userData ?? []).map((u: any) => ({
-          userId: u.id,
-          name: u.name,
-          phoneNumber: u.phoneNumber,
-          email: u.email,
+        rows.map((r: any) => ({
+          userId: r.userId,
+          name: r.user?.name,
+          phoneNumber: r.user?.phoneNumber,
+          email: r.user?.email,
         })),
       );
     } catch (e: any) {
@@ -450,6 +456,23 @@ export default function UserAnnouncementsPage() {
                       w={150}
                     />
 
+                    <Select
+                      placeholder='다른 앱 위 표시'
+                      data={[
+                        { value: 'ALL', label: '전체 (다른 앱 위)' },
+                        { value: 'granted', label: '허용 (AOS 아파트)' },
+                        { value: 'denied', label: '미허용 (AOS 아파트)' },
+                      ]}
+                      value={filterOverlay}
+                      onChange={(v) => {
+                        if (v === null) return;
+                        setFilterOverlay(v as FilterOverlay);
+                        setPage(0);
+                      }}
+                      allowDeselect={false}
+                      w={180}
+                    />
+
                     <ActionIcon
                       variant='subtle'
                       color='gray'
@@ -483,18 +506,19 @@ export default function UserAnnouncementsPage() {
                             <Table.Th w={80}>문연횟수</Table.Th>
                             <Table.Th w={80}>FCM</Table.Th>
                             <Table.Th w={80}>마케팅</Table.Th>
+                            <Table.Th w={100}>다른 앱 위</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
                           {loading && users.length === 0 ? (
                             <Table.Tr>
-                              <Table.Td colSpan={10} p={0}>
-                                <TableSkeleton rows={8} columns={10} showHeader={false} />
+                              <Table.Td colSpan={11} p={0}>
+                                <TableSkeleton rows={8} columns={11} showHeader={false} />
                               </Table.Td>
                             </Table.Tr>
                           ) : users.length === 0 ? (
                             <Table.Tr>
-                              <Table.Td colSpan={10} py='xl' ta='center' c='dimmed'>
+                              <Table.Td colSpan={11} py='xl' ta='center' c='dimmed'>
                                 조회된 회원이 없습니다
                               </Table.Td>
                             </Table.Tr>
@@ -562,6 +586,9 @@ export default function UserAnnouncementsPage() {
                                   ) : (
                                     <XCircle size={16} color='var(--mantine-color-red-6)' />
                                   )}
+                                </Table.Td>
+                                <Table.Td>
+                                  <OverlayPermissionBadge granted={u.overlayPermissionGranted} />
                                 </Table.Td>
                               </Table.Tr>
                             ))
@@ -819,6 +846,15 @@ export default function UserAnnouncementsPage() {
         </Modal>
       </PageContent>
     </PageShell>
+  );
+}
+
+function OverlayPermissionBadge({ granted }: { granted: boolean | null }) {
+  if (granted === null) return <Text span size='xs' c='dimmed'>-</Text>;
+  return (
+    <Badge variant='light' color={granted ? 'green' : 'red'}>
+      {granted ? '허용' : '미허용'}
+    </Badge>
   );
 }
 
