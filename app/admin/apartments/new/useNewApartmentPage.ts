@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -13,6 +13,7 @@ import type {
   BuildingField,
   BulkDraft,
   BulkErrors,
+  BulkMode,
   NewApartmentSummary,
   UseNewApartmentPageReturn,
 } from './types';
@@ -76,14 +77,15 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
   // Step 1: 기본 정보
   const [apartmentName, setApartmentName] = useState<string>('');
   const [address, setAddress] = useState<string>('');
+  const [addressSearchOpened, setAddressSearchOpened] = useState<boolean>(false);
   const [step1Tried, setStep1Tried] = useState<boolean>(false);
 
   // Step 2: 동 정보
   const [buildings, setBuildings] = useState<BuildingDraft[]>([]);
   const [step2Tried, setStep2Tried] = useState<boolean>(false);
 
-  // 여러 동 한 번에 추가
-  const [bulkOpened, setBulkOpened] = useState<boolean>(false);
+  // 동 추가 패널 — 한 동씩 / 번호가 이어지는 여러 동
+  const [bulkMode, setBulkMode] = useState<BulkMode>('single');
   const [bulkDraft, setBulkDraft] = useState<BulkDraft>(EMPTY_BULK);
   const [bulkTried, setBulkTried] = useState<boolean>(false);
 
@@ -102,14 +104,25 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
   }, [isDirty, loading]);
 
   // ───── Step 1 ─────
-  const openAddressSearch = (): void => {
+  // 새 창 대신 입력칸 아래 드롭다운 안에 주소 검색을 바로 띄운다
+  // ref 콜백으로 쓰여서, 매번 새 함수면 렌더마다 검색 화면이 다시 붙으므로 고정한다
+  const embedAddressSearch = useCallback((el: HTMLDivElement | null): void => {
+    if (!el) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     new (window as any).daum.Postcode({
       oncomplete: (data: DaumPostcodeResult) => {
         setAddress(data.roadAddress || data.jibunAddress);
+        setAddressSearchOpened(false);
       },
-    }).open();
-  };
+      // 검색 화면 높이만큼 영역을 늘려 iframe 안쪽 스크롤바(기본 스타일)를 없애고,
+      // 바깥 상자에서 앱 공통 스크롤바로 스크롤되게 한다
+      onresize: (size: { height: number }) => {
+        el.style.height = `${size.height}px`;
+      },
+      width: '100%',
+      height: '100%',
+    }).embed(el);
+  }, []);
 
   const basicErrors = useMemo<BasicInfoErrors>(() => {
     const errors: BasicInfoErrors = {};
@@ -127,15 +140,6 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
   const goPrev = (): void => setStep(1);
 
   // ───── Step 2 ─────
-  const addBuilding = (): void => {
-    // 이전 동 번호 + 1, 같은 라인을 미리 채워 둔다 (세대수는 동마다 달라 비워 둔다)
-    // 번호순으로 정리한 뒤 맨 뒤(가장 큰 번호) 다음 번호로 추가한다
-    const sorted = sortByBuildingNumber(buildings);
-    const last = sorted[sorted.length - 1];
-    const nextNumber = last && /^\d+$/.test(last.number) ? String(Number(last.number) + 1) : '';
-    setBuildings([...sorted, { id: newId(), number: nextNumber, householdsCount: 0, lines: last?.lines ?? '' }]);
-  };
-
   const removeBuilding = (id: string): void => {
     setBuildings(buildings.filter((b) => b.id !== id));
   };
@@ -177,12 +181,16 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
     [buildings],
   );
 
-  // ───── 여러 동 한 번에 추가 ─────
+  // ───── 동 추가 (한 동씩 / 여러 동) ─────
+  // 한 동씩 추가는 시작 동 = 끝 동인 여러 동 추가로 처리한다
+  const bulkTo = bulkMode === 'single' ? bulkDraft.from : bulkDraft.to;
+
   const bulkErrors = useMemo<BulkErrors>(() => {
     const errors: BulkErrors = {};
     const from = Number(bulkDraft.from);
-    const to = Number(bulkDraft.to);
-    if (!bulkDraft.from || !bulkDraft.to) errors.range = '시작 동과 끝 동을 입력해주세요';
+    const to = Number(bulkTo);
+    if (bulkMode === 'single' && !bulkDraft.from) errors.range = '동 번호를 입력해주세요';
+    else if (!bulkDraft.from || !bulkTo) errors.range = '시작 동과 끝 동을 입력해주세요';
     else if (from > to) errors.range = '끝 동은 시작 동보다 크거나 같아야 합니다';
     else if (to - from + 1 > BULK_MAX) errors.range = `한 번에 ${BULK_MAX}개 동까지 추가할 수 있습니다`;
     else {
@@ -194,9 +202,9 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
     const lineError = parseLines(bulkDraft.lines).error;
     if (lineError) errors.lines = lineError;
     return errors;
-  }, [bulkDraft, buildings]);
+  }, [bulkDraft, bulkTo, bulkMode, buildings]);
 
-  const bulkCount = bulkErrors.range ? 0 : Number(bulkDraft.to) - Number(bulkDraft.from) + 1;
+  const bulkCount = bulkErrors.range ? 0 : Number(bulkTo) - Number(bulkDraft.from) + 1;
 
   const updateBulk = (field: keyof BulkDraft, value: string | number): void => {
     const next =
@@ -215,9 +223,9 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
       lines: bulkDraft.lines,
     }));
     setBuildings(sortByBuildingNumber([...buildings, ...added]));
-    toast.success(`${added.length}개 동을 추가했습니다.`);
-    // 이어서 추가할 수 있게 패널은 열어 두고, 다음 시작 동·세대수·라인은 미리 채워 둔다
-    setBulkDraft({ ...EMPTY_BULK, from: String(Number(bulkDraft.to) + 1), householdsCount: bulkDraft.householdsCount, lines: bulkDraft.lines });
+    toast.success(added.length === 1 ? `${added[0].number}동을 추가했습니다.` : `${added.length}개 동을 추가했습니다.`);
+    // 이어서 추가할 수 있게 다음 동 번호·세대수·라인을 미리 채워 둔다
+    setBulkDraft({ ...EMPTY_BULK, from: String(Number(bulkTo) + 1), householdsCount: bulkDraft.householdsCount, lines: bulkDraft.lines });
     setBulkTried(false);
   };
 
@@ -352,20 +360,24 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
       apartmentName,
       setApartmentName,
       address,
-      openAddressSearch,
+      addressSearchOpened,
+      setAddressSearchOpened,
+      embedAddressSearch,
       errors: step1Tried ? basicErrors : {},
     },
     buildings: {
       list: buildings,
-      addBuilding,
       removeBuilding,
       updateBuilding,
       errors: step2Tried ? allBuildingErrors : {},
       linePreview,
     },
     bulk: {
-      opened: bulkOpened,
-      toggle: () => setBulkOpened((v) => !v),
+      mode: bulkMode,
+      setMode: (mode: BulkMode) => {
+        setBulkMode(mode);
+        setBulkTried(false);
+      },
       draft: bulkDraft,
       update: updateBulk,
       errors: bulkTried ? bulkErrors : {},

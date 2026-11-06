@@ -37,14 +37,17 @@ export interface UseBasicInfoReturn {
   apartmentName: string;
   setApartmentName: (value: string) => void;
   address: string;
-  openAddressSearch: () => void;
+  /** 입력칸 아래 주소 검색 드롭다운 열림 여부 */
+  addressSearchOpened: boolean;
+  setAddressSearchOpened: (opened: boolean) => void;
+  /** 드롭다운 안의 영역에 주소 검색을 띄운다 */
+  embedAddressSearch: (el: HTMLDivElement | null) => void;
   /** '다음 단계'를 누른 뒤에만 채워진다 */
   errors: BasicInfoErrors;
 }
 
 export interface UseBuildingsReturn {
   list: BuildingDraft[];
-  addBuilding: () => void;
   removeBuilding: (id: string) => void;
   updateBuilding: (id: string, field: BuildingField, value: string | number) => void;
   /** '아파트 등록'을 누른 뒤에만 채워진다 */
@@ -53,9 +56,12 @@ export interface UseBuildingsReturn {
   linePreview: (lines: string) => string[];
 }
 
+/** 동 추가 방식 — 한 동씩 / 번호가 이어지는 여러 동 */
+export type BulkMode = 'single' | 'range';
+
 export interface UseBulkAddReturn {
-  opened: boolean;
-  toggle: () => void;
+  mode: BulkMode;
+  setMode: (mode: BulkMode) => void;
   draft: BulkDraft;
   update: (field: keyof BulkDraft, value: string | number) => void;
   errors: BulkErrors;

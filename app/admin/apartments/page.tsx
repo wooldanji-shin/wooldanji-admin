@@ -348,13 +348,28 @@ export default function ApartmentsPage() {
     if (!deletingApartment) return;
 
     setDeleting(true);
+    // 매니저가 등록하면 담당 연결이 자동으로 생기는데, 이 연결은 아파트 삭제를 막으므로 먼저 지운다
+    const { data: managerLinks } = await supabase
+      .from('manager_apartments')
+      .select('managerId, apartmentId')
+      .eq('apartmentId', deletingApartment.id);
     try {
+      const { error: unlinkError } = await supabase
+        .from('manager_apartments')
+        .delete()
+        .eq('apartmentId', deletingApartment.id);
+      if (unlinkError) throw unlinkError;
+
       const { error } = await supabase
         .from('apartments')
         .delete()
         .eq('id', deletingApartment.id);
 
-      if (error) throw error;
+      if (error) {
+        // 회원 등 다른 참조 때문에 실패하면 매니저 담당 연결을 되돌린다
+        if (managerLinks?.length) await supabase.from('manager_apartments').insert(managerLinks);
+        throw error;
+      }
 
       setApartments(apartments.filter(apt => apt.id !== deletingApartment.id));
       setDeleteDialog(false);
@@ -363,11 +378,11 @@ export default function ApartmentsPage() {
       toast.success('아파트가 삭제되었습니다.');
     } catch (error) {
       console.error('Failed to delete apartment:', error);
-      // 23503 = FK 위반. 회원·파트너 신청 등이 아직 이 아파트를 참조하는 경우다.
+      // 23503 = FK 위반. 회원·파트너 입점 신청·이벤트 응모가 아직 이 아파트를 참조하는 경우다.
       const isReferenced = (error as { code?: string })?.code === '23503';
       toast.error(
         isReferenced
-          ? '이 아파트를 참조하는 데이터가 남아 있어 삭제할 수 없습니다. 소속 회원을 먼저 다른 아파트로 이동시켜 주세요.'
+          ? '이 아파트를 참조하는 데이터(소속 회원, 파트너 입점 신청, 이벤트 응모)가 남아 있어 삭제할 수 없습니다.'
           : '아파트 삭제 중 오류가 발생했습니다.'
       );
     } finally {
