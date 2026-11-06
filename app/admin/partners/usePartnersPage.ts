@@ -26,6 +26,8 @@ export interface PartnerUser {
   analyticsEnabled: boolean;
   email: string | null;
   createdAt: string;
+  /** 직접 로그인한 마지막 시각 (자동 로그인으로 앱만 켠 경우는 갱신되지 않음) */
+  lastSignInAt: string | null;
   categoryNames: string[];
   totalImpressionCount: number;
   totalClickCount: number;
@@ -182,6 +184,15 @@ export function usePartnersPage(): UsePartnersPageReturn {
         (users ?? []).forEach((u: any) => { emailMap[u.id] = u.email; });
       }
 
+      // 최종 로그인 시각 — auth.users는 직접 못 읽어 관리자 전용 RPC로 조회
+      const lastSignInMap: Record<string, string | null> = {};
+      if (userIds.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: signIns } = await (supabase as any)
+          .rpc('admin_get_partner_last_sign_in', { p_user_ids: userIds });
+        (signIns ?? []).forEach((r: any) => { lastSignInMap[r.userId] = r.lastSignInAt; });
+      }
+
       // 파트너별 노출수/클릭수 집계 (기본광고 + 프리미엄 합산)
       const partnerIds = rows.map((r: any) => r.id);
       const analyticsMap: Record<string, { impression: number; click: number }> = {};
@@ -235,6 +246,7 @@ export function usePartnersPage(): UsePartnersPageReturn {
         analyticsEnabled: row.analyticsEnabled ?? false,
         email: emailMap[row.userId] ?? null,
         createdAt: row.createdAt,
+        lastSignInAt: lastSignInMap[row.userId] ?? null,
         categoryNames: Array.from(categoryNamesMap[row.id] ?? []),
         totalImpressionCount: analyticsMap[row.id]?.impression ?? 0,
         totalClickCount: analyticsMap[row.id]?.click ?? 0,

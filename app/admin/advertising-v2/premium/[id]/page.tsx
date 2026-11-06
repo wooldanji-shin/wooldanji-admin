@@ -475,7 +475,7 @@ export default function PremiumAdDetailPage({
                 { key: 'impression', label: '카테고리 노출', basic: basic?.impressionCount ?? 0, premium: premium?.impressionCount ?? 0 },
                 { key: 'home', label: '홈 노출수', basic: basic?.homeImpressionCount ?? 0, premium: null },
                 { key: 'home-premium', label: '홈 프리미엄 노출수', basic: null, premium: premium?.homeImpressionCount ?? 0 },
-                { key: 'dialog', label: '다이얼로그 노출수', basic: basic?.dialogImpressionCount ?? 0, premium: premium?.dialogImpressionCount ?? 0 },
+                { key: 'dialog', label: '팝업 노출수', basic: basic?.dialogImpressionCount ?? 0, premium: premium?.dialogImpressionCount ?? 0 },
                 { key: 'dialog-click', label: '팝업 클릭수', basic: basic?.dialogClickCount ?? 0, premium: premium?.dialogClickCount ?? 0 },
                 { key: 'click', label: '클릭수', basic: basic?.clickCount ?? 0, premium: premium?.clickCount ?? 0 },
                 { key: 'phone', label: '전화 클릭', basic: basic?.phoneClickCount ?? 0, premium: premium?.phoneClickCount ?? 0 },

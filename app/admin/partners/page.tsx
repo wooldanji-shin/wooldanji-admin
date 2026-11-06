@@ -96,7 +96,7 @@ function PartnersContent(): React.ReactElement {
           }
         >
           {page.loading ? (
-            <TableSkeleton rows={8} columns={10} />
+            <TableSkeleton rows={8} columns={11} />
           ) : page.partners.length === 0 ? (
             <EmptyState
               icon={Users}
@@ -117,6 +117,7 @@ function PartnersContent(): React.ReactElement {
                   <Table.Th>광고 이력</Table.Th>
                   <Table.Th>분석 권한</Table.Th>
                   <Table.Th>가입일</Table.Th>
+                  <Table.Th>최종 로그인</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -169,6 +170,9 @@ function PartnersContent(): React.ReactElement {
                     </Table.Td>
                     <Table.Td c="dimmed">
                       {new Date(partner.createdAt).toLocaleDateString('ko-KR')}
+                    </Table.Td>
+                    <Table.Td c="dimmed">
+                      {partner.lastSignInAt ? new Date(partner.lastSignInAt).toLocaleDateString('ko-KR') : '-'}
                     </Table.Td>
                   </Table.Tr>
                 ))}
