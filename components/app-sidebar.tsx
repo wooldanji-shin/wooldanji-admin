@@ -4,9 +4,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   AppShell,
   Avatar,
+  Badge,
   Burger,
   Divider,
   Group,
+  Indicator,
   NavLink,
   ScrollArea,
   Stack,
@@ -39,6 +41,7 @@ import {
 import { logout } from '@/lib/auth';
 import { useState, useEffect } from 'react';
 import { useAuthUser } from '@/components/auth-user-context';
+import { useMenuBadges, type MenuBadgeKey } from '@/hooks/use-menu-badges';
 import classes from './app-sidebar.module.css';
 
 interface MenuItem {
@@ -46,6 +49,27 @@ interface MenuItem {
   href: string;
   icon: LucideIcon;
   roles: string[];
+  /** 새로 들어온 건수를 오른쪽 끝에 표시할 메뉴 */
+  badgeKey?: MenuBadgeKey;
+}
+
+/** 배지 숫자가 이보다 크면 99+로 줄인다 */
+const MAX_BADGE_COUNT = 99;
+
+function CountBadge({ count }: { count: number }): React.ReactElement | null {
+  if (count <= 0) return null;
+  return (
+    // 고정폭 숫자는 '12'처럼 자릿수 사이가 벌어져 보여 기본 숫자에 자간만 살짝 줄인다
+    <Badge
+      size="sm"
+      color="red"
+      variant="filled"
+      radius="xl"
+      styles={{ root: { paddingInline: 5 }, label: { letterSpacing: -0.3 } }}
+    >
+      {count > MAX_BADGE_COUNT ? `${MAX_BADGE_COUNT}+` : count}
+    </Badge>
+  );
 }
 
 // ─── 관리 ──────────────────────────────────────────────────
@@ -59,6 +83,7 @@ const navigationItems: MenuItem[] = [
   {
     name: '회원관리',
     href: '/admin/users',
+    badgeKey: 'users',
     icon: Users,
     roles: ['SUPER_ADMIN', 'APT_ADMIN', 'MANAGER'],
   },
@@ -77,12 +102,14 @@ const navigationItems: MenuItem[] = [
   {
     name: '승인보류/거절 관리',
     href: '/admin/user-reconfirm',
+    badgeKey: 'user_reconfirm',
     icon: ShieldAlert,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
     name: '문의 관리',
     href: '/admin/inquiries',
+    badgeKey: 'inquiries',
     icon: HelpCircle,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
@@ -99,6 +126,7 @@ const partnerItems: MenuItem[] = [
   {
     name: '파트너 회원 관리',
     href: '/admin/partners',
+    badgeKey: 'partners',
     icon: Users,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
@@ -111,6 +139,7 @@ const partnerItems: MenuItem[] = [
   {
     name: '파트너 문의 관리',
     href: '/admin/partner-inquiries',
+    badgeKey: 'partner_inquiries',
     icon: HelpCircle,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
@@ -135,6 +164,7 @@ const partnerItems: MenuItem[] = [
   {
     name: '이벤트 관리',
     href: '/admin/partner-events',
+    badgeKey: 'partner_events',
     icon: PartyPopper,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
@@ -145,18 +175,21 @@ const advertisingItems: MenuItem[] = [
   {
     name: '기본광고 관리',
     href: '/admin/advertising-v2/applications',
+    badgeKey: 'ad_applications',
     icon: ShieldAlert,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
     name: '프리미엄 광고 관리',
     href: '/admin/advertising-v2/premium',
+    badgeKey: 'premium_ads',
     icon: Sparkles,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
   {
     name: '단독 팝업 광고 관리',
     href: '/admin/advertising-v2/solo-popup',
+    badgeKey: 'solo_popup_ads',
     icon: DoorOpen,
     roles: ['SUPER_ADMIN', 'MANAGER'],
   },
@@ -290,6 +323,12 @@ export function AppSidebar({ collapsed, onCloseMobile }: AppSidebarProps): React
   const authUser = useAuthUser();
   const userRoles = authUser.roles;
   const user: SidebarUser = { name: authUser.name, email: authUser.email || null };
+  // 배지 함수는 관리자(최고관리자·매니저)만 호출할 수 있다
+  const canSeeBadges = userRoles.includes('SUPER_ADMIN') || userRoles.includes('MANAGER');
+  const currentBadgeKey =
+    MENU_SECTIONS.flatMap((section) => section.items).find((item) => item.href === pathname)?.badgeKey ?? null;
+  const badgeCounts = useMenuBadges(canSeeBadges, currentBadgeKey);
+  const countOf = (item: MenuItem): number => (item.badgeKey ? badgeCounts[item.badgeKey] ?? 0 : 0);
   // 펼쳐 둔 사이드바 섹션 — 현재 페이지가 속한 섹션은 자동으로 펼친다
   const [openedSections, setOpenedSections] = useState<string[]>(() => {
     const current = MENU_SECTIONS.find((section) =>
@@ -358,9 +397,13 @@ export function AppSidebar({ collapsed, onCloseMobile }: AppSidebarProps): React
                 // 펼친 상태에서는 아이콘 없이 메뉴 이름만, 접힌 상태(아이콘만 보이는 좁은 바)에서만 아이콘을 쓴다
                 leftSection={
                   collapsed ? (
-                    <Icon size={18} strokeWidth={1.75} className={classes.icon} />
+                    // 접힌 상태에서는 숫자 대신 아이콘 위 점으로 새 데이터를 알린다
+                    <Indicator color="red" size={8} disabled={countOf(item) === 0}>
+                      <Icon size={18} strokeWidth={1.75} className={classes.icon} />
+                    </Indicator>
                   ) : undefined
                 }
+                rightSection={collapsed ? undefined : <CountBadge count={countOf(item)} />}
                 classNames={{ root: classes.link }}
               />
             </Tooltip>
@@ -382,6 +425,7 @@ export function AppSidebar({ collapsed, onCloseMobile }: AppSidebarProps): React
     // 펼친 사이드바: 섹션 제목을 눌러 메뉴를 접고 펼친다
     const isOpen = openedSections.includes(label);
     const hasActive = visible.some((item) => item.href === pathname);
+    const sectionCount = visible.reduce((sum, item) => sum + countOf(item), 0);
 
     return (
       <NavLink
@@ -392,11 +436,14 @@ export function AppSidebar({ collapsed, onCloseMobile }: AppSidebarProps): React
         childrenOffset={0}
         disableRightSectionRotation
         rightSection={
-          <ChevronRight
-            size={16}
-            className={classes.sectionChevron}
-            data-opened={isOpen || undefined}
-          />
+          <Group gap={6} wrap="nowrap">
+            <CountBadge count={sectionCount} />
+            <ChevronRight
+              size={16}
+              className={classes.sectionChevron}
+              data-opened={isOpen || undefined}
+            />
+          </Group>
         }
         data-section-active={hasActive || undefined}
         classNames={{ root: classes.section, label: classes.sectionLabel, children: classes.sectionChildren }}

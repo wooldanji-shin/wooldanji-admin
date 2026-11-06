@@ -313,13 +313,25 @@ const POPUP_PRIORITY_FILTERS: { label: string; value: PopupPriorityFilter }[] = 
 const METRIC_COLUMNS: { key: MetricColumnKey; label: string; value: (ad: AdApplication) => number }[] = [
   { key: 'impressions', label: '노출수', value: (ad) => ad.totalImpressions },
   { key: 'clicks', label: '클릭수', value: (ad) => ad.totalClicks },
-  { key: 'phoneClicks', label: '전화클릭수', value: (ad) => ad.totalPhoneClicks },
-  { key: 'couponUsage', label: '사용수', value: (ad) => ad.couponUsageCount },
-  { key: 'dialogClicks', label: '팝업클릭수', value: (ad) => ad.totalDialogClicks },
+  { key: 'phoneClicks', label: '전화', value: (ad) => ad.totalPhoneClicks },
+  { key: 'dialogImpressions', label: '팝업노출', value: (ad) => ad.totalDialogImpressions },
+  { key: 'dialogClicks', label: '팝업클릭', value: (ad) => ad.totalDialogClicks },
+  { key: 'couponDownloads', label: '쿠폰다운', value: (ad) => ad.couponDownloadCount },
+  { key: 'couponUsage', label: '쿠폰사용', value: (ad) => ad.couponUsageCount },
 ];
 
-/** 통계 컬럼을 제외한 기본 컬럼 수 (스켈레톤용) */
-const BASE_COLUMN_COUNT = 12;
+/** 컬럼 설정에서 켜고 끄는 부가 정보 컬럼 — 기본은 숨김 */
+const EXTRA_COLUMNS: { key: MetricColumnKey; label: string }[] = [
+  { key: 'startDate', label: '광고 시작일' },
+  { key: 'endDate', label: '광고 종료일' },
+  { key: 'salesRep', label: '영업 담당자' },
+  { key: 'autoApprove', label: '자동승인' },
+  { key: 'hidden', label: '숨김' },
+  { key: 'popupPriority', label: '팝업 우선' },
+];
+
+/** 항상 보이는 컬럼 수 (상호명·제목·아파트·상태·금액·액션, 스켈레톤용) */
+const BASE_COLUMN_COUNT = 6;
 
 export default function AdApplicationsPage(): React.ReactElement {
   const {
@@ -410,6 +422,7 @@ export default function AdApplicationsPage(): React.ReactElement {
   const selectedAdMonthlyAmount = selectedAdTotalHouseholds * pricePerHousehold;
   const approveCategoryData = allCategoriesWithSubs.find((c) => c.id === approveCategory);
   const shownMetricColumns = METRIC_COLUMNS.filter((c) => visibleMetricColumns.includes(c.key));
+  const isShown = (key: MetricColumnKey): boolean => visibleMetricColumns.includes(key);
 
   return (
     <>
@@ -530,7 +543,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                 ) : (
                   <span />
                 )}
-                {/* 통계 컬럼 표시 설정 — 기본은 모두 숨김, 체크한 컬럼만 표에 나온다 */}
+                {/* 컬럼 표시 설정 — 기본은 통계만 보이고, 체크한 컬럼만 표에 나온다 */}
                 <Popover position="bottom-end" shadow="md" withinPortal>
                   <Popover.Target>
                     <Button variant="default" size="xs" leftSection={<Columns3 size={16} />}>
@@ -548,7 +561,12 @@ export default function AdApplicationsPage(): React.ReactElement {
                         onChange={(v) => setVisibleMetricColumns(v as MetricColumnKey[])}
                       >
                         <Stack gap="xs">
+                          <Text size="xs" c="dimmed">통계</Text>
                           {METRIC_COLUMNS.map((c) => (
+                            <Checkbox key={c.key} value={c.key} label={c.label} />
+                          ))}
+                          <Text size="xs" c="dimmed" mt="xs">추가 정보</Text>
+                          {EXTRA_COLUMNS.map((c) => (
                             <Checkbox key={c.key} value={c.key} label={c.label} />
                           ))}
                         </Stack>
@@ -563,7 +581,7 @@ export default function AdApplicationsPage(): React.ReactElement {
             }
           >
             {loading ? (
-              <TableSkeleton rows={6} columns={BASE_COLUMN_COUNT + shownMetricColumns.length} />
+              <TableSkeleton rows={6} columns={BASE_COLUMN_COUNT + visibleMetricColumns.length} />
             ) : paginatedApplications.length === 0 ? (
               <EmptyState
                 icon={Inbox}
@@ -579,12 +597,13 @@ export default function AdApplicationsPage(): React.ReactElement {
                     <Table.Th ta="center">신청 아파트</Table.Th>
                     <Table.Th ta="center">광고 상태</Table.Th>
                     <Table.Th ta="right">금액(월)</Table.Th>
-                    <Table.Th>광고 시작일</Table.Th>
-                    <Table.Th>광고 종료일</Table.Th>
-                    <Table.Th>영업 담당자</Table.Th>
+                    {isShown('startDate') && <Table.Th>광고 시작일</Table.Th>}
+                    {isShown('endDate') && <Table.Th>광고 종료일</Table.Th>}
+                    {isShown('salesRep') && <Table.Th>영업 담당자</Table.Th>}
                     {shownMetricColumns.map((c) => (
                       <Table.Th key={c.key} ta="center">{c.label}</Table.Th>
                     ))}
+                    {isShown('autoApprove') && (
                     <Table.Th ta="center">
                       <Tooltip
                         multiline
@@ -609,7 +628,9 @@ export default function AdApplicationsPage(): React.ReactElement {
                         </Text>
                       </Tooltip>
                     </Table.Th>
-                    <Table.Th ta="center">숨김</Table.Th>
+                    )}
+                    {isShown('hidden') && <Table.Th ta="center">숨김</Table.Th>}
+                    {isShown('popupPriority') && (
                     <Table.Th ta="center">
                       <Tooltip
                         multiline
@@ -637,6 +658,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                         </Text>
                       </Tooltip>
                     </Table.Th>
+                    )}
                     <Table.Th ta="center">액션</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
@@ -723,19 +745,25 @@ export default function AdApplicationsPage(): React.ReactElement {
                           );
                         })()}
                       </Table.Td>
+                      {isShown('startDate') && (
                       <Table.Td c="dimmed">
                         {app.activatedAt
                           ? new Date(app.activatedAt).toLocaleDateString('ko-KR')
                           : '-'}
                       </Table.Td>
+                      )}
+                      {isShown('endDate') && (
                       <Table.Td c="dimmed">
                         {app.nextBillingDate
                           ? new Date(app.nextBillingDate).toLocaleDateString('ko-KR')
                           : '-'}
                       </Table.Td>
+                      )}
+                      {isShown('salesRep') && (
                       <Table.Td c="dimmed">
                         {app.salesRepName ?? '-'}
                       </Table.Td>
+                      )}
                       {shownMetricColumns.map((c) => {
                         const v = c.value(app);
                         return (
@@ -745,6 +773,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                         );
                       })}
                       {/* 행 클릭이 상세로 넘어가므로 체크박스 조작은 여기서 막는다 */}
+                      {isShown('autoApprove') && (
                       <Table.Td
                         ta="center"
                         onClick={(e) => e.stopPropagation()}
@@ -763,6 +792,8 @@ export default function AdApplicationsPage(): React.ReactElement {
                           <Text span c="dimmed">-</Text>
                         )}
                       </Table.Td>
+                      )}
+                      {isShown('hidden') && (
                       <Table.Td
                         ta="center"
                         onClick={(e) => e.stopPropagation()}
@@ -775,6 +806,8 @@ export default function AdApplicationsPage(): React.ReactElement {
                           />
                         </Group>
                       </Table.Td>
+                      )}
+                      {isShown('popupPriority') && (
                       <Table.Td
                         ta="center"
                         onClick={(e) => e.stopPropagation()}
@@ -788,6 +821,7 @@ export default function AdApplicationsPage(): React.ReactElement {
                           />
                         </Group>
                       </Table.Td>
+                      )}
                       <Table.Td
                         ta="center"
                         onClick={(e) => e.stopPropagation()}

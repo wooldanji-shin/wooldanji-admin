@@ -27,12 +27,21 @@ export type StatusFilter = 'all' | 'free_running' | 'paid_running' | 'unpaid' | 
 export type BizCallFilter = 'all' | 'used' | 'unused';
 /** 팝업 우선(showInDoorPopup) 지정 여부 필터 */
 export type PopupPriorityFilter = 'all' | 'on' | 'off';
-/** 목록에서 켜고 끌 수 있는 통계 컬럼 */
-export type MetricColumnKey = 'impressions' | 'clicks' | 'phoneClicks' | 'couponUsage' | 'dialogClicks';
+/** 목록에서 켜고 끌 수 있는 컬럼 — 앞 7개는 통계, 뒤 6개는 부가 정보 */
+export type MetricColumnKey =
+  | 'impressions' | 'clicks' | 'phoneClicks' | 'dialogImpressions' | 'dialogClicks' | 'couponDownloads' | 'couponUsage'
+  | 'startDate' | 'endDate' | 'salesRep' | 'autoApprove' | 'hidden' | 'popupPriority';
 
-/** 통계 컬럼 표시 설정 저장 키 (브라우저별) */
-const METRIC_COLUMNS_STORAGE_KEY = 'adApplicationsVisibleMetricColumns';
-const METRIC_COLUMN_KEYS: MetricColumnKey[] = ['impressions', 'clicks', 'phoneClicks', 'couponUsage', 'dialogClicks'];
+/** 컬럼 표시 설정 저장 키 (브라우저별) — 기본 표시가 바뀌어 예전 키 대신 새 키를 쓴다 */
+const METRIC_COLUMNS_STORAGE_KEY = 'adApplicationsVisibleColumns';
+const METRIC_COLUMN_KEYS: MetricColumnKey[] = [
+  'impressions', 'clicks', 'phoneClicks', 'dialogImpressions', 'dialogClicks', 'couponDownloads', 'couponUsage',
+  'startDate', 'endDate', 'salesRep', 'autoApprove', 'hidden', 'popupPriority',
+];
+/** 처음 들어오면 통계만 보이고 부가 정보는 컬럼 설정에서 켠다 */
+const DEFAULT_VISIBLE_COLUMNS: MetricColumnKey[] = [
+  'impressions', 'clicks', 'phoneClicks', 'dialogImpressions', 'dialogClicks', 'couponDownloads', 'couponUsage',
+];
 
 export interface AdCategoryWithSubs {
   id: string;
@@ -95,8 +104,12 @@ export interface AdApplication {
   totalImpressions: number;
   totalClicks: number;
   totalPhoneClicks: number;
+  /** 문열림 팝업 노출수 */
+  totalDialogImpressions: number;
   /** 문열림 팝업 클릭수 */
   totalDialogClicks: number;
+  /** 이 광고 파트너의 쿠폰 다운로드 수 (쿠폰은 파트너 단위) */
+  couponDownloadCount: number;
   /** 이 광고 파트너의 쿠폰 사용완료 수 (쿠폰은 파트너 단위) */
   couponUsageCount: number;
   /** 다음 정기결제일 — 현재 결제 주기가 끝나는 날 */
@@ -169,7 +182,7 @@ export interface UseApplicationsPageReturn {
   popupPriorityFilter: PopupPriorityFilter;
   setPopupPriorityFilter: (v: PopupPriorityFilter) => void;
   popupPriorityCounts: Record<PopupPriorityFilter, number>;
-  /** 표에 표시할 통계 컬럼 (기본: 모두 숨김) */
+  /** 표에 표시할 선택 컬럼 (기본: 통계 7개) */
   visibleMetricColumns: MetricColumnKey[];
   setVisibleMetricColumns: (keys: MetricColumnKey[]) => void;
   searchTerm: string;
@@ -248,7 +261,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const [subCategoryFilter, _setSubCategoryFilter] = useState<string | null>(null);
   const [bizCallFilter, _setBizCallFilter] = useState<BizCallFilter>('all');
   const [popupPriorityFilter, _setPopupPriorityFilter] = useState<PopupPriorityFilter>('all');
-  const [visibleMetricColumns, _setVisibleMetricColumns] = useState<MetricColumnKey[]>([]);
+  const [visibleMetricColumns, _setVisibleMetricColumns] = useState<MetricColumnKey[]>(DEFAULT_VISIBLE_COLUMNS);
   const [searchTerm, _setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm);
   const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
@@ -279,10 +292,12 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const setBizCallFilter = useCallback((v: BizCallFilter) => { _setBizCallFilter(v); setPage(1); }, [setPage]);
   const setPopupPriorityFilter = useCallback((v: PopupPriorityFilter) => { _setPopupPriorityFilter(v); setPage(1); }, [setPage]);
 
-  // 통계 컬럼 표시 설정은 브라우저에 기억해 둔다 (저장소를 못 쓰면 기본값 = 모두 숨김)
+  // 컬럼 표시 설정은 브라우저에 기억해 둔다 (저장된 게 없거나 저장소를 못 쓰면 기본 표시)
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(METRIC_COLUMNS_STORAGE_KEY) ?? '[]');
+      const raw = localStorage.getItem(METRIC_COLUMNS_STORAGE_KEY);
+      if (raw === null) return;
+      const saved = JSON.parse(raw);
       if (Array.isArray(saved)) {
         _setVisibleMetricColumns(saved.filter((k): k is MetricColumnKey => METRIC_COLUMN_KEYS.includes(k)));
       }
@@ -428,7 +443,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
 
       // 통계와 구독은 서로 기다릴 필요가 없어 동시에 요청한다
       // 일별 행을 받아 합산하면 API 행 제한에 잘려 일부 광고 통계가 비므로 DB에서 합산한다
-      const [{ data: analyticsRows }, { data: subscriptionRows }, { data: couponUsageRows }] = await Promise.all([
+      const [{ data: analyticsRows }, { data: subscriptionRows }, { data: couponUsageRows }, { data: couponDownloadRows }] = await Promise.all([
         adIds.length > 0
           ? (supabase as any).rpc('get_ad_analytics_totals', { p_ad_ids: adIds })
           : Promise.resolve({ data: [] }),
@@ -443,11 +458,21 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         partnerIds.length > 0
           ? (supabase as any).rpc('get_partner_coupon_usage_counts', { p_partner_ids: partnerIds })
           : Promise.resolve({ data: [] }),
+        partnerIds.length > 0
+          ? supabase.from('coupons').select('partnerUserId, coupon_downloads(count)').in('partnerUserId', partnerIds)
+          : Promise.resolve({ data: [] }),
       ]);
 
       const couponUsageMap = new Map<string, number>(
         ((couponUsageRows ?? []) as any[]).map((r) => [r.partnerUserId as string, Number(r.usageCount) || 0])
       );
+
+      // 쿠폰별 다운로드 수를 파트너 단위로 합친다
+      const couponDownloadMap = new Map<string, number>();
+      for (const c of (couponDownloadRows ?? []) as any[]) {
+        const n = (c.coupon_downloads as { count: number }[] | null)?.[0]?.count ?? 0;
+        couponDownloadMap.set(c.partnerUserId, (couponDownloadMap.get(c.partnerUserId) ?? 0) + n);
+      }
 
       // 광고당 가장 최근 구독 1건만 남긴다 (createdAt 내림차순이라 먼저 온 것이 최신)
       const subscriptionMap = (subscriptionRows ?? []).reduce<
@@ -467,7 +492,10 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         return acc;
       }, {});
 
-      const analyticsMap: Record<string, { impressions: number; clicks: number; phoneClicks: number; dialogClicks: number }> =
+      const analyticsMap: Record<
+        string,
+        { impressions: number; clicks: number; phoneClicks: number; dialogImpressions: number; dialogClicks: number }
+      > =
         Object.fromEntries(
           ((analyticsRows ?? []) as any[]).map((r) => [
             r.baseAdId as string,
@@ -475,6 +503,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
               impressions: r.homeImpressionCount + r.impressionCount,
               clicks: r.clickCount,
               phoneClicks: r.phoneClickCount,
+              dialogImpressions: r.dialogImpressionCount ?? 0,
               dialogClicks: r.dialogClickCount ?? 0,
             },
           ])
@@ -513,7 +542,9 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         totalImpressions: analyticsMap[row.id]?.impressions ?? 0,
         totalClicks: analyticsMap[row.id]?.clicks ?? 0,
         totalPhoneClicks: analyticsMap[row.id]?.phoneClicks ?? 0,
+        totalDialogImpressions: analyticsMap[row.id]?.dialogImpressions ?? 0,
         totalDialogClicks: analyticsMap[row.id]?.dialogClicks ?? 0,
+        couponDownloadCount: row.partner_users?.id ? couponDownloadMap.get(row.partner_users.id) ?? 0 : 0,
         couponUsageCount: row.partner_users?.id ? couponUsageMap.get(row.partner_users.id) ?? 0 : 0,
         nextBillingDate: subscriptionMap[row.id]?.nextBillingDate ?? null,
         freeEndDate: subscriptionMap[row.id]?.freeEndDate ?? null,
