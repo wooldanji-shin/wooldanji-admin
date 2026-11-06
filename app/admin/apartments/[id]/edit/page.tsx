@@ -148,7 +148,8 @@ export default function EditApartmentPage({ params }: { params: Promise<{ id: st
       setApartment(formattedApartment);
       setName(formattedApartment.name);
       setAddress(formattedApartment.address);
-      setBuildings(formattedApartment.buildings);
+      // 동 번호 오름차순으로 보여준다
+      setBuildings([...formattedApartment.buildings].sort((a, b) => a.buildingNumber - b.buildingNumber));
     } catch (err) {
       console.error('Failed to fetch apartment:', err);
       toast.error('아파트 정보를 불러오는데 실패했습니다.');

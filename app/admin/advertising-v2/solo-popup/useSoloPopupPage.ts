@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { setAutoApproveModification } from '@/lib/ads/auto-approve';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useApartmentLookup } from '@/lib/hooks/useLookups';
+import type { ApartmentOption } from '@/components/apartment-combobox';
 import type { SoloPeriodUnit, SoloPopupStatus } from '@/lib/ads/solo-popup';
 
 export interface SoloPopupRow {
@@ -34,6 +36,10 @@ export interface SoloPopupRow {
   /** 홈 프리미엄 추천 섹션 (위 2개는 문열림 팝업) */
   homeImpressions: number;
   homeClicks: number;
+  /** 노출 아파트 — 앱 노출과 같은 기준(연결된 기본광고의 현재 아파트) */
+  apartments: { apartmentId: string; apartmentName: string }[];
+  /** 연결된 기본광고 제목 — 검색용 */
+  baseAdTitle: string;
 }
 
 /** 필터 탭 — 수정 심사는 running + modificationStatus=pending */
@@ -57,6 +63,8 @@ export function useSoloPopupPage() {
   const [page, setPage] = useState(1);
   const supabase = useMemo(() => createClient(), []);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [apartmentFilter, setApartmentFilterState] = useState<string | null>(null);
+  const allApartments = useApartmentLookup() as ApartmentOption[];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,8 +82,9 @@ export function useSoloPopupPage() {
       const ads = (data ?? []) as any[];
       const partnerIds = [...new Set(ads.map((a) => a.partnerId))];
       const adIds = ads.map((a) => a.id);
+      const baseAdIds = [...new Set(ads.map((a) => a.baseAdId).filter(Boolean))];
 
-      const [{ data: partners }, { data: stats }] = await Promise.all([
+      const [{ data: partners }, { data: stats }, { data: baseAdApartments }, { data: baseAds }] = await Promise.all([
         partnerIds.length
           ? db.from('partner_users').select('id, businessName').in('id', partnerIds)
           : Promise.resolve({ data: [] }),
@@ -85,7 +94,25 @@ export function useSoloPopupPage() {
               .select('"soloPopupAdId", "impressionCount", "primaryClickCount", "secondaryClickCount", "homeImpressionCount", "homeClickCount"')
               .in('soloPopupAdId', adIds)
           : Promise.resolve({ data: [] }),
+        baseAdIds.length
+          ? db
+              .from('advertisement_apartments_v2')
+              .select('"advertisementId", "apartmentId", apartments:apartmentId(name)')
+              .in('advertisementId', baseAdIds)
+          : Promise.resolve({ data: [] }),
+        baseAdIds.length
+          ? db.from('advertisements_v2').select('id, title').in('id', baseAdIds)
+          : Promise.resolve({ data: [] }),
       ]);
+
+      const baseAdTitles = new Map<string, string>((baseAds ?? []).map((b: any) => [b.id, b.title ?? '']));
+
+      const apartmentsByBaseAd = new Map<string, { apartmentId: string; apartmentName: string }[]>();
+      for (const r of (baseAdApartments ?? []) as any[]) {
+        const list = apartmentsByBaseAd.get(r.advertisementId) ?? [];
+        list.push({ apartmentId: r.apartmentId, apartmentName: r.apartments?.name ?? '-' });
+        apartmentsByBaseAd.set(r.advertisementId, list);
+      }
 
       const names = new Map<string, string>((partners ?? []).map((p: any) => [p.id, p.businessName]));
       const sums = new Map<string, { imp: number; clk: number; homeImp: number; homeClk: number }>();
@@ -107,6 +134,8 @@ export function useSoloPopupPage() {
           clicks: sums.get(a.id)?.clk ?? 0,
           homeImpressions: sums.get(a.id)?.homeImp ?? 0,
           homeClicks: sums.get(a.id)?.homeClk ?? 0,
+          apartments: a.baseAdId ? apartmentsByBaseAd.get(a.baseAdId) ?? [] : [],
+          baseAdTitle: a.baseAdId ? baseAdTitles.get(a.baseAdId) ?? '' : '',
         }))
       );
     } catch (err) {
@@ -121,13 +150,20 @@ export function useSoloPopupPage() {
     load();
   }, [load]);
 
+  // 아파트 필터는 상태별 개수에도 반영되도록 상태 필터보다 먼저 적용한다
   const bySearch = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter(
-      (r) => r.partnerBusinessName.toLowerCase().includes(term) || r.title.toLowerCase().includes(term)
+    const byApartment = apartmentFilter
+      ? rows.filter((r) => r.apartments.some((apt) => apt.apartmentId === apartmentFilter))
+      : rows;
+    if (!term) return byApartment;
+    return byApartment.filter(
+      (r) =>
+        r.partnerBusinessName.toLowerCase().includes(term) ||
+        r.title.toLowerCase().includes(term) ||
+        r.baseAdTitle.toLowerCase().includes(term)
     );
-  }, [rows, debouncedSearch]);
+  }, [rows, debouncedSearch, apartmentFilter]);
 
   const statusCounts = useMemo(() => {
     const filters: SoloStatusFilter[] = ['all', 'running', 'pending', 'modification', 'approved', 'ended', 'rejected'];
@@ -176,6 +212,9 @@ export function useSoloPopupPage() {
     setStatusFilter: (f: SoloStatusFilter) => { setStatusFilterState(f); setPage(1); },
     searchTerm,
     setSearchTerm: (v: string) => { setSearchTermState(v); setPage(1); },
+    apartmentFilter,
+    setApartmentFilter: (v: string | null) => { setApartmentFilterState(v); setPage(1); },
+    allApartments,
     statusCounts,
     pageRows,
     page,

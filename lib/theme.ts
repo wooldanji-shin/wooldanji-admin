@@ -256,7 +256,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => ({
     '--app-bg-subtle': '#eff2f7',
     '--app-table-head-bg': '#f8f9fa',
     '--app-input-bg': '#f2f4f8',
-    '--app-scrollbar-thumb': '#dfe3ea',
+    '--app-scrollbar-thumb': '#c3cbea', // primary 계열 블루그레이 — 회색보다 살짝 진하게
   },
   dark: {
     '--mantine-color-text': '#ffffff',
@@ -279,6 +279,6 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => ({
     '--app-bg-subtle': 'var(--mantine-color-dark-6)',
     '--app-table-head-bg': 'var(--mantine-color-dark-6)',
     '--app-input-bg': 'var(--mantine-color-dark-6)',
-    '--app-scrollbar-thumb': 'var(--mantine-color-dark-4)',
+    '--app-scrollbar-thumb': '#4a5478', // 다크 모드용 블루그레이
   },
 });

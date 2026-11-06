@@ -23,6 +23,12 @@ const LIST_PATH = '/admin/apartments';
 const BULK_MAX = 100;
 const EMPTY_BULK: BulkDraft = { from: '', to: '', householdsCount: 0, lines: '' };
 
+/** 동 번호 오름차순 — 번호를 아직 안 넣은 동은 맨 뒤 */
+function sortByBuildingNumber(list: BuildingDraft[]): BuildingDraft[] {
+  const key = (b: BuildingDraft): number => (/^\d+$/.test(b.number) ? Number(b.number) : Number.POSITIVE_INFINITY);
+  return [...list].sort((a, b) => key(a) - key(b));
+}
+
 interface DaumPostcodeResult {
   roadAddress: string;
   jibunAddress: string;
@@ -123,9 +129,11 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
   // ───── Step 2 ─────
   const addBuilding = (): void => {
     // 이전 동 번호 + 1, 같은 라인을 미리 채워 둔다 (세대수는 동마다 달라 비워 둔다)
-    const last = buildings[buildings.length - 1];
+    // 번호순으로 정리한 뒤 맨 뒤(가장 큰 번호) 다음 번호로 추가한다
+    const sorted = sortByBuildingNumber(buildings);
+    const last = sorted[sorted.length - 1];
     const nextNumber = last && /^\d+$/.test(last.number) ? String(Number(last.number) + 1) : '';
-    setBuildings([...buildings, { id: newId(), number: nextNumber, householdsCount: 0, lines: last?.lines ?? '' }]);
+    setBuildings([...sorted, { id: newId(), number: nextNumber, householdsCount: 0, lines: last?.lines ?? '' }]);
   };
 
   const removeBuilding = (id: string): void => {
@@ -206,11 +214,11 @@ export function useNewApartmentPage(): UseNewApartmentPageReturn {
       householdsCount: bulkDraft.householdsCount,
       lines: bulkDraft.lines,
     }));
-    setBuildings([...buildings, ...added]);
+    setBuildings(sortByBuildingNumber([...buildings, ...added]));
     toast.success(`${added.length}개 동을 추가했습니다.`);
-    setBulkDraft(EMPTY_BULK);
+    // 이어서 추가할 수 있게 패널은 열어 두고, 다음 시작 동·세대수·라인은 미리 채워 둔다
+    setBulkDraft({ ...EMPTY_BULK, from: String(Number(bulkDraft.to) + 1), householdsCount: bulkDraft.householdsCount, lines: bulkDraft.lines });
     setBulkTried(false);
-    setBulkOpened(false);
   };
 
   // ───── 등록 ─────

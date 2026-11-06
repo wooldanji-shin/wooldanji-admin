@@ -58,6 +58,10 @@ interface Apartment {
   totalOpenDoorCount: number;
   basicAdCount: number;
   premiumAdCount: number;
+  /** 진행 중이면서 '팝업 우선' 체크된 기본광고 수 */
+  popupPriorityAdCount: number;
+  /** 진행 중 단독팝업 수 */
+  soloPopupCount: number;
   lineRanges: { id: string; line: number[] }[];
   createdAt: string;
   createdBy: string | null;
@@ -177,10 +181,15 @@ export default function ApartmentsPage() {
       const { data: adCounts } = await supabase
         .rpc('get_apartment_running_ad_counts');
 
-      const adCountMap = new Map<string, { basic: number; premium: number }>(
-        (adCounts || []).map((r: { apartment_id: string; basic_running_count: number; premium_running_count: number }) => [
+      const adCountMap = new Map<string, { basic: number; premium: number; popupPriority: number; soloPopup: number }>(
+        (adCounts || []).map((r: { apartment_id: string; basic_running_count: number; premium_running_count: number; popup_priority_count?: number; solo_popup_running_count?: number }) => [
           r.apartment_id,
-          { basic: r.basic_running_count, premium: r.premium_running_count },
+          {
+            basic: r.basic_running_count,
+            premium: r.premium_running_count,
+            popupPriority: Number(r.popup_priority_count ?? 0),
+            soloPopup: Number(r.solo_popup_running_count ?? 0),
+          },
         ])
       );
 
@@ -242,7 +251,7 @@ export default function ApartmentsPage() {
         const totalOpenDoorCount = openDoorCountMap.get(apt.id) ?? 0;
 
         // 광고 수 (RPC 집계 결과에서 조회)
-        const adCount = adCountMap.get(apt.id) ?? { basic: 0, premium: 0 };
+        const adCount = adCountMap.get(apt.id) ?? { basic: 0, premium: 0, popupPriority: 0, soloPopup: 0 };
 
         return {
           id: apt.id,
@@ -255,6 +264,8 @@ export default function ApartmentsPage() {
           totalOpenDoorCount,
           basicAdCount: adCount.basic,
           premiumAdCount: adCount.premium,
+          popupPriorityAdCount: adCount.popupPriority,
+          soloPopupCount: adCount.soloPopup,
           lineRanges,
           createdAt: new Date(apt.createdAt).toLocaleDateString('ko-KR'),
           createdBy: (apt as any).createdBy || null,
@@ -502,7 +513,10 @@ export default function ApartmentsPage() {
                   기본광고
                 </Table.Th>
                 <Table.Th ta="center">
-                  프리미엄
+                  팝업우선
+                </Table.Th>
+                <Table.Th ta="center">
+                  단독팝업
                 </Table.Th>
                 <Table.Th ta="center">
                   광고
@@ -522,13 +536,13 @@ export default function ApartmentsPage() {
             <Table.Tbody>
               {loading ? (
                 <Table.Tr>
-                  <Table.Td colSpan={hideOpenDoorColumn ? 12 : 13} p={0}>
-                    <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 11 : 12} showHeader={false} />
+                  <Table.Td colSpan={hideOpenDoorColumn ? 13 : 14} p={0}>
+                    <TableSkeleton rows={6} columns={hideOpenDoorColumn ? 12 : 13} showHeader={false} />
                   </Table.Td>
                 </Table.Tr>
               ) : filteredApartments.length === 0 ? (
                 <Table.Tr>
-                  <Table.Td colSpan={hideOpenDoorColumn ? 12 : 13} p={0}>
+                  <Table.Td colSpan={hideOpenDoorColumn ? 13 : 14} p={0}>
                     <EmptyState
                       icon={Building2}
                       title={searchTerm ? '검색 결과가 없습니다' : '등록된 아파트가 없습니다'}
@@ -591,7 +605,12 @@ export default function ApartmentsPage() {
                       )}
                     </Table.Td>
                     <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {apartment.premiumAdCount > 0 ? apartment.premiumAdCount : (
+                      {apartment.popupPriorityAdCount > 0 ? apartment.popupPriorityAdCount : (
+                        <Text span size="sm" c="dimmed">-</Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td ta="center" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {apartment.soloPopupCount > 0 ? apartment.soloPopupCount : (
                         <Text span size="sm" c="dimmed">-</Text>
                       )}
                     </Table.Td>

@@ -25,6 +25,14 @@ export type PaymentStatus = 'unpaid' | 'paid';
 export type StatusFilter = 'all' | 'free_running' | 'paid_running' | 'unpaid' | 'pending' | 'modification' | 'ended' | 'rejected' | 'hidden';
 /** 비즈콜(안심번호) 부여 여부 필터 */
 export type BizCallFilter = 'all' | 'used' | 'unused';
+/** 팝업 우선(showInDoorPopup) 지정 여부 필터 */
+export type PopupPriorityFilter = 'all' | 'on' | 'off';
+/** 목록에서 켜고 끌 수 있는 통계 컬럼 */
+export type MetricColumnKey = 'impressions' | 'clicks' | 'phoneClicks' | 'couponUsage' | 'dialogClicks';
+
+/** 통계 컬럼 표시 설정 저장 키 (브라우저별) */
+const METRIC_COLUMNS_STORAGE_KEY = 'adApplicationsVisibleMetricColumns';
+const METRIC_COLUMN_KEYS: MetricColumnKey[] = ['impressions', 'clicks', 'phoneClicks', 'couponUsage', 'dialogClicks'];
 
 export interface AdCategoryWithSubs {
   id: string;
@@ -87,6 +95,10 @@ export interface AdApplication {
   totalImpressions: number;
   totalClicks: number;
   totalPhoneClicks: number;
+  /** 문열림 팝업 클릭수 */
+  totalDialogClicks: number;
+  /** 이 광고 파트너의 쿠폰 사용완료 수 (쿠폰은 파트너 단위) */
+  couponUsageCount: number;
   /** 다음 정기결제일 — 현재 결제 주기가 끝나는 날 */
   nextBillingDate: string | null;
   /** 무료체험 종료일 */
@@ -154,6 +166,12 @@ export interface UseApplicationsPageReturn {
   bizCallFilter: BizCallFilter;
   setBizCallFilter: (v: BizCallFilter) => void;
   bizCallCounts: Record<BizCallFilter, number>;
+  popupPriorityFilter: PopupPriorityFilter;
+  setPopupPriorityFilter: (v: PopupPriorityFilter) => void;
+  popupPriorityCounts: Record<PopupPriorityFilter, number>;
+  /** 표에 표시할 통계 컬럼 (기본: 모두 숨김) */
+  visibleMetricColumns: MetricColumnKey[];
+  setVisibleMetricColumns: (keys: MetricColumnKey[]) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   apartmentFilter: string | null;
@@ -229,6 +247,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const [categoryFilter, _setCategoryFilter] = useState<string | null>(null);
   const [subCategoryFilter, _setSubCategoryFilter] = useState<string | null>(null);
   const [bizCallFilter, _setBizCallFilter] = useState<BizCallFilter>('all');
+  const [popupPriorityFilter, _setPopupPriorityFilter] = useState<PopupPriorityFilter>('all');
+  const [visibleMetricColumns, _setVisibleMetricColumns] = useState<MetricColumnKey[]>([]);
   const [searchTerm, _setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm);
   const [apartmentFilter, _setApartmentFilter] = useState<string | null>(null);
@@ -257,6 +277,28 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
   const setCategoryFilter = useCallback((v: string | null) => { _setCategoryFilter(v); setPage(1); }, [setPage]);
   const setSubCategoryFilter = useCallback((v: string | null) => { _setSubCategoryFilter(v); setPage(1); }, [setPage]);
   const setBizCallFilter = useCallback((v: BizCallFilter) => { _setBizCallFilter(v); setPage(1); }, [setPage]);
+  const setPopupPriorityFilter = useCallback((v: PopupPriorityFilter) => { _setPopupPriorityFilter(v); setPage(1); }, [setPage]);
+
+  // 통계 컬럼 표시 설정은 브라우저에 기억해 둔다 (저장소를 못 쓰면 기본값 = 모두 숨김)
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(METRIC_COLUMNS_STORAGE_KEY) ?? '[]');
+      if (Array.isArray(saved)) {
+        _setVisibleMetricColumns(saved.filter((k): k is MetricColumnKey => METRIC_COLUMN_KEYS.includes(k)));
+      }
+    } catch {
+      // 무시 — 기본값 유지
+    }
+  }, []);
+
+  const setVisibleMetricColumns = useCallback((keys: MetricColumnKey[]) => {
+    _setVisibleMetricColumns(keys);
+    try {
+      localStorage.setItem(METRIC_COLUMNS_STORAGE_KEY, JSON.stringify(keys));
+    } catch {
+      // 무시 — 이번 화면에서만 적용
+    }
+  }, []);
   const setSearchTerm = useCallback((v: string) => { _setSearchTerm(v); setPage(1); }, [setPage]);
   const setApartmentFilter = useCallback((v: string | null) => { _setApartmentFilter(v); setPage(1); }, [setPage]);
   const setSalesRepFilter = useCallback((v: string | null) => { _setSalesRepFilter(v); setPage(1); }, [setPage]);
@@ -380,10 +422,13 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       if (error) throw error;
 
       const adIds = (data ?? []).map((r: any) => r.id as string);
+      const partnerIds = [
+        ...new Set((data ?? []).map((r: any) => r.partner_users?.id as string | undefined).filter(Boolean)),
+      ] as string[];
 
       // 통계와 구독은 서로 기다릴 필요가 없어 동시에 요청한다
       // 일별 행을 받아 합산하면 API 행 제한에 잘려 일부 광고 통계가 비므로 DB에서 합산한다
-      const [{ data: analyticsRows }, { data: subscriptionRows }] = await Promise.all([
+      const [{ data: analyticsRows }, { data: subscriptionRows }, { data: couponUsageRows }] = await Promise.all([
         adIds.length > 0
           ? (supabase as any).rpc('get_ad_analytics_totals', { p_ad_ids: adIds })
           : Promise.resolve({ data: [] }),
@@ -395,7 +440,14 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
               .in('subscriptionStatus', ['active', 'grace_period', 'cancel_pending'])
               .order('createdAt', { ascending: false })
           : Promise.resolve({ data: [] }),
+        partnerIds.length > 0
+          ? (supabase as any).rpc('get_partner_coupon_usage_counts', { p_partner_ids: partnerIds })
+          : Promise.resolve({ data: [] }),
       ]);
+
+      const couponUsageMap = new Map<string, number>(
+        ((couponUsageRows ?? []) as any[]).map((r) => [r.partnerUserId as string, Number(r.usageCount) || 0])
+      );
 
       // 광고당 가장 최근 구독 1건만 남긴다 (createdAt 내림차순이라 먼저 온 것이 최신)
       const subscriptionMap = (subscriptionRows ?? []).reduce<
@@ -415,7 +467,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         return acc;
       }, {});
 
-      const analyticsMap: Record<string, { impressions: number; clicks: number; phoneClicks: number }> =
+      const analyticsMap: Record<string, { impressions: number; clicks: number; phoneClicks: number; dialogClicks: number }> =
         Object.fromEntries(
           ((analyticsRows ?? []) as any[]).map((r) => [
             r.baseAdId as string,
@@ -423,6 +475,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
               impressions: r.homeImpressionCount + r.impressionCount,
               clicks: r.clickCount,
               phoneClicks: r.phoneClickCount,
+              dialogClicks: r.dialogClickCount ?? 0,
             },
           ])
         );
@@ -460,6 +513,8 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
         totalImpressions: analyticsMap[row.id]?.impressions ?? 0,
         totalClicks: analyticsMap[row.id]?.clicks ?? 0,
         totalPhoneClicks: analyticsMap[row.id]?.phoneClicks ?? 0,
+        totalDialogClicks: analyticsMap[row.id]?.dialogClicks ?? 0,
+        couponUsageCount: row.partner_users?.id ? couponUsageMap.get(row.partner_users.id) ?? 0 : 0,
         nextBillingDate: subscriptionMap[row.id]?.nextBillingDate ?? null,
         freeEndDate: subscriptionMap[row.id]?.freeEndDate ?? null,
         subscriptionStatus: subscriptionMap[row.id]?.subscriptionStatus ?? null,
@@ -557,6 +612,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     return { all: statusFiltered.length, used, unused: statusFiltered.length - used };
   }, [statusFiltered]);
 
+  const popupPriorityCounts = useMemo<Record<PopupPriorityFilter, number>>(() => {
+    const on = statusFiltered.filter((a) => a.showInDoorPopup).length;
+    return { all: statusFiltered.length, on, off: statusFiltered.length - on };
+  }, [statusFiltered]);
+
   // 전체 클라이언트 필터 (상태 → 카테고리 → 서브카테고리 → 비즈콜 → 검색)
   const filtered = useMemo(() => {
     let result = statusFiltered;
@@ -579,6 +639,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
       result = result.filter((a) => hasBizCall(a) === want);
     }
 
+    if (popupPriorityFilter !== 'all') {
+      const want = popupPriorityFilter === 'on';
+      result = result.filter((a) => a.showInDoorPopup === want);
+    }
+
     if (debouncedSearchTerm.trim()) {
       const term = debouncedSearchTerm.trim().toLowerCase();
       result = result.filter(
@@ -590,7 +655,7 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     }
 
     return result;
-  }, [statusFiltered, categoryFilter, subCategoryFilter, bizCallFilter, debouncedSearchTerm, categories]);
+  }, [statusFiltered, categoryFilter, subCategoryFilter, bizCallFilter, popupPriorityFilter, debouncedSearchTerm, categories]);
 
 
   // 필터를 바꾸면 같이 바뀌는 월 광고료 합계
@@ -795,6 +860,11 @@ export function useApplicationsPage(): UseApplicationsPageReturn {
     bizCallFilter,
     setBizCallFilter,
     bizCallCounts,
+    popupPriorityFilter,
+    setPopupPriorityFilter,
+    popupPriorityCounts,
+    visibleMetricColumns,
+    setVisibleMetricColumns,
     searchTerm,
     setSearchTerm,
     apartmentFilter,

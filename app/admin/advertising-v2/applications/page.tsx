@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertCircle, Check, Download, Inbox, Plus, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertCircle, Check, Columns3, Download, Inbox, Plus, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
@@ -46,6 +46,8 @@ import {
   type ApartmentSummary,
   type StatusFilter,
   type BizCallFilter,
+  type MetricColumnKey,
+  type PopupPriorityFilter,
 } from './useApplicationsPage';
 
 interface ApartmentTooltipProps {
@@ -301,6 +303,24 @@ const BIZ_CALL_FILTERS: { label: string; value: BizCallFilter }[] = [
   { label: '미사용', value: 'unused' },
 ];
 
+const POPUP_PRIORITY_FILTERS: { label: string; value: PopupPriorityFilter }[] = [
+  { label: '전체', value: 'all' },
+  { label: '팝업 우선', value: 'on' },
+  { label: '미지정', value: 'off' },
+];
+
+/** 컬럼 설정에서 켜고 끄는 통계 컬럼 (표시 순서) */
+const METRIC_COLUMNS: { key: MetricColumnKey; label: string; value: (ad: AdApplication) => number }[] = [
+  { key: 'impressions', label: '노출수', value: (ad) => ad.totalImpressions },
+  { key: 'clicks', label: '클릭수', value: (ad) => ad.totalClicks },
+  { key: 'phoneClicks', label: '전화클릭수', value: (ad) => ad.totalPhoneClicks },
+  { key: 'couponUsage', label: '사용수', value: (ad) => ad.couponUsageCount },
+  { key: 'dialogClicks', label: '팝업클릭수', value: (ad) => ad.totalDialogClicks },
+];
+
+/** 통계 컬럼을 제외한 기본 컬럼 수 (스켈레톤용) */
+const BASE_COLUMN_COUNT = 12;
+
 export default function AdApplicationsPage(): React.ReactElement {
   const {
     loading,
@@ -313,6 +333,11 @@ export default function AdApplicationsPage(): React.ReactElement {
     bizCallFilter,
     setBizCallFilter,
     bizCallCounts,
+    popupPriorityFilter,
+    setPopupPriorityFilter,
+    popupPriorityCounts,
+    visibleMetricColumns,
+    setVisibleMetricColumns,
     searchTerm,
     setSearchTerm,
     apartmentFilter,
@@ -384,6 +409,7 @@ export default function AdApplicationsPage(): React.ReactElement {
     : 0;
   const selectedAdMonthlyAmount = selectedAdTotalHouseholds * pricePerHousehold;
   const approveCategoryData = allCategoriesWithSubs.find((c) => c.id === approveCategory);
+  const shownMetricColumns = METRIC_COLUMNS.filter((c) => visibleMetricColumns.includes(c.key));
 
   return (
     <>
@@ -470,31 +496,74 @@ export default function AdApplicationsPage(): React.ReactElement {
                     onChange={setBizCallFilter}
                   />
                 </FilterRow>
+
+                {/* 문열림 팝업 우선 노출 지정 여부 */}
+                <FilterRow label="팝업 우선">
+                  <FilterChips
+                    options={POPUP_PRIORITY_FILTERS.map((f) => ({
+                      value: f.value,
+                      label: f.label,
+                      count: popupPriorityCounts[f.value],
+                    }))}
+                    value={popupPriorityFilter}
+                    onChange={setPopupPriorityFilter}
+                  />
+                </FilterRow>
               </Stack>
             }
             summary={
-              !loading && filteredCount > 0 ? (
-                <Group gap="lg">
-                  <Text size="sm" c="dimmed">
-                    총 <Text span fw={700} c="var(--mantine-color-text)">{filteredCount.toLocaleString()}</Text>건
-                  </Text>
-                  <Group gap={6} wrap="nowrap">
+              <Group justify="space-between" gap="sm">
+                {!loading && filteredCount > 0 ? (
+                  <Group gap="lg">
                     <Text size="sm" c="dimmed">
-                      월 광고료 합계
+                      총 <Text span fw={700} c="var(--mantine-color-text)">{filteredCount.toLocaleString()}</Text>건
                     </Text>
-                    <Text fw={700} c="blue" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {totalMonthlyAmount.toLocaleString()}원
-                    </Text>
+                    <Group gap={6} wrap="nowrap">
+                      <Text size="sm" c="dimmed">
+                        월 광고료 합계
+                      </Text>
+                      <Text fw={700} c="blue" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {totalMonthlyAmount.toLocaleString()}원
+                      </Text>
+                    </Group>
                   </Group>
-                </Group>
-              ) : undefined
+                ) : (
+                  <span />
+                )}
+                {/* 통계 컬럼 표시 설정 — 기본은 모두 숨김, 체크한 컬럼만 표에 나온다 */}
+                <Popover position="bottom-end" shadow="md" withinPortal>
+                  <Popover.Target>
+                    <Button variant="default" size="xs" leftSection={<Columns3 size={16} />}>
+                      컬럼 설정
+                      {visibleMetricColumns.length > 0 && ` (${visibleMetricColumns.length})`}
+                    </Button>
+                  </Popover.Target>
+                  <Popover.Dropdown p="md">
+                    <Stack gap="sm">
+                      <Text size="sm" fw={600}>
+                        표시할 컬럼
+                      </Text>
+                      <Checkbox.Group
+                        value={visibleMetricColumns}
+                        onChange={(v) => setVisibleMetricColumns(v as MetricColumnKey[])}
+                      >
+                        <Stack gap="xs">
+                          {METRIC_COLUMNS.map((c) => (
+                            <Checkbox key={c.key} value={c.key} label={c.label} />
+                          ))}
+                        </Stack>
+                      </Checkbox.Group>
+                    </Stack>
+                  </Popover.Dropdown>
+                </Popover>
+              </Group>
             }
             pagination={
               <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
             }
           >
             {loading ? (
-              <TableSkeleton rows={6} columns={9} />
+              <TableSkeleton rows={6} columns={BASE_COLUMN_COUNT + shownMetricColumns.length} />
             ) : paginatedApplications.length === 0 ? (
               <EmptyState
                 icon={Inbox}
@@ -506,19 +575,16 @@ export default function AdApplicationsPage(): React.ReactElement {
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>상호명</Table.Th>
-                    <Table.Th ta="center">구분</Table.Th>
                     <Table.Th>광고 제목</Table.Th>
                     <Table.Th ta="center">신청 아파트</Table.Th>
                     <Table.Th ta="center">광고 상태</Table.Th>
-                    <Table.Th ta="center">결제 상태</Table.Th>
                     <Table.Th ta="right">금액(월)</Table.Th>
                     <Table.Th>광고 시작일</Table.Th>
                     <Table.Th>광고 종료일</Table.Th>
-                    <Table.Th>무료체험 종료일</Table.Th>
                     <Table.Th>영업 담당자</Table.Th>
-                    <Table.Th ta="center">노출수</Table.Th>
-                    <Table.Th ta="center">클릭수</Table.Th>
-                    <Table.Th ta="center">전화클릭수</Table.Th>
+                    {shownMetricColumns.map((c) => (
+                      <Table.Th key={c.key} ta="center">{c.label}</Table.Th>
+                    ))}
                     <Table.Th ta="center">
                       <Tooltip
                         multiline
@@ -587,19 +653,6 @@ export default function AdApplicationsPage(): React.ReactElement {
                       <Table.Td fw={500}>
                         {app.partner_users?.businessName ?? '-'}
                       </Table.Td>
-                      <Table.Td ta="center">
-                        {app.subscriptionStatus === 'cancel_pending' ? (
-                          <StatusBadge variant="error" size="sm" withDot={false}>
-                            중단예정
-                          </StatusBadge>
-                        ) : app.isFirstAdApplication ? (
-                          <StatusBadge variant="info" size="sm" withDot={false}>
-                            첫광고
-                          </StatusBadge>
-                        ) : (
-                          <Text span c="dimmed">-</Text>
-                        )}
-                      </Table.Td>
                       <Table.Td maw={240}>
                         {app.title ? (
                           <Text size="sm" truncate>
@@ -641,9 +694,6 @@ export default function AdApplicationsPage(): React.ReactElement {
                           )}
                         </Stack>
                       </Table.Td>
-                      <Table.Td ta="center">
-                        <StatusBadge.Payment status={app.paymentStatus} />
-                      </Table.Td>
                       <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {(() => {
                           const totalHouseholds = app.apartments.reduce((s, a) => s + a.totalHouseholds, 0);
@@ -684,22 +734,16 @@ export default function AdApplicationsPage(): React.ReactElement {
                           : '-'}
                       </Table.Td>
                       <Table.Td c="dimmed">
-                        {app.freeEndDate
-                          ? new Date(app.freeEndDate).toLocaleDateString('ko-KR')
-                          : '-'}
-                      </Table.Td>
-                      <Table.Td c="dimmed">
                         {app.salesRepName ?? '-'}
                       </Table.Td>
-                      <Table.Td ta="center" fz="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {app.totalImpressions > 0 ? app.totalImpressions.toLocaleString() : '-'}
-                      </Table.Td>
-                      <Table.Td ta="center" fz="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {app.totalClicks > 0 ? app.totalClicks.toLocaleString() : '-'}
-                      </Table.Td>
-                      <Table.Td ta="center" fz="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {app.totalPhoneClicks > 0 ? app.totalPhoneClicks.toLocaleString() : '-'}
-                      </Table.Td>
+                      {shownMetricColumns.map((c) => {
+                        const v = c.value(app);
+                        return (
+                          <Table.Td key={c.key} ta="center" fz="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {v > 0 ? v.toLocaleString() : '-'}
+                          </Table.Td>
+                        );
+                      })}
                       {/* 행 클릭이 상세로 넘어가므로 체크박스 조작은 여기서 막는다 */}
                       <Table.Td
                         ta="center"

@@ -7,6 +7,7 @@ import {
   PageHeaderTitle,
   PageShell,
 } from '@/components/page-shell';
+import { ApartmentCell } from '@/components/apartment-cell';
 import { DataTableShell } from '@/components/data-table-shell';
 import { DataPagination } from '@/components/data-pagination';
 import { StatusBadge } from '@/components/status-badge';
@@ -33,18 +34,6 @@ const PAGE_SIZE = 20;
 
 function toDateText(value: string): string {
   return new Date(value).toLocaleDateString('ko-KR');
-}
-
-/** 대상 아파트 열 — 목록이 길어도 한 줄로, 나머지는 title 속성으로 hover 확인 */
-function ApartmentCell({ names }: { names: string[] }): React.ReactElement {
-  if (names.length === 0) return <Text span size="sm" c="dimmed">-</Text>;
-  const [first, ...rest] = names;
-  return (
-    <Text span size="sm" title={names.join(', ')}>
-      {first}
-      {rest.length > 0 && ` 외 ${rest.length}곳`}
-    </Text>
-  );
 }
 
 function ScheduleCell({ event }: { event: PartnerEventListItem }): React.ReactElement {

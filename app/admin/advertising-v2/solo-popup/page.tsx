@@ -8,6 +8,8 @@ import { FilterChips, FilterRow } from '@/components/filter-chips';
 import { StatusBadge } from '@/components/status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { TableSkeleton } from '@/components/skeletons';
+import { ApartmentCombobox } from '@/components/apartment-combobox';
+import { ApartmentCell } from '@/components/apartment-cell';
 import { Button, Checkbox, Divider, Group, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { periodLabel } from '@/lib/ads/solo-popup';
 import { useSoloPopupPage, type SoloStatusFilter } from './useSoloPopupPage';
@@ -50,10 +52,16 @@ export default function SoloPopupListPage(): React.ReactElement {
               <Group gap="xs">
                 <TextInput
                   w={260}
-                  placeholder="업체명·광고 제목 검색"
+                  placeholder="상호명·광고·팝업 제목 검색"
                   value={p.searchTerm}
                   onChange={(e) => p.setSearchTerm(e.target.value)}
                   leftSection={<Search size={16} />}
+                />
+                <ApartmentCombobox
+                  apartments={p.allApartments}
+                  value={p.apartmentFilter}
+                  onChange={p.setApartmentFilter}
+                  placeholder="아파트 필터"
                 />
               </Group>
 
@@ -83,7 +91,7 @@ export default function SoloPopupListPage(): React.ReactElement {
           }
         >
           {p.loading ? (
-            <TableSkeleton rows={6} columns={8} />
+            <TableSkeleton rows={6} columns={15} />
           ) : p.pageRows.length === 0 ? (
             <EmptyState icon={DoorOpen} title="해당하는 단독 팝업 광고가 없습니다" description="필터를 변경해 보세요." />
           ) : (
@@ -92,6 +100,7 @@ export default function SoloPopupListPage(): React.ReactElement {
                 <Table.Tr>
                   <Table.Th>업체명</Table.Th>
                   <Table.Th>팝업 제목</Table.Th>
+                  <Table.Th>아파트</Table.Th>
                   <Table.Th>기간</Table.Th>
                   <Table.Th>금액</Table.Th>
                   <Table.Th>상태</Table.Th>
@@ -139,6 +148,9 @@ export default function SoloPopupListPage(): React.ReactElement {
                     <Table.Tr key={ad.id} style={{ cursor: 'pointer' }} onClick={() => p.handleRowClick(ad.id)}>
                       <Table.Td fw={500}>{ad.partnerBusinessName}</Table.Td>
                       <Table.Td>{ad.title}</Table.Td>
+                      <Table.Td>
+                        <ApartmentCell names={ad.apartments.map((a) => a.apartmentName)} />
+                      </Table.Td>
                       <Table.Td>{periodLabel(ad.periodUnit, ad.periodCount)}</Table.Td>
                       <Table.Td style={{ fontVariantNumeric: 'tabular-nums' }}>
                         <Group gap={6}>

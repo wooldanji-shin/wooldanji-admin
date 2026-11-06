@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { format } from 'date-fns';
-import { Tag, Trash2 } from 'lucide-react';
+import { Search, Tag, Trash2 } from 'lucide-react';
 import {
   PageContent,
   PageHeader,
@@ -11,10 +11,19 @@ import {
 } from '@/components/page-shell';
 import { DataTableShell } from '@/components/data-table-shell';
 import { DataPagination } from '@/components/data-pagination';
+import { FilterChips, FilterRow } from '@/components/filter-chips';
+import { ApartmentCombobox } from '@/components/apartment-combobox';
 import { EmptyState } from '@/components/empty-state';
 import { PageSkeleton, TableSkeleton } from '@/components/skeletons';
-import { ActionIcon, Badge, Table, Text } from '@mantine/core';
-import { useCouponsPage } from './useCouponsPage';
+import { ActionIcon, Badge, Divider, Group, Stack, Table, Text, TextInput } from '@mantine/core';
+import { useCouponsPage, type CouponStatusFilter } from './useCouponsPage';
+
+const STATUS_FILTERS: { value: CouponStatusFilter; label: string }[] = [
+  { value: 'all', label: '전체' },
+  { value: 'active', label: '활성' },
+  { value: 'expired', label: '만료' },
+  { value: 'inactive', label: '비활성' },
+];
 
 function CouponsContent(): React.ReactElement {
   const {
@@ -24,7 +33,16 @@ function CouponsContent(): React.ReactElement {
     page,
     pageSize,
     totalCount,
+    allCount,
     setPage,
+    searchTerm,
+    setSearchTerm,
+    apartmentFilter,
+    setApartmentFilter,
+    allApartments,
+    statusFilter,
+    setStatusFilter,
+    statusCounts,
     deleteCoupon,
   } = useCouponsPage();
 
@@ -42,7 +60,7 @@ function CouponsContent(): React.ReactElement {
           <DataTableShell>
             <TableSkeleton rows={8} columns={12} />
           </DataTableShell>
-        ) : totalCount === 0 ? (
+        ) : allCount === 0 ? (
           <EmptyState
             icon={Tag}
             title="쿠폰 없음"
@@ -51,13 +69,50 @@ function CouponsContent(): React.ReactElement {
         ) : (
           <>
             <DataTableShell
+              toolbar={
+                <Stack gap="md">
+                  <Group gap="xs">
+                    <TextInput
+                      w={260}
+                      placeholder="상호명·광고·쿠폰 제목 검색"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      leftSection={<Search size={16} />}
+                    />
+                    {/* 쿠폰은 파트너 단위라, 그 파트너가 광고한 적 있는 아파트(종료 포함) 기준 */}
+                    <ApartmentCombobox
+                      apartments={allApartments}
+                      value={apartmentFilter}
+                      onChange={setApartmentFilter}
+                      placeholder="아파트 필터"
+                    />
+                  </Group>
+
+                  <Divider />
+
+                  <FilterRow label="상태">
+                    <FilterChips
+                      options={STATUS_FILTERS.map((f) => ({
+                        value: f.value,
+                        label: f.label,
+                        count: statusCounts[f.value],
+                      }))}
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                    />
+                  </FilterRow>
+                </Stack>
+              }
               summary={
                 <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
                   전체 {totalCount}건
                 </Text>
               }
             >
-              {/* 페이지 이동 중에는 테이블을 유지한 채 흐리게 표시해 깜빡임을 줄임 */}
+              {totalCount === 0 ? (
+                <EmptyState icon={Tag} title="해당하는 쿠폰이 없습니다" description="필터를 변경해 보세요." />
+              ) : (
+              /* 재조회 중에는 테이블을 유지한 채 흐리게 표시해 깜빡임을 줄임 */
               <Table
                 style={{ transition: 'opacity 150ms', opacity: loading ? 0.5 : 1 }}
                 highlightOnHover
@@ -170,6 +225,7 @@ function CouponsContent(): React.ReactElement {
                   })}
                 </Table.Tbody>
               </Table>
+              )}
             </DataTableShell>
 
             <DataPagination
