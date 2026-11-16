@@ -27,10 +27,19 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { CONTENT_TYPE_LABEL, periodLabel } from '@/lib/ads/solo-popup';
+import { confirmModal } from '@/components/confirm-modal';
+import { CONTENT_TYPE_LABEL, periodLabel, periodToWeeks } from '@/lib/ads/solo-popup';
 import { useSoloPopupDetailPage, type SoloPopupDetail } from './useSoloPopupDetailPage';
+import { RestartPeriodFields, type RestartPeriod } from './RestartPeriodFields';
 
 const LIST_PATH = '/admin/advertising-v2/solo-popup';
+/** 재시작 창 내용 영역 최소 높이(px) — 기간 선택 영역이 답답하지 않게, 남는 공간은 버튼 위에 생긴다 */
+const RESTART_DIALOG_MIN_HEIGHT = 240;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 확인 안내용 예상 종료일 (실제 종료 시각은 서버가 KST 종료일 23:59:59 로 정한다) */
+const expectedEndDate = (weeks: number): string =>
+  new Date(Date.now() + weeks * 7 * DAY_MS).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 const formatDateTime = (iso: string | null): string => (iso ? new Date(iso).toLocaleString('ko-KR') : '-');
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
@@ -102,7 +111,7 @@ function ContentCard({ title, c, buttonLabel }: { title: string; buttonLabel?: s
 export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: string }> }): React.ReactElement {
   const page = useSoloPopupDetailPage(params);
   const router = useRouter();
-  const [dialog, setDialog] = useState<'approve' | 'reject' | 'approveMod' | 'rejectMod' | 'stop' | 'delete' | null>(null);
+  const [dialog, setDialog] = useState<'approve' | 'reject' | 'approveMod' | 'rejectMod' | 'stop' | 'restart' | 'delete' | null>(null);
   const [discountRate, setDiscountRate] = useState(0);
   const [startImmediately, setStartImmediately] = useState(false);
   const [memo, setMemo] = useState<string | null>(null);
@@ -110,6 +119,7 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
   const [buttonLabel, setButtonLabel] = useState<string | null>(null);
   const [salesRepId, setSalesRepId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [restartPeriod, setRestartPeriod] = useState<RestartPeriod | null>(null);
 
   if (page.loading) {
     return <DetailSkeleton sections={5} />;
@@ -144,7 +154,8 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
   const hasDiscount = (detail.approvedDiscountRate ?? 0) > 0;
   // 체크박스는 할인율 100%일 때만 보이므로, 숨겨진 뒤 남은 값이 전송되지 않게 한다
   const canStartImmediately = discountRate === 100;
-  const closeDialog = () => { setDialog(null); setReason(''); setStartImmediately(false); };
+  const restartPeriodValue = restartPeriod ?? { unit: detail.periodUnit, count: detail.periodCount };
+  const closeDialog = () => { setDialog(null); setReason(''); setStartImmediately(false); setRestartPeriod(null); };
 
   const submitApprove = () => {
     const start = canStartImmediately && startImmediately;
@@ -153,6 +164,17 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
       { discountRate, adminMemo: memoValue, salesRepId, startImmediately: start },
       start ? '승인하고 바로 시작했습니다.' : '승인했습니다.'
     );
+  };
+
+  const submitRestart = async () => {
+    const { unit, count } = restartPeriodValue;
+    const confirmed = await confirmModal({
+      title: '정말 다시 시작할까요?',
+      message: `${periodLabel(unit, count)} 동안 결제 없이(0원) 바로 게재됩니다.\n예상 종료일: ${expectedEndDate(periodToWeeks(unit, count))}\n파트너에게 시작 알림이 전달됩니다.`,
+      confirmLabel: '시작',
+    });
+    if (!confirmed) return false;
+    return page.runAction('restart', { periodUnit: unit, periodCount: count }, '광고를 다시 시작했습니다.');
   };
 
   const submitDialog = async () => {
@@ -167,7 +189,9 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
             ? await page.runAction('reject-modification', { reason }, '수정을 거절했습니다.')
             : dialog === 'stop'
               ? await page.runAction('stop', {}, '광고를 중단했습니다.')
-              : await page.runAction('delete', {}, '삭제했습니다.');
+              : dialog === 'restart'
+                ? await submitRestart()
+                : await page.runAction('delete', {}, '삭제했습니다.');
     if (ok) closeDialog();
   };
 
@@ -326,6 +350,9 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
                   {detail.status === 'running' && (
                     <Button fullWidth variant="default" onClick={() => setDialog('stop')} disabled={processing}>중단</Button>
                   )}
+                  {detail.status === 'ended' && (
+                    <Button fullWidth onClick={() => setDialog('restart')} disabled={processing}>무료로 다시 시작</Button>
+                  )}
                   <Button fullWidth variant="light" color="red" onClick={() => setDialog('delete')} disabled={processing}>삭제</Button>
                 </Stack>
               </Stack>
@@ -347,14 +374,18 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
       <Modal
         opened={dialog !== null}
         onClose={closeDialog}
-        title={{ approve: '신청 승인', reject: '신청 거절', approveMod: '수정 승인', rejectMod: '수정 거절', stop: '광고 중단', delete: '광고 삭제', '': '' }[dialog ?? '']}
+        // 기간 선택 두 칸이 나란히 들어가도록 재시작 창만 넓힌다
+        size={dialog === 'restart' ? 'lg' : 'md'}
+        title={{ approve: '신청 승인', reject: '신청 거절', approveMod: '수정 승인', rejectMod: '수정 거절', stop: '광고 중단', restart: '무료로 다시 시작', delete: '광고 삭제', '': '' }[dialog ?? '']}
       >
-        <Stack gap="md">
+        <Stack gap="md" mih={dialog === 'restart' ? RESTART_DIALOG_MIN_HEIGHT : undefined}>
           <Text size="sm" c="dimmed">
             {dialog === 'delete'
               ? '삭제하면 노출이 즉시 멈추고 통계가 함께 삭제됩니다. 결제 이력은 보존되며 환불은 되지 않습니다.'
               : dialog === 'stop'
                 ? '지금 종료 처리됩니다. 노출이 즉시 멈추고 환불은 없으며 통계와 결제 이력은 남습니다. 파트너에게 종료 알림이 전달됩니다.'
+                : dialog === 'restart'
+                  ? '결제 없이(0원) 오늘부터 바로 게재를 시작합니다. 연결된 기본 광고가 게재 중이어야 하며, 파트너에게 시작 알림이 전달됩니다.'
                 : dialog === 'approve'
                   ? '할인율을 입력하면 결제 금액에 반영됩니다.'
                   : dialog === 'approveMod'
@@ -395,11 +426,12 @@ export default function SoloPopupDetailPage({ params }: { params: Promise<{ id: 
               </Stack>
             </Stack>
           )}
+          {dialog === 'restart' && <RestartPeriodFields value={restartPeriodValue} onChange={setRestartPeriod} />}
           {(dialog === 'reject' || dialog === 'rejectMod') && (
             <Textarea placeholder="거절 사유" value={reason} onChange={(e) => setReason(e.target.value)} />
           )}
         </Stack>
-        <Group justify="flex-end" mt="lg">
+        <Group justify="flex-end" mt="lg" gap={dialog === 'restart' ? 'xs' : undefined}>
           <Button variant="default" onClick={closeDialog}>취소</Button>
           <Button
             color={dialog === 'delete' ? 'red' : undefined}
